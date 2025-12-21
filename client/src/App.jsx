@@ -1,0 +1,1029 @@
+import React, { useState, useEffect } from 'react';
+import FlowTree from './FlowTree';
+import axios from 'axios';
+import './App.css';
+
+const API_URL = 'http://localhost:8000/api/goals';
+
+// Helper to get the allowed child type for a parent
+const getChildType = (parentType) => {
+  const map = {
+    'UltimateGoal': 'LongTermGoal',
+    'LongTermGoal': 'MidTermGoal',
+    'MidTermGoal': 'ShortTermGoal',
+    'ShortTermGoal': 'PracticeSession',
+    'PracticeSession': 'ImmediateGoal',
+    'ImmediateGoal': 'MicroGoal',
+    'MicroGoal': 'NanoGoal',
+    'NanoGoal': null // Nano goals can't have children
+  };
+  return map[parentType];
+};
+
+// Helper to get human-readable name for goal type
+const getTypeDisplayName = (type) => {
+  const names = {
+    'UltimateGoal': 'Ultimate Goal',
+    'LongTermGoal': 'Long Term Goal',
+    'MidTermGoal': 'Mid Term Goal',
+    'ShortTermGoal': 'Short Term Goal',
+    'PracticeSession': 'Practice Session',
+    'ImmediateGoal': 'Immediate Goal',
+    'MicroGoal': 'Micro Goal',
+    'NanoGoal': 'Nano Goal'
+  };
+  return names[type] || type;
+};
+
+// Helper to calculate goal age
+const calculateGoalAge = (createdAt) => {
+  if (!createdAt) return null;
+
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now - created;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffDays >= 365) {
+    // Years as a decimal when more than a single year
+    return `${(diffDays / 365).toFixed(1)}y`;
+  } else if (diffDays >= 30 || diffDays > 7) {
+    // Months as a decimal when more than a single month OR more than a single week
+    return `${(diffDays / 30.44).toFixed(1)}mo`;
+  } else if (diffDays > 6) {
+    // Weeks as a decimal when more than six days
+    return `${(diffDays / 7).toFixed(1)}w`;
+  } else {
+    // Days when less than a week
+    return `${Math.floor(diffDays)}d`;
+  }
+};
+
+// Helper to calculate metrics for a goal tree
+// Helper to calculate metrics for a goal tree
+const calculateMetrics = (goalNode, allPracticeSessions = []) => {
+  if (!goalNode) return { totalGoals: 0, completedGoals: 0, completionPercentage: 0, practiceSessionCount: 0 };
+
+  let totalGoals = 0;
+  let completedGoals = 0;
+  const goalIds = new Set();
+
+  const traverse = (node) => {
+    totalGoals++;
+    goalIds.add(node.id || node.attributes?.id);
+    if (node.attributes?.completed) {
+      completedGoals++;
+    }
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => traverse(child));
+    }
+  };
+
+  traverse(goalNode);
+
+  // Count unique practice sessions linked to any goal in this tree
+  let practiceSessionCount = 0;
+  if (allPracticeSessions.length > 0) {
+    practiceSessionCount = allPracticeSessions.filter(session => {
+      const parentIds = session.attributes?.parent_ids || [];
+      // Check if any parent of this session is in the current tree
+      return parentIds.some(pid => goalIds.has(pid));
+    }).length;
+  }
+
+  const completionPercentage = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+
+  return { totalGoals, completedGoals, completionPercentage, practiceSessionCount };
+};
+
+function App() {
+  const [roots, setRoots] = useState([]); // All top-level fractals
+  const [selectedRootId, setSelectedRootId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedParent, setSelectedParent] = useState(null);
+
+  // Goal details modal state
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [viewingGoal, setViewingGoal] = useState(null);
+
+  // Practice session modal state
+  const [showPracticeSessionModal, setShowPracticeSessionModal] = useState(false);
+  const [selectedShortTermGoals, setSelectedShortTermGoals] = useState([]);
+  const [immediateGoals, setImmediateGoals] = useState([{ name: '', description: '' }]);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const [goalType, setGoalType] = useState('UltimateGoal');
+
+  const fetchGoals = async () => {
+    try {
+      const res = await axios.get(API_URL);
+      const fetchedRoots = res.data;
+      setRoots(fetchedRoots);
+
+      // Select first root if none selected and roots exist
+      if (!selectedRootId && fetchedRoots.length > 0) {
+        setSelectedRootId(fetchedRoots[0].id);
+      } else if (fetchedRoots.length === 0) {
+        setSelectedRootId(null);
+      }
+      // If currently selected root is gone (deleted?), reset? (not handling delete yet)
+
+      setLoading(false);
+    } catch (err) {
+      console.error("Failed to fetch goals", err);
+      setLoading(false);
+    }
+  };
+
+  const [practiceSessions, setPracticeSessions] = useState([]);
+  const [selectedPracticeSession, setSelectedPracticeSession] = useState(null);
+
+  const fetchPracticeSessions = async () => {
+    try {
+      const res = await axios.get('http://localhost:8000/api/practice-sessions');
+      setPracticeSessions(res.data);
+    } catch (err) {
+      console.error("Failed to fetch practice sessions", err);
+    }
+  };
+
+  // Helper to find a goal by ID in the tree
+  const findGoalById = (node, targetId) => {
+    if (!node) return null;
+    if (node.id === targetId || node.attributes?.id === targetId) {
+      return node;
+    }
+    if (node.children && node.children.length > 0) {
+      for (const child of node.children) {
+        const found = findGoalById(child, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Helper to inject practice session into tree
+  const injectPracticeSessionIntoTree = (treeData, session) => {
+    if (!session || !treeData) return treeData;
+
+    // Deep clone the tree to avoid mutations
+    const clonedTree = JSON.parse(JSON.stringify(treeData));
+
+    const parentIds = session.attributes?.parent_ids || [];
+
+    if (parentIds.length === 0) return clonedTree;
+
+    // Add practice session only under the FIRST parent to avoid duplication
+    // But store all parent IDs for custom line rendering
+    const primaryParentId = parentIds[0];
+    const parentGoal = findGoalById(clonedTree, primaryParentId);
+
+    if (parentGoal) {
+      const alreadyExists = parentGoal.children?.some(child => child.id === session.id);
+      if (!alreadyExists) {
+        if (!parentGoal.children) {
+          parentGoal.children = [];
+        }
+        // Add practice session with ALL parent IDs stored
+        parentGoal.children.push({
+          ...session,
+          __isPracticeSession: true,
+          __allParentIds: parentIds // Store all parents for custom rendering
+        });
+      }
+    }
+
+    return clonedTree;
+  };
+
+  useEffect(() => {
+    fetchGoals();
+    fetchPracticeSessions();
+  }, []);
+
+  const handleAddChildClick = (nodeDatum) => {
+    openModal(nodeDatum);
+  };
+
+  const handleGoalNameClick = (nodeDatum) => {
+    setViewingGoal(nodeDatum);
+    setShowDetailsModal(true);
+  };
+
+  const openModal = (parent) => {
+    setSelectedParent(parent);
+    // Smart default type selection based on parent level
+    if (!parent) {
+      setGoalType('UltimateGoal'); // Default for new fractal
+    } else {
+      const parentType = parent.attributes?.type || parent.type;
+      const childType = getChildType(parentType);
+      if (!childType) {
+        alert('This goal type cannot have children.');
+        return;
+      }
+      setGoalType(childType);
+    }
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name,
+        description,
+        type: goalType,
+        parent_id: selectedParent ? (selectedParent.attributes?.id || selectedParent.id) : null,
+        deadline: deadline || null
+      };
+
+      const res = await axios.post(API_URL, payload);
+
+      // Reset form
+      setShowModal(false);
+      setName('');
+      setDescription('');
+      setDeadline('');
+
+      // Refresh fractal
+      await fetchGoals();
+
+      // If we created a new root, select it
+      if (!selectedParent) {
+        setSelectedRootId(res.data.id);
+      }
+
+    } catch (err) {
+      alert('Error creating goal: ' + err.message);
+    }
+  };
+
+  const handleToggleCompletion = async (goalId, currentStatus) => {
+    try {
+      const response = await axios.patch(`${API_URL}/${goalId}/complete`, {
+        completed: !currentStatus
+      });
+
+      // Update the viewingGoal with the fresh data from the response
+      if (viewingGoal && (viewingGoal.attributes?.id === goalId || viewingGoal.id === goalId)) {
+        setViewingGoal(response.data.goal);
+      }
+
+      // Refresh the fractal to show updated status
+      await fetchGoals();
+    } catch (err) {
+      alert('Error updating goal completion: ' + err.message);
+    }
+  };
+
+  // Helper to collect all short-term goals from the tree
+  const collectShortTermGoals = (node, collected = []) => {
+    if (!node) return collected;
+
+    const type = node.attributes?.type || node.type;
+    if (type === 'ShortTermGoal') {
+      collected.push({
+        id: node.attributes?.id || node.id,
+        name: node.name
+      });
+    }
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => collectShortTermGoals(child, collected));
+    }
+
+    return collected;
+  };
+
+  // Helper to count practice sessions in the tree
+  const countPracticeSessions = (node) => {
+    if (!node) return 0;
+
+    let count = 0;
+    const type = node.attributes?.type || node.type;
+    if (type === 'PracticeSession') {
+      count = 1;
+    }
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => {
+        count += countPracticeSessions(child);
+      });
+    }
+
+    return count;
+  };
+
+  // Helper function to wrap text
+  const wrapText = (text, maxCharsPerLine = 20) => {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    words.forEach(word => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (testLine.length > maxCharsPerLine && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
+  };
+
+  // Custom Node to show details
+  const renderCustomNode = ({ nodeDatum, toggleNode }) => {
+    const nameLines = wrapText(nodeDatum.name, 50);
+    const lineHeight = 16;
+    const startY = -5 - ((nameLines.length - 1) * lineHeight / 2); // Center multi-line text
+    const isCompleted = nodeDatum.attributes?.completed || false;
+    const isPracticeSession = nodeDatum.__isPracticeSession || nodeDatum.attributes?.type === 'PracticeSession';
+
+    // Determine node color
+    let fillColor = "#2196f3"; // Default blue
+    if (isPracticeSession) {
+      fillColor = "#ff9800"; // Orange for practice sessions
+    } else if (nodeDatum.children && nodeDatum.children.length > 0) {
+      fillColor = "#4caf50"; // Green for nodes with children
+    }
+
+    return (
+      <g data-id={nodeDatum.id || nodeDatum.attributes?.id}>
+        {/* Node Circle */}
+        <circle
+          r={15}
+          fill={fillColor}
+          stroke="#fff"
+          strokeWidth="2"
+          onClick={toggleNode}
+          opacity={isCompleted ? 0.5 : 1}
+        />
+
+        {/* Node Name - wrapped */}
+        <text
+          fill="#e0e0e0"
+          strokeWidth="0"
+          x="20"
+          fontSize="14"
+          fontWeight="600"
+          onClick={() => handleGoalNameClick(nodeDatum)}
+          style={{
+            cursor: 'pointer',
+            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            opacity: isCompleted ? 0.6 : 1
+          }}
+        >
+          {nameLines.map((line, index) => (
+            <tspan key={index} x="20" dy={index === 0 ? startY : lineHeight}>
+              {line}
+            </tspan>
+          ))}
+        </text>
+
+        {/* Goal Age - for goals down to ShortTermGoal */}
+        {(() => {
+          const type = nodeDatum.attributes?.type || nodeDatum.type;
+          const showAge = ["UltimateGoal", "LongTermGoal", "MidTermGoal", "ShortTermGoal"].includes(type);
+          const age = calculateGoalAge(nodeDatum.attributes?.created_at);
+
+          if (!showAge || !age) return null;
+
+          const ageY = startY + (nameLines.length * lineHeight) + 0;
+
+          return (
+            <text
+              fill="#fff"
+              className="add-child-text"
+              x="20"
+              dy={ageY}
+              fontSize="12"
+              fontWeight="bold"
+              style={{ fill: 'white', stroke: 'none' }}
+            >
+              {age}
+            </text>
+          );
+        })()}
+
+        {/* Add Child Button */}
+        {(() => {
+          const parentType = nodeDatum.attributes?.type || nodeDatum.type;
+          const childType = getChildType(parentType);
+          if (!childType) return null; // Don't show button if no children allowed
+
+          const type = nodeDatum.attributes?.type || nodeDatum.type;
+          const hasAge = ["UltimateGoal", "LongTermGoal", "MidTermGoal", "ShortTermGoal"].includes(type) && nodeDatum.attributes?.created_at;
+
+          let offset = 12;
+          if (hasAge) offset += 6; // More space after age
+
+          const buttonY = startY + (nameLines.length * lineHeight) + offset;
+
+          return (
+            <text
+              fill="#fff"
+              className="add-child-text"
+              x="20"
+              dy={buttonY}
+              fontSize="12"
+              fontWeight="bold"
+              onClick={() => handleAddChildClick(nodeDatum)}
+              style={{ cursor: 'pointer', textDecoration: 'underline', fill: 'white', stroke: 'none' }}
+            >
+              + Add {getTypeDisplayName(childType)}
+            </text>
+          );
+        })()}
+      </g>
+    );
+  };
+
+  // Delete Modal State
+  const [fractalToDelete, setFractalToDelete] = useState(null);
+
+  const selectedFractalData = roots.find(r => r.id === selectedRootId);
+
+  const handleDeleteFractal = (e, fractalId, fractalName) => {
+    e.stopPropagation();
+    setFractalToDelete({ id: fractalId, name: fractalName });
+  };
+
+  const confirmDeleteFractal = async () => {
+    if (!fractalToDelete) return;
+
+    try {
+      await axios.delete(`${API_URL}/${fractalToDelete.id}`);
+
+      if (selectedRootId === fractalToDelete.id) {
+        const remaining = roots.filter(r => r.id !== fractalToDelete.id);
+        setSelectedRootId(remaining.length > 0 ? remaining[0].id : null);
+      }
+
+      await fetchGoals();
+      setFractalToDelete(null);
+    } catch (err) {
+      alert('Failed to delete fractal: ' + err.message);
+    }
+  };
+
+  // Component to draw custom connection lines for multi-parent practice sessions
+  const CustomConnectionLines = ({ session, treeData }) => {
+    const [lines, setLines] = React.useState([]);
+    const [updateTrigger, setUpdateTrigger] = React.useState(0);
+
+    const calculateLines = React.useCallback(() => {
+      const parentIds = session.attributes?.parent_ids || [];
+      if (parentIds.length <= 1) return;
+
+      const newLines = [];
+
+      // Find the practice session node in the DOM
+      const sessionElements = document.querySelectorAll(`[data-id="${session.id}"]`);
+      if (sessionElements.length === 0) return;
+
+      const sessionElement = sessionElements[0];
+      const sessionCircle = sessionElement.querySelector('circle');
+      if (!sessionCircle) return;
+
+      const sessionRect = sessionCircle.getBoundingClientRect();
+      const sessionX = sessionRect.left + sessionRect.width / 2;
+      const sessionY = sessionRect.top + sessionRect.height / 2;
+
+      // Find secondary parent nodes (skip first one as it's already connected by tree)
+      for (let i = 1; i < parentIds.length; i++) {
+        const parentId = parentIds[i];
+        const parentElements = document.querySelectorAll(`[data-id="${parentId}"]`);
+
+        if (parentElements.length > 0) {
+          const parentElement = parentElements[0];
+          const parentCircle = parentElement.querySelector('circle');
+          if (parentCircle) {
+            const parentRect = parentCircle.getBoundingClientRect();
+            const parentX = parentRect.left + parentRect.width / 2;
+            const parentY = parentRect.top + parentRect.height / 2;
+
+            newLines.push({
+              x1: sessionX,
+              y1: sessionY,
+              x2: parentX,
+              y2: parentY,
+              key: `${session.id}-${parentId}`
+            });
+          }
+        }
+      }
+
+      setLines(newLines);
+    }, [session]);
+
+    React.useEffect(() => {
+      // Initial calculation
+      const timer = setTimeout(calculateLines, 100);
+
+      // Recalculate on scroll/pan (tree container scrolls)
+      const mainContent = document.querySelector('.main-content');
+      const handleUpdate = () => {
+        setUpdateTrigger(prev => prev + 1);
+      };
+
+      if (mainContent) {
+        mainContent.addEventListener('scroll', handleUpdate);
+        mainContent.addEventListener('wheel', handleUpdate);
+      }
+
+      // Recalculate on window resize
+      window.addEventListener('resize', handleUpdate);
+
+      // Use MutationObserver to detect tree changes (collapse/expand)
+      const observer = new MutationObserver(handleUpdate);
+      if (mainContent) {
+        observer.observe(mainContent, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['transform']
+        });
+      }
+
+      return () => {
+        clearTimeout(timer);
+        if (mainContent) {
+          mainContent.removeEventListener('scroll', handleUpdate);
+          mainContent.removeEventListener('wheel', handleUpdate);
+        }
+        window.removeEventListener('resize', handleUpdate);
+        observer.disconnect();
+      };
+    }, [calculateLines]);
+
+    // Recalculate when update is triggered
+    React.useEffect(() => {
+      if (updateTrigger > 0) {
+        const timer = setTimeout(calculateLines, 50);
+        return () => clearTimeout(timer);
+      }
+    }, [updateTrigger, calculateLines]);
+
+    if (lines.length === 0) return null;
+
+    return (
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 0
+        }}
+      >
+        {lines.map(line => (
+          <line
+            key={line.key}
+            x1={line.x1}
+            y1={line.y1}
+            x2={line.x2}
+            y2={line.y2}
+            stroke="#fff"
+            strokeWidth="2"
+            opacity="0.6"
+          />
+        ))}
+      </svg>
+    );
+  };
+
+  return (
+    <div className="app-container">
+      <div className="top-section">
+        <div className="main-content">
+          {loading ? <p>Loading...</p> : (
+            selectedFractalData ? (
+              <>
+                {/* Metrics Overlay */}
+                {(() => {
+                  const metrics = calculateMetrics(selectedFractalData, practiceSessions);
+                  return (
+                    <div className="metrics-overlay">
+                      <div className="metric-item">{metrics.totalGoals} goals</div>
+                      <div className="metric-item">{metrics.practiceSessionCount} sessions</div>
+                      <div className="metric-item">{metrics.completionPercentage}% complete</div>
+                    </div>
+                  );
+                })()}
+
+                <FlowTree
+                  treeData={selectedFractalData}
+                  onNodeClick={(node) => {
+                    const goalId = node.id || node.attributes?.id;
+                    setViewingGoal(node);
+                    setShowDetailsModal(true);
+                  }}
+                  selectedPracticeSession={selectedPracticeSession}
+                  key={selectedRootId + (selectedPracticeSession?.id || '')}
+                />
+              </>
+            ) : (
+              <div className="empty-state">
+                <h2>No Goals Created Yet</h2>
+                <button onClick={() => openModal(null)}>Create Your First Goal Fractal</button>
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="sidebar">
+          <h3>My Goal Fractals</h3>
+          <ul className="fractal-list">
+            {roots.map(root => (
+              <li
+                key={root.id}
+                className={root.id === selectedRootId ? 'active' : ''}
+                onClick={() => setSelectedRootId(root.id)}
+              >
+                <span className="fractal-name">{root.name}</span>
+                <button
+                  className="delete-fractal-btn"
+                  onClick={(e) => handleDeleteFractal(e, root.id, root.name)}
+                  title="Delete Fractal"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button className="create-fractal-btn" onClick={() => openModal(null)}>+ New Fractal</button>
+
+          {/* Add Practice Session button - shown when a fractal is selected */}
+          {selectedRootId && (
+            <button
+              className="practice-session-btn"
+              onClick={() => {
+                const selectedRoot = roots.find(r => r.id === selectedRootId);
+                if (selectedRoot) {
+                  // Reset form state and open modal
+                  setSelectedShortTermGoals([]);
+                  setImmediateGoals([{ name: '', description: '' }]);
+                  setShowPracticeSessionModal(true);
+                }
+              }}
+            >
+              + Add a Practice Session
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Practice Sessions Grid */}
+      <div className="practice-sessions-grid">
+        <h3>Practice Sessions</h3>
+        <div className="sessions-grid-container">
+          {practiceSessions.length === 0 ? (
+            <p className="no-sessions-message">No practice sessions yet. Create one to get started!</p>
+          ) : (
+            practiceSessions.map(session => (
+              <div
+                key={session.id}
+                className={`session-square ${selectedPracticeSession?.id === session.id ? 'selected' : ''}`}
+                onClick={() => {
+                  setSelectedPracticeSession(session);
+                }}
+              >
+                <div className="session-name">{session.name}</div>
+                <div className="session-meta">
+                  {session.attributes.parent_ids?.length || 0} goal{session.attributes.parent_ids?.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {
+        showModal && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <h2>{selectedParent ? `Add ${getTypeDisplayName(goalType)} under "${selectedParent.name}"` : "Create New Fractal"}</h2>
+              <form onSubmit={handleSubmit}>
+                <label>Type:</label>
+                {selectedParent ? (
+                  <div style={{ padding: '10px', background: '#f5f5f5', borderRadius: '4px', color: '#333', fontWeight: 'bold' }}>
+                    {getTypeDisplayName(goalType)}
+                  </div>
+                ) : (
+                  <select
+                    value={goalType}
+                    onChange={e => setGoalType(e.target.value)}
+                    style={{ padding: '10px', background: '#1e1e1e', border: '1px solid #454545', borderRadius: '6px', color: 'white' }}
+                  >
+                    <option value="UltimateGoal">Ultimate Goal</option>
+                    <option value="LongTermGoal">Long Term Goal</option>
+                    <option value="MidTermGoal">Mid Term Goal</option>
+                    <option value="ShortTermGoal">Short Term Goal</option>
+                  </select>
+                )}
+
+                <label>Name:</label>
+                <input value={name} onChange={e => setName(e.target.value)} required />
+
+                <label>Description:</label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} />
+
+                <label>Deadline:</label>
+                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+
+                <div className="actions">
+                  <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit">Create</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
+
+
+
+      {
+        fractalToDelete && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <h2>Delete {selectedRootId === fractalToDelete.id ? "Fractal" : "Goal"}?</h2>
+              <p>Are you sure you want to delete <strong>"{fractalToDelete.name}"</strong>?</p>
+              <p style={{ color: '#ff5252', fontSize: '0.9rem' }}>This action cannot be undone.</p>
+              <div className="actions">
+                <button type="button" onClick={() => setFractalToDelete(null)}>Cancel</button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteFractal}
+                  style={{ background: '#d32f2f', color: 'white', border: 'none' }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Goal Details Modal */}
+      {
+        showDetailsModal && viewingGoal && (
+          <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+            <div className="modal details-modal" onClick={(e) => e.stopPropagation()}>
+              <h2>{viewingGoal?.name}</h2>
+              <div className="modal-content-scroll">
+                <p><strong>Type:</strong> {viewingGoal?.attributes?.type || viewingGoal?.type}</p>
+                <p><strong>Created:</strong> {viewingGoal?.attributes?.created_at ? new Date(viewingGoal.attributes.created_at).toLocaleDateString() : 'Unknown'}
+                  {viewingGoal?.attributes?.created_at && ` (${calculateGoalAge(viewingGoal.attributes.created_at)})`}
+                </p>
+                <p><strong>Description:</strong> {viewingGoal?.attributes?.description || viewingGoal?.description || 'No description'}</p>
+                {(viewingGoal?.attributes?.deadline || viewingGoal?.deadline) && (
+                  <p><strong>Deadline:</strong> {viewingGoal?.attributes?.deadline || viewingGoal?.deadline}</p>
+                )}
+
+                <h4>Immediate Children:</h4>
+                {viewingGoal?.children && viewingGoal.children.length > 0 ? (
+                  <ul className="children-list">
+                    {viewingGoal.children.map(child => (
+                      <li key={child.attributes?.id || child.id}>
+                        <strong>{child.name}</strong> ({getTypeDisplayName(child.attributes?.type || child.type)})
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="no-children">No children yet.</p>
+                )}
+
+                <div className="completion-section">
+                  <label className="completion-label">
+                    <input
+                      type="checkbox"
+                      checked={viewingGoal?.attributes?.completed || false}
+                      onChange={() => {
+                        const goalId = viewingGoal?.attributes?.id || viewingGoal?.id;
+                        const currentStatus = viewingGoal?.attributes?.completed || false;
+                        handleToggleCompletion(goalId, currentStatus);
+                      }}
+                    />
+                    <span>
+                      Mark as {viewingGoal?.attributes?.completed ? 'Incomplete' : 'Completed'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                {(() => {
+                  const parentType = viewingGoal?.attributes?.type || viewingGoal?.type;
+                  const childType = getChildType(parentType);
+                  if (childType) {
+                    return (
+                      <button
+                        className="action-btn primary"
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          handleAddChildClick(viewingGoal);
+                        }}
+                      >
+                        + Add Child
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
+                <button
+                  className="action-btn danger"
+                  onClick={() => {
+                    const goalId = viewingGoal?.attributes?.id || viewingGoal?.id;
+                    setShowDetailsModal(false);
+                    setFractalToDelete({
+                      id: goalId,
+                      name: viewingGoal?.name
+                    });
+                  }}
+                >
+                  Delete Goal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailsModal(false)}
+                  style={{ marginTop: '10px' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {/* Practice Session Modal */}
+      {
+        showPracticeSessionModal && (
+          <div className="modal-overlay" onClick={() => setShowPracticeSessionModal(false)}>
+            <div className="modal practice-session-modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Create Practice Session</h2>
+
+              <div className="modal-content-scroll">
+                {/* Auto-generated name preview */}
+                <div className="session-name-preview">
+                  <strong>Session Name:</strong>
+                  <p>Practice Session # - {new Date().toLocaleDateString()}</p>
+                  <p style={{ fontSize: '0.8em', color: '#888', fontStyle: 'italic', marginTop: '5px' }}>
+                    (Name will be automatically generated with the next database index)
+                  </p>
+                </div>
+
+                {/* Select Short-Term Goals */}
+                <div className="form-section">
+                  <label><strong>Select Short-Term Goals (Required - at least one):</strong></label>
+                  <div className="checkbox-list">
+                    {(() => {
+                      const selectedRoot = roots.find(r => r.id === selectedRootId);
+                      const shortTermGoals = selectedRoot ? collectShortTermGoals(selectedRoot) : [];
+
+                      if (shortTermGoals.length === 0) {
+                        return <p className="no-goals-message">No short-term goals available. Please create short-term goals first.</p>;
+                      }
+
+                      return shortTermGoals.map(goal => (
+                        <label key={goal.id} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={selectedShortTermGoals.includes(goal.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedShortTermGoals([...selectedShortTermGoals, goal.id]);
+                              } else {
+                                setSelectedShortTermGoals(selectedShortTermGoals.filter(id => id !== goal.id));
+                              }
+                            }}
+                          />
+                          <span>{goal.name}</span>
+                        </label>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Add Immediate Goals */}
+                <div className="form-section">
+                  <label><strong>Immediate Goals for this Session:</strong></label>
+                  {immediateGoals.map((goal, index) => (
+                    <div key={index} className="immediate-goal-item">
+                      <input
+                        type="text"
+                        placeholder="Goal name"
+                        value={goal.name}
+                        onChange={(e) => {
+                          const updated = [...immediateGoals];
+                          updated[index].name = e.target.value;
+                          setImmediateGoals(updated);
+                        }}
+                        className="immediate-goal-input"
+                      />
+                      <textarea
+                        placeholder="Description (optional)"
+                        value={goal.description}
+                        onChange={(e) => {
+                          const updated = [...immediateGoals];
+                          updated[index].description = e.target.value;
+                          setImmediateGoals(updated);
+                        }}
+                        className="immediate-goal-textarea"
+                        rows="2"
+                      />
+                      {immediateGoals.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImmediateGoals(immediateGoals.filter((_, i) => i !== index));
+                          }}
+                          className="remove-goal-btn"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImmediateGoals([...immediateGoals, { name: '', description: '' }]);
+                    }}
+                    className="add-goal-btn"
+                  >
+                    + Add Another Immediate Goal
+                  </button>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="action-btn primary"
+                  onClick={async () => {
+                    // Validation
+                    if (selectedShortTermGoals.length === 0) {
+                      alert('Please select at least one short-term goal');
+                      return;
+                    }
+
+                    const validImmediateGoals = immediateGoals.filter(g => g.name.trim() !== '');
+                    if (validImmediateGoals.length === 0) {
+                      alert('Please add at least one immediate goal with a name');
+                      return;
+                    }
+
+                    try {
+                      // Create practice session with immediate goals
+                      const payload = {
+                        name: "Auto-Generated", // Backend generates: "Practice Session {N} - {Date}"
+                        description: `Practice session with ${validImmediateGoals.length} immediate goal(s)`,
+                        parent_ids: selectedShortTermGoals,
+                        immediate_goals: validImmediateGoals
+                      };
+
+                      const res = await axios.post(`${API_URL}/practice-session`, payload);
+
+                      setShowPracticeSessionModal(false);
+                      await fetchGoals();
+                      await fetchPracticeSessions();
+
+                    } catch (err) {
+                      alert('Error creating practice session: ' + err.message);
+                    }
+                  }}
+                >
+                  Create Practice Session
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPracticeSessionModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
+  );
+}
+
+export default App;

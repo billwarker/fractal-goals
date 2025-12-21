@@ -1,0 +1,6 @@
+*.log
+goals.db
+goals_db*.json
+server.py.bak
+test_db.py
+fractal-goals-venv

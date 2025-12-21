@@ -1,0 +1,791 @@
+#root {
+    width: 100%;
+    height: 100%;
+}
+
+:root {
+    --bg-color: #1e1e1e;
+    --sidebar-bg: #252526;
+    --text-color: #d4d4d4;
+    --accent-color: #3794ff;
+    --grid-color: #333;
+    --card-bg: #2d2d2d;
+    --hover-bg: #3e3e42;
+    --border-color: #454545;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+.main-content {
+    flex-grow: 1;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    /* Grid Pattern */
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Metrics Overlay */
+.metrics-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.metric-item {
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: right;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.sidebar {
+    width: 300px;
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.sidebar h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #fff;
+    font-weight: 600;
+}
+
+.fractal-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.fractal-list li {
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    color: #aaa;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fractal-list li:hover {
+    background: var(--hover-bg);
+    color: #fff;
+}
+
+.fractal-list li:hover .delete-fractal-btn {
+    opacity: 1;
+}
+
+.delete-fractal-btn {
+    opacity: 0;
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: all 0.2s;
+}
+
+.delete-fractal-btn:hover {
+    color: #ff5252;
+}
+
+.fractal-list li.active {
+    background: #37373d;
+    color: var(--accent-color);
+    border-left: 3px solid var(--accent-color);
+    font-weight: 500;
+}
+
+.create-fractal-btn {
+    margin-top: 20px;
+    padding: 12px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.create-fractal-btn:hover {
+    background: #2b7cdb;
+}
+
+.practice-session-btn {
+    margin-top: 12px;
+    padding: 12px;
+    background: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.practice-session-btn:hover {
+    background: #45a049;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+}
+
+.empty-state h2 {
+    color: #888;
+}
+
+.empty-state button {
+    margin-top: 20px;
+    padding: 10px 24px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: var(--card-bg);
+    padding: 25px;
+    border-radius: 12px;
+    width: 450px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.modal h2 {
+    margin-top: 0;
+    color: #fff;
+    font-size: 1.2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.modal form {
+    display: flex;
+    flex-direction: column;
+}
+
+.modal label {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    color: #aaa;
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+    padding: 10px;
+    margin-top: 8px;
+    background: #1e1e1e;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: white;
+    font-family: inherit;
+}
+
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.modal .actions {
+    margin-top: 25px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal button {
+    padding: 10px 18px;
+    cursor: pointer;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: opacity 0.2s;
+}
+
+.modal button[type="submit"] {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+}
+
+.modal button[type="button"] {
+    background: transparent;
+    color: #aaa;
+    border: 1px solid var(--border-color);
+}
+
+.modal button:hover {
+    opacity: 0.9;
+}
+
+/* Modal Content Scroll */
+.modal-content-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Details Modal Specifics */
+.details-modal p {
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+.details-modal strong {
+    color: #fff;
+}
+
+.details-modal ul {
+    list-style: disc;
+    padding-left: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px 15px 15px 35px;
+    border-radius: 6px;
+}
+
+.details-modal li {
+    margin-bottom: 5px;
+}
+
+/* Fractal Visualization Specifics */
+.rd3t-link {
+    stroke: #fff !important;
+}
+
+.add-child-text {
+    fill: #fff !important;
+    stroke: none !important;
+}
+
+/* Sidebar Details View */
+.sidebar-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.3rem;
+    word-wrap: break-word;
+}
+
+.sidebar-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+.sidebar-content p {
+    margin: 12px 0;
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.sidebar-content strong {
+    color: #fff;
+    display: inline-block;
+    min-width: 90px;
+}
+
+.sidebar-content h4 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #fff;
+    font-size: 1rem;
+}
+
+.children-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.children-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.children-list li:last-child {
+    border-bottom: none;
+}
+
+.no-children {
+    color: #666;
+    font-style: italic;
+}
+
+.completion-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(55, 148, 255, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(55, 148, 255, 0.3);
+}
+
+.completion-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.completion-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+}
+
+.completion-label span {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.action-btn {
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.action-btn.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #2b7cdb;
+}
+
+.action-btn.danger {
+    background: #d32f2f;
+    color: white;
+}
+
+.action-btn.danger:hover {
+    background: #b71c1c;
+}
+
+.switch-view-btn {
+    margin-top: auto;
+    padding: 12px;
+    background: transparent;
+    color: var(--accent-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.switch-view-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-color);
+}
+
+/* New Layout Structure */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+}
+
+.top-section {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Practice Sessions Grid */
+.practice-sessions-grid {
+    height: 200px;
+    background: var(--sidebar-bg);
+    border-top: 2px solid var(--border-color);
+    padding: 15px 20px;
+    overflow-y: auto;
+}
+
+.practice-sessions-grid h3 {
+    margin: 0 0 15px 0;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.sessions-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.no-sessions-message {
+    color: #888;
+    font-style: italic;
+    padding: 20px;
+    text-align: center;
+}
+
+.session-square {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.session-square:hover {
+    border-color: var(--accent-color);
+    background: var(--hover-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.session-square.selected {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+}
+
+.session-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.session-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.session-square.selected .session-meta {
+    color: #4caf50;
+}
+
+/* Practice Session Modal */
+.practice-session-modal {
+    width: 600px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    max-height: calc(90vh - 200px);
+}
+
+.session-name-preview {
+    background: rgba(76, 175, 80, 0.1);
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.session-name-preview p {
+    margin: 5px 0 0 0;
+    color: #4caf50;
+    font-weight: 600;
+}
+
+.form-section {
+    margin-bottom: 25px;
+}
+
+.form-section label {
+    display: block;
+    margin-bottom: 10px;
+    color: #fff;
+}
+
+.checkbox-list {
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.checkbox-label:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+}
+
+.no-goals-message {
+    color: #666;
+    font-style: italic;
+    padding: 10px;
+}
+
+.immediate-goal-item {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.immediate-goal-input,
+.immediate-goal-textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #1e1e1e;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: white;
+    font-family: inherit;
+}
+
+.immediate-goal-input:focus,
+.immediate-goal-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.remove-goal-btn {
+    background: #d32f2f;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.remove-goal-btn:hover {
+    background: #b71c1c;
+}
+
+.add-goal-btn {
+    background: transparent;
+    color: var(--accent-color);
+    border: 1px dashed var(--accent-color);
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.add-goal-btn:hover {
+    background: rgba(55, 148, 255, 0.1);
+}
+
+/* Connection View */
+.connection-view {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: var(--bg-color);
+    /* Grid Pattern */
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.connection-header {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(37, 37, 38, 0.95);
+    padding: 15px 30px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.connection-header h2 {
+    margin: 0;
+    color: #ff9800;
+    font-size: 1.3rem;
+}
+
+.close-connection-btn {
+    background: #d32f2f;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.close-connection-btn:hover {
+    background: #b71c1c;
+    transform: scale(1.05);
+}
+
+.connection-view svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Animate connection lines */
+.connection-view line {
+    animation: dash 2s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -24;
+    }
+}
+
+/* Subtle glow for practice session circle */
+.connection-view circle[fill="#ff9800"] {
+    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
+}
+
+/* Goal circles - subtle styling */
+.connection-view circle[fill="#4caf50"] {
+    transition: all 0.2s ease;
+}
+/* Clear Session Button */
+.clear-session-btn {
+    background: #d32f2f;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    margin-left: 15px;
+}
+
+.clear-session-btn:hover {
+    background: #b71c1c;
+    transform: scale(1.05);
+}

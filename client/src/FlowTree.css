@@ -1,0 +1,14 @@
+/* ReactFlow Edge Overrides */
+.react-flow__edge-path {
+    stroke: #ffffff !important;
+    stroke-width: 1px !important;
+}
+
+.react-flow__edge {
+    pointer-events: all !important;
+}
+
+.react-flow__connection-path {
+    stroke: #ffffff !important;
+    stroke-width: 1px !important;
+}
