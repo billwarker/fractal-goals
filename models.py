@@ -102,6 +102,9 @@ class PracticeSession(Base):
     
     Practice sessions are separate from goals to allow for session-specific
     attributes and future extensibility (duration, focus score, etc.)
+    
+    Session data is stored as JSON for maximum flexibility and can be populated
+    from session templates.
     """
     __tablename__ = 'practice_sessions'
     
@@ -110,20 +113,12 @@ class PracticeSession(Base):
     description = Column(String, default='')
     completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=True)
     
-    # Future extensibility fields (commented out for now, uncomment as needed)
-    # duration = Column(Integer)  # Session duration in minutes
-    # focus_score = Column(Integer)  # User's focus rating (1-10)
-    # energy_level = Column(Integer)  # Energy level during session (1-10)
-    # session_notes = Column(String)  # Detailed notes about the session
-    # tags = Column(String)  # Comma-separated tags
-    # location = Column(String)  # Where the session took place
-    # tools_used = Column(String)  # Tools/resources used
-    # interruptions = Column(Integer)  # Number of interruptions
-    # actual_start_time = Column(DateTime)  # When session actually started
-    # actual_end_time = Column(DateTime)  # When session actually ended
-    # planned_duration = Column(Integer)  # How long it was supposed to take
-    # productivity_rating = Column(Integer)  # Self-assessed productivity (1-10)
+    # JSON structure for flexible session data
+    # Can include: template_id, template_name, sections, exercises, 
+    # duration, focus_score, energy_level, notes, etc.
+    session_data = Column(String, nullable=True)  # Stored as JSON string
     
     # Many-to-many relationship with short-term goals
     parent_goals = relationship(
@@ -134,6 +129,8 @@ class PracticeSession(Base):
     
     def to_dict(self, include_children=True, include_parents=True):
         """Convert practice session to dictionary format compatible with frontend."""
+        import json
+        
         result = {
             "name": self.name,
             "id": self.id,
@@ -143,6 +140,7 @@ class PracticeSession(Base):
                 "description": self.description,
                 "completed": self.completed,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
+                "root_id": self.root_id,
             },
             "children": []
         }
@@ -151,6 +149,15 @@ class PracticeSession(Base):
         if include_parents:
             result["attributes"]["parent_ids"] = [goal.id for goal in self.parent_goals]
         
+        # Add session_data (parse JSON if present)
+        if self.session_data:
+            try:
+                result["attributes"]["session_data"] = json.loads(self.session_data)
+            except (json.JSONDecodeError, TypeError):
+                result["attributes"]["session_data"] = None
+        else:
+            result["attributes"]["session_data"] = None
+        
         # Note: Children (ImmediateGoals) need to be queried separately
         # since they're in the goals table with parent_id pointing here
         
@@ -158,6 +165,64 @@ class PracticeSession(Base):
     
     def __repr__(self):
         return f"<PracticeSession(id={self.id}, name={self.name}, parents={len(self.parent_goals)})>"
+
+
+class SessionTemplate(Base):
+    """
+    Represents a reusable template for practice sessions.
+    
+    Templates define the structure of a practice session including sections,
+    exercises, and durations. Users can create sessions from templates.
+    """
+    __tablename__ = 'session_templates'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Template structure stored as JSON
+    # Structure: {
+    #   "sections": [
+    #     {
+    #       "name": "Warm-up",
+    #       "duration_minutes": 10,
+    #       "exercises": [
+    #         {"name": "Chromatic scales", "description": "Up and down the neck"}
+    #       ]
+    #     }
+    #   ],
+    #   "total_duration_minutes": 60,
+    #   "tags": ["guitar", "technique"]
+    # }
+    template_data = Column(String, nullable=False)  # Stored as JSON string
+    
+    def to_dict(self):
+        """Convert template to dictionary format compatible with frontend."""
+        import json
+        
+        result = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "root_id": self.root_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+        
+        # Parse template_data JSON
+        if self.template_data:
+            try:
+                result["template_data"] = json.loads(self.template_data)
+            except (json.JSONDecodeError, TypeError):
+                result["template_data"] = {}
+        else:
+            result["template_data"] = {}
+        
+        return result
+    
+    def __repr__(self):
+        return f"<SessionTemplate(id={self.id}, name={self.name}, root_id={self.root_id})>"
 
 
 # Database connection and session management
@@ -264,6 +329,52 @@ def build_practice_session_tree(session, practice_session):
     ps_dict["children"] = [build_goal_tree(session, ig) for ig in immediate_goals]
     
     return ps_dict
+
+
+def get_root_id_for_goal(session, goal_id):
+    """
+    Traverse up the goal tree to find the root goal ID.
+    
+    Args:
+        session: Database session
+        goal_id: ID of the goal to find root for
+        
+    Returns:
+        str: ID of the root goal, or None if not found
+    """
+    goal = get_goal_by_id(session, goal_id)
+    if not goal:
+        return None
+    
+    current = goal
+    depth = 0
+    max_depth = 20  # Safety limit to prevent infinite loops
+    
+    while current.parent_id and depth < max_depth:
+        parent = get_goal_by_id(session, current.parent_id)
+        if not parent:
+            break  # Reached top or broken link
+        current = parent
+        depth += 1
+    
+    return current.id
+
+
+def validate_root_goal(session, root_id):
+    """
+    Validate that a root_id exists and is actually a root goal (has no parent).
+    
+    Args:
+        session: Database session
+        root_id: ID to validate
+        
+    Returns:
+        Goal: The root goal if valid, None otherwise
+    """
+    goal = get_goal_by_id(session, root_id)
+    if goal and goal.parent_id is None:
+        return goal
+    return None
 
 
 if __name__ == "__main__":

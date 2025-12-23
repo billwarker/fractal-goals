@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
     Background,
     useNodesState,
@@ -50,7 +50,6 @@ const CustomNode = ({ data }) => {
                 cursor: 'pointer',
                 position: 'relative', // Ensure handles are positioned relative to this
             }}
-            onClick={data.onClick}
         >
             {/* Target Handle (Centered hidden behind circle) */}
             <Handle
@@ -82,6 +81,7 @@ const CustomNode = ({ data }) => {
                     zIndex: 2, // Ensure circle sits ABOVE the connecting lines
                     position: 'relative'
                 }}
+                onClick={data.onClick}
             />
 
             {/* Text beside circle */}
@@ -101,6 +101,7 @@ const CustomNode = ({ data }) => {
                         textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                         whiteSpace: 'nowrap',
                     }}
+                    onClick={data.onClick}
                 >
                     {data.label}
                 </div>
@@ -114,6 +115,26 @@ const CustomNode = ({ data }) => {
                         }}
                     >
                         {age}
+                    </div>
+                )}
+                {/* Add Child Button - for all goal types that can have children */}
+                {data.onAddChild && data.childTypeName && (
+                    <div
+                        style={{
+                            color: '#ff9800',
+                            fontSize: '11px',
+                            marginTop: '4px',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            data.onAddChild();
+                        }}
+                    >
+                        + Add {data.childTypeName}
                     </div>
                 )}
             </div>
@@ -181,10 +202,38 @@ const getLayoutedElements = (nodes, edges, direction = 'TB') => {
 };
 
 // Convert tree data to ReactFlow format
-const convertTreeToFlow = (treeData, onNodeClick) => {
+const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChild) => {
     const nodes = [];
     const edges = [];
     const addedNodeIds = new Set();
+
+    // Helper to get child type name
+    const getChildType = (parentType) => {
+        const map = {
+            'UltimateGoal': 'LongTermGoal',
+            'LongTermGoal': 'MidTermGoal',
+            'MidTermGoal': 'ShortTermGoal',
+            'ShortTermGoal': 'PracticeSession',
+            'PracticeSession': 'ImmediateGoal',
+            'ImmediateGoal': 'MicroGoal',
+            'MicroGoal': 'NanoGoal',
+            'NanoGoal': null
+        };
+        return map[parentType];
+    };
+
+    const getTypeDisplayName = (type) => {
+        const names = {
+            'LongTermGoal': 'Long Term Goal',
+            'MidTermGoal': 'Mid Term Goal',
+            'ShortTermGoal': 'Short Term Goal',
+            'PracticeSession': 'Practice Session',
+            'ImmediateGoal': 'Immediate Goal',
+            'MicroGoal': 'Micro Goal',
+            'NanoGoal': 'Nano Goal',
+        };
+        return names[type] || type;
+    };
 
     const traverse = (node, parentId = null) => {
         if (!node) return;
@@ -215,6 +264,9 @@ const convertTreeToFlow = (treeData, onNodeClick) => {
         addedNodeIds.add(nodeId);
 
         const isPracticeSession = node.__isPracticeSession || node.attributes?.type === 'PracticeSession';
+        const nodeType = node.attributes?.type;
+        const childType = getChildType(nodeType);
+        const childTypeName = childType ? getTypeDisplayName(childType) : null;
 
         nodes.push({
             id: nodeId,
@@ -223,12 +275,15 @@ const convertTreeToFlow = (treeData, onNodeClick) => {
             position: { x: 0, y: 0 },
             data: {
                 label: node.name,
-                type: node.attributes?.type,
+                type: nodeType,
                 completed: node.attributes?.completed,
                 created_at: node.attributes?.created_at,
                 hasChildren: node.children && node.children.length > 0,
                 __isPracticeSession: isPracticeSession,
                 onClick: () => onNodeClick(node),
+                onAddPracticeSession: onAddPracticeSession,
+                onAddChild: childType ? () => onAddChild(node) : null,
+                childTypeName: childTypeName,
             },
         });
 
@@ -242,14 +297,16 @@ const convertTreeToFlow = (treeData, onNodeClick) => {
     return { nodes, edges };
 };
 
-const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession }) => {
+const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild }) => {
+    const [rfInstance, setRfInstance] = useState(null);
+    const [isVisible, setIsVisible] = useState(false);
+
     const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
         if (!treeData) return { nodes: [], edges: [] };
 
         // Inject practice session if selected
-        let dataToConvert = treeData;
+        let dataToConvert = JSON.parse(JSON.stringify(treeData));
         if (selectedPracticeSession) {
-            dataToConvert = JSON.parse(JSON.stringify(treeData));
             const parentIds = selectedPracticeSession.attributes?.parent_ids || [];
 
             // Add practice session under ALL parents (network graph handles this!)
@@ -282,9 +339,9 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession }) => {
             }
         }
 
-        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick);
+        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick, onAddPracticeSession, onAddChild);
         return getLayoutedElements(nodes, edges);
-    }, [treeData, onNodeClick, selectedPracticeSession]);
+    }, [treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
@@ -295,14 +352,42 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession }) => {
         setEdges(layoutedEdges);
     }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
+    // Center graph on initial mount (with delay for container width transition)
+    useEffect(() => {
+        if (rfInstance) {
+            setIsVisible(false); // Hide during centering
+            const timer = setTimeout(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                // Show after fitView completes
+                setTimeout(() => setIsVisible(true), 200);
+            }, 100); // Minimal delay for layout settling
+            return () => clearTimeout(timer);
+        }
+    }, [rfInstance]);
+
+    // Re-center when nodes are laid out (handles view switches)
+    useEffect(() => {
+        if (rfInstance && layoutedNodes.length > 0) {
+            requestAnimationFrame(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 200 });
+            });
+        }
+    }, [layoutedNodes.length, rfInstance]);
+
     return (
-        <div style={{ width: '100%', height: '100%' }}>
+        <div style={{
+            width: '100%',
+            height: '100%',
+            opacity: isVisible ? 1 : 0,
+            transition: 'opacity 200ms ease-in-out'
+        }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
+                onInit={setRfInstance}
                 fitView
                 attributionPosition="bottom-left"
                 minZoom={0.1}

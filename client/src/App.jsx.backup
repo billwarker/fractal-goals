@@ -529,41 +529,6 @@ function App() {
             </text>
           );
         })()}
-
-        {/* Add Practice Session Button - only for ShortTermGoal nodes */}
-        {(() => {
-          const type = nodeDatum.attributes?.type || nodeDatum.type;
-          if (type !== 'ShortTermGoal') return null; // Only show on ShortTermGoal nodes
-
-          const hasAge = ["UltimateGoal", "LongTermGoal", "MidTermGoal", "ShortTermGoal"].includes(type) && nodeDatum.attributes?.created_at;
-          const parentType = nodeDatum.attributes?.type || nodeDatum.type;
-          const childType = getChildType(parentType);
-
-          let offset = 12;
-          if (hasAge) offset += 6; // Space after age
-          if (childType) offset += 14; // Space after Add Child button
-
-          const buttonY = startY + (nameLines.length * lineHeight) + offset;
-
-          return (
-            <text
-              fill="#ff9800"
-              className="add-session-text"
-              x="20"
-              dy={buttonY}
-              fontSize="12"
-              fontWeight="bold"
-              onClick={() => {
-                setSelectedShortTermGoals([]);
-                setImmediateGoals([{ name: '', description: '' }]);
-                setShowPracticeSessionModal(true);
-              }}
-              style={{ cursor: 'pointer', textDecoration: 'underline', fill: '#ff9800', stroke: 'none' }}
-            >
-              + Add Practice Session
-            </text>
-          );
-        })()}
       </g>
     );
   };

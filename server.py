@@ -50,8 +50,15 @@ class PracticeSessionCreate(BaseModel):
     immediate_goals: List[dict]  # List of {name, description} dicts
 
 
+
 class GoalCompletionUpdate(BaseModel):
     completed: bool
+
+
+class GoalUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    deadline: Optional[date] = None
 
 
 @app.get("/api/goals")
@@ -136,17 +143,38 @@ def create_practice_session(session_request: PracticeSessionCreate):
             raise HTTPException(status_code=400, detail="At least one parent short-term goal required")
         
         # Find all parent goals
+        # Find all parent goals and identify root
         parent_goals = []
+        detected_root_id = None
+
         for parent_id in session_request.parent_ids:
             parent_goal = get_goal_by_id(db_session, parent_id)
             if not parent_goal:
                 raise HTTPException(status_code=404, detail=f"Parent goal {parent_id} not found")
             if parent_goal.type != 'ShortTermGoal':
                 raise HTTPException(status_code=400, detail=f"Parent {parent_id} must be a ShortTermGoal")
+            
+            # Find fractal root for this parent
+            current = parent_goal
+            depth = 0
+            while current.parent_id and depth < 20: # Max depth safety
+                # Explicitly fetch parent by ID to ensure we get a scalar object
+                parent = get_goal_by_id(db_session, current.parent_id)
+                
+                if parent:
+                    current = parent
+                else:
+                    break # Reached top or broken link
+                depth += 1
+            
+            if detected_root_id and detected_root_id != current.id:
+                raise HTTPException(status_code=400, detail="All parent goals must belong to the same fractal tree")
+            detected_root_id = current.id
+
             parent_goals.append(parent_goal)
         
-        # Generate name based on index and date
-        session_count = db_session.query(PracticeSession).count()
+        # Generate name based on index relative to this fractal root
+        session_count = db_session.query(PracticeSession).filter_by(root_id=detected_root_id).count()
         session_index = session_count + 1
         date_str = datetime.now().strftime("%m/%d/%Y")
         generated_name = f"Practice Session {session_index} - {date_str}"
@@ -155,7 +183,8 @@ def create_practice_session(session_request: PracticeSessionCreate):
         practice_session = PracticeSession(
             name=generated_name,
             description=session_request.description or "",
-            completed=False
+            completed=False,
+            root_id=detected_root_id
         )
         
         # Add parent relationships
@@ -243,6 +272,45 @@ def delete_goal(goal_id: str):
     except HTTPException:
         session.rollback()
         raise
+    except Exception as e:
+        session.rollback()
+        print(f"ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        session.close()
+
+
+@app.put("/api/goals/{goal_id}")
+def update_goal(goal_id: str, update: GoalUpdate):
+    """Update goal or practice session details."""
+    session = get_session(engine)
+    try:
+        # Try finding as Goal
+        goal = get_goal_by_id(session, goal_id)
+        if goal:
+            if update.name is not None:
+                goal.name = update.name
+            if update.description is not None:
+                goal.description = update.description
+            if update.deadline is not None:
+                goal.deadline = update.deadline
+            session.commit()
+            return {"status": "success", "message": "Goal updated"}
+        
+        # Try finding as PracticeSession
+        ps = get_practice_session_by_id(session, goal_id)
+        if ps:
+            if update.name is not None:
+                ps.name = update.name
+            if update.description is not None:
+                ps.description = update.description
+            # PracticeSession has no deadline
+            session.commit()
+            return {"status": "success", "message": "Practice Session updated"}
+        
+        raise HTTPException(status_code=404, detail="Goal or session not found")
+        
     except Exception as e:
         session.rollback()
         print(f"ERROR: {str(e)}")
