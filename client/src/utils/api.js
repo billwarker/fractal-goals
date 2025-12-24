@@ -151,6 +151,28 @@ export const fractalApi = {
      */
     deleteSessionTemplate: (rootId, templateId) =>
         axios.delete(`${API_BASE}/${rootId}/session-templates/${templateId}`),
+
+    // ========== Activities & Metrics ==========
+
+    /**
+     * Get all activity definitions for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    getActivities: (rootId) => axios.get(`${API_BASE}/${rootId}/activities`),
+
+    /**
+     * Create a new activity definition
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {name, description, metrics: [{name, unit}]}
+     */
+    createActivity: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activities`, data),
+
+    /**
+     * Delete an activity definition
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity
+     */
+    deleteActivity: (rootId, activityId) => axios.delete(`${API_BASE}/${rootId}/activities/${activityId}`),
 };
 
 /**

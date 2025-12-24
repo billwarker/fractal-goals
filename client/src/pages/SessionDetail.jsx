@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import SessionActivityItem from '../components/SessionActivityItem';
 import '../App.css';
 
 /**
@@ -15,6 +16,8 @@ function SessionDetail() {
     const [sessionData, setSessionData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [activities, setActivities] = useState([]);
+    const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
 
     useEffect(() => {
         if (!rootId || !sessionId) {
@@ -22,7 +25,17 @@ function SessionDetail() {
             return;
         }
         fetchSession();
+        fetchActivities();
     }, [rootId, sessionId, navigate]);
+
+    const fetchActivities = async () => {
+        try {
+            const res = await fractalApi.getActivities(rootId);
+            setActivities(res.data);
+        } catch (err) {
+            console.error("Failed to fetch activities", err);
+        }
+    };
 
     const fetchSession = async () => {
         try {
@@ -97,6 +110,53 @@ function SessionDetail() {
             console.error('Error deleting session:', err);
             alert('Error deleting session: ' + err.message);
         }
+    };
+
+    const handleToggleSessionComplete = async () => {
+        if (!session) return;
+
+        try {
+            const newCompleted = !session.attributes.completed;
+            const res = await fractalApi.toggleGoalCompletion(rootId, sessionId, newCompleted);
+            setSession(res.data.goal); // Endpoint returns { status: 'success', goal: ... }
+        } catch (err) {
+            console.error('Error toggling completion:', err);
+            alert('Error updating completion status');
+        }
+    };
+
+    const handleAddActivity = (sectionIndex, activityId) => {
+        const activityDef = activities.find(a => a.id === activityId);
+        if (!activityDef) return;
+
+        const newActivity = {
+            type: 'activity',
+            name: activityDef.name,
+            activity_id: activityDef.id,
+            instance_id: crypto.randomUUID(),
+            description: activityDef.description,
+            has_sets: activityDef.has_sets,
+            has_metrics: activityDef.has_metrics,
+            completed: false,
+            sets: activityDef.has_sets ? [] : undefined,
+            metrics: (!activityDef.has_sets && activityDef.has_metrics) ?
+                activityDef.metric_definitions.map(m => ({ metric_id: m.id, value: '' })) : undefined
+        };
+
+        const updatedData = { ...sessionData };
+        if (!updatedData.sections[sectionIndex].exercises) {
+            updatedData.sections[sectionIndex].exercises = [];
+        }
+        updatedData.sections[sectionIndex].exercises.push(newActivity);
+        setSessionData(updatedData);
+        setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
+    };
+
+    const handleDeleteExercise = (sectionIndex, exerciseIndex) => {
+        // Same as removing from array
+        const updatedData = { ...sessionData };
+        updatedData.sections[sectionIndex].exercises.splice(exerciseIndex, 1);
+        setSessionData(updatedData);
     };
 
     if (loading) {
@@ -195,92 +255,161 @@ function SessionDetail() {
                         {/* Exercises */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {section.exercises?.map((exercise, exerciseIndex) => (
-                                <div
-                                    key={exerciseIndex}
-                                    style={{
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '6px',
-                                        padding: '16px'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                                        {/* Checkbox */}
-                                        <div
-                                            onClick={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
-                                            style={{
-                                                width: '24px',
-                                                height: '24px',
-                                                borderRadius: '4px',
-                                                border: `2px solid ${exercise.completed ? '#4caf50' : '#666'}`,
-                                                background: exercise.completed ? '#4caf50' : 'transparent',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                flexShrink: 0,
-                                                marginTop: '2px'
-                                            }}
-                                        >
-                                            {exercise.completed && (
-                                                <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>✓</span>
-                                            )}
-                                        </div>
-
-                                        {/* Exercise Content */}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{
-                                                fontWeight: 'bold',
-                                                fontSize: '16px',
-                                                marginBottom: '8px',
-                                                textDecoration: exercise.completed ? 'line-through' : 'none',
-                                                opacity: exercise.completed ? 0.6 : 1
-                                            }}>
-                                                {exercise.name}
+                                exercise.type === 'activity' ? (
+                                    <SessionActivityItem
+                                        key={exercise.instance_id || exerciseIndex}
+                                        exercise={exercise}
+                                        activityDefinition={activities.find(a => a.id === exercise.activity_id)}
+                                        onUpdate={(field, value) => handleExerciseChange(sectionIndex, exerciseIndex, field, value)}
+                                        onToggleComplete={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
+                                        onDelete={() => handleDeleteExercise(sectionIndex, exerciseIndex)}
+                                    />
+                                ) : (
+                                    <div
+                                        key={exerciseIndex}
+                                        style={{
+                                            background: '#2a2a2a',
+                                            border: '1px solid #444',
+                                            borderRadius: '6px',
+                                            padding: '16px'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                                            {/* Checkbox */}
+                                            <div
+                                                onClick={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '4px',
+                                                    border: `2px solid ${exercise.completed ? '#4caf50' : '#666'}`,
+                                                    background: exercise.completed ? '#4caf50' : 'transparent',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    flexShrink: 0,
+                                                    marginTop: '2px'
+                                                }}
+                                            >
+                                                {exercise.completed && (
+                                                    <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>✓</span>
+                                                )}
                                             </div>
 
-                                            {exercise.description && (
+                                            {/* Exercise Content */}
+                                            <div style={{ flex: 1 }}>
                                                 <div style={{
-                                                    fontSize: '13px',
-                                                    color: '#aaa',
-                                                    marginBottom: '12px'
+                                                    fontWeight: 'bold',
+                                                    fontSize: '16px',
+                                                    marginBottom: '8px',
+                                                    textDecoration: exercise.completed ? 'line-through' : 'none',
+                                                    opacity: exercise.completed ? 0.6 : 1
                                                 }}>
-                                                    {exercise.description}
+                                                    {exercise.name}
                                                 </div>
-                                            )}
 
-                                            {/* Notes Field */}
-                                            <div>
-                                                <label style={{
-                                                    display: 'block',
-                                                    fontSize: '12px',
-                                                    color: '#888',
-                                                    marginBottom: '4px'
-                                                }}>
-                                                    Notes:
-                                                </label>
-                                                <textarea
-                                                    value={exercise.notes || ''}
-                                                    onChange={(e) => handleExerciseChange(sectionIndex, exerciseIndex, 'notes', e.target.value)}
-                                                    placeholder="Add notes about this exercise..."
-                                                    style={{
-                                                        width: '100%',
-                                                        minHeight: '60px',
-                                                        padding: '8px',
-                                                        background: '#1e1e1e',
-                                                        border: '1px solid #444',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
+                                                {exercise.description && (
+                                                    <div style={{
                                                         fontSize: '13px',
-                                                        fontFamily: 'inherit',
-                                                        resize: 'vertical'
-                                                    }}
-                                                />
+                                                        color: '#aaa',
+                                                        marginBottom: '12px'
+                                                    }}>
+                                                        {exercise.description}
+                                                    </div>
+                                                )}
+
+                                                {/* Notes Field */}
+                                                <div>
+                                                    <label style={{
+                                                        display: 'block',
+                                                        fontSize: '12px',
+                                                        color: '#888',
+                                                        marginBottom: '4px'
+                                                    }}>
+                                                        Notes:
+                                                    </label>
+                                                    <textarea
+                                                        value={exercise.notes || ''}
+                                                        onChange={(e) => handleExerciseChange(sectionIndex, exerciseIndex, 'notes', e.target.value)}
+                                                        placeholder="Add notes about this exercise..."
+                                                        style={{
+                                                            width: '100%',
+                                                            minHeight: '60px',
+                                                            padding: '8px',
+                                                            background: '#1e1e1e',
+                                                            border: '1px solid #444',
+                                                            borderRadius: '4px',
+                                                            color: 'white',
+                                                            fontSize: '13px',
+                                                            fontFamily: 'inherit',
+                                                            resize: 'vertical'
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                )
                             ))}
+                        </div>
+
+                        {/* Add Activity Button */}
+                        <div style={{ marginTop: '15px' }}>
+                            {showActivitySelector[sectionIndex] ? (
+                                <div style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #444' }}>
+                                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity to add:</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                        {activities.map(act => (
+                                            <button
+                                                key={act.id}
+                                                onClick={() => handleAddActivity(sectionIndex, act.id)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#333',
+                                                    border: '1px solid #555',
+                                                    borderRadius: '4px',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px'
+                                                }}
+                                            >
+                                                {act.name}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#888',
+                                                cursor: 'pointer',
+                                                fontSize: '13px'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px dashed #444',
+                                        color: '#888',
+                                        padding: '8px 16px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        width: '100%',
+                                        textAlign: 'center'
+                                    }}
+                                >
+                                    + Add Activity
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -327,11 +456,26 @@ function SessionDetail() {
                         Cancel
                     </button>
                     <button
+                        onClick={handleToggleSessionComplete}
+                        style={{
+                            padding: '12px 32px',
+                            background: session.attributes?.completed ? '#4caf50' : 'transparent',
+                            border: session.attributes?.completed ? 'none' : '2px solid #666',
+                            borderRadius: '6px',
+                            color: session.attributes?.completed ? 'white' : '#ccc',
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {session.attributes?.completed ? '✓ Completed' : 'Mark Complete'}
+                    </button>
+                    <button
                         onClick={handleSaveSession}
                         disabled={saving}
                         style={{
                             padding: '12px 32px',
-                            background: saving ? '#666' : '#4caf50',
+                            background: saving ? '#666' : '#2196f3',
                             border: 'none',
                             borderRadius: '6px',
                             color: 'white',
@@ -341,7 +485,7 @@ function SessionDetail() {
                             opacity: saving ? 0.5 : 1
                         }}
                     >
-                        {saving ? 'Saving...' : '✓ Save Session'}
+                        {saving ? 'Saving...' : 'Save Session'}
                     </button>
                 </div>
             </div>

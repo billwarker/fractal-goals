@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useHeader } from '../context/HeaderContext';
+import ActivitiesManager from '../components/ActivitiesManager';
 import '../App.css';
 
 /**
@@ -18,6 +19,8 @@ function Sessions() {
     const [loading, setLoading] = useState(true);
     const [filterCompleted, setFilterCompleted] = useState('all');
     const [parentGoals, setParentGoals] = useState({});
+    const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+    const [activities, setActivities] = useState([]);
 
     useEffect(() => {
         if (!rootId) {
@@ -25,7 +28,17 @@ function Sessions() {
             return;
         }
         fetchSessions();
+        fetchActivities();
     }, [rootId, navigate]);
+
+    const fetchActivities = async () => {
+        try {
+            const res = await fractalApi.getActivities(rootId);
+            setActivities(res.data);
+        } catch (err) {
+            console.error("Failed to fetch activities", err);
+        }
+    };
 
     // Filter logic removed from header effect
 
@@ -204,6 +217,21 @@ function Sessions() {
                     >
                         + Create Template
                     </button>
+                    <button
+                        onClick={() => setShowActivitiesModal(true)}
+                        style={{
+                            padding: '6px 16px',
+                            background: '#333',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: '#ccc',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: 500
+                        }}
+                    >
+                        Manage Activities
+                    </button>
                 </div>
             </div>
 
@@ -234,7 +262,10 @@ function Sessions() {
                                         border: '1px solid #333',
                                         borderRadius: '8px',
                                         overflow: 'hidden',
-                                        opacity: session.attributes?.completed ? 0.7 : 1
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
                                     }}
                                 >
                                     {/* Top Level: High-level session info */}
@@ -378,50 +409,108 @@ function Sessions() {
                                                             {/* Exercises - Vertical List */}
                                                             {section.exercises && section.exercises.length > 0 && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                    {section.exercises.map((exercise, exerciseIndex) => (
-                                                                        <div
-                                                                            key={exerciseIndex}
-                                                                            style={{
-                                                                                padding: '8px',
-                                                                                background: '#1e1e1e',
-                                                                                borderRadius: '4px',
-                                                                                fontSize: '13px'
-                                                                            }}
-                                                                        >
-                                                                            <div style={{ display: 'flex', alignItems: 'start', gap: '6px' }}>
-                                                                                <span style={{ fontSize: '14px', marginTop: '2px' }}>
-                                                                                    {exercise.completed ? '✓' : '○'}
-                                                                                </span>
-                                                                                <div style={{ flex: 1 }}>
-                                                                                    <div style={{
-                                                                                        fontWeight: 500,
-                                                                                        textDecoration: exercise.completed ? 'line-through' : 'none',
-                                                                                        marginBottom: '2px'
-                                                                                    }}>
-                                                                                        {exercise.name}
+                                                                    {section.exercises.map((exercise, exerciseIndex) => {
+                                                                        const actDef = exercise.type === 'activity' ? activities.find(a => a.id === exercise.activity_id) : null;
+
+                                                                        const getMetricInfo = (metricId) => {
+                                                                            if (!actDef) return { name: '', unit: '' };
+                                                                            const m = actDef.metric_definitions.find(md => md.id === metricId);
+                                                                            return m || { name: '', unit: '' };
+                                                                        };
+
+                                                                        return (
+                                                                            <div
+                                                                                key={exerciseIndex}
+                                                                                style={{
+                                                                                    padding: '8px',
+                                                                                    background: '#1e1e1e',
+                                                                                    borderRadius: '4px',
+                                                                                    fontSize: '13px',
+                                                                                    border: exercise.type === 'activity' ? '1px solid #33691e' : 'none'
+                                                                                }}
+                                                                            >
+                                                                                <div style={{ display: 'flex', alignItems: 'start', gap: '6px' }}>
+                                                                                    {exercise.type !== 'activity' && (
+                                                                                        <span style={{ fontSize: '14px', marginTop: '2px', color: exercise.completed ? '#4caf50' : '#666' }}>
+                                                                                            {exercise.completed ? '✓' : '○'}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <div style={{ flex: 1 }}>
+                                                                                        <div style={{
+                                                                                            fontWeight: 500,
+                                                                                            textDecoration: exercise.completed ? 'line-through' : 'none',
+                                                                                            marginBottom: '2px',
+                                                                                            color: exercise.completed ? '#888' : 'white'
+                                                                                        }}>
+                                                                                            {exercise.name}
+                                                                                        </div>
+
+                                                                                        {/* Activity Data Display */}
+                                                                                        {exercise.type === 'activity' && (
+                                                                                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#ccc' }}>
+                                                                                                {/* Sets View */}
+                                                                                                {exercise.has_sets && exercise.sets && exercise.sets.length > 0 && (
+                                                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px', borderLeft: '2px solid #333', marginTop: '6px' }}>
+                                                                                                        {exercise.sets.map((set, setIdx) => (
+                                                                                                            <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                                                                                <span style={{ color: '#666', fontSize: '11px', width: '40px' }}>SET {setIdx + 1}</span>
+                                                                                                                {set.metrics?.map(m => {
+                                                                                                                    const mInfo = getMetricInfo(m.metric_id);
+                                                                                                                    if (!m.value) return null;
+                                                                                                                    return (
+                                                                                                                        <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
+                                                                                                                            <span style={{ color: '#888' }}>{mInfo.name}:</span>
+                                                                                                                            <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                        </div>
+                                                                                                                    );
+                                                                                                                })}
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                )}
+
+                                                                                                {/* Single Metrics View */}
+                                                                                                {!exercise.has_sets && exercise.has_metrics && exercise.metrics && (
+                                                                                                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                                                                                        {exercise.metrics.map(m => {
+                                                                                                            const mInfo = getMetricInfo(m.metric_id);
+                                                                                                            if (!m.value) return null;
+                                                                                                            return (
+                                                                                                                <div key={m.metric_id} style={{ background: '#263238', padding: '2px 8px', borderRadius: '3px', border: '1px solid #37474F' }}>
+                                                                                                                    <span style={{ color: '#aaa', marginRight: '4px' }}>{mInfo.name}:</span>
+                                                                                                                    <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                </div>
+                                                                                                            )
+                                                                                                        })}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+
+                                                                                        {exercise.description && (
+                                                                                            <div style={{
+                                                                                                fontSize: '11px',
+                                                                                                color: '#888',
+                                                                                                marginTop: '4px',
+                                                                                                marginBottom: '4px'
+                                                                                            }}>
+                                                                                                {exercise.description}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {exercise.notes && (
+                                                                                            <div style={{
+                                                                                                fontSize: '11px',
+                                                                                                color: '#4caf50',
+                                                                                                fontStyle: 'italic'
+                                                                                            }}>
+                                                                                                💡 {exercise.notes}
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
-                                                                                    {exercise.description && (
-                                                                                        <div style={{
-                                                                                            fontSize: '11px',
-                                                                                            color: '#888',
-                                                                                            marginBottom: '4px'
-                                                                                        }}>
-                                                                                            {exercise.description}
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {exercise.notes && (
-                                                                                        <div style={{
-                                                                                            fontSize: '11px',
-                                                                                            color: '#4caf50',
-                                                                                            fontStyle: 'italic'
-                                                                                        }}>
-                                                                                            💡 {exercise.notes}
-                                                                                        </div>
-                                                                                    )}
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -455,6 +544,13 @@ function Sessions() {
                     </div>
                 )}
             </div>
+
+            {showActivitiesModal && (
+                <ActivitiesManager
+                    rootId={rootId}
+                    onClose={() => setShowActivitiesModal(false)}
+                />
+            )}
         </div>
     );
 }

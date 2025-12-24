@@ -14,7 +14,8 @@ from models import (
     get_all_practice_sessions, get_immediate_goals_for_session,
     build_goal_tree, build_practice_session_tree,
     delete_goal_recursive, delete_practice_session,
-    validate_root_goal, get_root_id_for_goal
+    validate_root_goal, get_root_id_for_goal,
+    ActivityDefinition, MetricDefinition, ActivityInstance, MetricValue
 )
 
 # Create blueprint
@@ -196,6 +197,100 @@ def create_practice_session():
     finally:
         db_session.close()
 
+def sync_session_activities(db_session, practice_session, session_data_dict):
+    """
+    Parses session_data JSON to find activity instances and syncs them to the relational DB.
+     This allows for analytics querying later.
+    """
+    if not session_data_dict:
+        return
+
+    # Extract all activity items from the session structure
+    # Structure: { sections: [ { items/exercises: [ { type: 'activity', ... } ] } ] }
+    
+    found_instances = []
+    
+    sections = session_data_dict.get('sections', [])
+    for section in sections:
+        items = section.get('exercises', []) # Currently called 'exercises' in frontend, maybe mixed
+        # items might include old-style exercises AND new activities.
+        # We look for explicit type='activity' or presence of 'activity_id'
+        
+        for item in items:
+            # Check if this is a trackable activity
+            activity_def_id = item.get('activity_id')
+            if activity_def_id:
+                # Check for Sets
+                sets = item.get('sets', [])
+                instances_to_process = []
+
+                if sets:
+                    # Treat each set as an instance
+                    for s in sets:
+                         if s.get('instance_id'):
+                             instances_to_process.append(s)
+                else:
+                    # Treat the item itself as the instance (legacy or single instance)
+                    if item.get('instance_id'):
+                        instances_to_process.append(item)
+
+                for inst_data in instances_to_process:
+                    instance_id = inst_data.get('instance_id')
+                    
+                    # Update or Create Instance
+                    instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+                    if not instance:
+                        instance = ActivityInstance(
+                            id=instance_id,
+                            practice_session_id=practice_session.id,
+                            activity_definition_id=activity_def_id,
+                            created_at=practice_session.created_at # Approximate timestamp
+                        )
+                        db_session.add(instance)
+                    
+                    found_instances.append(instance_id)
+
+                    # Update Metrics
+                    # metrics = [ { 'metric_id': '...', 'value': 100 }, ... ]
+                    for m_data in inst_data.get('metrics', []):
+                        m_def_id = m_data.get('metric_id')
+                        m_val = m_data.get('value')
+                        
+                        # Only save if we have a value.
+                        if m_def_id and m_val is not None and str(m_val).strip() != '':
+                                # Check if value is float convertible
+                                try:
+                                    float_val = float(m_val)
+                                    # Find existing value record
+                                    metric_val_rec = db_session.query(MetricValue).filter_by(
+                                        activity_instance_id=instance_id,
+                                        metric_definition_id=m_def_id
+                                    ).first()
+                                    
+                                    if metric_val_rec:
+                                        metric_val_rec.value = float_val
+                                    else:
+                                        new_mv = MetricValue(
+                                            activity_instance_id=instance_id,
+                                            metric_definition_id=m_def_id,
+                                            value=float_val
+                                        )
+                                        db_session.add(new_mv)
+                                except ValueError:
+                                    pass # Ignore non-numeric values
+    
+    # Optional: Delete instances that are no longer in the session_data?
+    # This is risky if we have partial updates (PATCH). 
+    # But currently we overwrite session_data on PUT/POST fully.
+    # So yes, we should clean up orphans for this session.
+    # Get all current instances for this session
+    existing_for_session = db_session.query(ActivityInstance).filter_by(practice_session_id=practice_session.id).all()
+    for ex_inst in existing_for_session:
+        if ex_inst.id not in found_instances:
+            db_session.delete(ex_inst)
+            
+
+
 
 @api_bp.route('/practice-sessions', methods=['GET'])
 def get_all_practice_sessions_endpoint():
@@ -301,7 +396,8 @@ def update_goal_endpoint(goal_id: str):
 
 
 @api_bp.route('/goals/<goal_id>/complete', methods=['PATCH'])
-def update_goal_completion_endpoint(goal_id: str):
+@api_bp.route('/<root_id>/goals/<goal_id>/complete', methods=['PATCH'])
+def update_goal_completion_endpoint(goal_id: str, root_id=None):
     """Update goal or practice session completion status."""
     data = request.get_json()
     completed = data.get('completed', False)
@@ -488,6 +584,26 @@ def create_fractal_session(root_id):
         
         db_session.commit()
         
+        # Sync activities to relational DB
+        if new_session.session_data:
+             import json
+             try:
+                 data_dict = json.loads(new_session.session_data)
+                 sync_session_activities(db_session, new_session, data_dict)
+                 db_session.commit() # Commit changes from sync
+             except Exception as e:
+                 print(f"Warning: Failed to sync activities: {e}")
+
+        # Sync activities to relational DB
+        if new_session.session_data:
+             import json
+             try:
+                 data_dict = json.loads(new_session.session_data)
+                 sync_session_activities(db_session, new_session, data_dict)
+                 db_session.commit() # Commit changes from sync
+             except Exception as e:
+                 print(f"Warning: Failed to sync activities: {e}")
+
         # Return the created session
         result = build_practice_session_tree(db_session, new_session)
         return jsonify(result), 201
@@ -541,6 +657,18 @@ def update_practice_session(root_id, session_id):
                 practice_session.session_data = data['session_data']
             else:
                 practice_session.session_data = json.dumps(data['session_data'])
+
+            # Sync activities
+            try:
+                # If string, parse it first
+                if isinstance(data['session_data'], str):
+                     s_data = json.loads(data['session_data'])
+                else:
+                     s_data = data['session_data']
+                
+                sync_session_activities(db_session, practice_session, s_data)
+            except Exception as e:
+                print(f"Warning: Failed to sync activities in update: {e}")
         
         db_session.commit()
         
@@ -883,6 +1011,93 @@ def toggle_fractal_goal_completion(root_id, goal_id):
         
         return jsonify({"goal": goal.to_dict(include_children=False)}), 200
         
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+# ============================================================================
+# ACTIVITY DEFINITION ENDPOINTS (Fractal-Scoped)
+# ============================================================================
+
+@api_bp.route('/<root_id>/activities', methods=['GET'])
+def get_activities(root_id):
+    """Get all activity definitions for a fractal."""
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id)
+        if not root:
+             return jsonify({"error": "Fractal not found"}), 404
+        
+        activities = session.query(ActivityDefinition).filter_by(root_id=root_id).order_by(ActivityDefinition.name).all()
+        return jsonify([a.to_dict() for a in activities])
+    finally:
+        session.close()
+
+@api_bp.route('/<root_id>/activities', methods=['POST'])
+def create_activity(root_id):
+    """Create a new activity definition with metrics."""
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id)
+        if not root:
+             return jsonify({"error": "Fractal not found"}), 404
+        
+        data = request.get_json()
+        if not data.get('name'):
+            return jsonify({"error": "Name is required"}), 400
+        
+        # Create Activity
+        new_activity = ActivityDefinition(
+            root_id=root_id,
+            name=data['name'],
+            description=data.get('description', ''),
+            has_sets=data.get('has_sets', False),
+            has_metrics=data.get('has_metrics', True)
+        )
+        session.add(new_activity)
+        session.flush() # Get ID
+        
+        # Create Metrics
+        # Expect metrics: [ { name: "Speed", unit: "bpm" }, ... ]
+        metrics_data = data.get('metrics', [])
+        # LIMIT TO 3 METRICS per requirements? "picking up to as many as three"
+        if len(metrics_data) > 3:
+             return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
+
+        for m in metrics_data:
+            if m.get('name') and m.get('unit'):
+                new_metric = MetricDefinition(
+                    activity_id=new_activity.id,
+                    name=m['name'],
+                    unit=m['unit']
+                )
+                session.add(new_metric)
+        
+        session.commit()
+        session.refresh(new_activity) # refresh to load metrics
+        return jsonify(new_activity.to_dict()), 201
+
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@api_bp.route('/<root_id>/activities/<activity_id>', methods=['DELETE'])
+def delete_activity(root_id, activity_id):
+    """Delete an activity definition."""
+    session = get_session(engine)
+    try:
+        # Check ownership via root_id? Not strictly necessary if ID is unique, but good practice.
+        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+            
+        session.delete(activity)
+        session.commit()
+        return jsonify({"message": "Activity deleted"})
     except Exception as e:
         session.rollback()
         return jsonify({"error": str(e)}), 500

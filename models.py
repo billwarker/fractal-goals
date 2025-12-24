@@ -1,14 +1,6 @@
-"""
-SQLAlchemy database models for Fractal Goals application.
 
-This module defines the database schema using SQLAlchemy ORM:
-- Goal: All goal types except practice sessions
-- PracticeSession: Separate table for practice sessions with extensibility
-- practice_session_goals: Junction table for many-to-many relationships
-"""
-
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Float
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
 from datetime import datetime
 import uuid
 
@@ -246,6 +238,120 @@ class SessionTemplate(Base):
     
     def __repr__(self):
         return f"<SessionTemplate(id={self.id}, name={self.name}, root_id={self.root_id})>"
+
+
+# New Models for Activities and Metrics
+
+class ActivityDefinition(Base):
+    """
+    Defines a type of activity that can be performed in a practice session.
+    Example: "Scale Practice", "Sight Reading", "Improvisation"
+    """
+    __tablename__ = 'activity_definitions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False) # Scoped to a Fractal
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    created_at = Column(DateTime, default=datetime.now)
+    has_sets = Column(Boolean, default=False)
+    has_metrics = Column(Boolean, default=True)
+
+    # Relationship to metrics
+    metric_definitions = relationship(
+        "MetricDefinition",
+        backref="activity_definition",
+        cascade="all, delete-orphan",
+        lazy='joined'
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "name": self.name,
+            "description": self.description,
+            "has_sets": self.has_sets,
+            "has_metrics": self.has_metrics,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "metric_definitions": [m.to_dict() for m in self.metric_definitions]
+        }
+
+class MetricDefinition(Base):
+    """
+    Defines a numerical metric to track for a specific activity.
+    Example: "BPM", "Accuracy (%)", "Minutes"
+    """
+    __tablename__ = 'metric_definitions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    name = Column(String, nullable=False)
+    unit = Column(String, nullable=False) # e.g. "bpm", "seconds", "reps", "%"
+    created_at = Column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "activity_id": self.activity_id,
+            "name": self.name,
+            "unit": self.unit
+        }
+
+class ActivityInstance(Base):
+    """
+    A specific instance of an activity performed within a practice session.
+    """
+    __tablename__ = 'activity_instances'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    practice_session_id = Column(String, ForeignKey('practice_sessions.id', ondelete='CASCADE'), nullable=False)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Store metrics values for this instance
+    metric_values = relationship(
+        "MetricValue",
+        backref="activity_instance",
+        cascade="all, delete-orphan",
+        lazy='joined'
+    )
+    
+    # Relationship to definition for easy access
+    definition = relationship("ActivityDefinition")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "practice_session_id": self.practice_session_id,
+            "activity_definition_id": self.activity_definition_id,
+            "definition_name": self.definition.name if self.definition else "Unknown",
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "metric_values": [m.to_dict() for m in self.metric_values]
+        }
+
+class MetricValue(Base):
+    """
+    The value recorded for a specific metric in an activity instance.
+    """
+    __tablename__ = 'metric_values'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False)
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id'), nullable=False)
+    value = Column(Float, nullable=False)
+    
+    # Relationship to definition
+    definition = relationship("MetricDefinition")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "metric_definition_id": self.metric_definition_id,
+            "name": self.definition.name if self.definition else "Unknown",
+            "unit": self.definition.unit if self.definition else "",
+            "value": self.value
+        }
 
 
 # Database connection and session management
