@@ -297,7 +297,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
     return { nodes, edges };
 };
 
-const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild }) => {
+const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, sidebarOpen }) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -351,6 +351,16 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
         setNodes(layoutedNodes);
         setEdges(layoutedEdges);
     }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+
+    // Handle sidebar toggle reflow
+    useEffect(() => {
+        if (rfInstance) {
+            const timer = setTimeout(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 300 });
+            }, 300); // 300ms matches sidebar transition
+            return () => clearTimeout(timer);
+        }
+    }, [sidebarOpen, rfInstance]);
 
     // Center graph on initial mount (with delay for container width transition)
     useEffect(() => {

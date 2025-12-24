@@ -42,13 +42,6 @@ export const fractalApi = {
     getGoals: (rootId) => axios.get(`${API_BASE}/${rootId}/goals`),
 
     /**
-     * Get a specific goal by ID
-     * @param {string} rootId - ID of the fractal
-     * @param {string} goalId - ID of the goal to fetch
-     */
-    getGoal: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}`),
-
-    /**
      * Create a new goal within a fractal
      * @param {string} rootId - ID of the fractal
      * @param {Object} data - {name, description, type, parent_id, deadline}

@@ -53,15 +53,27 @@ def sessions_page(root_id):
     return render_template_string(REACT_APP_TEMPLATE)
 
 
+@pages_bp.route('/<root_id>/session/<session_id>')
+def session_detail_page(root_id, session_id):
+    """Session Detail - Fill in details for a specific practice session."""
+    return render_template_string(REACT_APP_TEMPLATE)
+
+
 @pages_bp.route('/<root_id>/log')
 def log_page(root_id):
     """Log Session - Add practice sessions to the database."""
     return render_template_string(REACT_APP_TEMPLATE)
 
 
+@pages_bp.route('/<root_id>/create-practice-session')
+def create_practice_session(root_id):
+    """Create Practice Session - Page for creating new practice sessions."""
+    return render_template_string(REACT_APP_TEMPLATE)
+
+
 @pages_bp.route('/<root_id>/create-session-template')
-def create_session_template_page(root_id):
-    """Create Session Template - Build reusable practice session templates."""
+def create_session_template(root_id):
+    """Programming - Placeholder for future programming features."""
     return render_template_string(REACT_APP_TEMPLATE)
 
 

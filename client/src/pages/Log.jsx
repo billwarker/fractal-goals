@@ -4,279 +4,363 @@ import { fractalApi } from '../utils/api';
 import '../App.css';
 
 /**
- * Log Page - Log new practice sessions
- * Allows users to create practice sessions linked to short-term goals for the current fractal
+ * Create Practice Session Page
+ * Simple 3-step flow: Select template → Associate with goal → Create session
  */
 function Log() {
-    const { rootId } = useParams(); // Get rootId from URL
+    const { rootId } = useParams();
     const navigate = useNavigate();
 
-    const [fractalData, setFractalData] = useState(null);
-    const [shortTermGoals, setShortTermGoals] = useState([]);
-    const [selectedGoals, setSelectedGoals] = useState([]);
-    const [description, setDescription] = useState('');
-    const [immediateGoals, setImmediateGoals] = useState([{ name: '', description: '' }]);
+    const [templates, setTemplates] = useState([]);
+    const [goals, setGoals] = useState([]);
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [selectedGoalIds, setSelectedGoalIds] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [creating, setCreating] = useState(false);
 
     useEffect(() => {
         if (!rootId) {
             navigate('/');
             return;
         }
-        fetchFractalData();
+        fetchData();
     }, [rootId, navigate]);
 
-    const fetchFractalData = async () => {
+    const fetchData = async () => {
         try {
-            const res = await fractalApi.getGoals(rootId);
-            setFractalData(res.data);
-            const stGoals = collectShortTermGoals(res.data);
-            setShortTermGoals(stGoals);
+            // Fetch templates and goals in parallel
+            const [templatesRes, goalsRes] = await Promise.all([
+                fractalApi.getSessionTemplates(rootId),
+                fractalApi.getGoals(rootId)
+            ]);
+
+            setTemplates(templatesRes.data);
+
+            // Extract all short-term goals from the tree
+            const shortTermGoals = extractShortTermGoals(goalsRes.data);
+            setGoals(shortTermGoals);
+
             setLoading(false);
         } catch (err) {
-            console.error("Failed to fetch fractal data", err);
+            console.error("Failed to fetch data", err);
             setLoading(false);
-            if (err.response?.status === 404) {
-                navigate('/');
+        }
+    };
+
+    const extractShortTermGoals = (goalTree) => {
+        const shortTermGoals = [];
+
+        const traverse = (node) => {
+            if (node.attributes?.type === 'ShortTermGoal') {
+                shortTermGoals.push({
+                    id: node.id,
+                    name: node.name,
+                    description: node.attributes?.description
+                });
             }
-        }
+            if (node.children) {
+                node.children.forEach(child => traverse(child));
+            }
+        };
+
+        traverse(goalTree);
+        return shortTermGoals;
     };
 
-    // Collect all short-term goals from a tree
-    const collectShortTermGoals = (node, collected = []) => {
-        if (!node) return collected;
-
-        const type = node.attributes?.type || node.type;
-        if (type === 'ShortTermGoal') {
-            collected.push({
-                id: node.attributes?.id || node.id,
-                name: node.name
-            });
-        }
-
-        if (node.children && node.children.length > 0) {
-            node.children.forEach(child => collectShortTermGoals(child, collected));
-        }
-
-        return collected;
-    };
-
-    const handleGoalToggle = (goalId) => {
-        setSelectedGoals(prev =>
+    const handleToggleGoal = (goalId) => {
+        setSelectedGoalIds(prev =>
             prev.includes(goalId)
                 ? prev.filter(id => id !== goalId)
                 : [...prev, goalId]
         );
     };
 
-    const handleAddImmediateGoal = () => {
-        setImmediateGoals([...immediateGoals, { name: '', description: '' }]);
-    };
+    const handleCreateSession = async () => {
+        if (!selectedTemplate) {
+            alert('Please select a template');
+            return;
+        }
 
-    const handleRemoveImmediateGoal = (index) => {
-        setImmediateGoals(immediateGoals.filter((_, i) => i !== index));
-    };
-
-    const handleImmediateGoalChange = (index, field, value) => {
-        const updated = [...immediateGoals];
-        updated[index][field] = value;
-        setImmediateGoals(updated);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (selectedGoals.length === 0) {
+        if (selectedGoalIds.length === 0) {
             alert('Please select at least one short-term goal');
             return;
         }
 
-        setSubmitting(true);
+        setCreating(true);
 
         try {
-            await fractalApi.createSession(rootId, {
-                parent_ids: selectedGoals,
-                description: description,
-                immediate_goals: immediateGoals.filter(ig => ig.name.trim() !== '')
-            });
+            // Create the practice session
+            const sessionData = {
+                name: selectedTemplate.name,
+                description: selectedTemplate.description || '',
+                parent_ids: selectedGoalIds,
+                duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
+                session_data: JSON.stringify({
+                    template_id: selectedTemplate.id,
+                    template_name: selectedTemplate.name,
+                    sections: selectedTemplate.template_data?.sections || [],
+                    total_duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0
+                })
+            };
 
-            // Reset form
-            setSelectedGoals([]);
-            setDescription('');
-            setImmediateGoals([{ name: '', description: '' }]);
+            const response = await fractalApi.createSession(rootId, sessionData);
 
-            alert('Practice session logged successfully!');
+            // Get the created session ID from the response
+            const createdSessionId = response.data.id;
+
+            // Navigate to the session detail page to fill in details
+            navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {
-            alert('Error logging practice session: ' + err.message);
-        } finally {
-            setSubmitting(false);
+            console.error('Error creating session:', err);
+            alert('Error creating session: ' + err.message);
+            setCreating(false);
         }
     };
 
+    if (loading) {
+        return (
+            <div className="page-container">
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                    <p>Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="log-page" style={{ padding: '20px', color: 'white', maxWidth: '800px', margin: '0 auto' }}>
-            <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '20px' }}>
-                Log Practice Session
+        <div className="page-container" style={{ color: 'white' }}>
+            <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '30px' }}>
+                Create Practice Session
             </h1>
 
-            {loading ? (
-                <p>Loading...</p>
-            ) : (
-                <form onSubmit={handleSubmit}>
-                    {/* Step 1: Select Short-Term Goals */}
-                    <div style={{ marginBottom: '30px' }}>
-                        <h3 style={{ fontSize: '18px', marginBottom: '12px' }}>
-                            1. Select Short-Term Goals ({selectedGoals.length} selected)
-                        </h3>
-                        {shortTermGoals.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {shortTermGoals.map(goal => (
-                                    <label
-                                        key={goal.id}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            padding: '12px',
-                                            background: selectedGoals.includes(goal.id) ? '#1e3a5f' : '#2a2a2a',
-                                            border: '1px solid ' + (selectedGoals.includes(goal.id) ? '#2196f3' : '#444'),
-                                            borderRadius: '6px',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedGoals.includes(goal.id)}
-                                            onChange={() => handleGoalToggle(goal.id)}
-                                            style={{ marginRight: '12px', cursor: 'pointer' }}
-                                        />
-                                        <span>{goal.name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        ) : (
-                            <p style={{ color: '#666' }}>No short-term goals found in this fractal</p>
-                        )}
-                    </div>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                {/* Step 1: Select Template */}
+                <div style={{
+                    background: '#1e1e1e',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '24px',
+                    marginBottom: '24px'
+                }}>
+                    <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                            background: '#2196f3',
+                            color: 'white',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                        }}>1</span>
+                        Select a Template
+                    </h2>
 
-                    {/* Step 2: Session Description */}
-                    {selectedGoals.length > 0 && (
-                        <>
-                            <div style={{ marginBottom: '30px' }}>
-                                <h3 style={{ fontSize: '18px', marginBottom: '12px' }}>2. Session Description (Optional)</h3>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    placeholder="Describe what you worked on in this session..."
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '100px',
-                                        padding: '12px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '6px',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        fontFamily: 'inherit',
-                                        resize: 'vertical'
-                                    }}
-                                />
-                            </div>
-
-                            {/* Step 3: Immediate Goals */}
-                            <div style={{ marginBottom: '30px' }}>
-                                <h3 style={{ fontSize: '18px', marginBottom: '12px' }}>3. Immediate Goals</h3>
-                                {immediateGoals.map((ig, index) => (
-                                    <div key={index} style={{ marginBottom: '12px', padding: '12px', background: '#2a2a2a', borderRadius: '6px' }}>
-                                        <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                                            <input
-                                                type="text"
-                                                placeholder="Goal name"
-                                                value={ig.name}
-                                                onChange={(e) => handleImmediateGoalChange(index, 'name', e.target.value)}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '8px',
-                                                    background: '#1e1e1e',
-                                                    border: '1px solid #444',
-                                                    borderRadius: '4px',
-                                                    color: 'white'
-                                                }}
-                                            />
-                                            {immediateGoals.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveImmediateGoal(index)}
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        background: '#d32f2f',
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-                                        <textarea
-                                            placeholder="Description (optional)"
-                                            value={ig.description}
-                                            onChange={(e) => handleImmediateGoalChange(index, 'description', e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                background: '#1e1e1e',
-                                                border: '1px solid #444',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                fontSize: '14px',
-                                                fontFamily: 'inherit',
-                                                resize: 'vertical',
-                                                minHeight: '60px'
-                                            }}
-                                        />
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={handleAddImmediateGoal}
-                                    style={{
-                                        padding: '10px 16px',
-                                        background: '#333',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    + Add Immediate Goal
-                                </button>
-                            </div>
-
-                            {/* Submit Button */}
+                    {templates.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
                             <button
-                                type="submit"
-                                disabled={submitting}
+                                onClick={() => navigate(`/${rootId}/create-session-template`)}
                                 style={{
-                                    width: '100%',
-                                    padding: '14px',
-                                    background: submitting ? '#666' : '#4caf50',
+                                    padding: '10px 20px',
+                                    background: '#2196f3',
                                     border: 'none',
-                                    borderRadius: '6px',
+                                    borderRadius: '4px',
                                     color: 'white',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    cursor: submitting ? 'not-allowed' : 'pointer'
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
                                 }}
                             >
-                                {submitting ? 'Logging Session...' : 'Log Practice Session'}
+                                Create a Template
                             </button>
-                        </>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
+                            {templates.map(template => {
+                                const isSelected = selectedTemplate?.id === template.id;
+                                const sectionCount = template.template_data?.sections?.length || 0;
+                                const duration = template.template_data?.total_duration_minutes || 0;
+
+                                return (
+                                    <div
+                                        key={template.id}
+                                        onClick={() => setSelectedTemplate(template)}
+                                        style={{
+                                            background: isSelected ? '#2a3f5f' : '#2a2a2a',
+                                            border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                            borderRadius: '6px',
+                                            padding: '16px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+                                            {template.name}
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
+                                            {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
+                                        </div>
+                                        {template.description && (
+                                            <div style={{ fontSize: '12px', color: '#888' }}>
+                                                {template.description}
+                                            </div>
+                                        )}
+                                        {isSelected && (
+                                            <div style={{
+                                                marginTop: '8px',
+                                                color: '#2196f3',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                ✓ Selected
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
-                </form>
-            )}
+                </div>
+
+                {/* Step 2: Associate with Short-Term Goal */}
+                <div style={{
+                    background: '#1e1e1e',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '24px',
+                    marginBottom: '24px',
+                    opacity: selectedTemplate ? 1 : 0.5,
+                    pointerEvents: selectedTemplate ? 'auto' : 'none'
+                }}>
+                    <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                            background: '#2196f3',
+                            color: 'white',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                        }}>2</span>
+                        Associate with Short-Term Goal(s)
+                    </h2>
+
+                    {goals.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                            <p>No short-term goals found. Create goals in the Fractal View first.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {goals.map(goal => {
+                                const isSelected = selectedGoalIds.includes(goal.id);
+
+                                return (
+                                    <div
+                                        key={goal.id}
+                                        onClick={() => handleToggleGoal(goal.id)}
+                                        style={{
+                                            background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                            border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                            borderRadius: '6px',
+                                            padding: '12px 16px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '4px',
+                                            border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
+                                            background: isSelected ? '#4caf50' : 'transparent',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'white',
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            flexShrink: 0
+                                        }}>
+                                            {isSelected && '✓'}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                                                {goal.name}
+                                            </div>
+                                            {goal.description && (
+                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                    {goal.description}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Step 3: Create Session Button */}
+                <div style={{
+                    background: '#1e1e1e',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '24px',
+                    textAlign: 'center'
+                }}>
+                    <h2 style={{ fontSize: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <span style={{
+                            background: '#2196f3',
+                            color: 'white',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                        }}>3</span>
+                        Create Practice Session
+                    </h2>
+
+                    <button
+                        onClick={handleCreateSession}
+                        disabled={!selectedTemplate || selectedGoalIds.length === 0 || creating}
+                        style={{
+                            padding: '16px 48px',
+                            background: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? '#666' : '#4caf50',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: 'white',
+                            fontSize: '18px',
+                            fontWeight: 'bold',
+                            cursor: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 'not-allowed' : 'pointer',
+                            opacity: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 0.5 : 1,
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        {creating ? 'Creating...' : '✓ Create Session'}
+                    </button>
+
+                    {selectedTemplate && selectedGoalIds.length > 0 && (
+                        <div style={{ marginTop: '16px', fontSize: '14px', color: '#aaa' }}>
+                            Creating: <strong style={{ color: 'white' }}>{selectedTemplate.name}</strong>
+                            {' '}associated with{' '}
+                            <strong style={{ color: 'white' }}>{selectedGoalIds.length}</strong>
+                            {' '}goal{selectedGoalIds.length !== 1 ? 's' : ''}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

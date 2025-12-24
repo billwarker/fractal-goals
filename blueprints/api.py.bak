@@ -555,36 +555,6 @@ def update_practice_session(root_id, session_id):
         db_session.close()
 
 
-
-@api_bp.route('/<root_id>/sessions/<session_id>', methods=['DELETE'])
-def delete_practice_session(root_id, session_id):
-    """Delete a practice session."""
-    db_session = get_session(engine)
-    try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        # Get the practice session
-        practice_session = db_session.query(PracticeSession).filter_by(
-            id=session_id,
-            root_id=root_id
-        ).first()
-        
-        if not practice_session:
-            return jsonify({"error": "Practice session not found"}), 404
-            
-        db_session.delete(practice_session)
-        db_session.commit()
-        
-        return jsonify({"message": "Practice session deleted successfully"})
-        
-    except Exception as e:
-        db_session.rollback()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
 # ============================================================================
 # SESSION TEMPLATE ENDPOINTS (Fractal-Scoped)
 # ============================================================================

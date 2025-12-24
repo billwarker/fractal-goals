@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { globalApi, fractalApi } from './utils/api';
+import { HeaderProvider, useHeader } from './context/HeaderContext';
 import './App.css';
 
 // Import page components
 import Selection from './pages/Selection';
 import FractalGoals from './pages/FractalGoals';
 import Sessions from './pages/Sessions';
+import SessionDetail from './pages/SessionDetail';
 import Log from './pages/Log';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
 
@@ -66,15 +69,13 @@ function App() {
 
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [fractalToDelete, setFractalToDelete] = useState(null);
-
-    // Form State for creating new fractals
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [fractalName, setFractalName] = useState('Fractal Goals');
+    const [fractalNameCache, setFractalNameCache] = useState({});
 
-    useEffect(() => {
-        setLoading(false);
-    }, []);
+    // Deletion state
+    const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const handleDeleteFractal = (e, fractalId, fractalName) => {
         e.stopPropagation();
@@ -85,7 +86,7 @@ function App() {
         if (!fractalToDelete) return;
 
         try {
-            await axios.delete(`http://localhost:8000/api/fractals/${fractalToDelete.id}`);
+            await globalApi.deleteFractal(fractalToDelete.id);
             setFractalToDelete(null);
 
             // If we're currently viewing this fractal, redirect to home
@@ -125,25 +126,33 @@ function App() {
 
     // Navigation header component
     const NavigationHeader = () => {
+        const { headerActions } = useHeader();
+
         // Extract rootId from current path
         const pathParts = location.pathname.split('/');
         const rootId = pathParts[1]; // First part after /
 
-        const [fractalName, setFractalName] = React.useState('Fractal Goals');
-
-        // Fetch fractal name when rootId changes
-        React.useEffect(() => {
-            if (rootId && rootId !== '') {
-                // Fetch the fractal data to get its name
-                axios.get(`http://localhost:8001/api/${rootId}/goals`)
-                    .then(res => {
-                        if (res.data && res.data.name) {
-                            setFractalName(res.data.name);
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Failed to fetch fractal name:', err);
-                    });
+        // Fetch fractal name on component mount or rootId change
+        useEffect(() => {
+            if (rootId && rootId !== 'assets' && rootId !== 'vite.svg') {
+                if (fractalNameCache[rootId]) {
+                    setFractalName(fractalNameCache[rootId]);
+                } else {
+                    fractalApi.getGoal(rootId, rootId) // Fetch root goal to get name
+                        .then(res => {
+                            if (res.data && res.data.name) {
+                                setFractalName(res.data.name);
+                                // Update cache
+                                setFractalNameCache(prev => ({
+                                    ...prev,
+                                    [rootId]: res.data.name
+                                }));
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Failed to fetch fractal name:', err);
+                        });
+                }
             } else {
                 setFractalName('Fractal Goals');
             }
@@ -154,15 +163,26 @@ function App() {
 
         const navItems = [
             { path: `/${rootId}/fractal-goals`, label: 'FRACTAL VIEW' },
-            { path: `/${rootId}/sessions`, label: 'SESSIONS' },
-            { path: `/${rootId}/log`, label: 'LOG' },
-            { path: `/${rootId}/create-session-template`, label: 'TEMPLATES' }
+            { path: `/${rootId}/sessions`, label: 'SESSIONS' }
         ];
 
         return (
             <div className="top-nav-links">
                 <div className="nav-group">
                     <span className="fractal-title">{fractalName}</span>
+                    <div className="nav-separator">|</div>
+                    <button
+                        className="nav-text-link add-session-btn"
+                        onClick={() => navigate(`/${rootId}/create-practice-session`)}
+                        style={{
+                            background: '#4caf50',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        + ADD SESSION
+                    </button>
                     <div className="nav-separator">|</div>
                     {navItems.map(item => (
                         <button
@@ -173,6 +193,15 @@ function App() {
                             {item.label}
                         </button>
                     ))}
+
+                    {/* Render Page Specific Actions */}
+                    {headerActions && (
+                        <>
+                            <div className="nav-separator">|</div>
+                            {headerActions}
+                        </>
+                    )}
+
                     <div className="nav-separator">|</div>
                     <button className="nav-text-link home-link" onClick={() => navigate('/')}>
                         EXIT TO HOME
@@ -183,95 +212,89 @@ function App() {
     };
 
     return (
-        <div className="app-container">
-            <NavigationHeader />
+        <HeaderProvider>
+            <div className="app-container">
+                {location.pathname !== '/' && (
+                    <NavigationHeader />
+                )}
 
-            <div className="top-section">
-                <div className="main-content">
-                    {loading ? (
-                        <p>Loading...</p>
+                <div className="content-container">
+                    {location.pathname === '/' ? (
+                        <Selection
+                            openModal={openModal}
+                            onDeleteFractal={handleDeleteFractal}
+                        />
                     ) : (
                         <Routes>
-                            <Route
-                                path="/"
-                                element={
-                                    <Selection
-                                        onDeleteFractal={handleDeleteFractal}
-                                        onCreateNewFractal={openModal}
-                                    />
-                                }
-                            />
-                            <Route
-                                path="/selection"
-                                element={<Navigate to="/" replace />}
-                            />
                             <Route
                                 path="/:rootId/fractal-goals"
                                 element={<FractalGoals />}
                             />
                             <Route path="/:rootId/sessions" element={<Sessions />} />
-                            <Route path="/:rootId/log" element={<Log />} />
+                            <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
+                            <Route path="/:rootId/create-practice-session" element={<Log />} />
                             <Route path="/:rootId/create-session-template" element={<CreateSessionTemplate />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     )}
                 </div>
-            </div>
 
-            {/* Create Fractal Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>Create New Fractal</h2>
-                        <form onSubmit={handleSubmit}>
-                            <div className="form-group">
-                                <label>Name:</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    required
-                                    autoFocus
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>Description:</label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={4}
-                                />
-                            </div>
-
-                            <div className="modal-actions">
-                                <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit">Create</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation Modal */}
-            {fractalToDelete && (
-                <div className="modal-overlay" onClick={() => setFractalToDelete(null)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>Delete Fractal</h2>
-                        <p>Are you sure you want to delete <strong>{fractalToDelete.name}</strong>?</p>
-                        <p style={{ color: '#ff6b6b', fontSize: '0.9em' }}>
-                            This will permanently delete the entire goal tree.
-                        </p>
-                        <div className="modal-actions">
-                            <button onClick={() => setFractalToDelete(null)}>Cancel</button>
-                            <button onClick={confirmDeleteFractal} style={{ background: '#d32f2f' }}>
-                                Delete
-                            </button>
+                {/* Create Fractal Modal */}
+                {showModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h2>Create New Fractal</h2>
+                            <form onSubmit={handleSubmit}>
+                                <div className="form-group">
+                                    <label>Name</label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Description (Optional)</label>
+                                    <textarea
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        rows="3"
+                                    />
+                                </div>
+                                <div className="modal-actions">
+                                    <button type="button" onClick={() => setShowModal(false)} className="cancel-btn">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="create-btn">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {fractalToDelete && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h2>Delete Fractal</h2>
+                            <p>Are you sure you want to delete <strong>{fractalToDelete.name}</strong>? This cannot be undone.</p>
+                            <div className="modal-actions">
+                                <button type="button" onClick={() => setFractalToDelete(null)} className="cancel-btn">
+                                    Cancel
+                                </button>
+                                <button type="button" onClick={confirmDeleteFractal} className="delete-btn">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </HeaderProvider>
     );
 }
 

@@ -111,7 +111,7 @@ function FractalGoals() {
     const [loading, setLoading] = useState(true);
 
     // Sidebar state
-    const [sidebarMode, setSidebarMode] = useState('default');
+    const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
     const [viewingPracticeSession, setViewingPracticeSession] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -294,7 +294,7 @@ function FractalGoals() {
             await fractalApi.deleteGoal(rootId, fractalToDelete.id);
             await fetchGoals();
             setFractalToDelete(null);
-            setSidebarMode('default');
+            setSidebarMode(null);
             setViewingGoal(null);
             setViewingPracticeSession(null);
         } catch (err) {
@@ -334,341 +334,352 @@ function FractalGoals() {
                     }}
                     onAddChild={handleAddChildClick}
                     key={rootId + (selectedPracticeSession?.id || '')}
+                    sidebarOpen={!!sidebarMode}
                 />
             </div>
 
             {/* Sidebar */}
-            <div className="details-window">
-                <div className="window-content">
-                    {sidebarMode === 'goal-details' && (
-                        <div className="goal-details-pane">
-                            <button className="back-btn" onClick={() => { setSidebarMode('default'); setViewingGoal(null); }}>← Close</button>
+            {sidebarMode && (
+                <div className="details-window">
+                    <div className="window-content">
+                        {/* Close Button */}
+                        <button
+                            className="close-sidebar-btn"
+                            onClick={() => { setSidebarMode(null); setViewingGoal(null); setViewingPracticeSession(null); }}
+                            style={{
+                                position: 'absolute',
+                                top: '10px',
+                                right: '10px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#999',
+                                fontSize: '24px',
+                                cursor: 'pointer',
+                                zIndex: 20
+                            }}
+                        >
+                            &times;
+                        </button>
 
-                            {isEditing ? (
-                                <div className="edit-form-sidebar">
-                                    <input
-                                        type="text"
-                                        value={editForm.name}
-                                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                                        className="edit-input-title"
-                                        placeholder="Goal Name"
-                                    />
-                                    <div className="form-group">
-                                        <label>Description:</label>
-                                        <textarea
-                                            value={editForm.description}
-                                            onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                                            rows={5}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Deadline:</label>
-                                        <input
-                                            type="date"
-                                            value={editForm.deadline}
-                                            onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
-                                            style={{ background: '#333', border: '1px solid #555', color: 'white', padding: '8px', borderRadius: '4px', marginTop: '5px' }}
-                                        />
-                                    </div>
-                                    <div className="sidebar-actions">
-                                        <button className="action-btn secondary" onClick={handleCancelEdit}>Cancel</button>
-                                        <button className="action-btn primary" onClick={handleSaveEdit}>Save</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <div style={{ marginBottom: '10px' }}>
-                                        <span style={{ background: '#444', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8em', color: '#ccc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                            {viewingGoal?.attributes?.type || viewingGoal?.type}
-                                        </span>
-                                    </div>
-                                    <h2>{viewingGoal?.name}</h2>
+                        {sidebarMode === 'goal-details' && (
+                            <div className="goal-details-pane">
+                                {/* Back button removed as we have X, or keep if preferred for drilldown */}
+                                {/* Keeping title/content structure */}
 
-                                    {viewingGoal?.attributes?.created_at && (
-                                        <p className="meta-info">Created: {new Date(viewingGoal.attributes.created_at).toLocaleDateString()}</p>
-                                    )}
-
-                                    <div className="description-section">
-                                        <h4>Description</h4>
-                                        <p>{viewingGoal?.attributes?.description || viewingGoal?.description || 'No description provided.'}</p>
-                                    </div>
-
-                                    <div className="description-section" style={{ maxHeight: '100px' }}>
-                                        <h4>Deadline</h4>
-                                        <p>{viewingGoal?.attributes?.deadline || viewingGoal?.deadline || 'No deadline set'}</p>
-                                    </div>
-
-                                    <div className="sidebar-actions" style={{ flexDirection: 'column', gap: '10px' }}>
-                                        <button className="action-btn primary" onClick={handleEditClick}>Edit Goal</button>
-
-                                        {(() => {
-                                            const type = viewingGoal?.attributes?.type || viewingGoal?.type;
-                                            const childType = getChildType(type);
-                                            if (childType) {
-                                                return (
-                                                    <button className="action-btn secondary" onClick={() => handleAddChildClick(viewingGoal)}>
-                                                        + Add {getTypeDisplayName(childType)}
-                                                    </button>
-                                                );
-                                            }
-                                        })()}
-
-                                        <button className="action-btn danger" onClick={() => setFractalToDelete(viewingGoal)}>Delete Goal</button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-
-                    {sidebarMode === 'session-details' && (
-                        <div className="session-details-pane">
-                            <button className="back-btn" onClick={() => { setSidebarMode('default'); setViewingPracticeSession(null); }}>← Close Details</button>
-                            {isEditing ? (
-                                <div className="edit-form-sidebar">
-                                    <input
-                                        type="text"
-                                        value={editForm.name}
-                                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                                        className="edit-input-title"
-                                        placeholder="Session Name"
-                                    />
-                                    <div className="form-group">
-                                        <label>Description:</label>
-                                        <textarea
-                                            value={editForm.description}
-                                            onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                                            rows={5}
-                                        />
-                                    </div>
-                                    <div className="sidebar-actions">
-                                        <button className="action-btn secondary" onClick={handleCancelEdit}>Cancel</button>
-                                        <button className="action-btn primary" onClick={handleSaveEdit}>Save</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <h2>{viewingPracticeSession?.name}</h2>
-                                    <p className="meta-info">
-                                        <strong>Created:</strong> {viewingPracticeSession?.attributes?.created_at ? new Date(viewingPracticeSession.attributes.created_at).toLocaleDateString() : 'Unknown'}
-                                    </p>
-
-                                    <div className="description-section">
-                                        <h4>Description</h4>
-                                        <p>{viewingPracticeSession?.attributes?.description || 'No description provided.'}</p>
-                                    </div>
-
-                                    <div className="sidebar-actions">
-                                        <button className="action-btn secondary" onClick={handleEditClick}>Edit Session</button>
-                                        <button className="action-btn danger" onClick={() => setFractalToDelete(viewingPracticeSession)}>Delete Session</button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-
-                    {(sidebarMode === 'default' || !sidebarMode) && (
-                        <div style={{ padding: '40px', textAlign: 'center', color: '#666', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80%' }}>
-                            <h2 style={{ fontWeight: 300, marginBottom: '10px' }}>Inspector</h2>
-                            <p>Select a Goal or Practice Session in the graph to view details.</p>
-                            <button
-                                className="practice-session-btn"
-                                style={{ marginTop: '30px', padding: '12px 20px', background: 'var(--accent-color)', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontWeight: 600, width: '100%' }}
-                                onClick={() => {
-                                    setSelectedShortTermGoals([]);
-                                    setImmediateGoals([{ name: '', description: '' }]);
-                                    setShowPracticeSessionModal(true);
-                                }}
-                            >
-                                + Add Practice Session
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Create Goal Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>{selectedParent ? `Add ${getTypeDisplayName(goalType)} under "${selectedParent.name}"` : "Create New Goal"}</h2>
-                        <form onSubmit={handleSubmit}>
-                            <label>Type:</label>
-                            <div style={{ padding: '10px', background: '#f5f5f5', borderRadius: '4px', color: '#333', fontWeight: 'bold' }}>
-                                {getTypeDisplayName(goalType)}
-                            </div>
-
-                            <label>Name:</label>
-                            <input value={name} onChange={e => setName(e.target.value)} required />
-
-                            <label>Description:</label>
-                            <textarea value={description} onChange={e => setDescription(e.target.value)} />
-
-                            <label>Deadline:</label>
-                            <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
-
-                            <div className="actions">
-                                <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit">Create</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation Modal */}
-            {fractalToDelete && (
-                <div className="modal-overlay" onClick={() => setFractalToDelete(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Delete {fractalToDelete.attributes?.type === 'PracticeSession' ? 'Session' : 'Goal'}?</h2>
-                        <p>Are you sure you want to delete <strong>"{fractalToDelete.name}"</strong>?</p>
-                        <p style={{ color: '#ff5252', fontSize: '0.9rem' }}>This action cannot be undone.</p>
-                        <div className="actions">
-                            <button type="button" onClick={() => setFractalToDelete(null)}>Cancel</button>
-                            <button
-                                type="button"
-                                onClick={confirmDeleteFractal}
-                                style={{ background: '#d32f2f', color: 'white', border: 'none' }}
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Practice Session Modal */}
-            {showPracticeSessionModal && (
-                <div className="modal-overlay" onClick={() => setShowPracticeSessionModal(false)}>
-                    <div className="modal practice-session-modal" onClick={(e) => e.stopPropagation()}>
-                        <h2>Create Practice Session</h2>
-
-                        <div className="modal-content-scroll">
-                            <div className="session-name-preview">
-                                <strong>Session Name:</strong>
-                                <p>Practice Session # - {new Date().toLocaleDateString()}</p>
-                                <p style={{ fontSize: '0.8em', color: '#888', fontStyle: 'italic', marginTop: '5px' }}>
-                                    (Name will be automatically generated)
-                                </p>
-                            </div>
-
-                            <div className="form-section">
-                                <label><strong>Select Short-Term Goals (Required):</strong></label>
-                                <div className="checkbox-list">
-                                    {(() => {
-                                        const shortTermGoals = collectShortTermGoals(fractalData);
-                                        if (shortTermGoals.length === 0) {
-                                            return <p className="no-goals-message">No short-term goals available.</p>;
-                                        }
-                                        return shortTermGoals.map(goal => (
-                                            <label key={goal.id} className="checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedShortTermGoals.includes(goal.id)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedShortTermGoals([...selectedShortTermGoals, goal.id]);
-                                                        } else {
-                                                            setSelectedShortTermGoals(selectedShortTermGoals.filter(id => id !== goal.id));
-                                                        }
-                                                    }}
-                                                />
-                                                <span>{goal.name}</span>
-                                            </label>
-                                        ));
-                                    })()}
-                                </div>
-                            </div>
-
-                            <div className="form-section">
-                                <label><strong>Immediate Goals:</strong></label>
-                                {immediateGoals.map((goal, index) => (
-                                    <div key={index} className="immediate-goal-item">
+                                {isEditing ? (
+                                    <div className="edit-form-sidebar">
                                         <input
                                             type="text"
-                                            placeholder="Goal name"
-                                            value={goal.name}
-                                            onChange={(e) => {
-                                                const updated = [...immediateGoals];
-                                                updated[index].name = e.target.value;
-                                                setImmediateGoals(updated);
-                                            }}
-                                            className="immediate-goal-input"
+                                            value={editForm.name}
+                                            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                            className="edit-input-title"
+                                            placeholder="Goal Name"
                                         />
-                                        <textarea
-                                            placeholder="Description (optional)"
-                                            value={goal.description}
-                                            onChange={(e) => {
-                                                const updated = [...immediateGoals];
-                                                updated[index].description = e.target.value;
-                                                setImmediateGoals(updated);
-                                            }}
-                                            className="immediate-goal-textarea"
-                                            rows="2"
-                                        />
-                                        {immediateGoals.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setImmediateGoals(immediateGoals.filter((_, i) => i !== index))}
-                                                className="remove-goal-btn"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
+                                        <div className="form-group">
+                                            <label>Description:</label>
+                                            <textarea
+                                                value={editForm.description}
+                                                onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                                                rows={5}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Deadline:</label>
+                                            <input
+                                                type="date"
+                                                value={editForm.deadline}
+                                                onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
+                                                style={{ background: '#333', border: '1px solid #555', color: 'white', padding: '8px', borderRadius: '4px', marginTop: '5px' }}
+                                            />
+                                        </div>
+                                        <div className="sidebar-actions">
+                                            <button className="action-btn secondary" onClick={handleCancelEdit}>Cancel</button>
+                                            <button className="action-btn primary" onClick={handleSaveEdit}>Save</button>
+                                        </div>
                                     </div>
-                                ))}
+                                ) : (
+                                    <>
+                                        <div style={{ marginBottom: '10px' }}>
+                                            <span style={{ background: '#444', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8em', color: '#ccc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                {viewingGoal?.attributes?.type || viewingGoal?.type}
+                                            </span>
+                                        </div>
+                                        <h2>{viewingGoal?.name}</h2>
+
+                                        {viewingGoal?.attributes?.created_at && (
+                                            <p className="meta-info">Created: {new Date(viewingGoal.attributes.created_at).toLocaleDateString()}</p>
+                                        )}
+
+                                        <div className="description-section">
+                                            <h4>Description</h4>
+                                            <p>{viewingGoal?.attributes?.description || viewingGoal?.description || 'No description provided.'}</p>
+                                        </div>
+
+                                        <div className="description-section" style={{ maxHeight: '100px' }}>
+                                            <h4>Deadline</h4>
+                                            <p>{viewingGoal?.attributes?.deadline || viewingGoal?.deadline || 'No deadline set'}</p>
+                                        </div>
+
+                                        <div className="sidebar-actions" style={{ flexDirection: 'column', gap: '10px' }}>
+                                            <button className="action-btn primary" onClick={handleEditClick}>Edit Goal</button>
+
+                                            {(() => {
+                                                const type = viewingGoal?.attributes?.type || viewingGoal?.type;
+                                                const childType = getChildType(type);
+                                                if (childType) {
+                                                    return (
+                                                        <button className="action-btn secondary" onClick={() => handleAddChildClick(viewingGoal)}>
+                                                            + Add {getTypeDisplayName(childType)}
+                                                        </button>
+                                                    );
+                                                }
+                                            })()}
+
+                                            <button className="action-btn danger" onClick={() => setFractalToDelete(viewingGoal)}>Delete Goal</button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {sidebarMode === 'session-details' && (
+                            <div className="session-details-pane">
+                                {isEditing ? (
+                                    <div className="edit-form-sidebar">
+                                        <input
+                                            type="text"
+                                            value={editForm.name}
+                                            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                            className="edit-input-title"
+                                            placeholder="Session Name"
+                                        />
+                                        <div className="form-group">
+                                            <label>Description:</label>
+                                            <textarea
+                                                value={editForm.description}
+                                                onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                                                rows={5}
+                                            />
+                                        </div>
+                                        <div className="sidebar-actions">
+                                            <button className="action-btn secondary" onClick={handleCancelEdit}>Cancel</button>
+                                            <button className="action-btn primary" onClick={handleSaveEdit}>Save</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h2>{viewingPracticeSession?.name}</h2>
+                                        <p className="meta-info">
+                                            <strong>Created:</strong> {viewingPracticeSession?.attributes?.created_at ? new Date(viewingPracticeSession.attributes.created_at).toLocaleDateString() : 'Unknown'}
+                                        </p>
+
+                                        <div className="description-section">
+                                            <h4>Description</h4>
+                                            <p>{viewingPracticeSession?.attributes?.description || 'No description provided.'}</p>
+                                        </div>
+
+                                        <div className="sidebar-actions">
+                                            <button className="action-btn secondary" onClick={handleEditClick}>Edit Session</button>
+                                            <button className="action-btn danger" onClick={() => setFractalToDelete(viewingPracticeSession)}>Delete Session</button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            )}
+
+            {/* Create Goal Modal */}
+            {
+                showModal && (
+                    <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <h2>{selectedParent ? `Add ${getTypeDisplayName(goalType)} under "${selectedParent.name}"` : "Create New Goal"}</h2>
+                            <form onSubmit={handleSubmit}>
+                                <label>Type:</label>
+                                <div style={{ padding: '10px', background: '#f5f5f5', borderRadius: '4px', color: '#333', fontWeight: 'bold' }}>
+                                    {getTypeDisplayName(goalType)}
+                                </div>
+
+                                <label>Name:</label>
+                                <input value={name} onChange={e => setName(e.target.value)} required />
+
+                                <label>Description:</label>
+                                <textarea value={description} onChange={e => setDescription(e.target.value)} />
+
+                                <label>Deadline:</label>
+                                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+
+                                <div className="actions">
+                                    <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
+                                    <button type="submit">Create</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Delete Confirmation Modal */}
+            {
+                fractalToDelete && (
+                    <div className="modal-overlay" onClick={() => setFractalToDelete(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <h2>Delete {fractalToDelete.attributes?.type === 'PracticeSession' ? 'Session' : 'Goal'}?</h2>
+                            <p>Are you sure you want to delete <strong>"{fractalToDelete.name}"</strong>?</p>
+                            <p style={{ color: '#ff5252', fontSize: '0.9rem' }}>This action cannot be undone.</p>
+                            <div className="actions">
+                                <button type="button" onClick={() => setFractalToDelete(null)}>Cancel</button>
                                 <button
                                     type="button"
-                                    onClick={() => setImmediateGoals([...immediateGoals, { name: '', description: '' }])}
-                                    className="add-goal-btn"
+                                    onClick={confirmDeleteFractal}
+                                    style={{ background: '#d32f2f', color: 'white', border: 'none' }}
                                 >
-                                    + Add Another Immediate Goal
+                                    Delete
                                 </button>
                             </div>
                         </div>
+                    </div>
+                )
+            }
 
-                        <div className="modal-actions">
-                            <button
-                                type="button"
-                                className="action-btn primary"
-                                onClick={async () => {
-                                    if (selectedShortTermGoals.length === 0) {
-                                        alert('Please select at least one short-term goal');
-                                        return;
-                                    }
+            {/* Practice Session Modal */}
+            {
+                showPracticeSessionModal && (
+                    <div className="modal-overlay" onClick={() => setShowPracticeSessionModal(false)}>
+                        <div className="modal practice-session-modal" onClick={(e) => e.stopPropagation()}>
+                            <h2>Create Practice Session</h2>
 
-                                    const validImmediateGoals = immediateGoals.filter(g => g.name.trim() !== '');
-                                    if (validImmediateGoals.length === 0) {
-                                        alert('Please add at least one immediate goal');
-                                        return;
-                                    }
+                            <div className="modal-content-scroll">
+                                <div className="session-name-preview">
+                                    <strong>Session Name:</strong>
+                                    <p>Practice Session # - {new Date().toLocaleDateString()}</p>
+                                    <p style={{ fontSize: '0.8em', color: '#888', fontStyle: 'italic', marginTop: '5px' }}>
+                                        (Name will be automatically generated)
+                                    </p>
+                                </div>
 
-                                    try {
-                                        const payload = {
-                                            name: "Auto-Generated",
-                                            description: `Practice session with ${validImmediateGoals.length} immediate goal(s)`,
-                                            parent_ids: selectedShortTermGoals,
-                                            immediate_goals: validImmediateGoals
-                                        };
+                                <div className="form-section">
+                                    <label><strong>Select Short-Term Goals (Required):</strong></label>
+                                    <div className="checkbox-list">
+                                        {(() => {
+                                            const shortTermGoals = collectShortTermGoals(fractalData);
+                                            if (shortTermGoals.length === 0) {
+                                                return <p className="no-goals-message">No short-term goals available.</p>;
+                                            }
+                                            return shortTermGoals.map(goal => (
+                                                <label key={goal.id} className="checkbox-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedShortTermGoals.includes(goal.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedShortTermGoals([...selectedShortTermGoals, goal.id]);
+                                                            } else {
+                                                                setSelectedShortTermGoals(selectedShortTermGoals.filter(id => id !== goal.id));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span>{goal.name}</span>
+                                                </label>
+                                            ));
+                                        })()}
+                                    </div>
+                                </div>
 
-                                        await fractalApi.createSession(rootId, payload);
-                                        setShowPracticeSessionModal(false);
-                                        await fetchGoals();
-                                        await fetchPracticeSessions();
-                                    } catch (err) {
-                                        alert('Error creating practice session: ' + err.message);
-                                    }
-                                }}
-                            >
-                                Create Practice Session
-                            </button>
-                            <button type="button" onClick={() => setShowPracticeSessionModal(false)}>
-                                Cancel
-                            </button>
+                                <div className="form-section">
+                                    <label><strong>Immediate Goals:</strong></label>
+                                    {immediateGoals.map((goal, index) => (
+                                        <div key={index} className="immediate-goal-item">
+                                            <input
+                                                type="text"
+                                                placeholder="Goal name"
+                                                value={goal.name}
+                                                onChange={(e) => {
+                                                    const updated = [...immediateGoals];
+                                                    updated[index].name = e.target.value;
+                                                    setImmediateGoals(updated);
+                                                }}
+                                                className="immediate-goal-input"
+                                            />
+                                            <textarea
+                                                placeholder="Description (optional)"
+                                                value={goal.description}
+                                                onChange={(e) => {
+                                                    const updated = [...immediateGoals];
+                                                    updated[index].description = e.target.value;
+                                                    setImmediateGoals(updated);
+                                                }}
+                                                className="immediate-goal-textarea"
+                                                rows="2"
+                                            />
+                                            {immediateGoals.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setImmediateGoals(immediateGoals.filter((_, i) => i !== index))}
+                                                    className="remove-goal-btn"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setImmediateGoals([...immediateGoals, { name: '', description: '' }])}
+                                        className="add-goal-btn"
+                                    >
+                                        + Add Another Immediate Goal
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button
+                                    type="button"
+                                    className="action-btn primary"
+                                    onClick={async () => {
+                                        if (selectedShortTermGoals.length === 0) {
+                                            alert('Please select at least one short-term goal');
+                                            return;
+                                        }
+
+                                        const validImmediateGoals = immediateGoals.filter(g => g.name.trim() !== '');
+                                        if (validImmediateGoals.length === 0) {
+                                            alert('Please add at least one immediate goal');
+                                            return;
+                                        }
+
+                                        try {
+                                            const payload = {
+                                                name: "Auto-Generated",
+                                                description: `Practice session with ${validImmediateGoals.length} immediate goal(s)`,
+                                                parent_ids: selectedShortTermGoals,
+                                                immediate_goals: validImmediateGoals
+                                            };
+
+                                            await fractalApi.createSession(rootId, payload);
+                                            setShowPracticeSessionModal(false);
+                                            await fetchGoals();
+                                            await fetchPracticeSessions();
+                                        } catch (err) {
+                                            alert('Error creating practice session: ' + err.message);
+                                        }
+                                    }}
+                                >
+                                    Create Practice Session
+                                </button>
+                                <button type="button" onClick={() => setShowPracticeSessionModal(false)}>
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 

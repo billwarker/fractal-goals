@@ -115,19 +115,26 @@ class PracticeSession(Base):
     created_at = Column(DateTime, default=datetime.now)
     root_id = Column(String, ForeignKey('goals.id'), nullable=True)
     
+    # Duration of the practice session in minutes
+    # Can be compared with planned duration from session_data
+    duration_minutes = Column(Integer, nullable=True)
+    
     # JSON structure for flexible session data
     # Can include: template_id, template_name, sections, exercises, 
     # duration, focus_score, energy_level, notes, etc.
     session_data = Column(String, nullable=True)  # Stored as JSON string
     
-    # Many-to-many relationship with short-term goals
+    # Many-to-many relationship with short-term goals  
     parent_goals = relationship(
         "Goal",
         secondary=practice_session_goals,
-        backref="linked_practice_sessions"
+        primaryjoin="PracticeSession.id==practice_session_goals.c.practice_session_id",
+        secondaryjoin="Goal.id==practice_session_goals.c.short_term_goal_id",
+        backref="linked_practice_sessions",
+        viewonly=False
     )
     
-    def to_dict(self, include_children=True, include_parents=True):
+    def to_dict(self, include_children=True, include_parents=True, session=None):
         """Convert practice session to dictionary format compatible with frontend."""
         import json
         
@@ -141,13 +148,29 @@ class PracticeSession(Base):
                 "completed": self.completed,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
                 "root_id": self.root_id,
+                "duration_minutes": self.duration_minutes,
             },
             "children": []
         }
         
-        # Add parent_ids for frontend
+        # Add parent_ids for frontend - manually query from junction table
         if include_parents:
-            result["attributes"]["parent_ids"] = [goal.id for goal in self.parent_goals]
+            from sqlalchemy import text
+            # Use passed session or try to get from inspect
+            session_obj = session
+            if not session_obj:
+                from sqlalchemy import inspect
+                session_obj = inspect(self).session
+            
+            if session_obj:
+                # Query the junction table directly
+                parent_ids_query = session_obj.execute(
+                    text("SELECT short_term_goal_id FROM practice_session_goals WHERE practice_session_id = :session_id"),
+                    {"session_id": self.id}
+                )
+                result["attributes"]["parent_ids"] = [row[0] for row in parent_ids_query]
+            else:
+                result["attributes"]["parent_ids"] = []
         
         # Add session_data (parse JSON if present)
         if self.session_data:
@@ -320,7 +343,7 @@ def build_practice_session_tree(session, practice_session):
     """
     Build practice session dict with immediate goals as children.
     """
-    ps_dict = practice_session.to_dict(include_children=False, include_parents=True)
+    ps_dict = practice_session.to_dict(include_children=False, include_parents=True, session=session)
     
     # Get immediate goals
     immediate_goals = get_immediate_goals_for_session(session, practice_session.id)

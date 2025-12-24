@@ -193,7 +193,7 @@ function CreateSessionTemplate() {
     }
 
     return (
-        <div className="programming-page" style={{ padding: '20px', color: 'white' }}>
+        <div className="page-container" style={{ color: 'white' }}>
             <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '20px' }}>
                 Create Session Template
             </h1>

@@ -452,53 +452,6 @@ def get_fractal_sessions(root_id):
         session.close()
 
 
-@api_bp.route('/<root_id>/sessions', methods=['POST'])
-def create_fractal_session(root_id):
-    """Create a new practice session within a fractal."""
-    db_session = get_session(engine)
-    try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        # Get request data
-        data = request.get_json()
-        
-        # Create the practice session
-        new_session = PracticeSession(
-            name=data.get('name', 'Untitled Session'),
-            description=data.get('description', ''),
-            root_id=root_id,
-            duration_minutes=data.get('duration_minutes'),
-            session_data=data.get('session_data')  # Already a JSON string
-        )
-        
-        db_session.add(new_session)
-        db_session.flush()  # Get the ID before committing
-        
-        # Associate with parent goals if provided
-        parent_ids = data.get('parent_ids', [])
-        if parent_ids:
-            for goal_id in parent_ids:
-                # Verify the goal exists and is a ShortTermGoal
-                goal = db_session.query(Goal).filter_by(id=goal_id).first()
-                if goal and goal.type == 'ShortTermGoal':
-                    new_session.parent_goals.append(goal)
-        
-        db_session.commit()
-        
-        # Return the created session
-        result = build_practice_session_tree(db_session, new_session)
-        return jsonify(result), 201
-        
-    except Exception as e:
-        db_session.rollback()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
-
-
 @api_bp.route('/<root_id>/sessions/<session_id>', methods=['PUT'])
 def update_practice_session(root_id, session_id):
     """Update a practice session's details."""
@@ -555,36 +508,6 @@ def update_practice_session(root_id, session_id):
         db_session.close()
 
 
-
-@api_bp.route('/<root_id>/sessions/<session_id>', methods=['DELETE'])
-def delete_practice_session(root_id, session_id):
-    """Delete a practice session."""
-    db_session = get_session(engine)
-    try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        # Get the practice session
-        practice_session = db_session.query(PracticeSession).filter_by(
-            id=session_id,
-            root_id=root_id
-        ).first()
-        
-        if not practice_session:
-            return jsonify({"error": "Practice session not found"}), 404
-            
-        db_session.delete(practice_session)
-        db_session.commit()
-        
-        return jsonify({"message": "Practice session deleted successfully"})
-        
-    except Exception as e:
-        db_session.rollback()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
 # ============================================================================
 # SESSION TEMPLATE ENDPOINTS (Fractal-Scoped)
 # ============================================================================
@@ -788,6 +711,10 @@ def get_fractal_goal(root_id, goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
+        # Verify goal belongs to this fractal
+        goal_root = get_root_goal(session, goal_id)
+        if not goal_root or goal_root.id != root_id:
+            return jsonify({"error": "Goal does not belong to this fractal"}), 403
         
         # Return goal data
         result = build_goal_tree(session, goal)
