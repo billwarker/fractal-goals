@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import '../App.css';
 
@@ -10,6 +10,7 @@ import '../App.css';
 function Log() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [templates, setTemplates] = useState([]);
     const [goals, setGoals] = useState([]);
@@ -39,6 +40,12 @@ function Log() {
             // Extract all short-term goals from the tree
             const shortTermGoals = extractShortTermGoals(goalsRes.data);
             setGoals(shortTermGoals);
+
+            // Pre-select goal from URL if provided
+            const goalIdFromUrl = searchParams.get('goalId');
+            if (goalIdFromUrl && shortTermGoals.some(g => g.id === goalIdFromUrl)) {
+                setSelectedGoalIds([goalIdFromUrl]);
+            }
 
             setLoading(false);
         } catch (err) {
@@ -89,6 +96,25 @@ function Log() {
         setCreating(true);
 
         try {
+            // Convert template sections with activities to session sections with exercises
+            const sectionsWithExercises = (selectedTemplate.template_data?.sections || []).map(section => {
+                // Convert activities to exercise instances
+                const exercises = (section.activities || []).map(activity => ({
+                    type: 'activity',
+                    name: activity.name,
+                    activity_id: activity.activity_id,
+                    instance_id: crypto.randomUUID(),
+                    completed: false,
+                    notes: ''
+                }));
+
+                return {
+                    ...section,
+                    exercises,
+                    actual_duration_minutes: section.duration_minutes
+                };
+            });
+
             // Create the practice session
             const sessionData = {
                 name: selectedTemplate.name,
@@ -98,7 +124,7 @@ function Log() {
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
-                    sections: selectedTemplate.template_data?.sections || [],
+                    sections: sectionsWithExercises,
                     total_duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0
                 })
             };
@@ -162,7 +188,7 @@ function Log() {
                         <div style={{ textAlign: 'center', padding: '20px' }}>
                             <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
                             <button
-                                onClick={() => navigate(`/${rootId}/create-session-template`)}
+                                onClick={() => navigate(`/${rootId}/manage-session-templates`)}
                                 style={{
                                     padding: '10px 20px',
                                     background: '#2196f3',
@@ -230,9 +256,7 @@ function Log() {
                     border: '1px solid #333',
                     borderRadius: '8px',
                     padding: '24px',
-                    marginBottom: '24px',
-                    opacity: selectedTemplate ? 1 : 0.5,
-                    pointerEvents: selectedTemplate ? 'auto' : 'none'
+                    marginBottom: '24px'
                 }}>
                     <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{

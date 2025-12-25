@@ -1085,6 +1085,61 @@ def create_activity(root_id):
     finally:
         session.close()
 
+@api_bp.route('/<root_id>/activities/<activity_id>', methods=['PUT'])
+def update_activity(root_id, activity_id):
+    """Update an activity definition and its metrics."""
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Find the activity
+        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+        
+        data = request.get_json()
+        
+        # Update activity fields
+        if 'name' in data:
+            activity.name = data['name']
+        if 'description' in data:
+            activity.description = data['description']
+        if 'has_sets' in data:
+            activity.has_sets = data['has_sets']
+        if 'has_metrics' in data:
+            activity.has_metrics = data['has_metrics']
+        
+        # Update metrics if provided
+        if 'metrics' in data:
+            # Delete existing metrics
+            session.query(MetricDefinition).filter_by(activity_id=activity_id).delete()
+            
+            # Add new metrics
+            metrics_data = data.get('metrics', [])
+            if len(metrics_data) > 3:
+                return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
+            
+            for m in metrics_data:
+                if m.get('name') and m.get('unit'):
+                    new_metric = MetricDefinition(
+                        activity_id=activity.id,
+                        name=m['name'],
+                        unit=m['unit']
+                    )
+                    session.add(new_metric)
+        
+        session.commit()
+        session.refresh(activity)  # Refresh to load updated metrics
+        return jsonify(activity.to_dict()), 200
+    
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
 @api_bp.route('/<root_id>/activities/<activity_id>', methods=['DELETE'])
 def delete_activity(root_id, activity_id):
     """Delete an activity definition."""

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useHeader } from '../context/HeaderContext';
-import ActivitiesManager from '../components/ActivitiesManager';
 import '../App.css';
 
 /**
@@ -19,7 +18,6 @@ function Sessions() {
     const [loading, setLoading] = useState(true);
     const [filterCompleted, setFilterCompleted] = useState('all');
     const [parentGoals, setParentGoals] = useState({});
-    const [showActivitiesModal, setShowActivitiesModal] = useState(false);
     const [activities, setActivities] = useState([]);
 
     useEffect(() => {
@@ -200,7 +198,7 @@ function Sessions() {
 
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button
-                        onClick={() => navigate(`/${rootId}/create-session-template`)}
+                        onClick={() => navigate(`/${rootId}/manage-session-templates`)}
                         style={{
                             padding: '6px 16px',
                             background: '#2196f3',
@@ -215,10 +213,10 @@ function Sessions() {
                             gap: '6px'
                         }}
                     >
-                        + Create Template
+                        Manage Session Templates
                     </button>
                     <button
-                        onClick={() => setShowActivitiesModal(true)}
+                        onClick={() => navigate(`/${rootId}/manage-activities`)}
                         style={{
                             padding: '6px 16px',
                             background: '#333',
@@ -454,9 +452,11 @@ function Sessions() {
                                                                                                         {exercise.sets.map((set, setIdx) => (
                                                                                                             <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                                                                                                 <span style={{ color: '#666', fontSize: '11px', width: '40px' }}>SET {setIdx + 1}</span>
-                                                                                                                {set.metrics?.map(m => {
+                                                                                                                {set.metrics?.filter(m => {
                                                                                                                     const mInfo = getMetricInfo(m.metric_id);
-                                                                                                                    if (!m.value) return null;
+                                                                                                                    return mInfo.name && m.value; // Only show if metric definition exists and has value
+                                                                                                                }).map(m => {
+                                                                                                                    const mInfo = getMetricInfo(m.metric_id);
                                                                                                                     return (
                                                                                                                         <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
                                                                                                                             <span style={{ color: '#888' }}>{mInfo.name}:</span>
@@ -472,9 +472,11 @@ function Sessions() {
                                                                                                 {/* Single Metrics View */}
                                                                                                 {!exercise.has_sets && exercise.has_metrics && exercise.metrics && (
                                                                                                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                                                                                        {exercise.metrics.map(m => {
+                                                                                                        {exercise.metrics.filter(m => {
                                                                                                             const mInfo = getMetricInfo(m.metric_id);
-                                                                                                            if (!m.value) return null;
+                                                                                                            return mInfo.name && m.value; // Only show if metric definition exists and has value
+                                                                                                        }).map(m => {
+                                                                                                            const mInfo = getMetricInfo(m.metric_id);
                                                                                                             return (
                                                                                                                 <div key={m.metric_id} style={{ background: '#263238', padding: '2px 8px', borderRadius: '3px', border: '1px solid #37474F' }}>
                                                                                                                     <span style={{ color: '#aaa', marginRight: '4px' }}>{mInfo.name}:</span>
@@ -544,13 +546,6 @@ function Sessions() {
                     </div>
                 )}
             </div>
-
-            {showActivitiesModal && (
-                <ActivitiesManager
-                    rootId={rootId}
-                    onClose={() => setShowActivitiesModal(false)}
-                />
-            )}
         </div>
     );
 }

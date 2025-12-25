@@ -12,6 +12,7 @@ function CreateSessionTemplate() {
     const navigate = useNavigate();
 
     const [templates, setTemplates] = useState([]);
+    const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentTemplate, setCurrentTemplate] = useState({
         name: '',
@@ -19,17 +20,14 @@ function CreateSessionTemplate() {
         sections: []
     });
     const [showSectionModal, setShowSectionModal] = useState(false);
-    const [showExerciseModal, setShowExerciseModal] = useState(false);
+    const [showActivityModal, setShowActivityModal] = useState(false);
     const [selectedSectionIndex, setSelectedSectionIndex] = useState(null);
     const [newSection, setNewSection] = useState({
         name: '',
         duration_minutes: 10,
-        exercises: []
+        activities: []
     });
-    const [newExercise, setNewExercise] = useState({
-        name: '',
-        description: ''
-    });
+    const [selectedActivities, setSelectedActivities] = useState([]);
 
     useEffect(() => {
         if (!rootId) {
@@ -41,8 +39,12 @@ function CreateSessionTemplate() {
 
     const fetchTemplates = async () => {
         try {
-            const res = await fractalApi.getSessionTemplates(rootId);
-            setTemplates(res.data);
+            const [templatesRes, activitiesRes] = await Promise.all([
+                fractalApi.getSessionTemplates(rootId),
+                fractalApi.getActivities(rootId)
+            ]);
+            setTemplates(templatesRes.data);
+            setActivities(activitiesRes.data);
             setLoading(false);
         } catch (err) {
             console.error("Failed to fetch templates", err);
@@ -64,32 +66,41 @@ function CreateSessionTemplate() {
         setNewSection({
             name: '',
             duration_minutes: 10,
-            exercises: []
+            activities: []
         });
 
         setShowSectionModal(false);
     };
 
-    const handleAddExercise = () => {
-        if (!newExercise.name.trim()) {
-            alert('Exercise name is required');
+    const handleAddActivities = () => {
+        if (selectedActivities.length === 0) {
+            alert('Please select at least one activity');
             return;
         }
 
         const updatedSections = [...currentTemplate.sections];
-        updatedSections[selectedSectionIndex].exercises.push({ ...newExercise });
+        // Add selected activities to the section
+        const activitiesToAdd = selectedActivities.map(actId => {
+            const activity = activities.find(a => a.id === actId);
+            return {
+                activity_id: activity.id,
+                name: activity.name,
+                type: activity.type
+            };
+        });
+
+        updatedSections[selectedSectionIndex].activities = [
+            ...updatedSections[selectedSectionIndex].activities,
+            ...activitiesToAdd
+        ];
 
         setCurrentTemplate({
             ...currentTemplate,
             sections: updatedSections
         });
 
-        setNewExercise({
-            name: '',
-            description: ''
-        });
-
-        setShowExerciseModal(false);
+        setSelectedActivities([]);
+        setShowActivityModal(false);
         setSelectedSectionIndex(null);
     };
 
@@ -100,9 +111,9 @@ function CreateSessionTemplate() {
         });
     };
 
-    const handleRemoveExercise = (sectionIndex, exerciseIndex) => {
+    const handleRemoveActivity = (sectionIndex, activityIndex) => {
         const updatedSections = [...currentTemplate.sections];
-        updatedSections[sectionIndex].exercises = updatedSections[sectionIndex].exercises.filter((_, i) => i !== exerciseIndex);
+        updatedSections[sectionIndex].activities = updatedSections[sectionIndex].activities.filter((_, i) => i !== activityIndex);
 
         setCurrentTemplate({
             ...currentTemplate,
@@ -166,10 +177,16 @@ function CreateSessionTemplate() {
     };
 
     const handleLoadTemplate = (template) => {
+        // Migrate old 'exercises' to 'activities' for backward compatibility
+        const sections = (template.template_data?.sections || []).map(section => ({
+            ...section,
+            activities: section.activities || section.exercises || []
+        }));
+
         setCurrentTemplate({
             name: template.name,
             description: template.description,
-            sections: template.template_data?.sections || []
+            sections
         });
     };
 
@@ -289,7 +306,7 @@ function CreateSessionTemplate() {
                                                         <span style={{ color: '#888', fontSize: '14px' }}>({section.duration_minutes} min)</span>
                                                     </div>
                                                     <p style={{ margin: '4px 0', color: '#aaa', fontSize: '13px' }}>
-                                                        {section.exercises.length} exercise{section.exercises.length !== 1 ? 's' : ''}
+                                                        {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
                                                     </p>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -339,11 +356,11 @@ function CreateSessionTemplate() {
                                                 </div>
                                             </div>
 
-                                            {/* Exercises in this section */}
+                                            {/* Activities in this section */}
                                             <div style={{ marginTop: '8px', paddingLeft: '12px', borderLeft: '2px solid #444' }}>
-                                                {section.exercises.map((exercise, exerciseIndex) => (
+                                                {(section.activities || []).map((activity, activityIndex) => (
                                                     <div
-                                                        key={exerciseIndex}
+                                                        key={activityIndex}
                                                         style={{
                                                             background: '#1e1e1e',
                                                             padding: '8px',
@@ -355,15 +372,15 @@ function CreateSessionTemplate() {
                                                         }}
                                                     >
                                                         <div>
-                                                            <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{exercise.name}</div>
-                                                            {exercise.description && (
+                                                            <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{activity.name}</div>
+                                                            {activity.type && (
                                                                 <div style={{ color: '#888', fontSize: '12px', marginTop: '2px' }}>
-                                                                    {exercise.description}
+                                                                    {activity.type}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <button
-                                                            onClick={() => handleRemoveExercise(sectionIndex, exerciseIndex)}
+                                                            onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
                                                             style={{
                                                                 padding: '2px 6px',
                                                                 background: '#d32f2f',
@@ -381,7 +398,8 @@ function CreateSessionTemplate() {
                                                 <button
                                                     onClick={() => {
                                                         setSelectedSectionIndex(sectionIndex);
-                                                        setShowExerciseModal(true);
+                                                        setSelectedActivities([]);
+                                                        setShowActivityModal(true);
                                                     }}
                                                     style={{
                                                         padding: '6px 12px',
@@ -394,7 +412,7 @@ function CreateSessionTemplate() {
                                                         width: '100%'
                                                     }}
                                                 >
-                                                    + Add Exercise
+                                                    + Add Activity
                                                 </button>
                                             </div>
                                         </div>
@@ -595,8 +613,8 @@ function CreateSessionTemplate() {
                 </div>
             )}
 
-            {/* Add Exercise Modal */}
-            {showExerciseModal && (
+            {/* Add Activity Modal */}
+            {showActivityModal && (
                 <div
                     style={{
                         position: 'fixed',
@@ -611,8 +629,9 @@ function CreateSessionTemplate() {
                         zIndex: 1000
                     }}
                     onClick={() => {
-                        setShowExerciseModal(false);
+                        setShowActivityModal(false);
                         setSelectedSectionIndex(null);
+                        setSelectedActivities([]);
                     }}
                 >
                     <div
@@ -621,71 +640,104 @@ function CreateSessionTemplate() {
                             border: '1px solid #444',
                             borderRadius: '8px',
                             padding: '24px',
-                            maxWidth: '500px',
-                            width: '90%'
+                            maxWidth: '600px',
+                            width: '90%',
+                            maxHeight: '80vh',
+                            overflow: 'auto'
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h2 style={{ margin: '0 0 20px 0' }}>Add Exercise</h2>
+                        <h2 style={{ margin: '0 0 20px 0' }}>Add Activities</h2>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Exercise Name</label>
-                            <input
-                                type="text"
-                                value={newExercise.name}
-                                onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
-                                placeholder="e.g., Chromatic scales"
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Description (Optional)</label>
-                            <textarea
-                                value={newExercise.description}
-                                onChange={(e) => setNewExercise({ ...newExercise, description: e.target.value })}
-                                placeholder="Additional details..."
-                                style={{
-                                    width: '100%',
-                                    minHeight: '80px',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontFamily: 'inherit',
-                                    resize: 'vertical'
-                                }}
-                            />
-                        </div>
+                        {activities.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                                <p>No activities available.</p>
+                                <p style={{ fontSize: '14px', marginTop: '8px' }}>Create activities first in the Activities page.</p>
+                            </div>
+                        ) : (
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', marginBottom: '12px', color: '#aaa' }}>Select Activities:</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {activities.map(activity => {
+                                        const isSelected = selectedActivities.includes(activity.id);
+                                        return (
+                                            <div
+                                                key={activity.id}
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        setSelectedActivities(selectedActivities.filter(id => id !== activity.id));
+                                                    } else {
+                                                        setSelectedActivities([...selectedActivities, activity.id]);
+                                                    }
+                                                }}
+                                                style={{
+                                                    background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                                    border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                                    borderRadius: '6px',
+                                                    padding: '12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    borderRadius: '4px',
+                                                    border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
+                                                    background: isSelected ? '#4caf50' : 'transparent',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'white',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {isSelected && '✓'}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                                                        {activity.name}
+                                                    </div>
+                                                    {activity.type && (
+                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                            {activity.type}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button
-                                onClick={handleAddExercise}
+                                onClick={handleAddActivities}
+                                disabled={selectedActivities.length === 0}
                                 style={{
                                     flex: 1,
                                     padding: '12px',
-                                    background: '#4caf50',
+                                    background: selectedActivities.length === 0 ? '#666' : '#4caf50',
                                     border: 'none',
                                     borderRadius: '4px',
                                     color: 'white',
                                     fontWeight: 'bold',
-                                    cursor: 'pointer'
+                                    cursor: selectedActivities.length === 0 ? 'not-allowed' : 'pointer',
+                                    opacity: selectedActivities.length === 0 ? 0.5 : 1
                                 }}
                             >
-                                Add Exercise
+                                Add {selectedActivities.length > 0 ? `(${selectedActivities.length})` : ''}
                             </button>
                             <button
                                 onClick={() => {
-                                    setShowExerciseModal(false);
+                                    setShowActivityModal(false);
                                     setSelectedSectionIndex(null);
+                                    setSelectedActivities([]);
                                 }}
                                 style={{
                                     flex: 1,

@@ -168,6 +168,15 @@ export const fractalApi = {
     createActivity: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activities`, data),
 
     /**
+     * Update an activity definition
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity
+     * @param {Object} data - {name, description, metrics: [{name, unit}], has_sets, has_metrics}
+     */
+    updateActivity: (rootId, activityId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activities/${activityId}`, data),
+
+    /**
      * Delete an activity definition
      * @param {string} rootId - ID of the fractal
      * @param {string} activityId - ID of the activity

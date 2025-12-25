@@ -185,13 +185,22 @@ function FractalGoals() {
     };
 
     const handleAddChildClick = (nodeDatum) => {
-        setSelectedParent(nodeDatum);
         const parentType = nodeDatum.attributes?.type || nodeDatum.type;
         const childType = getChildType(parentType);
         if (!childType) {
             alert('This goal type cannot have children.');
             return;
         }
+
+        // If adding a Practice Session to a ShortTermGoal, redirect to create-practice-session page
+        if (parentType === 'ShortTermGoal' && childType === 'PracticeSession') {
+            const goalId = nodeDatum.attributes?.id || nodeDatum.id;
+            navigate(`/${rootId}/create-practice-session?goalId=${goalId}`);
+            return;
+        }
+
+        // Otherwise, show the modal
+        setSelectedParent(nodeDatum);
         setGoalType(childType);
         setShowModal(true);
     };
@@ -420,7 +429,78 @@ function FractalGoals() {
                                             <p>{viewingGoal?.attributes?.deadline || viewingGoal?.deadline || 'No deadline set'}</p>
                                         </div>
 
+                                        {/* Practice Sessions Section (for ShortTermGoals only) */}
+                                        {(viewingGoal?.attributes?.type === 'ShortTermGoal' || viewingGoal?.type === 'ShortTermGoal') && (
+                                            <div className="description-section">
+                                                <h4>Practice Sessions</h4>
+                                                {(() => {
+                                                    const goalId = viewingGoal?.attributes?.id || viewingGoal?.id;
+                                                    const associatedSessions = practiceSessions.filter(session => {
+                                                        const parentIds = session.attributes?.parent_ids || [];
+                                                        return parentIds.includes(goalId);
+                                                    });
+
+                                                    if (associatedSessions.length === 0) {
+                                                        return <p style={{ color: '#888', fontSize: '14px' }}>No practice sessions yet</p>;
+                                                    }
+
+                                                    return (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                                                            {associatedSessions.map(session => (
+                                                                <div
+                                                                    key={session.id}
+                                                                    onClick={() => navigate(`/${rootId}/session/${session.id}`)}
+                                                                    style={{
+                                                                        background: '#2a2a2a',
+                                                                        border: '1px solid #444',
+                                                                        borderRadius: '4px',
+                                                                        padding: '10px 12px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s',
+                                                                        fontSize: '14px'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = '#333';
+                                                                        e.currentTarget.style.borderColor = '#666';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = '#2a2a2a';
+                                                                        e.currentTarget.style.borderColor = '#444';
+                                                                    }}
+                                                                >
+                                                                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                                                                        {session.name}
+                                                                    </div>
+                                                                    {session.attributes?.created_at && (
+                                                                        <div style={{ fontSize: '12px', color: '#888' }}>
+                                                                            {new Date(session.attributes.created_at).toLocaleDateString()}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+
                                         <div className="sidebar-actions" style={{ flexDirection: 'column', gap: '10px' }}>
+                                            <button
+                                                className="action-btn"
+                                                onClick={() => {
+                                                    const goalId = viewingGoal?.attributes?.id || viewingGoal?.id;
+                                                    const currentStatus = viewingGoal?.attributes?.completed || false;
+                                                    handleToggleCompletion(goalId, currentStatus);
+                                                }}
+                                                style={{
+                                                    background: viewingGoal?.attributes?.completed ? '#4caf50' : 'transparent',
+                                                    border: viewingGoal?.attributes?.completed ? 'none' : '2px solid #666',
+                                                    color: viewingGoal?.attributes?.completed ? 'white' : '#ccc'
+                                                }}
+                                            >
+                                                {viewingGoal?.attributes?.completed ? '✓ Completed' : 'Mark Complete'}
+                                            </button>
+
                                             <button className="action-btn primary" onClick={handleEditClick}>Edit Goal</button>
 
                                             {(() => {

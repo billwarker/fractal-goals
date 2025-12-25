@@ -12,6 +12,7 @@ import Sessions from './pages/Sessions';
 import SessionDetail from './pages/SessionDetail';
 import Log from './pages/Log';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
+import ManageActivities from './pages/ManageActivities';
 
 const API_URL = 'http://localhost:8000/api/goals';
 
@@ -110,7 +111,7 @@ function App() {
                 description
             };
 
-            const res = await axios.post('http://localhost:8000/api/fractals', payload);
+            const res = await globalApi.createFractal(payload);
 
             setShowModal(false);
             setName('');
@@ -221,7 +222,7 @@ function App() {
                 <div className="content-container">
                     {location.pathname === '/' ? (
                         <Selection
-                            openModal={openModal}
+                            onCreateNewFractal={openModal}
                             onDeleteFractal={handleDeleteFractal}
                         />
                     ) : (
@@ -233,7 +234,8 @@ function App() {
                             <Route path="/:rootId/sessions" element={<Sessions />} />
                             <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
                             <Route path="/:rootId/create-practice-session" element={<Log />} />
-                            <Route path="/:rootId/create-session-template" element={<CreateSessionTemplate />} />
+                            <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
+                            <Route path="/:rootId/manage-activities" element={<ManageActivities />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     )}
