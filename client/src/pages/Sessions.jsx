@@ -102,27 +102,34 @@ function Sessions() {
         });
     };
 
-    // Helper to get formatted duration
+    // Helper to get formatted duration from activity instances
     const getDuration = (session) => {
-        // Try to get from session_data first (calculated from sections)
         const sessionData = session.attributes?.session_data;
 
-        let minutes = 0;
-        if (session.attributes?.duration_minutes) {
-            minutes = session.attributes.duration_minutes;
-        } else if (sessionData?.total_duration_minutes) {
-            minutes = sessionData.total_duration_minutes;
+        // Calculate total duration from all activity instances across all sections
+        let totalSeconds = 0;
+        if (sessionData?.sections) {
+            for (const section of sessionData.sections) {
+                if (section.exercises) {
+                    for (const exercise of section.exercises) {
+                        if (exercise.instance_id && exercise.duration_seconds != null) {
+                            totalSeconds += exercise.duration_seconds;
+                        }
+                    }
+                }
+            }
         }
 
-        if (!minutes) return '-';
+        if (totalSeconds === 0) return '-';
 
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
+        // Format as HH:MM
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
 
         if (hours > 0) {
-            return `${hours}h ${mins > 0 ? mins + 'm' : ''}`;
+            return `${hours}:${String(minutes).padStart(2, '0')}`;
         }
-        return `${mins}m`;
+        return `0:${String(minutes).padStart(2, '0')}`;
     };
 
     if (loading) {
@@ -401,7 +408,24 @@ function Sessions() {
                                                                 color: '#888',
                                                                 marginBottom: '12px'
                                                             }}>
-                                                                {section.actual_duration_minutes || section.duration_minutes} min
+                                                                {(() => {
+                                                                    // Calculate section duration from activities
+                                                                    let sectionSeconds = 0;
+                                                                    if (section.exercises) {
+                                                                        for (const ex of section.exercises) {
+                                                                            if (ex.instance_id && ex.duration_seconds != null) {
+                                                                                sectionSeconds += ex.duration_seconds;
+                                                                            }
+                                                                        }
+                                                                    }
+
+                                                                    if (sectionSeconds > 0) {
+                                                                        const mins = Math.floor(sectionSeconds / 60);
+                                                                        const secs = sectionSeconds % 60;
+                                                                        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                                                                    }
+                                                                    return `${section.duration_minutes || 0} min (planned)`;
+                                                                })()}
                                                             </div>
 
                                                             {/* Exercises - Vertical List */}
@@ -435,12 +459,34 @@ function Sessions() {
                                                                                     )}
                                                                                     <div style={{ flex: 1 }}>
                                                                                         <div style={{
-                                                                                            fontWeight: 500,
-                                                                                            textDecoration: exercise.completed ? 'line-through' : 'none',
-                                                                                            marginBottom: '2px',
-                                                                                            color: exercise.completed ? '#888' : 'white'
+                                                                                            display: 'flex',
+                                                                                            justifyContent: 'space-between',
+                                                                                            alignItems: 'center',
+                                                                                            marginBottom: '2px'
                                                                                         }}>
-                                                                                            {exercise.name}
+                                                                                            <div style={{
+                                                                                                fontWeight: 500,
+                                                                                                textDecoration: exercise.completed ? 'line-through' : 'none',
+                                                                                                color: exercise.completed ? '#888' : 'white'
+                                                                                            }}>
+                                                                                                {exercise.name}
+                                                                                            </div>
+
+                                                                                            {/* Duration for activities */}
+                                                                                            {exercise.instance_id && exercise.duration_seconds != null && (
+                                                                                                <div style={{
+                                                                                                    fontSize: '11px',
+                                                                                                    color: '#4caf50',
+                                                                                                    fontWeight: 'bold',
+                                                                                                    fontFamily: 'monospace'
+                                                                                                }}>
+                                                                                                    {(() => {
+                                                                                                        const mins = Math.floor(exercise.duration_seconds / 60);
+                                                                                                        const secs = exercise.duration_seconds % 60;
+                                                                                                        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                                                                                                    })()}
+                                                                                                </div>
+                                                                                            )}
                                                                                         </div>
 
                                                                                         {/* Activity Data Display */}

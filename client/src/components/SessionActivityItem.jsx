@@ -1,6 +1,16 @@
 import React from 'react';
 
 /**
+ * Format duration in seconds to MM:SS format
+ */
+function formatDuration(seconds) {
+    if (seconds == null) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
  * SessionActivityItem
  * Renders an activity within a session section. 
  * Handles displaying/editing sets and metrics.
@@ -87,9 +97,174 @@ function SessionActivityItem({
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    {/* Add any top level controls here */}
-                    <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {/* Timer Controls - New Design */}
+                    {exercise.instance_id && (
+                        <>
+                            {/* DateTime Start Field */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Start</label>
+                                <input
+                                    type="datetime-local"
+                                    value={exercise.time_start ? new Date(exercise.time_start).toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            onUpdate('time_start', new Date(e.target.value).toISOString());
+                                        } else {
+                                            onUpdate('time_start', null);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: '#333',
+                                        border: '1px solid #555',
+                                        borderRadius: '3px',
+                                        color: '#ccc',
+                                        fontSize: '11px',
+                                        width: '140px',
+                                        fontFamily: 'monospace'
+                                    }}
+                                />
+                            </div>
+
+                            {/* DateTime Stop Field */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Stop</label>
+                                <input
+                                    type="datetime-local"
+                                    value={exercise.time_stop ? new Date(exercise.time_stop).toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            onUpdate('time_stop', new Date(e.target.value).toISOString());
+                                        } else {
+                                            onUpdate('time_stop', null);
+                                        }
+                                    }}
+                                    disabled={!exercise.time_start}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: exercise.time_start ? '#333' : '#222',
+                                        border: '1px solid #555',
+                                        borderRadius: '3px',
+                                        color: exercise.time_start ? '#ccc' : '#666',
+                                        fontSize: '11px',
+                                        width: '140px',
+                                        fontFamily: 'monospace',
+                                        cursor: exercise.time_start ? 'text' : 'not-allowed'
+                                    }}
+                                />
+                            </div>
+
+                            {/* Duration Display */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Duration</label>
+                                <div style={{
+                                    padding: '4px 8px',
+                                    background: '#1a1a1a',
+                                    border: '1px solid #444',
+                                    borderRadius: '3px',
+                                    color: exercise.time_start && exercise.time_stop ? '#4caf50' : '#666',
+                                    fontSize: '13px',
+                                    fontWeight: 'bold',
+                                    fontFamily: 'monospace',
+                                    minWidth: '60px',
+                                    textAlign: 'center',
+                                    height: '26px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    {(() => {
+                                        if (exercise.time_start && exercise.time_stop) {
+                                            const start = new Date(exercise.time_start);
+                                            const stop = new Date(exercise.time_stop);
+                                            const seconds = Math.floor((stop - start) / 1000);
+                                            return formatDuration(seconds);
+                                        }
+                                        return '--:--';
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Start/Stop Button */}
+                            {!exercise.time_start ? (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUpdate('timer_action', 'start');
+                                    }}
+                                    style={{
+                                        background: '#4caf50',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        padding: '6px 10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        marginTop: '14px'
+                                    }}
+                                    title="Start timer"
+                                >
+                                    ▶ Start
+                                </button>
+                            ) : !exercise.time_stop ? (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUpdate('timer_action', 'stop');
+                                    }}
+                                    style={{
+                                        background: '#f44336',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        padding: '6px 10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        marginTop: '14px'
+                                    }}
+                                    title="Stop timer"
+                                >
+                                    ■ Stop
+                                </button>
+                            ) : null}
+
+                            {/* Reset Button */}
+                            {(exercise.time_start || exercise.time_stop) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUpdate('timer_action', 'reset');
+                                    }}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid #666',
+                                        borderRadius: '4px',
+                                        color: '#888',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        padding: '6px 10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        marginTop: '14px'
+                                    }}
+                                    title="Reset timer"
+                                >
+                                    ↺ Reset
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    {/* Delete Button */}
+                    <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', fontSize: '18px', marginTop: '14px' }}>×</button>
                 </div>
             </div>
 

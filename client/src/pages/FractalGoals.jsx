@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import FlowTree from '../FlowTree';
+import TargetCard from '../components/TargetCard';
+import AddTargetModal from '../components/AddTargetModal';
 import '../App.css';
 
 // Helper functions
@@ -131,6 +133,12 @@ function FractalGoals() {
     const [deadline, setDeadline] = useState('');
     const [goalType, setGoalType] = useState('UltimateGoal');
 
+    // Targets state
+    const [activities, setActivities] = useState([]);
+    const [showTargetModal, setShowTargetModal] = useState(false);
+    const [editingTarget, setEditingTarget] = useState(null);
+    const [editedTargets, setEditedTargets] = useState([]);
+
     useEffect(() => {
         if (!rootId) {
             navigate('/');
@@ -138,6 +146,7 @@ function FractalGoals() {
         }
         fetchFractalData();
         fetchPracticeSessions();
+        fetchActivities();
     }, [rootId, navigate]);
 
     const fetchFractalData = async () => {
@@ -161,6 +170,15 @@ function FractalGoals() {
             setPracticeSessions(res.data);
         } catch (err) {
             console.error("Failed to fetch practice sessions", err);
+        }
+    };
+
+    const fetchActivities = async () => {
+        try {
+            const res = await fractalApi.getActivities(rootId);
+            setActivities(res.data);
+        } catch (err) {
+            console.error("Failed to fetch activities", err);
         }
     };
 
@@ -213,10 +231,16 @@ function FractalGoals() {
             description: target.attributes?.description || target.description || '',
             deadline: target.attributes?.deadline || target.deadline || ''
         });
+
+        // Initialize editedTargets with current targets
+        if (sidebarMode === 'goal-details') {
+            setEditedTargets(target.attributes?.targets || []);
+        }
     };
 
     const handleCancelEdit = () => {
         setIsEditing(false);
+        setEditedTargets([]); // Clear edited targets on cancel
     };
 
     const handleSaveEdit = async () => {
@@ -225,7 +249,17 @@ function FractalGoals() {
             const goalId = target.id || target.attributes?.id;
 
             const payload = { ...editForm };
-            if (payload.deadline === '') payload.deadline = null;
+            if (payload.deadline === '') {
+                payload.deadline = null;
+            } else if (payload.deadline) {
+                // Strip time portion to match backend format (YYYY-MM-DD)
+                payload.deadline = payload.deadline.split('T')[0];
+            }
+
+            // Include targets in payload for goals
+            if (sidebarMode === 'goal-details') {
+                payload.targets = editedTargets;
+            }
 
             await fractalApi.updateGoal(rootId, String(goalId), payload);
             await fetchGoals();
@@ -248,13 +282,15 @@ function FractalGoals() {
                     attributes: {
                         ...viewingGoal.attributes,
                         description: payload.description,
-                        deadline: payload.deadline
+                        deadline: payload.deadline,
+                        targets: editedTargets
                     }
                 };
                 setViewingGoal(updatedGoal);
             }
 
             setIsEditing(false);
+            setEditedTargets([]); // Clear edited targets after save
         } catch (error) {
             alert('Failed to update: ' + error.message);
         }
@@ -311,6 +347,39 @@ function FractalGoals() {
         }
     };
 
+    // Target handlers
+    const handleAddTarget = () => {
+        setEditingTarget(null);
+        setShowTargetModal(true);
+    };
+
+    const handleEditTarget = (target) => {
+        setEditingTarget(target);
+        setShowTargetModal(true);
+    };
+
+    const handleDeleteTarget = (targetId) => {
+        // Update editedTargets state (will be saved when user clicks Save)
+        const updatedTargets = editedTargets.filter(t => t.id !== targetId);
+        setEditedTargets(updatedTargets);
+    };
+
+    const handleSaveTarget = (target) => {
+        // Update editedTargets state (will be saved when user clicks Save)
+        let updatedTargets;
+        if (editingTarget) {
+            // Update existing target
+            updatedTargets = editedTargets.map(t =>
+                t.id === target.id ? target : t
+            );
+        } else {
+            // Add new target
+            updatedTargets = [...editedTargets, target];
+        }
+        setEditedTargets(updatedTargets);
+    };
+
+
     if (loading || !fractalData) {
         return (
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
@@ -344,6 +413,11 @@ function FractalGoals() {
                     onAddChild={handleAddChildClick}
                     key={rootId + (selectedPracticeSession?.id || '')}
                     sidebarOpen={!!sidebarMode}
+                    selectedNodeId={
+                        viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) :
+                            viewingPracticeSession ? (viewingPracticeSession.attributes?.id || viewingPracticeSession.id) :
+                                null
+                    }
                 />
             </div>
 
@@ -398,9 +472,72 @@ function FractalGoals() {
                                                 type="date"
                                                 value={editForm.deadline}
                                                 onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
-                                                style={{ background: '#333', border: '1px solid #555', color: 'white', padding: '8px', borderRadius: '4px', marginTop: '5px' }}
+                                                style={{ background: '#333', border: '1px solid #555', color: 'white', padding: '6px 8px', borderRadius: '4px', marginTop: '5px', width: '100%' }}
                                             />
                                         </div>
+
+                                        {/* Targets Section - Edit Mode */}
+                                        <div className="form-group">
+                                            <label style={{ marginBottom: '8px', display: 'block' }}>Targets:</label>
+
+                                            {/* Targets Container Box */}
+                                            <div style={{
+                                                background: '#1e1e1e',
+                                                border: '1px solid #444',
+                                                borderRadius: '6px',
+                                                padding: '12px',
+                                                minHeight: '100px'
+                                            }}>
+                                                {editedTargets.length === 0 ? (
+                                                    <p style={{
+                                                        color: '#888',
+                                                        fontSize: '13px',
+                                                        fontStyle: 'italic',
+                                                        textAlign: 'center',
+                                                        margin: '20px 0'
+                                                    }}>
+                                                        No targets set. Click "+ Add Target" below to define completion criteria.
+                                                    </p>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
+                                                        {editedTargets.map(target => (
+                                                            <TargetCard
+                                                                key={target.id}
+                                                                target={target}
+                                                                activityDefinitions={activities}
+                                                                onEdit={() => handleEditTarget(target)}
+                                                                onDelete={() => handleDeleteTarget(target.id)}
+                                                                isCompleted={false}
+                                                                isEditMode={true}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Add Target Button at Bottom */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddTarget}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '10px',
+                                                        background: '#4caf50',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        color: 'white',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px',
+                                                        fontWeight: 600,
+                                                        transition: 'background 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#45a049'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.background = '#4caf50'}
+                                                >
+                                                    + Add Target
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <div className="sidebar-actions">
                                             <button className="action-btn secondary" onClick={handleCancelEdit}>Cancel</button>
                                             <button className="action-btn primary" onClick={handleSaveEdit}>Save</button>
@@ -415,18 +552,20 @@ function FractalGoals() {
                                         </div>
                                         <h2>{viewingGoal?.name}</h2>
 
-                                        {viewingGoal?.attributes?.created_at && (
-                                            <p className="meta-info">Created: {new Date(viewingGoal.attributes.created_at).toLocaleDateString()}</p>
-                                        )}
+                                        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px', fontSize: '13px', color: '#999' }}>
+                                            {viewingGoal?.attributes?.created_at && (
+                                                <div>
+                                                    <strong style={{ color: '#ccc' }}>Created:</strong> {new Date(viewingGoal.attributes.created_at).toLocaleDateString()}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <strong style={{ color: '#ccc' }}>Deadline:</strong> {viewingGoal?.attributes?.deadline ? new Date(viewingGoal.attributes.deadline).toLocaleDateString() : 'None'}
+                                            </div>
+                                        </div>
 
                                         <div className="description-section">
                                             <h4>Description</h4>
                                             <p>{viewingGoal?.attributes?.description || viewingGoal?.description || 'No description provided.'}</p>
-                                        </div>
-
-                                        <div className="description-section" style={{ maxHeight: '100px' }}>
-                                            <h4>Deadline</h4>
-                                            <p>{viewingGoal?.attributes?.deadline || viewingGoal?.deadline || 'No deadline set'}</p>
                                         </div>
 
                                         {/* Practice Sessions Section (for ShortTermGoals only) */}
@@ -483,6 +622,39 @@ function FractalGoals() {
                                                 })()}
                                             </div>
                                         )}
+
+                                        {/* Targets Section - View Mode */}
+                                        <div className="description-section">
+                                            <h4>Targets</h4>
+
+                                            {(() => {
+                                                const targets = viewingGoal?.attributes?.targets || [];
+
+                                                if (targets.length === 0) {
+                                                    return (
+                                                        <p style={{ color: '#888', fontSize: '14px' }}>
+                                                            No targets set. Add a target to define completion criteria.
+                                                        </p>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        {targets.map(target => (
+                                                            <TargetCard
+                                                                key={target.id}
+                                                                target={target}
+                                                                activityDefinitions={activities}
+                                                                onEdit={() => handleEditTarget(target)}
+                                                                onDelete={() => handleDeleteTarget(target.id)}
+                                                                isCompleted={viewingGoal?.attributes?.completed || false}
+                                                                isEditMode={false}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
 
                                         <div className="sidebar-actions" style={{ flexDirection: 'column', gap: '10px' }}>
                                             <button
@@ -759,6 +931,18 @@ function FractalGoals() {
                     </div>
                 )
             }
+
+            {/* Add/Edit Target Modal */}
+            <AddTargetModal
+                isOpen={showTargetModal}
+                onClose={() => {
+                    setShowTargetModal(false);
+                    setEditingTarget(null);
+                }}
+                onSave={handleSaveTarget}
+                activityDefinitions={activities}
+                existingTarget={editingTarget}
+            />
         </div >
     );
 }

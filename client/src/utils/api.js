@@ -182,6 +182,31 @@ export const fractalApi = {
      * @param {string} activityId - ID of the activity
      */
     deleteActivity: (rootId, activityId) => axios.delete(`${API_BASE}/${rootId}/activities/${activityId}`),
+
+    // ========== Activity Instance Time Tracking ==========
+
+    /**
+     * Start timer for an activity instance
+     * @param {string} rootId - ID of the fractal
+     * @param {string} instanceId - ID of the activity instance
+     */
+    startActivityTimer: (rootId, instanceId) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`),
+
+    /**
+     * Stop timer for an activity instance
+     * @param {string} rootId - ID of the fractal
+     * @param {string} instanceId - ID of the activity instance
+     */
+    stopActivityTimer: (rootId, instanceId) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`),
+
+    /**
+     * Get all activity instances for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    getActivityInstances: (rootId) =>
+        axios.get(`${API_BASE}/${rootId}/activity-instances`),
 };
 
 /**

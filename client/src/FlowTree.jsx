@@ -48,24 +48,10 @@ const CustomNode = ({ data }) => {
                 display: 'flex',
                 alignItems: 'center',
                 cursor: 'pointer',
-                position: 'relative', // Ensure handles are positioned relative to this
+                position: 'relative',
             }}
         >
-            {/* Target Handle (Centered hidden behind circle) */}
-            <Handle
-                type="target"
-                position={Position.Top}
-                style={{
-                    top: 15, // Center vertical (half of 30px)
-                    left: 15, // Center horizontal
-                    background: 'transparent',
-                    border: 'none',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 0
-                }}
-            />
-
-            {/* Circle */}
+            {/* Circle with handles positioned relative to it */}
             <div
                 style={{
                     width: '30px',
@@ -73,16 +59,47 @@ const CustomNode = ({ data }) => {
                     borderRadius: '50%',
                     background: fillColor,
                     border: '2px solid #fff',
-                    // Removed opacity, added subtle glow for gold
                     boxShadow: isCompleted
                         ? '0 0 10px rgba(255, 215, 0, 0.6)'
                         : '0 2px 4px rgba(0,0,0,0.3)',
                     flexShrink: 0,
-                    zIndex: 2, // Ensure circle sits ABOVE the connecting lines
-                    position: 'relative'
+                    zIndex: 2,
+                    position: 'relative', // Handles are positioned relative to this circle
                 }}
                 onClick={data.onClick}
-            />
+            >
+                {/* Target Handle - centered on circle */}
+                <Handle
+                    type="target"
+                    position={Position.Top}
+                    style={{
+                        top: '50%',
+                        left: '50%',
+                        background: 'transparent',
+                        border: 'none',
+                        transform: 'translate(-50%, -50%)',
+                        width: '1px',
+                        height: '1px',
+                        zIndex: 0
+                    }}
+                />
+
+                {/* Source Handle - centered on circle */}
+                <Handle
+                    type="source"
+                    position={Position.Bottom}
+                    style={{
+                        top: '50%',
+                        left: '50%',
+                        background: 'transparent',
+                        border: 'none',
+                        transform: 'translate(-50%, -50%)',
+                        width: '1px',
+                        height: '1px',
+                        zIndex: 0
+                    }}
+                />
+            </div>
 
             {/* Text beside circle */}
             <div
@@ -99,7 +116,11 @@ const CustomNode = ({ data }) => {
                         fontSize: '14px',
                         fontWeight: '600',
                         textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                        whiteSpace: 'nowrap',
+                        whiteSpace: data.label.length > 30 ? 'normal' : 'nowrap',
+                        wordBreak: 'keep-all',
+                        overflowWrap: 'break-word',
+                        maxWidth: '200px',
+                        lineHeight: '1.3',
                     }}
                     onClick={data.onClick}
                 >
@@ -138,20 +159,6 @@ const CustomNode = ({ data }) => {
                     </div>
                 )}
             </div>
-
-            {/* Source Handle (Centered hidden behind circle) */}
-            <Handle
-                type="source"
-                position={Position.Bottom}
-                style={{
-                    top: 15, // Center vertical
-                    left: 15, // Center horizontal
-                    background: 'transparent',
-                    border: 'none',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 0
-                }}
-            />
         </div>
     );
 };
@@ -201,11 +208,100 @@ const getLayoutedElements = (nodes, edges, direction = 'TB') => {
     return { nodes: layoutedNodes, edges };
 };
 
+// Helper function to get all ancestor IDs from a node to the root
+const getAncestryPath = (treeData, targetNodeId) => {
+    const ancestorIds = new Set();
+
+    const findPath = (node, targetId, currentPath = []) => {
+        if (!node) return null;
+
+        const nodeId = String(node.id || node.attributes?.id);
+        const newPath = [...currentPath, nodeId];
+
+        // Found the target node
+        if (nodeId === targetId) {
+            return newPath;
+        }
+
+        // Search in children
+        if (node.children && node.children.length > 0) {
+            for (const child of node.children) {
+                const result = findPath(child, targetId, newPath);
+                if (result) return result;
+            }
+        }
+
+        return null;
+    };
+
+    const path = findPath(treeData, String(targetNodeId));
+    if (path) {
+        path.forEach(id => ancestorIds.add(id));
+    }
+
+    return ancestorIds;
+};
+// Helper function to get full lineage (ancestors + selected + descendants)
+const getLineagePath = (treeData, targetNodeId) => {
+    const lineageIds = new Set();
+
+    // Find the target node and collect ancestors
+    const findNodeAndAncestors = (node, targetId, currentPath = []) => {
+        if (!node) return null;
+
+        const nodeId = String(node.id || node.attributes?.id);
+        const newPath = [...currentPath, nodeId];
+
+        // Found the target node
+        if (nodeId === targetId) {
+            return { node, path: newPath };
+        }
+
+        // Search in children
+        if (node.children && node.children.length > 0) {
+            for (const child of node.children) {
+                const result = findNodeAndAncestors(child, targetId, newPath);
+                if (result) return result;
+            }
+        }
+
+        return null;
+    };
+
+    // Collect all descendants from a node
+    const collectDescendants = (node, descendants = new Set()) => {
+        if (!node) return descendants;
+
+        const nodeId = String(node.id || node.attributes?.id);
+        descendants.add(nodeId);
+
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => collectDescendants(child, descendants));
+        }
+
+        return descendants;
+    };
+
+    const result = findNodeAndAncestors(treeData, String(targetNodeId));
+    if (result) {
+        // Add all ancestors (the path to the target)
+        result.path.forEach(id => lineageIds.add(id));
+
+        // Add all descendants of the target node
+        collectDescendants(result.node, lineageIds);
+    }
+
+    return lineageIds;
+};
+
 // Convert tree data to ReactFlow format
-const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChild) => {
+const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId = null) => {
     const nodes = [];
     const edges = [];
     const addedNodeIds = new Set();
+
+    // Get lineage path (ancestors + descendants) if a node is selected
+    const lineagePath = selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null;
 
     // Helper to get child type name
     const getChildType = (parentType) => {
@@ -243,7 +339,19 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
 
         const nodeId = String(rawNodeId);
 
-        // Always add Edge connecting to parent (even if node was already added)
+        // Add Node only if unique
+        if (addedNodeIds.has(nodeId)) {
+            return;
+        }
+
+        // Skip nodes not in lineage path if filtering is active
+        if (lineagePath && !lineagePath.has(nodeId)) {
+            return;
+        }
+
+        addedNodeIds.add(nodeId);
+
+        // Add Edge connecting to parent (only after we know this node will be included)
         if (parentId) {
             edges.push({
                 id: `${parentId}-${nodeId}`,
@@ -257,11 +365,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
             });
         }
 
-        // Add Node only if unique
-        if (addedNodeIds.has(nodeId)) {
-            return;
-        }
-        addedNodeIds.add(nodeId);
+
 
         const isPracticeSession = node.__isPracticeSession || node.attributes?.type === 'PracticeSession';
         const nodeType = node.attributes?.type;
@@ -297,7 +401,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
     return { nodes, edges };
 };
 
-const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, sidebarOpen }) => {
+const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, sidebarOpen, selectedNodeId }) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -339,9 +443,9 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
             }
         }
 
-        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick, onAddPracticeSession, onAddChild);
+        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId);
         return getLayoutedElements(nodes, edges);
-    }, [treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild]);
+    }, [treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, selectedNodeId]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
@@ -383,6 +487,22 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
             });
         }
     }, [layoutedNodes.length, rfInstance]);
+
+    // Center on selected node when it changes
+    useEffect(() => {
+        if (rfInstance && selectedNodeId && layoutedNodes.length > 0) {
+            // Find the selected node
+            const selectedNode = layoutedNodes.find(n => n.id === String(selectedNodeId));
+            if (selectedNode) {
+                // Center on the node with smooth animation, shifted left to account for sidebar
+                rfInstance.setCenter(
+                    selectedNode.position.x + 125 - 150, // Center of node (nodeWidth/2) - 150px left shift for sidebar
+                    selectedNode.position.y + 40,  // Center of node (nodeHeight/2)
+                    { zoom: 1, duration: 500 }
+                );
+            }
+        }
+    }, [selectedNodeId, rfInstance, layoutedNodes]);
 
     return (
         <div style={{

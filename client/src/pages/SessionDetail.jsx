@@ -5,6 +5,31 @@ import SessionActivityItem from '../components/SessionActivityItem';
 import '../App.css';
 
 /**
+ * Calculate total duration in seconds for a section based on activity instances
+ */
+function calculateSectionDuration(section) {
+    if (!section || !section.exercises) return 0;
+
+    let totalSeconds = 0;
+    for (const exercise of section.exercises) {
+        if (exercise.instance_id && exercise.duration_seconds != null) {
+            totalSeconds += exercise.duration_seconds;
+        }
+    }
+    return totalSeconds;
+}
+
+/**
+ * Format duration in seconds to MM:SS format
+ */
+function formatDuration(seconds) {
+    if (seconds == null || seconds === 0) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
  * Session Detail Page
  * Fill in practice session details based on template sections
  */
@@ -69,7 +94,76 @@ function SessionDetail() {
         setSessionData(updatedData);
     };
 
-    const handleExerciseChange = (sectionIndex, exerciseIndex, field, value) => {
+    const handleExerciseChange = async (sectionIndex, exerciseIndex, field, value) => {
+        // Handle timer actions specially
+        if (field === 'timer_action') {
+            const exercise = sessionData.sections[sectionIndex].exercises[exerciseIndex];
+            const instanceId = exercise.instance_id;
+
+            if (!instanceId) {
+                console.error('No instance_id for timer action');
+                return;
+            }
+
+            try {
+                let response;
+                if (value === 'start') {
+                    response = await fractalApi.startActivityTimer(rootId, instanceId);
+                } else if (value === 'stop') {
+                    response = await fractalApi.stopActivityTimer(rootId, instanceId);
+                } else if (value === 'reset') {
+                    // Reset: clear time_start and time_stop locally
+                    const updatedData = { ...sessionData };
+                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
+                        ...exercise,
+                        time_start: null,
+                        time_stop: null,
+                        duration_seconds: null
+                    };
+                    setSessionData(updatedData);
+                    return;
+                }
+
+                // Update the exercise with the new time data
+                if (response && response.data) {
+                    const updatedData = { ...sessionData };
+                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
+                        ...exercise,
+                        time_start: response.data.time_start,
+                        time_stop: response.data.time_stop,
+                        duration_seconds: response.data.duration_seconds
+                    };
+                    setSessionData(updatedData);
+                }
+            } catch (err) {
+                console.error('Error with timer action:', err);
+                alert('Error updating timer: ' + err.message);
+            }
+            return;
+        }
+
+        // Handle manual datetime field updates (time_start, time_stop)
+        if (field === 'time_start' || field === 'time_stop') {
+            const updatedData = { ...sessionData };
+            const exercise = updatedData.sections[sectionIndex].exercises[exerciseIndex];
+
+            // Update the field
+            exercise[field] = value;
+
+            // Recalculate duration if both times are set
+            if (exercise.time_start && exercise.time_stop) {
+                const start = new Date(exercise.time_start);
+                const stop = new Date(exercise.time_stop);
+                exercise.duration_seconds = Math.floor((stop - start) / 1000);
+            } else {
+                exercise.duration_seconds = null;
+            }
+
+            setSessionData(updatedData);
+            return;
+        }
+
+        // Normal field update
         const updatedData = { ...sessionData };
         updatedData.sections[sectionIndex].exercises[exerciseIndex][field] = value;
         setSessionData(updatedData);
@@ -117,6 +211,44 @@ function SessionDetail() {
 
         try {
             const newCompleted = !session.attributes.completed;
+
+            // If marking as complete, stop all running timers first
+            if (newCompleted && sessionData) {
+                const updatedData = { ...sessionData };
+                let hasUpdates = false;
+
+                for (let sectionIndex = 0; sectionIndex < updatedData.sections.length; sectionIndex++) {
+                    const section = updatedData.sections[sectionIndex];
+                    if (!section.exercises) continue;
+
+                    for (let exerciseIndex = 0; exerciseIndex < section.exercises.length; exerciseIndex++) {
+                        const exercise = section.exercises[exerciseIndex];
+
+                        // Check if this is an activity with a running timer
+                        if (exercise.instance_id && exercise.time_start && !exercise.time_stop) {
+                            try {
+                                const response = await fractalApi.stopActivityTimer(rootId, exercise.instance_id);
+                                if (response && response.data) {
+                                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
+                                        ...exercise,
+                                        time_start: response.data.time_start,
+                                        time_stop: response.data.time_stop,
+                                        duration_seconds: response.data.duration_seconds
+                                    };
+                                    hasUpdates = true;
+                                }
+                            } catch (err) {
+                                console.error(`Error stopping timer for activity ${exercise.instance_id}:`, err);
+                            }
+                        }
+                    }
+                }
+
+                if (hasUpdates) {
+                    setSessionData(updatedData);
+                }
+            }
+
             const res = await fractalApi.toggleGoalCompletion(rootId, sessionId, newCompleted);
             setSession(res.data.goal); // Endpoint returns { status: 'success', goal: ... }
         } catch (err) {
@@ -228,24 +360,17 @@ function SessionDetail() {
                                 {section.name}
                             </h2>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <label style={{ color: '#aaa', fontSize: '14px' }}>
-                                    Actual Duration (min):
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={section.actual_duration_minutes || section.duration_minutes || 0}
-                                    onChange={(e) => handleSectionDurationChange(sectionIndex, e.target.value)}
-                                    style={{
-                                        width: '80px',
-                                        padding: '6px 10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '14px'
-                                    }}
-                                />
+                                <span style={{ color: '#aaa', fontSize: '14px' }}>
+                                    Duration:
+                                </span>
+                                <span style={{
+                                    color: '#4caf50',
+                                    fontSize: '16px',
+                                    fontWeight: 'bold',
+                                    fontFamily: 'monospace'
+                                }}>
+                                    {formatDuration(calculateSectionDuration(section))}
+                                </span>
                                 <span style={{ color: '#666', fontSize: '14px' }}>
                                     (planned: {section.duration_minutes} min)
                                 </span>

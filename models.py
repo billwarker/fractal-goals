@@ -1,8 +1,10 @@
 
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Float
+
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Float, Text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
 from datetime import datetime
 import uuid
+import json
 
 Base = declarative_base()
 
@@ -40,6 +42,10 @@ class Goal(Base):
     created_at = Column(DateTime, default=datetime.now)
     parent_id = Column(String, nullable=True)  # Can reference goals.id or practice_sessions.id
     
+    # Activity targets for goal completion (stored as JSON)
+    # Format: [{"id": "uuid", "activity_id": "uuid", "name": "...", "metrics": [...]}]
+    targets = Column(Text, nullable=True)
+    
     # Constraint to ensure type is valid
     __table_args__ = (
         CheckConstraint(
@@ -75,6 +81,7 @@ class Goal(Base):
                 "deadline": self.deadline.isoformat() if self.deadline else None,
                 "completed": self.completed,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
+                "targets": json.loads(self.targets) if self.targets else [],
             },
             "children": []
         }
@@ -309,6 +316,12 @@ class ActivityInstance(Base):
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
     
+    # Time tracking fields
+    time_start = Column(DateTime, nullable=True)
+    time_stop = Column(DateTime, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)  # Calculated from stop - start
+    
+    
     # Store metrics values for this instance
     metric_values = relationship(
         "MetricValue",
@@ -327,6 +340,9 @@ class ActivityInstance(Base):
             "activity_definition_id": self.activity_definition_id,
             "definition_name": self.definition.name if self.definition else "Unknown",
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "time_start": self.time_start.isoformat() if self.time_start else None,
+            "time_stop": self.time_stop.isoformat() if self.time_stop else None,
+            "duration_seconds": self.duration_seconds,
             "metric_values": [m.to_dict() for m in self.metric_values]
         }
 
