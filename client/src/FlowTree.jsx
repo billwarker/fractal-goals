@@ -42,6 +42,33 @@ const CustomNode = ({ data }) => {
 
     const age = getAge();
 
+    // Calculate due time if deadline exists
+    const getDueTime = () => {
+        if (!data.deadline) return null;
+        const deadlineDate = new Date(data.deadline);
+        const now = new Date();
+        const diffMs = deadlineDate - now;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        const isPast = diffDays < 0;
+        const absDays = Math.abs(diffDays);
+
+        let timeStr;
+        if (absDays >= 365) {
+            timeStr = `${(absDays / 365).toFixed(1)}y`;
+        } else if (absDays >= 30 || absDays > 7) {
+            timeStr = `${(absDays / 30.44).toFixed(1)}mo`;
+        } else if (absDays > 6) {
+            timeStr = `${(absDays / 7).toFixed(1)}w`;
+        } else {
+            timeStr = `${Math.floor(absDays)}d`;
+        }
+
+        return isPast ? `-${timeStr}` : timeStr;
+    };
+
+    const dueTime = getDueTime();
+
     return (
         <div
             style={{
@@ -126,16 +153,28 @@ const CustomNode = ({ data }) => {
                 >
                     {data.label}
                 </div>
-                {age && (
+                {(age || dueTime) && (
                     <div
                         style={{
                             color: '#fff',
                             fontSize: '12px',
                             marginTop: '2px',
                             textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'center'
                         }}
                     >
-                        {age}
+                        {age && <span>age: {age}</span>}
+                        {age && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
+                        {dueTime && (
+                            <span style={{
+                                color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
+                                fontWeight: 'bold'
+                            }}>
+                                due: {dueTime}
+                            </span>
+                        )}
                     </div>
                 )}
                 {/* Add Child Button - for all goal types that can have children */}
@@ -382,6 +421,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
                 type: nodeType,
                 completed: node.attributes?.completed,
                 created_at: node.attributes?.created_at,
+                deadline: node.attributes?.deadline,
                 hasChildren: node.children && node.children.length > 0,
                 __isPracticeSession: isPracticeSession,
                 onClick: () => onNodeClick(node),
@@ -456,15 +496,30 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
         setEdges(layoutedEdges);
     }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
-    // Handle sidebar toggle reflow
-    useEffect(() => {
-        if (rfInstance) {
-            const timer = setTimeout(() => {
-                rfInstance.fitView({ padding: 0.2, duration: 300 });
-            }, 300); // 300ms matches sidebar transition
-            return () => clearTimeout(timer);
-        }
-    }, [sidebarOpen, rfInstance]);
+    // Handle sidebar toggle reflow - DISABLED
+    // useEffect(() => {
+    //     if (rfInstance && layoutedNodes.length > 0) {
+    //         const timer = setTimeout(() => {
+    //             const rootNode = layoutedNodes[0];
+    //             if (!rootNode) return;
+    //             if (sidebarOpen) {
+    //                 const sidebarWidth = 400;
+    //                 const visibleWidth = window.innerWidth - sidebarWidth;
+    //                 const visibleCenterX = visibleWidth / 2;
+    //                 const viewportCenterX = window.innerWidth / 2;
+    //                 const offsetX = visibleCenterX - viewportCenterX;
+    //                 rfInstance.setCenter(
+    //                     rootNode.position.x + 125 + offsetX,
+    //                     rootNode.position.y + 40,
+    //                     { zoom: 1, duration: 300 }
+    //                 );
+    //             } else {
+    //                 rfInstance.fitView({ padding: 0.2, duration: 300 });
+    //             }
+    //         }, 300);
+    //         return () => clearTimeout(timer);
+    //     }
+    // }, [sidebarOpen, rfInstance, layoutedNodes]);
 
     // Center graph on initial mount (with delay for container width transition)
     useEffect(() => {
@@ -488,21 +543,6 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
         }
     }, [layoutedNodes.length, rfInstance]);
 
-    // Center on selected node when it changes
-    useEffect(() => {
-        if (rfInstance && selectedNodeId && layoutedNodes.length > 0) {
-            // Find the selected node
-            const selectedNode = layoutedNodes.find(n => n.id === String(selectedNodeId));
-            if (selectedNode) {
-                // Center on the node with smooth animation, shifted left to account for sidebar
-                rfInstance.setCenter(
-                    selectedNode.position.x + 125 - 150, // Center of node (nodeWidth/2) - 150px left shift for sidebar
-                    selectedNode.position.y + 40,  // Center of node (nodeHeight/2)
-                    { zoom: 1, duration: 500 }
-                );
-            }
-        }
-    }, [selectedNodeId, rfInstance, layoutedNodes]);
 
     return (
         <div style={{

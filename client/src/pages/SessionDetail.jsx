@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import SessionActivityItem from '../components/SessionActivityItem';
+import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import '../App.css';
 
 /**
@@ -42,6 +43,7 @@ function SessionDetail() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activities, setActivities] = useState([]);
+    const [parentGoals, setParentGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
 
     useEffect(() => {
@@ -80,6 +82,19 @@ function SessionDetail() {
             if (parsedData) {
                 setSessionData(parsedData);
             }
+
+            // Fetch parent goals for target achievement checking
+            const parentIds = foundSession.attributes?.parent_ids || [];
+            const goals = [];
+            for (const goalId of parentIds) {
+                try {
+                    const goalRes = await fractalApi.getGoal(rootId, goalId);
+                    goals.push(goalRes.data);
+                } catch (err) {
+                    console.error(`Failed to fetch goal ${goalId}`, err);
+                }
+            }
+            setParentGoals(goals);
 
             setLoading(false);
         } catch (err) {
@@ -331,6 +346,47 @@ function SessionDetail() {
                     <span>Total Duration: {sessionData.total_duration_minutes} min</span>
                     <span>Sections: {sessionData.sections?.length || 0}</span>
                 </div>
+
+                {/* Achieved Targets Indicator */}
+                {(() => {
+                    const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
+                    if (achievedTargets.length === 0) return null;
+
+                    return (
+                        <div style={{
+                            marginTop: '16px',
+                            padding: '12px',
+                            background: '#1a2e1a',
+                            borderRadius: '6px',
+                            borderLeft: '3px solid #4caf50'
+                        }}>
+                            <div style={{ fontSize: '12px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                                🎯 Targets Achieved ({achievedTargets.length}):
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {achievedTargets.map((achieved, idx) => (
+                                    <div
+                                        key={idx}
+                                        style={{
+                                            padding: '6px 12px',
+                                            background: '#2e7d32',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            color: 'white',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px'
+                                        }}
+                                    >
+                                        <span>✓</span>
+                                        <span>{achieved.target.name || 'Target'}</span>
+                                        <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Sections */}

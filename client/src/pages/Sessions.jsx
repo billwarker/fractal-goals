@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useHeader } from '../context/HeaderContext';
+import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import '../App.css';
 
 /**
@@ -368,6 +369,46 @@ function Sessions() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Achieved Targets Section */}
+                                    {(() => {
+                                        const achievedTargets = getAchievedTargetsForSession(session, sessionParentGoals);
+                                        if (achievedTargets.length === 0) return null;
+
+                                        return (
+                                            <div style={{
+                                                padding: '12px 16px',
+                                                background: '#1a2e1a',
+                                                borderBottom: '1px solid #333',
+                                                borderLeft: '3px solid #4caf50'
+                                            }}>
+                                                <div style={{ fontSize: '11px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                                                    🎯 Targets Achieved ({achievedTargets.length}):
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {achievedTargets.map((achieved, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            style={{
+                                                                padding: '6px 12px',
+                                                                background: '#2e7d32',
+                                                                borderRadius: '4px',
+                                                                fontSize: '12px',
+                                                                color: 'white',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px'
+                                                            }}
+                                                        >
+                                                            <span>✓</span>
+                                                            <span>{achieved.target.name || 'Target'}</span>
+                                                            <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* Bottom Level: Session data with horizontal sections */}
                                     <div style={{ padding: '16px' }}>

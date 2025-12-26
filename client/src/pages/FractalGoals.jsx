@@ -4,6 +4,7 @@ import { fractalApi } from '../utils/api';
 import FlowTree from '../FlowTree';
 import TargetCard from '../components/TargetCard';
 import AddTargetModal from '../components/AddTargetModal';
+import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import '../App.css';
 
 // Helper functions
@@ -51,6 +52,31 @@ const calculateGoalAge = (createdAt) => {
     } else {
         return `${Math.floor(diffDays)}d`;
     }
+};
+
+const calculateDueTime = (deadline) => {
+    if (!deadline) return null;
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    const diffMs = deadlineDate - now;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    // If past deadline, show negative
+    const isPast = diffDays < 0;
+    const absDays = Math.abs(diffDays);
+
+    let timeStr;
+    if (absDays >= 365) {
+        timeStr = `${(absDays / 365).toFixed(1)}y`;
+    } else if (absDays >= 30 || absDays > 7) {
+        timeStr = `${(absDays / 30.44).toFixed(1)}mo`;
+    } else if (absDays > 6) {
+        timeStr = `${(absDays / 7).toFixed(1)}w`;
+    } else {
+        timeStr = `${Math.floor(absDays)}d`;
+    }
+
+    return isPast ? `-${timeStr}` : timeStr;
 };
 
 const calculateMetrics = (goalNode, allPracticeSessions = []) => {
@@ -729,6 +755,64 @@ function FractalGoals() {
                                             <h4>Description</h4>
                                             <p>{viewingPracticeSession?.attributes?.description || 'No description provided.'}</p>
                                         </div>
+
+                                        {/* Achieved Targets Indicator */}
+                                        {(() => {
+                                            // Get parent goals for this session
+                                            const parentIds = viewingPracticeSession?.attributes?.parent_ids || [];
+                                            const parentGoals = parentIds.map(id => {
+                                                const findGoal = (node, targetId) => {
+                                                    if (!node) return null;
+                                                    if (node.id === targetId || node.attributes?.id === targetId) return node;
+                                                    if (node.children) {
+                                                        for (const child of node.children) {
+                                                            const found = findGoal(child, targetId);
+                                                            if (found) return found;
+                                                        }
+                                                    }
+                                                    return null;
+                                                };
+                                                return findGoal(fractalData, id);
+                                            }).filter(Boolean);
+
+                                            const achievedTargets = getAchievedTargetsForSession(viewingPracticeSession, parentGoals);
+                                            if (achievedTargets.length === 0) return null;
+
+                                            return (
+                                                <div style={{
+                                                    marginTop: '16px',
+                                                    padding: '12px',
+                                                    background: '#1a2e1a',
+                                                    borderRadius: '6px',
+                                                    borderLeft: '3px solid #4caf50'
+                                                }}>
+                                                    <h4 style={{ fontSize: '14px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                                                        🎯 Targets Achieved ({achievedTargets.length}):
+                                                    </h4>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        {achievedTargets.map((achieved, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    background: '#2e7d32',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '12px',
+                                                                    color: 'white',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px'
+                                                                }}
+                                                            >
+                                                                <span>✓</span>
+                                                                <span>{achieved.target.name || 'Target'}</span>
+                                                                <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
 
                                         <div className="sidebar-actions">
                                             <button className="action-btn secondary" onClick={handleEditClick}>Edit Session</button>
