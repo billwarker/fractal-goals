@@ -295,6 +295,11 @@ function App() {
                         </div>
                     </div>
                 )}
+
+                {/* Environment Indicator */}
+                <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
+                    {import.meta.env.VITE_ENV || 'development'}
+                </div>
             </div>
         </HeaderProvider>
     );

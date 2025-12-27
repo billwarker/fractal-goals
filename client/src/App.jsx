@@ -745,6 +745,7 @@ function App() {
       <div className="app-container">
 
 
+
         {selectedRootId && (
           <div className="top-nav-links">
             <div className="nav-group">
@@ -1391,6 +1392,11 @@ function App() {
             </div>
           )
         }
+
+        {/* Environment Indicator */}
+        <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
+          {import.meta.env.VITE_ENV || 'development'}
+        </div>
       </div >
     </TimezoneContext.Provider>
   );

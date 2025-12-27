@@ -1,24 +1,31 @@
 #!/bin/zsh
 # Start both Frontend and Backend with environment selection
-# Usage: ./start-all.sh [development|testing|production]
+# Usage: ./shell-scripts/start-all.sh [development|testing|production]
 # Default: development
 
 ENV=${1:-development}
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Get the project root (parent of shell-scripts)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "=================================================="
 echo "🚀 Starting Fractal Goals Application"
 echo "📦 Environment: $ENV"
+echo "📁 Project Root: $PROJECT_ROOT"
 echo "=================================================="
 echo ""
 
 # Create logs directory if it doesn't exist
-mkdir -p logs
+mkdir -p "$PROJECT_ROOT/logs"
 
 # Start Flask backend in background
 echo "Starting Flask backend..."
+cd "$PROJECT_ROOT"
 export ENV=$ENV
-source fractal-goals-venv/bin/activate
-python app.py > logs/${ENV}_backend.log 2>&1 &
+source "$PROJECT_ROOT/fractal-goals-venv/bin/activate"
+python "$PROJECT_ROOT/app.py" > "$PROJECT_ROOT/logs/${ENV}_backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "✓ Backend started (PID: $BACKEND_PID)"
 
@@ -27,10 +34,9 @@ sleep 2
 
 # Start React frontend in background
 echo "Starting React frontend..."
-cd client
-npm run dev -- --mode $ENV > ../logs/${ENV}_frontend.log 2>&1 &
+cd "$PROJECT_ROOT/client"
+npm run dev -- --mode $ENV > "$PROJECT_ROOT/logs/${ENV}_frontend.log" 2>&1 &
 FRONTEND_PID=$!
-cd ..
 echo "✓ Frontend started (PID: $FRONTEND_PID)"
 
 echo ""
@@ -39,7 +45,7 @@ echo "✅ Application started successfully!"
 echo "=================================================="
 echo "Backend:  http://localhost:8001"
 echo "Frontend: http://localhost:5173"
-echo "Logs:     logs/${ENV}_*.log"
+echo "Logs:     $PROJECT_ROOT/logs/${ENV}_*.log"
 echo ""
 echo "Backend PID:  $BACKEND_PID"
 echo "Frontend PID: $FRONTEND_PID"
