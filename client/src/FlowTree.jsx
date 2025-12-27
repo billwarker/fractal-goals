@@ -165,14 +165,14 @@ const CustomNode = ({ data }) => {
                             alignItems: 'center'
                         }}
                     >
-                        {age && <span>age: {age}</span>}
+                        {age && <span>Age: {age}</span>}
                         {age && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
                         {dueTime && (
                             <span style={{
                                 color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
                                 fontWeight: 'bold'
                             }}>
-                                due: {dueTime}
+                                Due: {dueTime}
                             </span>
                         )}
                     </div>
