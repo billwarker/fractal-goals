@@ -1,6 +1,57 @@
-*.log
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+fractal-goals-venv/
+venv/
+env/
+ENV/
+
+# Database Files
+*.db
 goals.db
 goals_db*.json
-server.py.bak
+*.db-journal
+
+# Logs
+*.log
+server.log
+client.log
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.deprecated
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Node.js (for client/)
+node_modules/
+.npm
+
+# Testing
 test_db.py
-fractal-goals-venv
+.pytest_cache/
+.coverage
+
+# Temporary Files
+*.tmp
+.cache/
