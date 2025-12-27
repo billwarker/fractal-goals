@@ -21,8 +21,8 @@ from models import (
 # Create blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
-# Initialize database
-engine = get_engine('sqlite:///goals.db')
+# Initialize database with environment-based path
+engine = get_engine()  # Uses config automatically
 init_db(engine)
 
 

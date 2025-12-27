@@ -117,6 +117,34 @@ fractal-goals/
    python -c "from models import get_engine, init_db; init_db(get_engine())"
    ```
 
+## Environment Configuration
+
+The application supports multiple environments (development, testing, production) with separate databases and configurations.
+
+**Quick Start:**
+```bash
+# Development (default)
+./shell-scripts/start-all.sh
+
+# Testing
+./shell-scripts/start-all.sh testing
+
+# Production
+./shell-scripts/start-all.sh production
+```
+
+**Environment Files:**
+- `.env.development` - Development settings (uses `goals_dev.db`)
+- `.env.testing` - Testing settings (uses `goals_test.db`)
+- `.env.production` - Production settings (uses `goals_prod.db`)
+
+**Git Branch Strategy:**
+- `main` → production
+- `develop` → testing
+- `feature/*` → development
+
+For detailed information, see [ENVIRONMENT_GUIDE.md](ENVIRONMENT_GUIDE.md).
+
 ## Running the Application
 
 ### Option 1: Start Everything (Recommended)

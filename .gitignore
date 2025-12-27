@@ -9,6 +9,14 @@ __pycache__/
 dist/
 build/
 
+# Environment Variables
+.env
+.env.local
+!.env.example
+!.env.development
+!.env.testing
+!.env.production
+
 # Virtual Environments
 fractal-goals-venv/
 venv/
@@ -16,15 +24,22 @@ env/
 ENV/
 
 # Database Files
-*.db
-goals.db
+# Environment-specific databases (not tracked)
+goals_dev.db
+goals_test.db
+goals_prod.db
 goals_db*.json
 *.db-journal
+
+# Production database (tracked)
+# goals.db is tracked as it's the production database
 
 # Logs
 *.log
 server.log
 client.log
+logs/
+!logs/README.md
 
 # Backup Files
 *.bak

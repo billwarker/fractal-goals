@@ -265,7 +265,12 @@ class SessionTemplate(Base):
 
 
 # Database Helper Functions
-def get_engine(db_path='sqlite:///goals.db'):
+def get_engine(db_path=None):
+    """Get SQLAlchemy engine with environment-based database path."""
+    if db_path is None:
+        # Import here to avoid circular dependency
+        from config import config
+        db_path = f"sqlite:///{config.get_db_path()}"
     return create_engine(db_path, echo=False)
 
 def init_db(engine):

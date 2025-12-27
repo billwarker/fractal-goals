@@ -5,18 +5,35 @@ Main application file that integrates API and page routes.
 
 from flask import Flask
 from flask_cors import CORS
-import os
+import logging
 
+from config import config
 from blueprints.api import api_bp
 from blueprints.pages import pages_bp
 
+# Print configuration on startup
+config.print_config()
+
 # Create Flask app
 app = Flask(__name__)
+app.config['ENV'] = config.ENV
+app.config['DEBUG'] = config.DEBUG
 
-# Enable CORS for development
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(config.get_log_path()),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Enable CORS with environment-based origins
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+        "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
         "allow_headers": ["Content-Type"]
     }
@@ -30,12 +47,18 @@ app.register_blueprint(pages_bp)
 @app.route('/health')
 def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "message": "Fractal Goals Flask Server"}
+    return {
+        "status": "healthy",
+        "message": "Fractal Goals Flask Server",
+        "environment": config.ENV,
+        "database": config.DATABASE_PATH
+    }
 
 
 if __name__ == '__main__':
     # Run the Flask development server
-    print("Starting Fractal Goals Flask Server...")
-    print("API endpoints available at: http://localhost:8001/api/")
-    print("Web interface available at: http://localhost:8001/")
-    app.run(host='0.0.0.0', port=8001, debug=True)
+    logger.info(f"Starting Fractal Goals Flask Server in {config.ENV} mode...")
+    logger.info(f"API endpoints available at: http://{config.HOST}:{config.PORT}/api/")
+    logger.info(f"Web interface available at: http://{config.HOST}:{config.PORT}/")
+    
+    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

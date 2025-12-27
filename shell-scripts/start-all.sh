@@ -1,53 +1,52 @@
 #!/bin/zsh
+# Start both Frontend and Backend with environment selection
+# Usage: ./start-all.sh [development|testing|production]
+# Default: development
 
-# Fractal Goals - Start All Services
-# This script starts Flask, FastAPI, and React frontend in separate terminal tabs
+ENV=${1:-development}
 
-echo "🚀 Starting Fractal Goals Application..."
+echo "=================================================="
+echo "🚀 Starting Fractal Goals Application"
+echo "📦 Environment: $ENV"
+echo "=================================================="
 echo ""
 
-# Get the project directory
-PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Create logs directory if it doesn't exist
+mkdir -p logs
 
-# Function to open a new terminal tab and run a command
-run_in_new_tab() {
-    local title=$1
-    local command=$2
-    
-    osascript <<EOF
-tell application "Terminal"
-    activate
-    tell application "System Events" to keystroke "t" using {command down}
-    delay 0.5
-    do script "cd '$PROJECT_DIR' && echo '=== $title ===' && $command" in front window
-end tell
-EOF
-}
+# Start Flask backend in background
+echo "Starting Flask backend..."
+export ENV=$ENV
+source fractal-goals-venv/bin/activate
+python app.py > logs/${ENV}_backend.log 2>&1 &
+BACKEND_PID=$!
+echo "✓ Backend started (PID: $BACKEND_PID)"
 
-# Start Flask Server (port 8001)
-echo "📦 Starting Flask Server (port 8001)..."
-run_in_new_tab "Flask Server" "source fractal-goals-venv/bin/activate && python app.py"
+# Wait a moment for backend to initialize
+sleep 2
 
-# Wait a moment
-sleep 1
-
-# Start FastAPI Server (port 8000)
-echo "⚡ Starting FastAPI Server (port 8000)..."
-run_in_new_tab "FastAPI Server" "source fractal-goals-venv/bin/activate && python server.py"
-
-# Wait a moment
-sleep 1
-
-# Start React Frontend (port 5173)
-echo "⚛️  Starting React Frontend (port 5173)..."
-run_in_new_tab "React Frontend" "cd client && npm run dev"
+# Start React frontend in background
+echo "Starting React frontend..."
+cd client
+npm run dev -- --mode $ENV > ../logs/${ENV}_frontend.log 2>&1 &
+FRONTEND_PID=$!
+cd ..
+echo "✓ Frontend started (PID: $FRONTEND_PID)"
 
 echo ""
-echo "✅ All services starting in separate terminal tabs!"
+echo "=================================================="
+echo "✅ Application started successfully!"
+echo "=================================================="
+echo "Backend:  http://localhost:8001"
+echo "Frontend: http://localhost:5173"
+echo "Logs:     logs/${ENV}_*.log"
 echo ""
-echo "Services:"
-echo "  - Flask Server:    http://localhost:8001"
-echo "  - FastAPI Server:  http://localhost:8000"
-echo "  - React Frontend:  http://localhost:5173"
+echo "Backend PID:  $BACKEND_PID"
+echo "Frontend PID: $FRONTEND_PID"
 echo ""
-echo "Press Ctrl+C in each tab to stop the respective service."
+echo "To stop both services:"
+echo "  kill $BACKEND_PID $FRONTEND_PID"
+echo "=================================================="
+
+# Keep script running and wait for both processes
+wait $BACKEND_PID $FRONTEND_PID
