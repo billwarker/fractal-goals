@@ -123,7 +123,10 @@ function SessionDetail() {
             try {
                 let response;
                 if (value === 'start') {
-                    response = await fractalApi.startActivityTimer(rootId, instanceId);
+                    response = await fractalApi.startActivityTimer(rootId, instanceId, {
+                        practice_session_id: sessionId,
+                        activity_definition_id: exercise.activity_id
+                    });
                 } else if (value === 'stop') {
                     response = await fractalApi.stopActivityTimer(rootId, instanceId);
                 } else if (value === 'reset') {

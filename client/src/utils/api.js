@@ -189,9 +189,10 @@ export const fractalApi = {
      * Start timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
      */
-    startActivityTimer: (rootId, instanceId) =>
-        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`),
+    startActivityTimer: (rootId, instanceId, data = {}) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`, data),
 
     /**
      * Stop timer for an activity instance

@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useTimezone } from '../App';
+import { formatForInput, localToISO } from '../utils/dateUtils';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -22,6 +24,21 @@ function SessionActivityItem({
     onToggleComplete,
     onDelete
 }) {
+    // Get timezone from context
+    const timezone = useTimezone();
+
+    // Local state for editing datetime fields
+    const [localStartTime, setLocalStartTime] = useState('');
+    const [localStopTime, setLocalStopTime] = useState('');
+
+    // Sync local state when exercise times change
+    useEffect(() => {
+        setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+    }, [exercise.time_start, timezone]);
+
+    useEffect(() => {
+        setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
+    }, [exercise.time_stop, timezone]);
     // If we don't have definition, we can't render much (maybe just name)
     // But we should have it passed in from parent lookups
     const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [] };
@@ -105,11 +122,20 @@ function SessionActivityItem({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Start</label>
                                 <input
-                                    type="datetime-local"
-                                    value={exercise.time_start ? new Date(exercise.time_start).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => {
+                                    type="text"
+                                    placeholder="YYYY-MM-DD HH:MM:SS"
+                                    value={localStartTime}
+                                    onChange={(e) => setLocalStartTime(e.target.value)}
+                                    onBlur={(e) => {
                                         if (e.target.value) {
-                                            onUpdate('time_start', new Date(e.target.value).toISOString());
+                                            try {
+                                                const isoValue = localToISO(e.target.value, timezone);
+                                                onUpdate('time_start', isoValue);
+                                            } catch (err) {
+                                                console.error('Invalid date format:', err);
+                                                // Reset to previous value
+                                                setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+                                            }
                                         } else {
                                             onUpdate('time_start', null);
                                         }
@@ -121,7 +147,7 @@ function SessionActivityItem({
                                         borderRadius: '3px',
                                         color: '#ccc',
                                         fontSize: '11px',
-                                        width: '140px',
+                                        width: '160px',
                                         fontFamily: 'monospace'
                                     }}
                                 />
@@ -131,11 +157,20 @@ function SessionActivityItem({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Stop</label>
                                 <input
-                                    type="datetime-local"
-                                    value={exercise.time_stop ? new Date(exercise.time_stop).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => {
+                                    type="text"
+                                    placeholder="YYYY-MM-DD HH:MM:SS"
+                                    value={localStopTime}
+                                    onChange={(e) => setLocalStopTime(e.target.value)}
+                                    onBlur={(e) => {
                                         if (e.target.value) {
-                                            onUpdate('time_stop', new Date(e.target.value).toISOString());
+                                            try {
+                                                const isoValue = localToISO(e.target.value, timezone);
+                                                onUpdate('time_stop', isoValue);
+                                            } catch (err) {
+                                                console.error('Invalid date format:', err);
+                                                // Reset to previous value
+                                                setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
+                                            }
                                         } else {
                                             onUpdate('time_stop', null);
                                         }
@@ -148,7 +183,7 @@ function SessionActivityItem({
                                         borderRadius: '3px',
                                         color: exercise.time_start ? '#ccc' : '#666',
                                         fontSize: '11px',
-                                        width: '140px',
+                                        width: '160px',
                                         fontFamily: 'monospace',
                                         cursor: exercise.time_start ? 'text' : 'not-allowed'
                                     }}

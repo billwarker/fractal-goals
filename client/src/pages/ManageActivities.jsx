@@ -172,6 +172,29 @@ function ManageActivities() {
         }
     };
 
+    const handleDuplicate = async (activity) => {
+        try {
+            setCreating(true);
+
+            // Create a copy with the same configuration but new ID
+            await fractalApi.createActivity(rootId, {
+                name: activity.name,
+                description: activity.description || '',
+                metrics: activity.metric_definitions?.map(m => ({ name: m.name, unit: m.unit })) || [],
+                has_sets: activity.has_sets,
+                has_metrics: activity.has_metrics
+            });
+
+            // Refresh list
+            fetchActivities();
+            setCreating(false);
+        } catch (err) {
+            console.error("Failed to duplicate activity", err);
+            setError("Failed to duplicate activity");
+            setCreating(false);
+        }
+    };
+
     if (loading) {
         return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading activities...</div>;
     }
@@ -498,6 +521,23 @@ function ManageActivities() {
                                                     }}
                                                 >
                                                     Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDuplicate(activity)}
+                                                    disabled={creating}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: creating ? '#666' : '#ff9800',
+                                                        border: 'none',
+                                                        borderRadius: '3px',
+                                                        color: 'white',
+                                                        fontSize: '12px',
+                                                        cursor: creating ? 'not-allowed' : 'pointer',
+                                                        opacity: creating ? 0.5 : 1
+                                                    }}
+                                                    title="Duplicate this activity"
+                                                >
+                                                    ⎘
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteClick(activity.id)}

@@ -1269,7 +1269,20 @@ def start_activity_timer(root_id, instance_id):
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         if not instance:
-            return jsonify({"error": "Activity instance not found"}), 404
+            # Instance doesn't exist yet - create it
+            data = request.get_json() or {}
+            practice_session_id = data.get('practice_session_id')
+            activity_definition_id = data.get('activity_definition_id')
+            
+            if not practice_session_id or not activity_definition_id:
+                return jsonify({"error": "practice_session_id and activity_definition_id required"}), 400
+            
+            instance = ActivityInstance(
+                id=instance_id,
+                practice_session_id=practice_session_id,
+                activity_definition_id=activity_definition_id
+            )
+            db_session.add(instance)
         
         # Set start time to now
         instance.time_start = datetime.now()
