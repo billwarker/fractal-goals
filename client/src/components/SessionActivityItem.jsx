@@ -43,7 +43,8 @@ function SessionActivityItem({
     // But we should have it passed in from parent lookups
     const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [] };
     const hasSets = exercise.has_sets; // Snapshot from creation
-    const hasMetrics = exercise.has_metrics;
+    // Check if metrics exist by looking at the definition, not just the flag
+    const hasMetrics = def.metric_definitions && def.metric_definitions.length > 0;
 
     const handleAddSet = () => {
         const newSet = {

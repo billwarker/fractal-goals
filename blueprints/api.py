@@ -159,15 +159,19 @@ def create_practice_session():
         generated_name = f"Practice Session {session_index} - {date_str}"
 
         # Create practice session
+        # Use first parent as primary
+        primary_parent_id = parent_goals[0].id if parent_goals else None
+        
         practice_session = PracticeSession(
             name=generated_name,
             description=data.get('description', ''),
             completed=False,
-            root_id=detected_root_id
+            root_id=detected_root_id,
+            parent_id=primary_parent_id
         )
         
-        # Add parent relationships
-        practice_session.parent_goals = parent_goals
+        # Add parent relationships (Legacy: only one parent supported now)
+        # practice_session.parent_goals = parent_goals
         
         db_session.add(practice_session)
         db_session.commit()
@@ -247,6 +251,7 @@ def sync_session_activities(db_session, practice_session, session_data_dict):
                             created_at=practice_session.created_at # Approximate timestamp
                         )
                         db_session.add(instance)
+                        db_session.flush()  # Ensure instance exists in DB before creating metric values
                     
                     found_instances.append(instance_id)
 
@@ -583,11 +588,18 @@ def create_fractal_session(root_id):
         # Associate with parent goals if provided
         parent_ids = data.get('parent_ids', [])
         if parent_ids:
-            for goal_id in parent_ids:
-                # Verify the goal exists and is a ShortTermGoal
-                goal = db_session.query(Goal).filter_by(id=goal_id).first()
-                if goal and goal.type == 'ShortTermGoal':
-                    new_session.parent_goals.append(goal)
+             # Just take the first valid parent for the tree structure
+             first_parent_id = parent_ids[0]
+             # Verify
+             goal = db_session.query(Goal).filter_by(id=first_parent_id).first()
+             if goal and goal.type == 'ShortTermGoal':
+                 new_session.parent_id = goal.id
+             
+             # Add ALL parents to relationship (M2M)
+             for pid in parent_ids:
+                 g = db_session.query(Goal).filter_by(id=pid).first()
+                 if g and g.type == 'ShortTermGoal':
+                      new_session.parent_goals.append(g)
         
         db_session.commit()
         
@@ -601,15 +613,7 @@ def create_fractal_session(root_id):
              except Exception as e:
                  print(f"Warning: Failed to sync activities: {e}")
 
-        # Sync activities to relational DB
-        if new_session.session_data:
-             import json
-             try:
-                 data_dict = json.loads(new_session.session_data)
-                 sync_session_activities(db_session, new_session, data_dict)
-                 db_session.commit() # Commit changes from sync
-             except Exception as e:
-                 print(f"Warning: Failed to sync activities: {e}")
+        # Return the created session
 
         # Return the created session
         result = build_practice_session_tree(db_session, new_session)
@@ -714,82 +718,10 @@ def delete_practice_session(root_id, session_id):
         if not practice_session:
             return jsonify({"error": "Practice session not found"}), 404
         
-        # Get parent goals to check their targets
-        parent_goal_ids = [pg.id for pg in practice_session.parent_goals]
-        
-        # Before deleting, check which targets will no longer be satisfied
-        targets_to_remove = {}  # {goal_id: [target_indices_to_remove]}
-        
-        for goal_id in parent_goal_ids:
-            goal = db_session.query(Goal).filter_by(id=goal_id).first()
-            if not goal or not goal.targets:
-                continue
-            
-            targets = json.loads(goal.targets) if isinstance(goal.targets, str) else goal.targets
-            if not targets:
-                continue
-            
-            # Get all activity instances from OTHER sessions for this goal
-            other_sessions = db_session.query(PracticeSession).join(
-                practice_session_goals,
-                PracticeSession.id == practice_session_goals.c.practice_session_id
-            ).filter(
-                practice_session_goals.c.short_term_goal_id == goal_id,
-                PracticeSession.id != session_id  # Exclude the session being deleted
-            ).all()
-            
-            # Get all activity instances from other sessions
-            other_activity_instances = []
-            for other_session in other_sessions:
-                instances = db_session.query(ActivityInstance).filter_by(
-                    practice_session_id=other_session.id
-                ).all()
-                other_activity_instances.extend(instances)
-            
-            # Check each target to see if it's still satisfied by remaining instances
-            indices_to_remove = []
-            for idx, target in enumerate(targets):
-                target_satisfied = False
-                
-                # Check if any remaining activity instance satisfies this target
-                for instance in other_activity_instances:
-                    if instance.activity_definition_id != target.get('activity_id'):
-                        continue
-                    
-                    # Get metric values for this instance
-                    metric_values = {mv.metric_definition_id: mv.value for mv in instance.metric_values}
-                    
-                    # Check if all target metrics are met
-                    all_metrics_met = True
-                    for target_metric in target.get('metrics', []):
-                        metric_id = target_metric.get('metric_id')
-                        target_value = target_metric.get('value')
-                        
-                        if metric_id not in metric_values or metric_values[metric_id] < target_value:
-                            all_metrics_met = False
-                            break
-                    
-                    if all_metrics_met:
-                        target_satisfied = True
-                        break
-                
-                # If target is not satisfied by any remaining instance, mark for removal
-                if not target_satisfied:
-                    indices_to_remove.append(idx)
-            
-            if indices_to_remove:
-                targets_to_remove[goal_id] = indices_to_remove
-        
-        # Remove targets that are no longer satisfied
-        for goal_id, indices in targets_to_remove.items():
-            goal = db_session.query(Goal).filter_by(id=goal_id).first()
-            if goal and goal.targets:
-                targets = json.loads(goal.targets) if isinstance(goal.targets, str) else goal.targets
-                # Remove in reverse order to maintain indices
-                for idx in sorted(indices, reverse=True):
-                    if idx < len(targets):
-                        targets.pop(idx)
-                goal.targets = json.dumps(targets) if targets else None
+        # Delete immediate goals first
+        immediate_goals = get_immediate_goals_for_session(db_session, session_id)
+        for ig in immediate_goals:
+            db_session.delete(ig)
             
         db_session.delete(practice_session)
         db_session.commit()

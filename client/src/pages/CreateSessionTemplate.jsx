@@ -14,6 +14,7 @@ function CreateSessionTemplate() {
     const [templates, setTemplates] = useState([]);
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [editingId, setEditingId] = useState(null); // Track which template we're editing
     const [currentTemplate, setCurrentTemplate] = useState({
         name: '',
         description: '',
@@ -28,6 +29,8 @@ function CreateSessionTemplate() {
         activities: []
     });
     const [selectedActivities, setSelectedActivities] = useState([]);
+    // Custom modal state
+    const [modal, setModal] = useState({ show: false, type: 'alert', title: '', message: '', onConfirm: null });
 
     useEffect(() => {
         if (!rootId) {
@@ -54,7 +57,7 @@ function CreateSessionTemplate() {
 
     const handleAddSection = () => {
         if (!newSection.name.trim()) {
-            alert('Section name is required');
+            setModal({ show: true, type: 'alert', title: 'Validation Error', message: 'Section name is required', onConfirm: null });
             return;
         }
 
@@ -74,7 +77,7 @@ function CreateSessionTemplate() {
 
     const handleAddActivities = () => {
         if (selectedActivities.length === 0) {
-            alert('Please select at least one activity');
+            setModal({ show: true, type: 'alert', title: 'Validation Error', message: 'Please select at least one activity', onConfirm: null });
             return;
         }
 
@@ -137,12 +140,12 @@ function CreateSessionTemplate() {
 
     const handleSaveTemplate = async () => {
         if (!currentTemplate.name.trim()) {
-            alert('Template name is required');
+            setModal({ show: true, type: 'alert', title: 'Validation Error', message: 'Template name is required', onConfirm: null });
             return;
         }
 
         if (currentTemplate.sections.length === 0) {
-            alert('Add at least one section to the template');
+            setModal({ show: true, type: 'alert', title: 'Validation Error', message: 'Add at least one section to the template', onConfirm: null });
             return;
         }
 
@@ -154,25 +157,33 @@ function CreateSessionTemplate() {
                 total_duration_minutes: totalDuration
             };
 
-            await fractalApi.createSessionTemplate(rootId, {
+            const payload = {
                 name: currentTemplate.name,
                 description: currentTemplate.description,
                 template_data: templateData
-            });
+            };
 
-            // Reset current template
+            // Update existing template or create new one
+            if (editingId) {
+                await fractalApi.updateSessionTemplate(rootId, editingId, payload);
+            } else {
+                await fractalApi.createSessionTemplate(rootId, payload);
+            }
+
+            // Reset current template and editing state
             setCurrentTemplate({
                 name: '',
                 description: '',
                 sections: []
             });
+            setEditingId(null);
 
             // Refresh templates
             await fetchTemplates();
 
-            alert('Template saved successfully!');
+            setModal({ show: true, type: 'alert', title: 'Success', message: 'Template saved successfully!', onConfirm: null });
         } catch (err) {
-            alert('Error saving template: ' + err.message);
+            setModal({ show: true, type: 'alert', title: 'Error', message: 'Error saving template: ' + err.message, onConfirm: null });
         }
     };
 
@@ -188,19 +199,25 @@ function CreateSessionTemplate() {
             description: template.description,
             sections
         });
+        setEditingId(template.id); // Store the template ID for updating
     };
 
     const handleDeleteTemplate = async (templateId) => {
-        if (!confirm('Are you sure you want to delete this template?')) {
-            return;
-        }
-
-        try {
-            await fractalApi.deleteSessionTemplate(rootId, templateId);
-            await fetchTemplates();
-        } catch (err) {
-            alert('Error deleting template: ' + err.message);
-        }
+        setModal({
+            show: true,
+            type: 'confirm',
+            title: 'Delete Template',
+            message: 'Are you sure you want to delete this template? This action cannot be undone.',
+            onConfirm: async () => {
+                try {
+                    await fractalApi.deleteSessionTemplate(rootId, templateId);
+                    await fetchTemplates();
+                    setModal({ show: false, type: 'alert', title: '', message: '', onConfirm: null });
+                } catch (err) {
+                    setModal({ show: true, type: 'alert', title: 'Error', message: 'Error deleting template: ' + err.message, onConfirm: null });
+                }
+            }
+        });
     };
 
     const totalDuration = currentTemplate.sections.reduce((sum, s) => sum + s.duration_minutes, 0);
@@ -436,8 +453,27 @@ function CreateSessionTemplate() {
                                     cursor: 'pointer'
                                 }}
                             >
-                                Save Template
+                                {editingId ? 'Update Template' : 'Save Template'}
                             </button>
+                            {editingId && (
+                                <button
+                                    onClick={() => {
+                                        setCurrentTemplate({ name: '', description: '', sections: [] });
+                                        setEditingId(null);
+                                    }}
+                                    style={{
+                                        padding: '12px 20px',
+                                        background: '#666',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel Edit
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -751,6 +787,83 @@ function CreateSessionTemplate() {
                                 }}
                             >
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Modal */}
+            {modal.show && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2000
+                    }}
+                    onClick={() => modal.type === 'alert' && setModal({ ...modal, show: false })}
+                >
+                    <div
+                        style={{
+                            background: '#1e1e1e',
+                            border: '1px solid #444',
+                            borderRadius: '8px',
+                            padding: '24px',
+                            maxWidth: '500px',
+                            width: '90%',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', color: modal.type === 'alert' && modal.title === 'Error' ? '#f44336' : 'white' }}>
+                            {modal.title}
+                        </h2>
+                        <p style={{ margin: '0 0 24px 0', color: '#ccc', lineHeight: '1.5' }}>
+                            {modal.message}
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            {modal.type === 'confirm' && (
+                                <button
+                                    onClick={() => setModal({ ...modal, show: false })}
+                                    style={{
+                                        padding: '10px 20px',
+                                        background: '#666',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    if (modal.type === 'confirm' && modal.onConfirm) {
+                                        modal.onConfirm();
+                                    } else {
+                                        setModal({ ...modal, show: false });
+                                    }
+                                }}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: modal.type === 'confirm' ? '#f44336' : '#2196f3',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {modal.type === 'confirm' ? 'Delete' : 'OK'}
                             </button>
                         </div>
                     </div>

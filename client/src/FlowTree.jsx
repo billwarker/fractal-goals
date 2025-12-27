@@ -390,8 +390,26 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
 
         addedNodeIds.add(nodeId);
 
-        // Add Edge connecting to parent (only after we know this node will be included)
-        if (parentId) {
+        // Add Edges
+        const parentIds = node.attributes?.parent_ids;
+        if (parentIds && parentIds.length > 0) {
+            // Multiple parents (Practice Session)
+            parentIds.forEach(pid => {
+                // Ensure parent exists in traversed map or just add?
+                // Traverse visits top-down via primary. Parent should exist or be visited eventually.
+                edges.push({
+                    id: `${pid}-${nodeId}`,
+                    source: String(pid),
+                    target: nodeId,
+                    type: 'straight',
+                    style: {
+                        stroke: '#ffffff',
+                        strokeWidth: 1.5,
+                    },
+                });
+            });
+        } else if (parentId) {
+            // Standard single parent
             edges.push({
                 id: `${parentId}-${nodeId}`,
                 source: String(parentId),

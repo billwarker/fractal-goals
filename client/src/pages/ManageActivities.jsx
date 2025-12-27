@@ -68,7 +68,10 @@ function ManageActivities() {
         setName(activity.name);
         setDescription(activity.description || '');
         setHasSets(activity.has_sets);
-        setHasMetrics(activity.has_metrics);
+
+        // Set hasMetrics based on whether metrics actually exist
+        const hasMetricDefinitions = activity.metric_definitions && activity.metric_definitions.length > 0;
+        setHasMetrics(hasMetricDefinitions || activity.has_metrics);
 
         // Load metrics
         if (activity.metric_definitions && activity.metric_definitions.length > 0) {
@@ -441,7 +444,7 @@ function ManageActivities() {
                                                         Sets
                                                     </span>
                                                 )}
-                                                {!activity.has_metrics && (
+                                                {(!activity.metric_definitions || activity.metric_definitions.length === 0) && (
                                                     <span style={{
                                                         fontSize: '11px',
                                                         background: '#333',

@@ -180,15 +180,19 @@ def create_practice_session(session_request: PracticeSessionCreate):
         generated_name = f"Practice Session {session_index} - {date_str}"
 
         # Create practice session
+        # Use the first parent as the primary parent in the tree
+        primary_parent_id = parent_goals[0].id if parent_goals else None
+        
         practice_session = PracticeSession(
             name=generated_name,
             description=session_request.description or "",
             completed=False,
-            root_id=detected_root_id
+            root_id=detected_root_id,
+            parent_id=primary_parent_id
         )
         
-        # Add parent relationships
-        practice_session.parent_goals = parent_goals
+        # Add parent relationships (Legacy: we only support one parent in tree structure now)
+        # practice_session.parent_goals = parent_goals # Removed in schema update
         
         db_session.add(practice_session)
         db_session.commit()

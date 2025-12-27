@@ -268,10 +268,6 @@ function Sessions() {
                                         border: '1px solid #333',
                                         borderRadius: '8px',
                                         overflow: 'hidden',
-                                        background: '#1e1e1e',
-                                        border: '1px solid #333',
-                                        borderRadius: '8px',
-                                        overflow: 'hidden',
                                     }}
                                 >
                                     {/* Top Level: High-level session info */}
@@ -557,7 +553,7 @@ function Sessions() {
                                                                                                 )}
 
                                                                                                 {/* Single Metrics View */}
-                                                                                                {!exercise.has_sets && exercise.has_metrics && exercise.metrics && (
+                                                                                                {!exercise.has_sets && actDef?.metric_definitions?.length > 0 && exercise.metrics && (
                                                                                                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
                                                                                                         {exercise.metrics.filter(m => {
                                                                                                             const mInfo = getMetricInfo(m.metric_id);

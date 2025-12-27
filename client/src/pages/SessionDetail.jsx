@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
+import ConfirmationModal from '../components/ConfirmationModal';
 import '../App.css';
 
 /**
@@ -45,6 +46,7 @@ function SessionDetail() {
     const [activities, setActivities] = useState([]);
     const [parentGoals, setParentGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
         if (!rootId || !sessionId) {
@@ -210,10 +212,11 @@ function SessionDetail() {
         }
     };
 
-    const handleDeleteSession = async () => {
-        if (!window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
-            return;
-        }
+    const handleDeleteSessionClick = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDeleteSession = async () => {
 
         try {
             await fractalApi.deleteSession(rootId, sessionId);
@@ -610,7 +613,8 @@ function SessionDetail() {
                     justifyContent: 'center'
                 }}>
                     <button
-                        onClick={handleDeleteSession}
+                        type="button"
+                        onClick={handleDeleteSessionClick}
                         style={{
                             padding: '12px 32px',
                             background: '#d32f2f',
@@ -673,6 +677,15 @@ function SessionDetail() {
                     </button>
                 </div>
             </div>
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleConfirmDeleteSession}
+                title="Delete Session"
+                message="Are you sure you want to delete this session? This action cannot be undone."
+                confirmText="Delete"
+            />
         </div>
     );
 }
