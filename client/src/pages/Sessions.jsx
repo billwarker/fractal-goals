@@ -276,7 +276,7 @@ function Sessions() {
                                         background: '#2a2a2a',
                                         borderBottom: '1px solid #333',
                                         display: 'grid',
-                                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
                                         gap: '16px',
                                         alignItems: 'center'
                                     }}>
@@ -301,12 +301,21 @@ function Sessions() {
                                             )}
                                         </div>
 
-                                        {/* Date */}
+                                        {/* Date Created */}
                                         <div>
-                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Date</div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Date Created</div>
                                             <div style={{ fontSize: '14px' }}>{formatDate(session.attributes?.created_at)}</div>
                                             <div style={{ fontSize: '11px', color: '#666' }}>
                                                 {formatTime(session.attributes?.created_at)}
+                                            </div>
+                                        </div>
+
+                                        {/* Last Modified */}
+                                        <div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Last Modified</div>
+                                            <div style={{ fontSize: '14px' }}>{formatDate(session.attributes?.updated_at)}</div>
+                                            <div style={{ fontSize: '11px', color: '#666' }}>
+                                                {formatTime(session.attributes?.updated_at)}
                                             </div>
                                         </div>
 
