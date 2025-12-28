@@ -22,6 +22,19 @@ function calculateSectionDuration(section) {
 }
 
 /**
+ * Calculate total completed duration across all sections
+ */
+function calculateTotalCompletedDuration(sessionData) {
+    if (!sessionData || !sessionData.sections) return 0;
+
+    let totalSeconds = 0;
+    for (const section of sessionData.sections) {
+        totalSeconds += calculateSectionDuration(section);
+    }
+    return totalSeconds;
+}
+
+/**
  * Format duration in seconds to MM:SS format
  */
 function formatDuration(seconds) {
@@ -29,6 +42,21 @@ function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
+ * Format datetime to readable format
+ */
+function formatDateTime(isoString) {
+    if (!isoString) return 'N/A';
+    const date = new Date(isoString);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 /**
@@ -42,11 +70,47 @@ function SessionDetail() {
     const [session, setSession] = useState(null);
     const [sessionData, setSessionData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [activities, setActivities] = useState([]);
     const [parentGoals, setParentGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
+
+    // Auto-save sessionData to database whenever it changes
+    useEffect(() => {
+        if (!sessionData || loading) return;
+
+        setAutoSaveStatus('saving');
+        const timeoutId = setTimeout(async () => {
+            try {
+                const response = await fractalApi.updateSession(rootId, sessionId, {
+                    session_data: JSON.stringify(sessionData)
+                });
+
+                // Update the session's updated_at timestamp from the response
+                if (response.data && response.data.attributes) {
+                    setSession(prevSession => ({
+                        ...prevSession,
+                        attributes: {
+                            ...prevSession.attributes,
+                            updated_at: response.data.attributes.updated_at
+                        }
+                    }));
+                }
+
+                setAutoSaveStatus('saved');
+                // Clear the "saved" indicator after 2 seconds
+                setTimeout(() => setAutoSaveStatus(''), 2000);
+            } catch (err) {
+                console.error('Error auto-saving session:', err);
+                setAutoSaveStatus('error');
+                // Clear error indicator after 3 seconds
+                setTimeout(() => setAutoSaveStatus(''), 3000);
+            }
+        }, 1000); // Debounce by 1 second to avoid excessive API calls
+
+        return () => clearTimeout(timeoutId);
+    }, [sessionData, loading, rootId, sessionId]);
 
     useEffect(() => {
         if (!rootId || !sessionId) {
@@ -197,19 +261,8 @@ function SessionDetail() {
     };
 
     const handleSaveSession = async () => {
-        setSaving(true);
-        try {
-            await fractalApi.updateSession(rootId, sessionId, {
-                session_data: JSON.stringify(sessionData)
-            });
-
-            alert('Session saved successfully!');
-            navigate(`/${rootId}/sessions`);
-        } catch (err) {
-            console.error('Error saving session:', err);
-            alert('Error saving session: ' + err.message);
-            setSaving(false);
-        }
+        // Auto-save is already handling persistence, so just navigate away
+        navigate(`/${rootId}/sessions`);
     };
 
     const handleDeleteSessionClick = () => {
@@ -347,10 +400,64 @@ function SessionDetail() {
                 <h1 style={{ fontWeight: 300, marginBottom: '10px' }}>
                     {session.name}
                 </h1>
-                <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#aaa' }}>
-                    <span>Template: {sessionData.template_name}</span>
-                    <span>Total Duration: {sessionData.total_duration_minutes} min</span>
-                    <span>Sections: {sessionData.sections?.length || 0}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '20px' }}>
+                    {/* Left side: Metadata grid */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, auto)',
+                        gap: '12px 24px',
+                        fontSize: '14px',
+                        color: '#aaa'
+                    }}>
+                        <div>
+                            <span style={{ color: '#666' }}>Template: </span>
+                            <span style={{ color: '#ccc' }}>{sessionData.template_name}</span>
+                        </div>
+                        <div>
+                            <span style={{ color: '#666' }}>Date Created: </span>
+                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.created_at)}</span>
+                        </div>
+                        <div>
+                            <span style={{ color: '#666' }}>Total Duration (Planned): </span>
+                            <span style={{ color: '#ccc' }}>{sessionData.total_duration_minutes} min</span>
+                        </div>
+
+                        <div>
+                            <span style={{ color: '#666' }}>Sections: </span>
+                            <span style={{ color: '#ccc' }}>{sessionData.sections?.length || 0}</span>
+                        </div>
+                        <div>
+                            <span style={{ color: '#666' }}>Last Modified: </span>
+                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.updated_at)}</span>
+                        </div>
+                        <div>
+                            <span style={{ color: '#666' }}>Total Duration (Completed): </span>
+                            <span style={{
+                                color: '#4caf50',
+                                fontWeight: 'bold',
+                                fontFamily: 'monospace'
+                            }}>
+                                {formatDuration(calculateTotalCompletedDuration(sessionData))}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Auto-save status indicator */}
+                    {autoSaveStatus && (
+                        <span style={{
+                            fontSize: '13px',
+                            color: autoSaveStatus === 'saved' ? '#4caf50' :
+                                autoSaveStatus === 'error' ? '#f44336' : '#888',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {autoSaveStatus === 'saving' && '💾 Saving...'}
+                            {autoSaveStatus === 'saved' && '✓ All changes saved'}
+                            {autoSaveStatus === 'error' && '⚠ Error saving'}
+                        </span>
+                    )}
                 </div>
 
                 {/* Achieved Targets Indicator */}
@@ -660,20 +767,18 @@ function SessionDetail() {
                     </button>
                     <button
                         onClick={handleSaveSession}
-                        disabled={saving}
                         style={{
                             padding: '12px 32px',
-                            background: saving ? '#666' : '#2196f3',
+                            background: '#2196f3',
                             border: 'none',
                             borderRadius: '6px',
                             color: 'white',
                             fontSize: '16px',
                             fontWeight: 'bold',
-                            cursor: saving ? 'not-allowed' : 'pointer',
-                            opacity: saving ? 0.5 : 1
+                            cursor: 'pointer'
                         }}
                     >
-                        {saving ? 'Saving...' : 'Save Session'}
+                        Done
                     </button>
                 </div>
             </div>

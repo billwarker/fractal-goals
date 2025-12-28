@@ -13,6 +13,7 @@ import SessionDetail from './pages/SessionDetail';
 import Log from './pages/Log';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
 import ManageActivities from './pages/ManageActivities';
+import Analytics from './pages/Analytics';
 
 const API_URL = 'http://localhost:8000/api/goals';
 
@@ -164,7 +165,8 @@ function App() {
 
         const navItems = [
             { path: `/${rootId}/fractal-goals`, label: 'FRACTAL VIEW' },
-            { path: `/${rootId}/sessions`, label: 'SESSIONS' }
+            { path: `/${rootId}/sessions`, label: 'SESSIONS' },
+            { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
         ];
 
         return (
@@ -232,6 +234,7 @@ function App() {
                                 element={<FractalGoals />}
                             />
                             <Route path="/:rootId/sessions" element={<Sessions />} />
+                            <Route path="/:rootId/analytics" element={<Analytics />} />
                             <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
                             <Route path="/:rootId/create-practice-session" element={<Log />} />
                             <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
