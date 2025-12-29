@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTypeDisplayName, getChildType, calculateGoalAge } from '../utils/goalHelpers';
+import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import TargetCard from './TargetCard';
 import AddTargetModal from './AddTargetModal';
@@ -210,7 +211,13 @@ const Sidebar = ({
                             {/* View Mode */}
                             {!isPracticeSession && (
                                 <div className="header-meta">
-                                    <span className="type-badge">
+                                    <span
+                                        className="type-badge"
+                                        style={{
+                                            background: getGoalColor(selectedNode.attributes?.type || selectedNode.type),
+                                            color: getGoalTextColor(selectedNode.attributes?.type || selectedNode.type)
+                                        }}
+                                    >
                                         {selectedNode.attributes?.type || selectedNode.type}
                                     </span>
                                 </div>

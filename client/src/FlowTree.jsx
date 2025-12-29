@@ -9,21 +9,19 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import './FlowTree.css';
 import dagre from 'dagre';
+import { getGoalColor } from './utils/goalColors';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
     const isPracticeSession = data.type === 'PracticeSession' || data.__isPracticeSession;
     const isCompleted = data.completed || false;
 
-    let fillColor = "#2196f3"; // Default blue
+    // Use cosmic color palette based on goal type
+    let fillColor = getGoalColor(data.type);
 
-    // Priority: Completed (Gold) > Practice Session (Orange) > Has Children (Green) > Default (Blue)
+    // Override with gold if completed
     if (isCompleted) {
         fillColor = "#FFD700"; // Gold for completed
-    } else if (isPracticeSession) {
-        fillColor = "#ff9800"; // Orange for practice sessions
-    } else if (data.hasChildren) {
-        fillColor = "#4caf50"; // Green for nodes with children
     }
 
     // Calculate age if created_at exists

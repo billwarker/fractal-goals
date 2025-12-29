@@ -339,19 +339,38 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
 @goals_bp.route('/fractals', methods=['GET'])
 def get_all_fractals():
     """Get all fractals (root goals) for the selection page."""
-    session = get_session(engine)
+    db_session = get_session(engine)
     try:
-        roots = get_all_root_goals(session)
-        # Return simplified list for selection page
-        result = [{
-            "id": root.id,
-            "name": root.name,
-            "description": root.description,
-            "created_at": root.created_at.isoformat() if root.created_at else None
-        } for root in roots]
+        roots = get_all_root_goals(db_session)
+        result = []
+        
+        for root in roots:
+            # Find the most recent updated_at timestamp in the entire fractal tree
+            # This includes the root and all descendant goals
+            max_updated = root.updated_at
+            
+            # Recursively check all descendants
+            def find_max_updated(goal, current_max):
+                if goal.updated_at and (not current_max or goal.updated_at > current_max):
+                    current_max = goal.updated_at
+                for child in goal.children:
+                    current_max = find_max_updated(child, current_max)
+                return current_max
+            
+            last_activity = find_max_updated(root, max_updated)
+            
+            result.append({
+                "id": root.id,
+                "name": root.name,
+                "description": root.description,
+                "type": root.type,
+                "created_at": root.created_at.isoformat() if root.created_at else None,
+                "updated_at": last_activity.isoformat() if last_activity else None
+            })
+        
         return jsonify(result)
     finally:
-        session.close()
+        db_session.close()
 
 
 @goals_bp.route('/fractals', methods=['POST'])
@@ -361,9 +380,16 @@ def create_fractal():
     
     session = get_session(engine)
     try:
+        # Validate allowed types for root goals
+        goal_type = data.get('type', 'UltimateGoal')
+        valid_root_types = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal']
+        
+        if goal_type not in valid_root_types:
+             return jsonify({"error": f"Invalid root goal type. Must be one of: {', '.join(valid_root_types)}"}), 400
+
         # Create root goal (UltimateGoal with no parent)
         new_fractal = Goal(
-            type='UltimateGoal',
+            type=goal_type,
             name=data.get('name'),
             description=data.get('description', ''),
             parent_id=None  # Root goal has no parent

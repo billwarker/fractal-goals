@@ -70,61 +70,8 @@ function App() {
     const location = useLocation();
 
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
-
-    // Deletion state
-    const [fractalToDelete, setFractalToDelete] = useState(null);
-
-    const handleDeleteFractal = (e, fractalId, fractalName) => {
-        e.stopPropagation();
-        setFractalToDelete({ id: fractalId, name: fractalName });
-    };
-
-    const confirmDeleteFractal = async () => {
-        if (!fractalToDelete) return;
-
-        try {
-            await globalApi.deleteFractal(fractalToDelete.id);
-            setFractalToDelete(null);
-
-            // If we're currently viewing this fractal, redirect to home
-            if (location.pathname.includes(fractalToDelete.id)) {
-                navigate('/');
-            }
-        } catch (err) {
-            alert('Failed to delete fractal: ' + err.message);
-        }
-    };
-
-    const openModal = () => {
-        setShowModal(true);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const payload = {
-                name,
-                description
-            };
-
-            const res = await globalApi.createFractal(payload);
-
-            setShowModal(false);
-            setName('');
-            setDescription('');
-
-            // Navigate to the new fractal's page
-            navigate(`/${res.data.id}/fractal-goals`);
-
-        } catch (err) {
-            alert('Error creating fractal: ' + err.message);
-        }
-    };
 
     // Navigation header component
     const NavigationHeader = () => {
@@ -223,10 +170,7 @@ function App() {
 
                 <div className="content-container">
                     {location.pathname === '/' ? (
-                        <Selection
-                            onCreateNewFractal={openModal}
-                            onDeleteFractal={handleDeleteFractal}
-                        />
+                        <Selection />
                     ) : (
                         <Routes>
                             <Route
@@ -243,61 +187,6 @@ function App() {
                         </Routes>
                     )}
                 </div>
-
-                {/* Create Fractal Modal */}
-                {showModal && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
-                            <h2>Create New Fractal</h2>
-                            <form onSubmit={handleSubmit}>
-                                <div className="form-group">
-                                    <label>Name</label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        required
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Description (Optional)</label>
-                                    <textarea
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        rows="3"
-                                    />
-                                </div>
-                                <div className="modal-actions">
-                                    <button type="button" onClick={() => setShowModal(false)} className="cancel-btn">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" className="create-btn">
-                                        Create
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Delete Confirmation Modal */}
-                {fractalToDelete && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
-                            <h2>Delete Fractal</h2>
-                            <p>Are you sure you want to delete <strong>{fractalToDelete.name}</strong>? This cannot be undone.</p>
-                            <div className="modal-actions">
-                                <button type="button" onClick={() => setFractalToDelete(null)} className="cancel-btn">
-                                    Cancel
-                                </button>
-                                <button type="button" onClick={confirmDeleteFractal} className="delete-btn">
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Environment Indicator */}
                 <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
