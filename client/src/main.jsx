@@ -5,11 +5,19 @@ import './index.css'
 import AppRouter from './AppRouter.jsx'
 import { ActivitiesProvider } from './contexts/ActivitiesContext.jsx'
 
+import { SessionsProvider } from './contexts/SessionsContext.jsx'
+
+import { GoalsProvider } from './contexts/GoalsContext.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ActivitiesProvider>
-        <AppRouter />
+        <SessionsProvider>
+          <GoalsProvider>
+            <AppRouter />
+          </GoalsProvider>
+        </SessionsProvider>
       </ActivitiesProvider>
     </BrowserRouter>
   </StrictMode>,
