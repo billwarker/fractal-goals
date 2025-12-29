@@ -183,18 +183,25 @@ function SessionDetail() {
 
             if (!instanceId) {
                 console.error('No instance_id for timer action');
+                alert('Error: Activity instance ID is missing. Please refresh the page.');
                 return;
             }
+
+
 
             try {
                 let response;
                 if (value === 'start') {
+
                     response = await fractalApi.startActivityTimer(rootId, instanceId, {
                         practice_session_id: sessionId,
                         activity_definition_id: exercise.activity_id
                     });
+
                 } else if (value === 'stop') {
+
                     response = await fractalApi.stopActivityTimer(rootId, instanceId);
+
                 } else if (value === 'reset') {
                     // Reset: clear time_start and time_stop locally
                     const updatedData = { ...sessionData };
@@ -213,15 +220,26 @@ function SessionDetail() {
                     const updatedData = { ...sessionData };
                     updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
                         ...exercise,
+                        instance_id: response.data.id, // CRITICAL: Update with backend's actual instance ID
                         time_start: response.data.time_start,
                         time_stop: response.data.time_stop,
                         duration_seconds: response.data.duration_seconds
                     };
                     setSessionData(updatedData);
+
                 }
             } catch (err) {
                 console.error('Error with timer action:', err);
-                alert('Error updating timer: ' + err.message);
+                console.error('Error details:', {
+                    action: value,
+                    instanceId,
+                    activityId: exercise.activity_id,
+                    sessionId,
+                    errorResponse: err.response?.data
+                });
+
+                const errorMsg = err.response?.data?.error || err.message;
+                alert(`Error updating timer: ${errorMsg}\n\nInstance ID: ${instanceId}\nAction: ${value}`);
             }
             return;
         }
