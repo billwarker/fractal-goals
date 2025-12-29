@@ -20,7 +20,7 @@ function ManageActivities() {
     // Form State
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [metrics, setMetrics] = useState([{ name: '', unit: '' }]);
+    const [metrics, setMetrics] = useState([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
     const [hasSets, setHasSets] = useState(false);
     const [hasMetrics, setHasMetrics] = useState(true);
     const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
@@ -48,7 +48,7 @@ function ManageActivities() {
 
     const handleAddMetric = () => {
         if (metrics.length < 3) {
-            setMetrics([...metrics, { name: '', unit: '' }]);
+            setMetrics([...metrics, { name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
         }
     };
 
@@ -60,6 +60,16 @@ function ManageActivities() {
 
     const handleMetricChange = (index, field, value) => {
         const newMetrics = [...metrics];
+
+        // If setting is_top_set_metric to true, unset it for all other metrics
+        if (field === 'is_top_set_metric' && value === true) {
+            newMetrics.forEach((m, i) => {
+                if (i !== index) {
+                    m.is_top_set_metric = false;
+                }
+            });
+        }
+
         newMetrics[index] = { ...newMetrics[index], [field]: value };
         setMetrics(newMetrics);
     };
@@ -77,9 +87,15 @@ function ManageActivities() {
 
         // Load metrics
         if (activity.metric_definitions && activity.metric_definitions.length > 0) {
-            setMetrics(activity.metric_definitions.map(m => ({ name: m.name, unit: m.unit })));
+            setMetrics(activity.metric_definitions.map(m => ({
+                id: m.id,  // Preserve the id for updates
+                name: m.name,
+                unit: m.unit,
+                is_top_set_metric: m.is_top_set_metric || false,
+                is_multiplicative: m.is_multiplicative !== undefined ? m.is_multiplicative : true
+            })));
         } else {
-            setMetrics([{ name: '', unit: '' }]);
+            setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
         }
     };
 
@@ -87,7 +103,7 @@ function ManageActivities() {
         setEditingId(null);
         setName('');
         setDescription('');
-        setMetrics([{ name: '', unit: '' }]);
+        setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
         setHasSets(false);
         setHasMetrics(true);
         setMetricsMultiplicative(false);
@@ -150,7 +166,7 @@ function ManageActivities() {
             setEditingId(null);
             setName('');
             setDescription('');
-            setMetrics([{ name: '', unit: '' }]);
+            setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
             setHasSets(false);
             setHasMetrics(true);
             setMetricsMultiplicative(false);
@@ -306,52 +322,78 @@ function ManageActivities() {
                                         <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Metrics (Max 3)</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                             {metrics.map((metric, idx) => (
-                                                <div key={idx} style={{ display: 'flex', gap: '8px' }}>
-                                                    <input
-                                                        type="text"
-                                                        value={metric.name}
-                                                        onChange={e => handleMetricChange(idx, 'name', e.target.value)}
-                                                        placeholder="Metric Name (e.g. Speed)"
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '10px',
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white'
-                                                        }}
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={metric.unit}
-                                                        onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
-                                                        placeholder="Unit (e.g. bpm)"
-                                                        style={{
-                                                            width: '100px',
-                                                            padding: '10px',
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white'
-                                                        }}
-                                                    />
-                                                    {metrics.length > 1 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveMetric(idx)}
+                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', background: '#252525', borderRadius: '4px', border: '1px solid #333' }}>
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={metric.name}
+                                                            onChange={e => handleMetricChange(idx, 'name', e.target.value)}
+                                                            placeholder="Metric Name (e.g. Speed)"
                                                             style={{
+                                                                flex: 1,
                                                                 padding: '10px',
-                                                                background: '#d32f2f',
-                                                                border: 'none',
+                                                                background: '#2a2a2a',
+                                                                border: '1px solid #444',
                                                                 borderRadius: '4px',
-                                                                color: 'white',
-                                                                cursor: 'pointer',
-                                                                width: '40px'
+                                                                color: 'white'
                                                             }}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    )}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={metric.unit}
+                                                            onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
+                                                            placeholder="Unit (e.g. bpm)"
+                                                            style={{
+                                                                width: '100px',
+                                                                padding: '10px',
+                                                                background: '#2a2a2a',
+                                                                border: '1px solid #444',
+                                                                borderRadius: '4px',
+                                                                color: 'white'
+                                                            }}
+                                                        />
+                                                        {metrics.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveMetric(idx)}
+                                                                style={{
+                                                                    padding: '10px',
+                                                                    background: '#d32f2f',
+                                                                    border: 'none',
+                                                                    borderRadius: '4px',
+                                                                    color: 'white',
+                                                                    cursor: 'pointer',
+                                                                    width: '40px'
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Metric Flags */}
+                                                    <div style={{ display: 'flex', gap: '16px', paddingLeft: '4px' }}>
+                                                        {hasSets && (
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={metric.is_top_set_metric || false}
+                                                                    onChange={e => handleMetricChange(idx, 'is_top_set_metric', e.target.checked)}
+                                                                />
+                                                                Top Set Metric
+                                                            </label>
+                                                        )}
+                                                        {metricsMultiplicative && (
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={metric.is_multiplicative !== undefined ? metric.is_multiplicative : true}
+                                                                    onChange={e => handleMetricChange(idx, 'is_multiplicative', e.target.checked)}
+                                                                />
+                                                                Multiplicative
+                                                            </label>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                             {metrics.length < 3 && (

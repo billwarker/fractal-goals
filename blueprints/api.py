@@ -1097,7 +1097,9 @@ def create_activity(root_id):
                 new_metric = MetricDefinition(
                     activity_id=new_activity.id,
                     name=m['name'],
-                    unit=m['unit']
+                    unit=m['unit'],
+                    is_top_set_metric=m.get('is_top_set_metric', False),
+                    is_multiplicative=m.get('is_multiplicative', True)
                 )
                 session.add(new_metric)
         
@@ -1141,22 +1143,60 @@ def update_activity(root_id, activity_id):
         
         # Update metrics if provided
         if 'metrics' in data:
-            # Delete existing metrics
-            session.query(MetricDefinition).filter_by(activity_id=activity_id).delete()
-            
-            # Add new metrics
             metrics_data = data.get('metrics', [])
             if len(metrics_data) > 3:
                 return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
             
+            # Get existing metrics
+            existing_metrics = session.query(MetricDefinition).filter_by(activity_id=activity_id).all()
+            existing_metrics_dict = {m.id: m for m in existing_metrics}
+            
+            # Track which existing metrics were updated
+            updated_metric_ids = set()
+            
+            # Update or create metrics
             for m in metrics_data:
                 if m.get('name') and m.get('unit'):
-                    new_metric = MetricDefinition(
-                        activity_id=activity.id,
-                        name=m['name'],
-                        unit=m['unit']
-                    )
-                    session.add(new_metric)
+                    metric_id = m.get('id')
+                    
+                    if metric_id and metric_id in existing_metrics_dict:
+                        # Update existing metric
+                        existing_metric = existing_metrics_dict[metric_id]
+                        existing_metric.name = m['name']
+                        existing_metric.unit = m['unit']
+                        existing_metric.is_top_set_metric = m.get('is_top_set_metric', False)
+                        existing_metric.is_multiplicative = m.get('is_multiplicative', True)
+                        updated_metric_ids.add(metric_id)
+                    else:
+                        # Try to match by name and unit (for backwards compatibility)
+                        matched_metric = None
+                        for existing_metric in existing_metrics:
+                            if (existing_metric.name == m['name'] and 
+                                existing_metric.unit == m['unit'] and 
+                                existing_metric.id not in updated_metric_ids):
+                                matched_metric = existing_metric
+                                break
+                        
+                        if matched_metric:
+                            # Update matched metric
+                            matched_metric.is_top_set_metric = m.get('is_top_set_metric', False)
+                            matched_metric.is_multiplicative = m.get('is_multiplicative', True)
+                            updated_metric_ids.add(matched_metric.id)
+                        else:
+                            # Create new metric
+                            new_metric = MetricDefinition(
+                                activity_id=activity.id,
+                                name=m['name'],
+                                unit=m['unit'],
+                                is_top_set_metric=m.get('is_top_set_metric', False),
+                                is_multiplicative=m.get('is_multiplicative', True)
+                            )
+                            session.add(new_metric)
+            
+            # Delete metrics that were not in the update
+            for existing_metric in existing_metrics:
+                if existing_metric.id not in updated_metric_ids:
+                    session.delete(existing_metric)
         
         session.commit()
         session.refresh(activity)  # Refresh to load updated metrics

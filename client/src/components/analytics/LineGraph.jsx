@@ -64,6 +64,12 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
     // Check if we're plotting the product metric
     const isProductMetric = metricToPlot.id === '__product__';
 
+    // Find the metric designated as the "top set" metric
+    const topSetMetric = metrics.find(m => m.is_top_set_metric) || metrics[0];
+
+    // Filter metrics for product calculation (only those marked as multiplicative)
+    const multiplicativeMetrics = metrics.filter(m => m.is_multiplicative !== false);
+
     // Collect data points with timestamps
     const dataPoints = [];
     instances.forEach(instance => {
@@ -71,61 +77,103 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
 
         // For activities with sets
         if (instance.has_sets && instance.sets) {
-            // Collect all set values for this metric
-            const setValues = [];
-            instance.sets.forEach((set, setIdx) => {
-                if (set.metrics) {
+            if (setsHandling === 'top') {
+                // Find the top set based on the designated top_set_metric
+                let topSetIndex = -1;
+                let topSetValue = -Infinity;
+
+                instance.sets.forEach((set, setIdx) => {
+                    if (set.metrics) {
+                        const metricValue = set.metrics.find(m => m.metric_id === (isProductMetric ? topSetMetric.id : metricToPlot.id));
+                        if (metricValue && metricValue.value) {
+                            const value = parseFloat(metricValue.value);
+                            if (value > topSetValue) {
+                                topSetValue = value;
+                                topSetIndex = setIdx;
+                            }
+                        }
+                    }
+                });
+
+                // Now get the value from the top set
+                if (topSetIndex >= 0) {
+                    const topSet = instance.sets[topSetIndex];
+
                     if (isProductMetric) {
-                        // For product metric, multiply all metric values in this set
+                        // Calculate product using only multiplicative metrics from the top set
                         let product = 1;
                         let hasAllMetrics = true;
-                        metrics.forEach(metricDef => {
-                            const metricValue = set.metrics.find(m => m.metric_id === metricDef.id);
+
+                        multiplicativeMetrics.forEach(metricDef => {
+                            const metricValue = topSet.metrics.find(m => m.metric_id === metricDef.id);
                             if (metricValue && metricValue.value) {
                                 product *= parseFloat(metricValue.value);
                             } else {
                                 hasAllMetrics = false;
                             }
                         });
-                        if (hasAllMetrics) {
-                            setValues.push({
+
+                        if (hasAllMetrics && multiplicativeMetrics.length > 0) {
+                            dataPoints.push({
+                                timestamp,
                                 value: product,
-                                set_number: setIdx + 1
+                                session_name: instance.session_name,
+                                set_number: topSetIndex + 1,
+                                aggregation: 'Top Set'
                             });
                         }
                     } else {
-                        // Normal single metric
-                        set.metrics.forEach(m => {
-                            if (m.metric_id === metricToPlot.id && m.value) {
-                                setValues.push({
-                                    value: parseFloat(m.value),
-                                    set_number: setIdx + 1
-                                });
-                            }
-                        });
+                        // Normal single metric from top set
+                        const metricValue = topSet.metrics.find(m => m.metric_id === metricToPlot.id);
+                        if (metricValue && metricValue.value) {
+                            dataPoints.push({
+                                timestamp,
+                                value: parseFloat(metricValue.value),
+                                session_name: instance.session_name,
+                                set_number: topSetIndex + 1,
+                                aggregation: 'Top Set'
+                            });
+                        }
                     }
                 }
-            });
+            } else if (setsHandling === 'average') {
+                // Calculate average across all sets
+                const setValues = [];
 
-            if (setValues.length > 0) {
-                if (setsHandling === 'top') {
-                    // Find the set with the highest value
-                    const topSet = setValues.reduce((max, current) =>
-                        current.value > max.value ? current : max
-                    );
+                instance.sets.forEach((set, setIdx) => {
+                    if (set.metrics) {
+                        if (isProductMetric) {
+                            // Calculate product for this set using only multiplicative metrics
+                            let product = 1;
+                            let hasAllMetrics = true;
+
+                            multiplicativeMetrics.forEach(metricDef => {
+                                const metricValue = set.metrics.find(m => m.metric_id === metricDef.id);
+                                if (metricValue && metricValue.value) {
+                                    product *= parseFloat(metricValue.value);
+                                } else {
+                                    hasAllMetrics = false;
+                                }
+                            });
+
+                            if (hasAllMetrics && multiplicativeMetrics.length > 0) {
+                                setValues.push(product);
+                            }
+                        } else {
+                            // Normal single metric
+                            const metricValue = set.metrics.find(m => m.metric_id === metricToPlot.id);
+                            if (metricValue && metricValue.value) {
+                                setValues.push(parseFloat(metricValue.value));
+                            }
+                        }
+                    }
+                });
+
+                if (setValues.length > 0) {
+                    const avgValue = setValues.reduce((sum, v) => sum + v, 0) / setValues.length;
                     dataPoints.push({
                         timestamp,
-                        value: topSet.value,
-                        session_name: instance.session_name,
-                        set_number: topSet.set_number,
-                        aggregation: 'Top Set'
-                    });
-                } else if (setsHandling === 'average') {
-                    // Calculate average across all sets
-                    const avgValue = setValues.reduce((sum, s) => sum + s.value, 0) / setValues.length;
-                    dataPoints.push({
-                        timestamp,
-                        value: Math.round(avgValue * 100) / 100, // Round to 2 decimal places
+                        value: Math.round(avgValue * 100) / 100,
                         session_name: instance.session_name,
                         set_number: null,
                         aggregation: `Avg of ${setValues.length} sets`
@@ -136,10 +184,10 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
         // For activities without sets
         else if (instance.metrics) {
             if (isProductMetric) {
-                // For product metric, multiply all metric values
+                // For product metric, multiply only multiplicative metric values
                 let product = 1;
                 let hasAllMetrics = true;
-                metrics.forEach(metricDef => {
+                multiplicativeMetrics.forEach(metricDef => {
                     const metricValue = instance.metrics.find(m => m.metric_id === metricDef.id);
                     if (metricValue && metricValue.value) {
                         product *= parseFloat(metricValue.value);
@@ -147,7 +195,7 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                         hasAllMetrics = false;
                     }
                 });
-                if (hasAllMetrics) {
+                if (hasAllMetrics && multiplicativeMetrics.length > 0) {
                     dataPoints.push({
                         timestamp,
                         value: product,
@@ -219,10 +267,10 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
 
     // Generate label for product metric
     const metricLabel = isProductMetric
-        ? metrics.map(m => m.name).join(' × ')
+        ? multiplicativeMetrics.map(m => m.name).join(' × ')
         : metricToPlot.name;
     const metricUnitText = isProductMetric
-        ? metrics.map(m => m.unit).join(' × ')
+        ? multiplicativeMetrics.map(m => m.unit).join(' × ')
         : metricToPlot.unit;
 
     const plotData = [{
@@ -246,7 +294,7 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
             `${p.session_name}<br>${p.aggregation || (p.set_number ? `Set ${p.set_number}` : '')}<br>${p.timestamp.toLocaleDateString()}`
         ),
         hovertemplate: '%{text}<br>' +
-            `${metricLabel}: %{y} ${metricUnitText}<br>` +
+            `${metricLabel}: %{y}${isProductMetric ? ` (${metricUnitText})` : ` ${metricUnitText}`}<br>` +
             '<extra></extra>'
     }];
 
@@ -315,9 +363,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                         </option>
                     ))}
                     {/* Add Product option if activity has metrics_multiplicative */}
-                    {activityDef.metrics_multiplicative && metrics.length > 1 && (
+                    {activityDef.metrics_multiplicative && multiplicativeMetrics.length > 1 && (
                         <option value="__product__" style={{ color: '#e91e63' }}>
-                            ({metrics.map(m => m.name).join(' × ')})
+                            ({multiplicativeMetrics.map(m => m.name).join(' × ')})
                         </option>
                     )}
                 </select>

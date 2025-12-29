@@ -204,9 +204,18 @@ class MetricDefinition(Base):
     created_at = Column(DateTime, default=datetime.now)
     deleted_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
+    is_top_set_metric = Column(Boolean, default=False)  # Determines which metric defines "top set"
+    is_multiplicative = Column(Boolean, default=True)   # Include in product calculations
 
     def to_dict(self):
-        return {"id": self.id, "name": self.name, "unit": self.unit, "is_active": self.is_active}
+        return {
+            "id": self.id, 
+            "name": self.name, 
+            "unit": self.unit, 
+            "is_active": self.is_active,
+            "is_top_set_metric": self.is_top_set_metric,
+            "is_multiplicative": self.is_multiplicative
+        }
 
 class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
