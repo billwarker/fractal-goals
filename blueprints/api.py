@@ -1079,7 +1079,8 @@ def create_activity(root_id):
             name=data['name'],
             description=data.get('description', ''),
             has_sets=data.get('has_sets', False),
-            has_metrics=data.get('has_metrics', True)
+            has_metrics=data.get('has_metrics', True),
+            metrics_multiplicative=data.get('metrics_multiplicative', False)
         )
         session.add(new_activity)
         session.flush() # Get ID
@@ -1135,6 +1136,8 @@ def update_activity(root_id, activity_id):
             activity.has_sets = data['has_sets']
         if 'has_metrics' in data:
             activity.has_metrics = data['has_metrics']
+        if 'metrics_multiplicative' in data:
+            activity.metrics_multiplicative = data['metrics_multiplicative']
         
         # Update metrics if provided
         if 'metrics' in data:

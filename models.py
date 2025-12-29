@@ -178,6 +178,7 @@ class ActivityDefinition(Base):
     created_at = Column(DateTime, default=datetime.now)
     has_sets = Column(Boolean, default=False)
     has_metrics = Column(Boolean, default=True)
+    metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
 
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
 
@@ -188,6 +189,7 @@ class ActivityDefinition(Base):
             "description": self.description,
             "has_sets": self.has_sets,
             "has_metrics": self.has_metrics,
+            "metrics_multiplicative": self.metrics_multiplicative,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "metric_definitions": [m.to_dict() for m in self.metric_definitions]
         }

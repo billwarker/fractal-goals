@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import Plotly from 'plotly.js-dist-min';
+import ScatterPlot from '../components/analytics/ScatterPlot';
+import LineGraph from '../components/analytics/LineGraph';
 import '../App.css';
 
 /**
@@ -19,7 +20,9 @@ function Analytics() {
     // Activities tab state
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [activityInstances, setActivityInstances] = useState({});
-    const [selectedGraph, setSelectedGraph] = useState('scatter'); // 'scatter', etc.
+    const [selectedGraph, setSelectedGraph] = useState('scatter'); // 'scatter', 'line'
+    const [selectedMetric, setSelectedMetric] = useState(null); // For line graph
+    const [setsHandling, setSetsHandling] = useState('top'); // 'top' or 'average'
 
     useEffect(() => {
         if (!rootId) {
@@ -96,279 +99,6 @@ function Analytics() {
 
             return bLatest - aLatest; // Most recent first
         });
-    };
-
-    // Render scatter plot for selected activity
-    const renderScatterPlot = () => {
-        console.log('renderScatterPlot called', { selectedActivity, activityInstances });
-
-        if (!selectedActivity) {
-            return (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: '#666',
-                    fontSize: '14px'
-                }}>
-                    Select an activity to view analytics
-                </div>
-            );
-        }
-
-        const instances = activityInstances[selectedActivity.id] || [];
-        const activityDef = activities.find(a => a.id === selectedActivity.id);
-
-        console.log('Activity instances:', instances);
-        console.log('Activity definition:', activityDef);
-
-        if (!activityDef || instances.length === 0) {
-            return (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: '#666',
-                    fontSize: '14px'
-                }}>
-                    No data available for this activity
-                </div>
-            );
-        }
-
-        const metrics = activityDef.metric_definitions || [];
-
-        console.log('Metrics:', metrics);
-
-        if (metrics.length === 0) {
-            return (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: '#666',
-                    fontSize: '14px'
-                }}>
-                    This activity has no metrics to display
-                </div>
-            );
-        }
-
-        // Collect data points from instances
-        const dataPoints = [];
-        instances.forEach(instance => {
-            const point = {
-                session_name: instance.session_name,
-                session_date: instance.session_date
-            };
-
-            // For activities with sets
-            if (instance.has_sets && instance.sets) {
-                instance.sets.forEach((set, setIdx) => {
-                    const setPoint = { ...point, set_number: setIdx + 1 };
-                    if (set.metrics) {
-                        set.metrics.forEach(m => {
-                            const metricDef = metrics.find(md => md.id === m.metric_id);
-                            if (metricDef && m.value) {
-                                setPoint[metricDef.name] = parseFloat(m.value);
-                            }
-                        });
-                    }
-                    if (Object.keys(setPoint).length > 3) { // Has at least one metric
-                        dataPoints.push(setPoint);
-                    }
-                });
-            }
-            // For activities without sets
-            else if (instance.metrics) {
-                instance.metrics.forEach(m => {
-                    const metricDef = metrics.find(md => md.id === m.metric_id);
-                    if (metricDef && m.value) {
-                        point[metricDef.name] = parseFloat(m.value);
-                    }
-                });
-                if (Object.keys(point).length > 2) { // Has at least one metric
-                    dataPoints.push(point);
-                }
-            }
-        });
-
-        console.log('Data points:', dataPoints);
-
-        if (dataPoints.length === 0) {
-            return (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: '#666',
-                    fontSize: '14px'
-                }}>
-                    No metric data available for this activity
-                </div>
-            );
-        }
-
-        // Determine which metrics to plot (up to 3)
-        const metricsToPlot = metrics.slice(0, 3);
-        const is3D = metricsToPlot.length === 3;
-
-        console.log('Metrics to plot:', metricsToPlot, 'is3D:', is3D);
-
-        // Prepare plot data
-        const xData = dataPoints.map(p => p[metricsToPlot[0].name]).filter(v => v != null);
-        const yData = metricsToPlot[1] ? dataPoints.map(p => p[metricsToPlot[1].name]).filter(v => v != null) : [];
-        const zData = is3D ? dataPoints.map(p => p[metricsToPlot[2].name]).filter(v => v != null) : [];
-
-        console.log('Plot data:', { xData, yData, zData });
-
-        if (xData.length === 0) {
-            return (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: '#666',
-                    fontSize: '14px'
-                }}>
-                    No valid metric values found
-                </div>
-            );
-        }
-
-        const plotData = [{
-            x: xData,
-            y: yData.length > 0 ? yData : undefined,
-            z: zData.length > 0 ? zData : undefined,
-            mode: 'markers',
-            type: is3D ? 'scatter3d' : 'scatter',
-            marker: {
-                size: 8,
-                color: '#2196f3',
-                opacity: 0.7,
-                line: {
-                    color: '#1976d2',
-                    width: 1
-                }
-            },
-            text: dataPoints.map(p =>
-                `${p.session_name}<br>Set ${p.set_number || 1}<br>${new Date(p.session_date).toLocaleDateString()}`
-            ),
-            hovertemplate: '%{text}<br>' +
-                `${metricsToPlot[0].name}: %{x} ${metricsToPlot[0].unit}<br>` +
-                (metricsToPlot[1] ? `${metricsToPlot[1].name}: %{y} ${metricsToPlot[1].unit}<br>` : '') +
-                (is3D ? `${metricsToPlot[2].name}: %{z} ${metricsToPlot[2].unit}<br>` : '') +
-                '<extra></extra>'
-        }];
-
-        const layout = {
-            title: {
-                text: `${selectedActivity.name} - Metrics Analysis`,
-                font: { color: '#ccc', size: 16 }
-            },
-            paper_bgcolor: '#1e1e1e',
-            plot_bgcolor: '#252525',
-            font: { color: '#ccc' },
-            margin: { l: 60, r: 40, t: 60, b: 60 },
-            height: is3D ? 700 : 500, // Larger height for 3D plots
-            autosize: true
-        };
-
-        // Add appropriate axes based on plot type
-        if (is3D) {
-            layout.scene = {
-                xaxis: {
-                    title: {
-                        text: `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`,
-                        font: { color: '#ccc', size: 12 }
-                    },
-                    gridcolor: '#333',
-                    backgroundcolor: '#252525'
-                },
-                yaxis: {
-                    title: {
-                        text: `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`,
-                        font: { color: '#ccc', size: 12 }
-                    },
-                    gridcolor: '#333',
-                    backgroundcolor: '#252525'
-                },
-                zaxis: {
-                    title: {
-                        text: `${metricsToPlot[2].name} (${metricsToPlot[2].unit})`,
-                        font: { color: '#ccc', size: 12 }
-                    },
-                    gridcolor: '#333',
-                    backgroundcolor: '#252525'
-                }
-            };
-        } else {
-            layout.xaxis = {
-                title: {
-                    text: `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`,
-                    font: { color: '#ccc', size: 12 }
-                },
-                gridcolor: '#333',
-                zerolinecolor: '#444'
-            };
-            if (metricsToPlot[1]) {
-                layout.yaxis = {
-                    title: {
-                        text: `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`,
-                        font: { color: '#ccc', size: 12 }
-                    },
-                    gridcolor: '#333',
-                    zerolinecolor: '#444'
-                };
-            }
-        }
-
-        console.log('Rendering plot with data:', plotData, 'layout:', layout);
-
-        return <PlotlyChart data={plotData} layout={layout} />;
-    };
-
-    // Custom Plotly component that uses direct Plotly.js rendering
-    const PlotlyChart = ({ data, layout }) => {
-        const plotRef = useRef(null);
-
-        useEffect(() => {
-            if (plotRef.current && data && data.length > 0) {
-                console.log('PlotlyChart useEffect - rendering plot');
-                try {
-                    Plotly.newPlot(plotRef.current, data, layout, {
-                        responsive: true,
-                        displayModeBar: true,
-                        displaylogo: false
-                    });
-                } catch (error) {
-                    console.error('Error rendering Plotly chart:', error);
-                }
-            }
-
-            // Cleanup
-            return () => {
-                if (plotRef.current) {
-                    Plotly.purge(plotRef.current);
-                }
-            };
-        }, [data, layout]);
-
-        return (
-            <div
-                ref={plotRef}
-                style={{
-                    width: '100%',
-                    height: '100%',
-                    minHeight: '500px'
-                }}
-            />
-        );
     };
 
     if (loading) {
@@ -479,8 +209,8 @@ function Analytics() {
                     <div style={{
                         display: 'flex',
                         gap: '20px',
-                        height: 'calc(100vh - 280px)', // Full height minus header
-                        minHeight: '500px'
+                        height: 'calc(100vh - 180px)', // Full height minus compact header
+                        minHeight: '600px'
                     }}>
                         {/* Graph Viewport (Left) */}
                         <div style={{
@@ -500,27 +230,71 @@ function Analytics() {
                             }}>
                                 <div style={{
                                     display: 'flex',
-                                    gap: '8px',
-                                    alignItems: 'center'
+                                    gap: '16px',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap'
                                 }}>
-                                    <span style={{ fontSize: '12px', color: '#888', marginRight: '8px' }}>
-                                        Graph Type:
-                                    </span>
-                                    <button
-                                        onClick={() => setSelectedGraph('scatter')}
-                                        style={{
-                                            padding: '6px 12px',
-                                            background: selectedGraph === 'scatter' ? '#2196f3' : '#333',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            color: selectedGraph === 'scatter' ? 'white' : '#888',
-                                            cursor: 'pointer',
-                                            fontSize: '12px',
-                                            fontWeight: 500
-                                        }}
-                                    >
-                                        Scatter Plot
-                                    </button>
+                                    {/* Graph Type */}
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '12px', color: '#888' }}>
+                                            Graph Type:
+                                        </span>
+                                        <button
+                                            onClick={() => setSelectedGraph('scatter')}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: selectedGraph === 'scatter' ? '#2196f3' : '#333',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                color: selectedGraph === 'scatter' ? 'white' : '#888',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                fontWeight: 500
+                                            }}
+                                        >
+                                            Scatter Plot
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedGraph('line')}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: selectedGraph === 'line' ? '#2196f3' : '#333',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                color: selectedGraph === 'line' ? 'white' : '#888',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                fontWeight: 500
+                                            }}
+                                        >
+                                            Line Graph
+                                        </button>
+                                    </div>
+
+                                    {/* Sets Handling - only show if selected activity uses sets */}
+                                    {selectedActivity && activities.find(a => a.id === selectedActivity.id)?.has_sets && (
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '12px', color: '#888' }}>
+                                                Sets Handling:
+                                            </span>
+                                            <select
+                                                value={setsHandling}
+                                                onChange={(e) => setSetsHandling(e.target.value)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#333',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '4px',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <option value="top">Top Set</option>
+                                                <option value="average">Average</option>
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -530,7 +304,23 @@ function Analytics() {
                                 padding: '20px',
                                 overflow: 'hidden'
                             }}>
-                                {renderScatterPlot()}
+                                {selectedGraph === 'scatter' ? (
+                                    <ScatterPlot
+                                        selectedActivity={selectedActivity}
+                                        activityInstances={activityInstances}
+                                        activities={activities}
+                                        setsHandling={setsHandling}
+                                    />
+                                ) : (
+                                    <LineGraph
+                                        selectedActivity={selectedActivity}
+                                        activityInstances={activityInstances}
+                                        activities={activities}
+                                        selectedMetric={selectedMetric}
+                                        setSelectedMetric={setSelectedMetric}
+                                        setsHandling={setsHandling}
+                                    />
+                                )}
                             </div>
                         </div>
 
@@ -653,23 +443,6 @@ function Analytics() {
                 borderBottom: '1px solid #333',
                 zIndex: 10
             }}>
-                <h1 style={{
-                    fontSize: '28px',
-                    fontWeight: 300,
-                    margin: 0,
-                    marginBottom: '8px',
-                    color: 'white'
-                }}>
-                    Analytics
-                </h1>
-                <p style={{
-                    fontSize: '14px',
-                    color: '#888',
-                    margin: '0 0 20px 0'
-                }}>
-                    Insights and statistics about your practice sessions
-                </p>
-
                 {/* Sub-navigation Tabs */}
                 <div style={{
                     display: 'flex',

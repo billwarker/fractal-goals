@@ -17,6 +17,7 @@ function ActivitiesManager({ rootId, onClose }) {
     const [metrics, setMetrics] = useState([{ name: '', unit: '' }]);
     const [hasSets, setHasSets] = useState(false);
     const [hasMetrics, setHasMetrics] = useState(true);
+    const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
 
     useEffect(() => {
         fetchActivities();
@@ -66,7 +67,8 @@ function ActivitiesManager({ rootId, onClose }) {
                 description,
                 metrics: hasMetrics ? validMetrics : [],
                 has_sets: hasSets,
-                has_metrics: hasMetrics
+                has_metrics: hasMetrics,
+                metrics_multiplicative: metricsMultiplicative
             });
 
             // Reset form
@@ -75,6 +77,7 @@ function ActivitiesManager({ rootId, onClose }) {
             setMetrics([{ name: '', unit: '' }]);
             setHasSets(false);
             setHasMetrics(true);
+            setMetricsMultiplicative(false);
 
             // Refresh list
             fetchActivities();
@@ -193,6 +196,11 @@ function ActivitiesManager({ rootId, onClose }) {
                                                 {!activity.has_metrics && (
                                                     <span style={{ fontSize: '11px', background: '#333', color: '#888', padding: '2px 6px', borderRadius: '3px', border: '1px solid #444' }}>
                                                         No Metrics
+                                                    </span>
+                                                )}
+                                                {activity.metrics_multiplicative && (
+                                                    <span style={{ fontSize: '11px', background: '#333', color: '#e91e63', padding: '2px 6px', borderRadius: '3px', border: '1px solid #444' }}>
+                                                        A × B × C
                                                     </span>
                                                 )}
 
@@ -333,6 +341,30 @@ function ActivitiesManager({ rootId, onClose }) {
                                                 </button>
                                             )}
                                         </div>
+
+                                        {/* Multiplicative Metrics Checkbox - only show when 2+ metrics */}
+                                        {metrics.filter(m => m.name.trim() !== '').length > 1 && (
+                                            <label style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: '13px',
+                                                color: '#e91e63',
+                                                cursor: 'pointer',
+                                                marginTop: '10px',
+                                                padding: '8px',
+                                                background: 'rgba(233, 30, 99, 0.1)',
+                                                borderRadius: '4px',
+                                                border: '1px solid rgba(233, 30, 99, 0.3)'
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={metricsMultiplicative}
+                                                    onChange={e => setMetricsMultiplicative(e.target.checked)}
+                                                />
+                                                Metrics are multiplicative (enables A × B × C derived metric on analytics)
+                                            </label>
+                                        )}
                                     </div>
                                 )}
 

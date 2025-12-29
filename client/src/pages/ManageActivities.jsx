@@ -23,6 +23,7 @@ function ManageActivities() {
     const [metrics, setMetrics] = useState([{ name: '', unit: '' }]);
     const [hasSets, setHasSets] = useState(false);
     const [hasMetrics, setHasMetrics] = useState(true);
+    const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
 
     useEffect(() => {
         if (!rootId) {
@@ -68,6 +69,7 @@ function ManageActivities() {
         setName(activity.name);
         setDescription(activity.description || '');
         setHasSets(activity.has_sets);
+        setMetricsMultiplicative(activity.metrics_multiplicative || false);
 
         // Set hasMetrics based on whether metrics actually exist
         const hasMetricDefinitions = activity.metric_definitions && activity.metric_definitions.length > 0;
@@ -88,6 +90,7 @@ function ManageActivities() {
         setMetrics([{ name: '', unit: '' }]);
         setHasSets(false);
         setHasMetrics(true);
+        setMetricsMultiplicative(false);
     };
 
     const handleSubmit = async (e) => {
@@ -128,7 +131,8 @@ function ManageActivities() {
                     description,
                     metrics: hasMetrics ? validMetrics : [],
                     has_sets: hasSets,
-                    has_metrics: hasMetrics
+                    has_metrics: hasMetrics,
+                    metrics_multiplicative: metricsMultiplicative
                 });
             } else {
                 // Create new activity
@@ -137,7 +141,8 @@ function ManageActivities() {
                     description,
                     metrics: hasMetrics ? validMetrics : [],
                     has_sets: hasSets,
-                    has_metrics: hasMetrics
+                    has_metrics: hasMetrics,
+                    metrics_multiplicative: metricsMultiplicative
                 });
             }
 
@@ -148,6 +153,7 @@ function ManageActivities() {
             setMetrics([{ name: '', unit: '' }]);
             setHasSets(false);
             setHasMetrics(true);
+            setMetricsMultiplicative(false);
 
             // Refresh list
             fetchActivities();
@@ -264,7 +270,7 @@ function ManageActivities() {
                                 </div>
 
                                 {/* Flags */}
-                                <div style={{ display: 'flex', gap: '20px' }}>
+                                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
                                         <input
                                             type="checkbox"
@@ -281,6 +287,17 @@ function ManageActivities() {
                                         />
                                         Enable Metrics
                                     </label>
+                                    {/* Show multiplicative checkbox when 2+ metric fields exist */}
+                                    {metrics.length >= 2 && (
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={metricsMultiplicative}
+                                                onChange={e => setMetricsMultiplicative(e.target.checked)}
+                                            />
+                                            Metrics are multiplicative
+                                        </label>
+                                    )}
                                 </div>
 
                                 {/* Metrics Section - Conditional */}
@@ -454,6 +471,18 @@ function ManageActivities() {
                                                         border: '1px solid #444'
                                                     }}>
                                                         No Metrics
+                                                    </span>
+                                                )}
+                                                {activity.metrics_multiplicative && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        background: '#333',
+                                                        color: '#f44336',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '3px',
+                                                        border: '1px solid #444'
+                                                    }}>
+                                                        Multiplicative
                                                     </span>
                                                 )}
                                                 {activity.metric_definitions?.map(m => (
