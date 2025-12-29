@@ -9,16 +9,20 @@ import { SessionsProvider } from './contexts/SessionsContext.jsx'
 
 import { GoalsProvider } from './contexts/GoalsContext.jsx'
 
+import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <ActivitiesProvider>
-        <SessionsProvider>
-          <GoalsProvider>
-            <AppRouter />
-          </GoalsProvider>
-        </SessionsProvider>
-      </ActivitiesProvider>
+      <TimezoneProvider>
+        <ActivitiesProvider>
+          <SessionsProvider>
+            <GoalsProvider>
+              <AppRouter />
+            </GoalsProvider>
+          </SessionsProvider>
+        </ActivitiesProvider>
+      </TimezoneProvider>
     </BrowserRouter>
   </StrictMode>,
 )

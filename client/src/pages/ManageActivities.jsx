@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
-import { useActivities } from '../contexts/ActivitiesContext';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import '../App.css';
 
@@ -539,20 +538,54 @@ function ManageActivities() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            onClick={() => handleDeleteClick(activity)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                background: '#d32f2f',
-                                                border: 'none',
-                                                borderRadius: '3px',
-                                                color: 'white',
-                                                fontSize: '12px',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            Delete
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                                onClick={() => handleLoadActivity(activity)}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '6px',
+                                                    background: '#2196f3',
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDuplicate(activity)}
+                                                disabled={creating}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: creating ? '#666' : '#ff9800',
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    cursor: creating ? 'not-allowed' : 'pointer',
+                                                    opacity: creating ? 0.5 : 1
+                                                }}
+                                                title="Duplicate this activity"
+                                            >
+                                                ⎘
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(activity)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#d32f2f',
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

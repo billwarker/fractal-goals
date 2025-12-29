@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTimezone } from '../App';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../utils/dateUtils';
 
 /**
