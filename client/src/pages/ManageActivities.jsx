@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
+import { useActivities } from '../contexts/ActivitiesContext';
+import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import '../App.css';
 
 /**
@@ -13,8 +15,11 @@ function ManageActivities() {
 
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
-    const [deletingId, setDeletingId] = useState(null);
+    const [activityToDelete, setActivityToDelete] = useState(null);
     const [editingId, setEditingId] = useState(null);
+    const [pendingSubmission, setPendingSubmission] = useState(null);
+    const [showMetricWarning, setShowMetricWarning] = useState(false);
+    const [metricWarningMessage, setMetricWarningMessage] = useState('');
 
     // Form State
     const [name, setName] = useState('');
@@ -95,57 +100,22 @@ function ManageActivities() {
         setMetricsMultiplicative(false);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const processSubmission = async (overrideData = null) => {
         try {
             setCreating(true);
-
-            // Filter out empty metrics
-            const validMetrics = metrics.filter(m => m.name.trim() !== '');
+            const dataToSubmit = overrideData || {
+                name,
+                description,
+                metrics: hasMetrics ? metrics.filter(m => m.name.trim() !== '') : [],
+                has_sets: hasSets,
+                has_metrics: hasMetrics,
+                metrics_multiplicative: metricsMultiplicative
+            };
 
             if (editingId) {
-                // Check if metrics are being removed
-                const originalActivity = activities.find(a => a.id === editingId);
-                if (originalActivity && originalActivity.metric_definitions) {
-                    const removedMetrics = originalActivity.metric_definitions.filter(
-                        oldMetric => !validMetrics.find(
-                            newMetric => newMetric.name === oldMetric.name && newMetric.unit === oldMetric.unit
-                        )
-                    );
-
-                    if (removedMetrics.length > 0) {
-                        const metricNames = removedMetrics.map(m => `"${m.name}"`).join(', ');
-                        const confirmed = window.confirm(
-                            `⚠️ Warning: You are removing ${removedMetrics.length} metric(s): ${metricNames}\n\n` +
-                            `This may affect existing session data. Metrics from old sessions will no longer display.\n\n` +
-                            `Continue with this change?`
-                        );
-                        if (!confirmed) {
-                            setCreating(false);
-                            return;
-                        }
-                    }
-                }
-
-                // Update existing activity
-                await updateActivity(rootId, editingId, {
-                    name,
-                    description,
-                    metrics: hasMetrics ? validMetrics : [],
-                    has_sets: hasSets,
-                    has_metrics: hasMetrics,
-                    metrics_multiplicative: metricsMultiplicative
-                });
+                await updateActivity(rootId, editingId, dataToSubmit);
             } else {
-                // Create new activity
-                await createActivity(rootId, {
-                    name,
-                    description,
-                    metrics: hasMetrics ? validMetrics : [],
-                    has_sets: hasSets,
-                    has_metrics: hasMetrics,
-                    metrics_multiplicative: metricsMultiplicative
-                });
+                await createActivity(rootId, dataToSubmit);
             }
 
             // Reset form
@@ -156,9 +126,9 @@ function ManageActivities() {
             setHasSets(false);
             setHasMetrics(true);
             setMetricsMultiplicative(false);
-
-            // Activities list will auto-refresh via context
             setCreating(false);
+            setPendingSubmission(null);
+            setShowMetricWarning(false);
         } catch (err) {
             console.error(editingId ? "Failed to update activity" : "Failed to create activity", err);
             setError(editingId ? "Failed to update activity" : "Failed to create activity");
@@ -166,19 +136,53 @@ function ManageActivities() {
         }
     };
 
-    const handleDeleteClick = (activityId) => {
-        setDeletingId(activityId);
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // Filter out empty metrics
+        const validMetrics = metrics.filter(m => m.name.trim() !== '');
+
+        if (editingId) {
+            // Check if metrics are being removed
+            const originalActivity = activities.find(a => a.id === editingId);
+            if (originalActivity && originalActivity.metric_definitions) {
+                const removedMetrics = originalActivity.metric_definitions.filter(
+                    oldMetric => !validMetrics.find(
+                        newMetric => newMetric.name === oldMetric.name && newMetric.unit === oldMetric.unit
+                    )
+                );
+
+                if (removedMetrics.length > 0) {
+                    const metricNames = removedMetrics.map(m => `"${m.name}"`).join(', ');
+                    setMetricWarningMessage(
+                        `You are removing ${removedMetrics.length} metric(s): ${metricNames}. ` +
+                        `This may affect existing session data. Metrics from old sessions will no longer display.`
+                    );
+                    setPendingSubmission({
+                        name, description, metrics: hasMetrics ? validMetrics : [], has_sets: hasSets, has_metrics: hasMetrics, metrics_multiplicative: metricsMultiplicative
+                    });
+                    setShowMetricWarning(true);
+                    return;
+                }
+            }
+        }
+
+        processSubmission();
     };
 
-    const handleConfirmDelete = async (activityId) => {
+    const handleDeleteClick = (activity) => {
+        setActivityToDelete(activity);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!activityToDelete) return;
         try {
-            await deleteActivity(rootId, activityId);
-            setDeletingId(null);
-            // Activities list will auto-refresh via context
+            await deleteActivity(rootId, activityToDelete.id);
+            setActivityToDelete(null);
         } catch (err) {
             console.error("Failed to delete activity", err);
             setError("Failed to delete activity");
-            setDeletingId(null);
+            setActivityToDelete(null);
         }
     };
 
@@ -535,90 +539,20 @@ function ManageActivities() {
                                             </div>
                                         </div>
 
-                                        {deletingId === activity.id ? (
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleConfirmDelete(activity.id)}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '6px',
-                                                        background: '#d32f2f',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: 'bold'
-                                                    }}
-                                                >
-                                                    Confirm Delete
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeletingId(null)}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '6px',
-                                                        background: '#666',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleLoadActivity(activity)}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '6px',
-                                                        background: '#2196f3',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDuplicate(activity)}
-                                                    disabled={creating}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: creating ? '#666' : '#ff9800',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        cursor: creating ? 'not-allowed' : 'pointer',
-                                                        opacity: creating ? 0.5 : 1
-                                                    }}
-                                                    title="Duplicate this activity"
-                                                >
-                                                    ⎘
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(activity.id)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#d32f2f',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        color: 'white',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        )}
+                                        <button
+                                            onClick={() => handleDeleteClick(activity)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: '#d32f2f',
+                                                border: 'none',
+                                                borderRadius: '3px',
+                                                color: 'white',
+                                                fontSize: '12px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -626,6 +560,27 @@ function ManageActivities() {
                     </div>
                 </div>
             </div>
+            {/* Modal for Deleting Activity */}
+            <DeleteConfirmModal
+                isOpen={!!activityToDelete}
+                onClose={() => setActivityToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Activity?"
+                message={`Are you sure you want to delete "${activityToDelete?.name}"?`}
+            />
+
+            {/* Modal for Metric Removal Warning */}
+            <DeleteConfirmModal
+                isOpen={showMetricWarning}
+                onClose={() => {
+                    setShowMetricWarning(false);
+                    setPendingSubmission(null);
+                    setCreating(false);
+                }}
+                onConfirm={() => processSubmission(pendingSubmission)}
+                title="Removing Metrics"
+                message={metricWarningMessage}
+            />
         </div>
     );
 }

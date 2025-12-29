@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import '../App.css';
+import AlertModal from '../components/modals/AlertModal';
+import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 
 /**
  * Programming Page - Create composable fractal practice session templates
@@ -21,6 +23,9 @@ function Programming() {
         description: ''
     });
 
+    const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
+    const [templateToDelete, setTemplateToDelete] = useState(null);
+
     const componentTypes = [
         { value: 'warmup', label: 'Warm-up', color: '#ff9800' },
         { value: 'drill', label: 'Drill', color: '#2196f3' },
@@ -30,7 +35,7 @@ function Programming() {
 
     const handleAddComponent = () => {
         if (!newComponent.name.trim()) {
-            alert('Component name is required');
+            setAlertData({ isOpen: true, title: 'Validation Error', message: 'Component name is required' });
             return;
         }
 
@@ -72,12 +77,12 @@ function Programming() {
 
     const handleSaveTemplate = () => {
         if (!currentTemplate.name.trim()) {
-            alert('Template name is required');
+            setAlertData({ isOpen: true, title: 'Validation Error', message: 'Template name is required' });
             return;
         }
 
         if (currentTemplate.components.length === 0) {
-            alert('Add at least one component to the template');
+            setAlertData({ isOpen: true, title: 'Validation Error', message: 'Add at least one component to the template' });
             return;
         }
 
@@ -91,7 +96,7 @@ function Programming() {
             components: []
         });
 
-        alert('Template saved successfully!');
+        setAlertData({ isOpen: true, title: 'Success', message: 'Template saved successfully!' });
     };
 
     const handleLoadTemplate = (template) => {
@@ -102,8 +107,14 @@ function Programming() {
     };
 
     const handleDeleteTemplate = (templateId) => {
-        if (confirm('Are you sure you want to delete this template?')) {
-            setTemplates(templates.filter(t => t.id !== templateId));
+        const template = templates.find(t => t.id === templateId);
+        setTemplateToDelete(template);
+    };
+
+    const confirmDeleteTemplate = () => {
+        if (templateToDelete) {
+            setTemplates(templates.filter(t => t.id !== templateToDelete.id));
+            setTemplateToDelete(null);
         }
     };
 
@@ -528,6 +539,21 @@ function Programming() {
                     </div>
                 </div>
             )}
+            {/* Alerts and Confirms */}
+            <AlertModal
+                isOpen={alertData.isOpen}
+                onClose={() => setAlertData({ ...alertData, isOpen: false })}
+                title={alertData.title}
+                message={alertData.message}
+            />
+
+            <DeleteConfirmModal
+                isOpen={!!templateToDelete}
+                onClose={() => setTemplateToDelete(null)}
+                onConfirm={confirmDeleteTemplate}
+                title="Delete Template?"
+                message={`Are you sure you want to delete "${templateToDelete?.name}"?`}
+            />
         </div>
     );
 }

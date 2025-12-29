@@ -3,27 +3,31 @@ import React, { useState, useEffect } from 'react';
 const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
     const [selectedShortTermGoals, setSelectedShortTermGoals] = useState([]);
     const [immediateGoals, setImmediateGoals] = useState([{ name: '', description: '' }]);
+    const [error, setError] = useState(null);
 
     // Reset state when opening
     useEffect(() => {
         if (isOpen) {
             setSelectedShortTermGoals([]);
             setImmediateGoals([{ name: '', description: '' }]);
+            setError(null);
         }
     }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleCreate = () => {
+        setError(null);
+
         // Validation
         if (selectedShortTermGoals.length === 0) {
-            alert('Please select at least one short-term goal');
+            setError('Please select at least one short-term goal');
             return;
         }
 
         const validImmediateGoals = immediateGoals.filter(g => g.name.trim() !== '');
         if (validImmediateGoals.length === 0) {
-            alert('Please add at least one immediate goal with a name');
+            setError('Please add at least one immediate goal with a name');
             return;
         }
 
@@ -48,6 +52,19 @@ const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }
                         </p>
                     </div>
 
+                    {error && (
+                        <div style={{
+                            background: 'rgba(211, 47, 47, 0.1)',
+                            border: '1px solid #d32f2f',
+                            color: '#ff5252',
+                            padding: '10px',
+                            borderRadius: '4px',
+                            marginBottom: '20px'
+                        }}>
+                            ⚠️ {error}
+                        </div>
+                    )}
+
                     {/* Select Short-Term Goals */}
                     <div className="form-section">
                         <label><strong>Select Short-Term Goals (Required - at least one):</strong></label>
@@ -61,6 +78,7 @@ const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }
                                             type="checkbox"
                                             checked={selectedShortTermGoals.includes(goal.id)}
                                             onChange={(e) => {
+                                                setError(null);
                                                 if (e.target.checked) {
                                                     setSelectedShortTermGoals([...selectedShortTermGoals, goal.id]);
                                                 } else {
@@ -85,6 +103,7 @@ const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }
                                     placeholder="Goal name"
                                     value={goal.name}
                                     onChange={(e) => {
+                                        setError(null);
                                         const updated = [...immediateGoals];
                                         updated[index].name = e.target.value;
                                         setImmediateGoals(updated);

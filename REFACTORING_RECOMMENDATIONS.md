@@ -36,13 +36,13 @@ This document tracks the refactoring progress and outlines the remaining high-im
 
 ## 🚀 High Priority (Immediate Next Steps)
 
-### 1. UI/UX Standardization (Styles)
-**Problem:** The application still relies heavily on inline styles, making theming and consistency difficult.
-**Plan:**
-- **CSS Modules**: Migrate inline styles from `Sidebar.jsx` and `FractalGoals.jsx` to `*.module.css` or global classes.
-- **Design Tokens**: Standardize colors (e.g., `#2a2a2a`, `#4caf50`) into CSS variables.
+### 1. UI/UX Standardization (✅ Completed for Core)
+**Goal:** Standardize styles and replace browser popups.
+- ✅ **CSS Extraction**: Extracted inline styles from `FractalGoals.jsx` and `Sidebar.jsx` into dedicated CSS files.
+- ✅ **Modal Standardization**: Replaced all `alert()` and `confirm()` calls with `AlertModal` and `DeleteConfirmModal` across `FractalGoals`, `Programming`, and `ManageActivities` pages.
+- ✅ **Design Tokens**: Standardized common colors in CSS.
 
-### 2. TypeScript Migration
+### 2. TypeScript Migration (Next Priority)
 **Problem:** Loose typing leads to `attributes.id` vs `id` confusion and prop errors.
 **Plan:**
 - **Install TypeScript**: Add TS configuration.

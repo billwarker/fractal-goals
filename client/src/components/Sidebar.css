@@ -1,0 +1,203 @@
+/* Sidebar Styles */
+
+/* Empty State */
+.inspector-empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80%;
+}
+
+.inspector-title {
+    font-weight: 300;
+    margin-bottom: 10px;
+}
+
+.select-hint {
+    color: #888;
+    font-style: italic;
+    margin-top: 20px;
+}
+
+/* Close Button */
+.close-sidebar-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 20;
+    transition: color 0.2s;
+}
+
+.close-sidebar-btn:hover {
+    color: #fff;
+}
+
+/* Form Elements */
+.edit-input-deadline {
+    background: #333;
+    border: 1px solid #555;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 5px;
+    width: 100%;
+}
+
+/* Targets Editor */
+.targets-editor-container {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 100px;
+}
+
+.no-targets-text {
+    color: #888;
+    font-size: 13px;
+    font-style: italic;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.targets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.add-target-btn {
+    width: 100%;
+    padding: 10px;
+    background: #4caf50;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.add-target-btn:hover {
+    background: #45a049;
+}
+
+/* Metadata Badges */
+.type-badge {
+    background: #444;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: #ccc;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.header-meta {
+    margin-bottom: 10px;
+}
+
+/* Session List Items */
+.session-item {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.session-item:hover {
+    background: #333;
+    border-color: #666;
+}
+
+.session-item-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.session-item-date {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Achieved Targets Box */
+.achieved-targets-box {
+    margin-top: 16px;
+    padding: 12px;
+    background: #1a2e1a;
+    border-radius: 6px;
+    border-left: 3px solid #4caf50;
+}
+
+.achieved-targets-title {
+    font-size: 14px;
+    color: #81c784;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.achieved-targets-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.achieved-target-pill {
+    padding: 6px 12px;
+    background: #2e7d32;
+    border-radius: 4px;
+    font-size: 12px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.target-pill-subtext {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+/* Completion Button States */
+.completion-btn-active {
+    background: #4caf50;
+    border: none;
+    color: white;
+}
+
+.completion-btn-inactive {
+    background: transparent;
+    border: 2px solid #666;
+    color: #ccc;
+}
+
+/* Utilities */
+.w-100 {
+    width: 100%;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+.mb-8 {
+    margin-bottom: 8px;
+}
+
+.block-display {
+    display: block;
+}

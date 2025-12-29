@@ -4,6 +4,7 @@ import { getTypeDisplayName, getChildType, calculateGoalAge } from '../utils/goa
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import TargetCard from './TargetCard';
 import AddTargetModal from './AddTargetModal';
+import './Sidebar.css';
 
 const Sidebar = ({
     selectedNode,
@@ -55,6 +56,10 @@ const Sidebar = ({
             deadline: editForm.deadline === '' ? null : editForm.deadline,
         };
 
+        const isPracticeSession = selectedNode?.attributes?.type === 'PracticeSession' ||
+            selectedNode?.type === 'PracticeSession' ||
+            selectedNode?.__isPracticeSession;
+
         // Include targets if it's a Goal
         if (!isPracticeSession) {
             payload.targets = editedTargets;
@@ -98,19 +103,18 @@ const Sidebar = ({
         return (
             <div className="details-window">
                 <div className="window-content">
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#666', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80%' }}>
-                        <h2 style={{ fontWeight: 300, marginBottom: '10px' }}>Inspector</h2>
+                    <div className="inspector-empty-state">
+                        <h2 className="inspector-title">Inspector</h2>
                         <p>Select a Goal or Practice Session in the graph to view details.</p>
                         {selectedRootId ? (
                             <button
-                                className="practice-session-btn"
-                                style={{ marginTop: '30px', padding: '12px 20px', background: 'var(--accent-color)', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontWeight: 600, width: '100%' }}
+                                className="practice-session-btn w-100 mt-20"
                                 onClick={onAddSession}
                             >
                                 + Add Practice Session
                             </button>
                         ) : (
-                            <p style={{ color: '#888', fontStyle: 'italic', marginTop: '20px' }}>Select a Fractal Tree from the main view first.</p>
+                            <p className="select-hint">Select a Fractal Tree from the main view first.</p>
                         )}
                     </div>
                 </div>
@@ -128,17 +132,6 @@ const Sidebar = ({
                     <button
                         className="close-sidebar-btn"
                         onClick={onClose}
-                        style={{
-                            position: 'absolute',
-                            top: '10px',
-                            right: '10px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#999',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            zIndex: 20
-                        }}
                     >
                         &times;
                     </button>
@@ -167,7 +160,7 @@ const Sidebar = ({
                                         type="date"
                                         value={editForm.deadline}
                                         onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
-                                        style={{ background: '#333', border: '1px solid #555', color: 'white', padding: '8px', borderRadius: '4px', marginTop: '5px', width: '100%' }}
+                                        className="edit-input-deadline"
                                     />
                                 </div>
                             )}
@@ -175,20 +168,14 @@ const Sidebar = ({
                             {/* Targets Editor (Goals Only) */}
                             {!isPracticeSession && (
                                 <div className="form-group">
-                                    <label style={{ marginBottom: '8px', display: 'block' }}>Targets:</label>
-                                    <div style={{
-                                        background: '#1e1e1e',
-                                        border: '1px solid #444',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        minHeight: '100px'
-                                    }}>
+                                    <label className="mb-8 block-display">Targets:</label>
+                                    <div className="targets-editor-container">
                                         {editedTargets.length === 0 ? (
-                                            <p style={{ color: '#888', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', margin: '20px 0' }}>
+                                            <p className="no-targets-text">
                                                 No targets set. Click "+ Add Target" below.
                                             </p>
                                         ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
+                                            <div className="targets-list">
                                                 {editedTargets.map(target => (
                                                     <TargetCard
                                                         key={target.id}
@@ -205,20 +192,7 @@ const Sidebar = ({
                                         <button
                                             type="button"
                                             onClick={handleAddTarget}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px',
-                                                background: '#4caf50',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                cursor: 'pointer',
-                                                fontSize: '13px',
-                                                fontWeight: 600,
-                                                transition: 'background 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = '#45a049'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = '#4caf50'}
+                                            className="add-target-btn"
                                         >
                                             + Add Target
                                         </button>
@@ -235,8 +209,8 @@ const Sidebar = ({
                         <>
                             {/* View Mode */}
                             {!isPracticeSession && (
-                                <div style={{ marginBottom: '10px' }}>
-                                    <span style={{ background: '#444', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8em', color: '#ccc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                <div className="header-meta">
+                                    <span className="type-badge">
                                         {selectedNode.attributes?.type || selectedNode.type}
                                     </span>
                                 </div>
@@ -282,29 +256,13 @@ const Sidebar = ({
                                                     <div
                                                         key={session.id}
                                                         onClick={() => navigate(`/${selectedRootId}/session/${session.id}`)}
-                                                        style={{
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            padding: '10px 12px',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s',
-                                                            fontSize: '14px'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = '#333';
-                                                            e.currentTarget.style.borderColor = '#666';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = '#2a2a2a';
-                                                            e.currentTarget.style.borderColor = '#444';
-                                                        }}
+                                                        className="session-item"
                                                     >
-                                                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                                                        <div className="session-item-title">
                                                             {session.name}
                                                         </div>
                                                         {session.attributes?.created_at && (
-                                                            <div style={{ fontSize: '12px', color: '#888' }}>
+                                                            <div className="session-item-date">
                                                                 {new Date(session.attributes.created_at).toLocaleDateString()}
                                                             </div>
                                                         )}
@@ -364,34 +322,16 @@ const Sidebar = ({
                                 if (achievedTargets.length === 0) return null;
 
                                 return (
-                                    <div style={{
-                                        marginTop: '16px',
-                                        padding: '12px',
-                                        background: '#1a2e1a',
-                                        borderRadius: '6px',
-                                        borderLeft: '3px solid #4caf50'
-                                    }}>
-                                        <h4 style={{ fontSize: '14px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                                    <div className="achieved-targets-box">
+                                        <h4 className="achieved-targets-title">
                                             🎯 Targets Achieved ({achievedTargets.length}):
                                         </h4>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                        <div className="achieved-targets-list">
                                             {achievedTargets.map((achieved, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#2e7d32',
-                                                        borderRadius: '4px',
-                                                        fontSize: '12px',
-                                                        color: 'white',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px'
-                                                    }}
-                                                >
+                                                <div key={idx} className="achieved-target-pill">
                                                     <span>✓</span>
                                                     <span>{achieved.target.name || 'Target'}</span>
-                                                    <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                                    <span className="target-pill-subtext">({achieved.goalName})</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -399,16 +339,11 @@ const Sidebar = ({
                                 );
                             })()}
 
-                            <div className="sidebar-actions" style={{ flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                            <div className="sidebar-actions mt-20">
                                 {!isPracticeSession && (
                                     <button
-                                        className="action-btn"
+                                        className={`action-btn ${selectedNode.attributes?.completed ? 'completion-btn-active' : 'completion-btn-inactive'}`}
                                         onClick={() => onToggleCompletion(selectedNode.attributes?.id || selectedNode.id, selectedNode.attributes?.completed)}
-                                        style={{
-                                            background: selectedNode.attributes?.completed ? '#4caf50' : 'transparent',
-                                            border: selectedNode.attributes?.completed ? 'none' : '2px solid #666',
-                                            color: selectedNode.attributes?.completed ? 'white' : '#ccc'
-                                        }}
                                     >
                                         {selectedNode.attributes?.completed ? '✓ Completed' : 'Mark Complete'}
                                     </button>

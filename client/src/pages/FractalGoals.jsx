@@ -5,11 +5,13 @@ import Sidebar from '../components/Sidebar';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GoalModal from '../components/modals/GoalModal';
 import PracticeSessionModal from '../components/modals/PracticeSessionModal';
+import AlertModal from '../components/modals/AlertModal';
 import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { getChildType, collectShortTermGoals } from '../utils/goalHelpers';
 import '../App.css';
+import './FractalGoals.css';
 
 /**
  * FractalGoals Page - FlowTree visualization with sidebar
@@ -56,6 +58,9 @@ function FractalGoals() {
     const [showPracticeSessionModal, setShowPracticeSessionModal] = useState(false);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
+    // Alert state
+    const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
+
     // Initial Data Fetch
     useEffect(() => {
         if (!rootId) {
@@ -69,6 +74,11 @@ function FractalGoals() {
 
     // Derived Data
     const shortTermGoals = fractalData ? collectShortTermGoals(fractalData) : [];
+
+    // Helper to show alert
+    const showAlert = (title, message) => {
+        setAlertData({ isOpen: true, title, message });
+    };
 
     // Handlers
 
@@ -91,14 +101,12 @@ function FractalGoals() {
         const childType = getChildType(parentType);
 
         if (!childType) {
-            alert('This goal type cannot have children.');
+            showAlert('Notice', 'This goal type cannot have children.');
             return;
         }
 
         // If adding a Practice Session to a ShortTermGoal, use Practice Session Modal
         if (parentType === 'ShortTermGoal' && childType === 'PracticeSession') {
-            // Optionally pre-select the goal? The modal expects a list. 
-            // We'll just open the modal for now.
             setShowPracticeSessionModal(true);
             return;
         }
@@ -113,14 +121,14 @@ function FractalGoals() {
             await createGoal(rootId, goalData);
             setShowGoalModal(false);
         } catch (err) {
-            alert('Error creating goal: ' + err.message);
+            showAlert('Creation Failed', 'Error creating goal: ' + err.message);
         }
     };
 
     const handleCreateSession = async (sessionData) => {
         try {
             const payload = {
-                name: "Auto-Generated", // Backend might override or we let user edit later
+                name: "Auto-Generated",
                 description: `Practice session with ${sessionData.immediateGoals.length} immediate goal(s)`,
                 parent_ids: sessionData.selectedShortTermGoals,
                 immediate_goals: sessionData.immediateGoals
@@ -129,7 +137,7 @@ function FractalGoals() {
             await createSession(rootId, payload);
             setShowPracticeSessionModal(false);
         } catch (err) {
-            alert('Error creating practice session: ' + err.message);
+            showAlert('Creation Failed', 'Error creating practice session: ' + err.message);
         }
     };
 
@@ -146,23 +154,15 @@ function FractalGoals() {
                 setViewingGoal(updated);
             }
         } catch (err) {
-            alert('Failed to update: ' + err.message);
+            showAlert('Update Failed', 'Failed to update: ' + err.message);
         }
     };
 
     const handleToggleCompletion = async (goalId, currentStatus) => {
         try {
             await toggleGoalCompletion(rootId, goalId, !currentStatus);
-            // Updating view state handled by context refreshing tree? 
-            // If viewingGoal is the one toggled, we might need to update it locally or wait for re-render.
-            // FractalView will re-render with new data. 
-            // Sidebar viewingGoal ref might need update if it relies on 'viewingGoal' state being fresh.
-            // But 'viewingGoal' is just a reference or snapshot? 
-            // Ideally we re-fetch or find the goal in the new tree.
-            // For now, next re-render of FractalView updates graph, but Sidebar might show stale data unless we update viewingGoal.
-            // We can assume context fetch updates 'currentFractal'.
         } catch (err) {
-            alert('Error updating completion: ' + err.message);
+            showAlert('Update Failed', 'Error updating completion: ' + err.message);
         }
     };
 
@@ -184,23 +184,23 @@ function FractalGoals() {
             setViewingGoal(null);
             setViewingPracticeSession(null);
         } catch (err) {
-            alert('Failed to delete: ' + err.message);
+            showAlert('Deletion Failed', 'Failed to delete: ' + err.message);
         }
     };
 
 
     if (loading || !fractalData) {
         return (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-                <p>Loading fractal data...</p>
+            <div className="loading-container">
+                <p className="loading-text">Loading fractal data...</p>
             </div>
         );
     }
 
     return (
-        <div className="fractal-goals-page" style={{ display: 'flex', height: '100%', position: 'relative' }}>
+        <div className="fractal-page-container">
             {/* Main Content - FlowTree */}
-            <div style={{ flex: 1, position: 'relative' }}>
+            <div className="fractal-view-wrapper">
                 <FractalView
                     treeData={fractalData}
                     practiceSessions={practiceSessions}
@@ -260,10 +260,16 @@ function FractalGoals() {
             <DeleteConfirmModal
                 isOpen={!!fractalToDelete}
                 onClose={() => setFractalToDelete(null)}
-                onDelete={handleDelete}
+                onConfirm={handleDelete}
                 title={`Delete ${fractalToDelete?.attributes?.type === 'PracticeSession' ? 'Session' : 'Goal'}?`}
                 message={`Are you sure you want to delete "${fractalToDelete?.name}"?`}
-                isDeleting={false} // Loading state could be added
+            />
+
+            <AlertModal
+                isOpen={alertData.isOpen}
+                onClose={() => setAlertData({ ...alertData, isOpen: false })}
+                title={alertData.title}
+                message={alertData.message}
             />
         </div>
     );
