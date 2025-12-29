@@ -9,6 +9,9 @@ import logging
 
 from config import config
 from blueprints.api import api_bp
+from blueprints.activities_api import activities_bp
+from blueprints.sessions_api import sessions_bp
+from blueprints.goals_api import goals_bp
 from blueprints.pages import pages_bp
 
 # Print configuration on startup
@@ -41,6 +44,9 @@ CORS(app, resources={
 
 # Register blueprints
 app.register_blueprint(api_bp)
+app.register_blueprint(activities_bp)
+app.register_blueprint(sessions_bp)
+app.register_blueprint(goals_bp)
 app.register_blueprint(pages_bp)
 
 

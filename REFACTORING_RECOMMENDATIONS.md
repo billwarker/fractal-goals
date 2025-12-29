@@ -151,7 +151,14 @@ app.register_blueprint(timers_bp)
 4. Test all endpoints to ensure they still work
 5. Remove old `api.py` file
 
-**Estimated Effort:** 1 week  
+**Status:** 🚧 **Partially Implemented** (Dec 2025)
+- ✅ `activities_api.py`: Implemented.
+- ✅ `sessions_api.py`: Implemented.
+- ✅ `goals_api.py`: Implemented.
+- ❌ `templates_api.py`: Pending.
+- ❌ `timers_api.py`: Pending (currently in `api.py`).
+
+**Estimated Effort:** ~1 day remaining
 **Priority:** High
 
 ---
@@ -218,23 +225,29 @@ await fractalApi.getSessions(rootId);
 ### 4. No Proper State Management
 
 **Problem:**  
-All application state is managed in `App.jsx` with extensive prop drilling through multiple component levels. State includes:
+All application state is managed in `App.jsx` in a monolithic way. While progress has been made with `ActivitiesContext` (implemented Dec 2025) and `TimezoneContext`, many other states are still prop-drilled:
 - `roots`, `selectedRootId`
-- `sessions`, `practiceSessions`, `selectedPracticeSession`
-- `activities`
-- `showModal`, `showDetailsModal`, `showPracticeSessionModal`
-- `sidebarMode`, `isSidebarCollapsed`, `isBottomPaneCollapsed`
-- `viewMode`, `viewingGoal`, `viewingPracticeSession`
+- `sessions`, `practiceSessions` (partially overlapping with activities)
+- `showModal`, `showDetailsModal`
+- `sidebarMode`, `viewMode`
 - `isEditing`, `editForm`
-- And many more...
 
 **Impact:**
-- Props must be passed through many levels
-- Difficult to access state from deeply nested components
-- Hard to share state between sibling components
-- Performance issues from unnecessary re-renders
+- `App.jsx` remains bloated
+- Still heavy prop drilling for UI state and Goals data
+- Difficult to share UI state (like modals) between components
+- Performance issues from unnecessary re-renders in the main tree
+
+**Status:** 🚧 **Partially Implemented**
+- ✅ `ActivitiesContext`: Implemented! Centralizes activity logic and syncs between pages.
+- ✅ `TimezoneContext`: Implemented.
+- ❌ `GoalsContext`: Pending.
+- ❌ `SessionsContext`: Pending.
+- ❌ `UIContext`: Pending.
 
 **Recommended Solution:**
+
+Continue implementing React Context API for remaining global state:
 
 Implement React Context API for global state management:
 

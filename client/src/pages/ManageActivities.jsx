@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fractalApi } from '../utils/api';
+import { useActivities } from '../contexts/ActivitiesContext';
 import '../App.css';
 
 /**
@@ -9,9 +9,8 @@ import '../App.css';
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const { activities, fetchActivities, createActivity, updateActivity, deleteActivity, loading, error: contextError } = useActivities();
 
-    const [activities, setActivities] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
@@ -30,21 +29,8 @@ function ManageActivities() {
             navigate('/');
             return;
         }
-        fetchActivities();
-    }, [rootId, navigate]);
-
-    const fetchActivities = async () => {
-        try {
-            setLoading(true);
-            const res = await fractalApi.getActivities(rootId);
-            setActivities(res.data);
-            setLoading(false);
-        } catch (err) {
-            console.error("Failed to fetch activities", err);
-            setError("Failed to load activities");
-            setLoading(false);
-        }
-    };
+        fetchActivities(rootId);
+    }, [rootId, navigate, fetchActivities]);
 
     const handleAddMetric = () => {
         if (metrics.length < 3) {
@@ -142,7 +128,7 @@ function ManageActivities() {
                 }
 
                 // Update existing activity
-                await fractalApi.updateActivity(rootId, editingId, {
+                await updateActivity(rootId, editingId, {
                     name,
                     description,
                     metrics: hasMetrics ? validMetrics : [],
@@ -152,7 +138,7 @@ function ManageActivities() {
                 });
             } else {
                 // Create new activity
-                await fractalApi.createActivity(rootId, {
+                await createActivity(rootId, {
                     name,
                     description,
                     metrics: hasMetrics ? validMetrics : [],
@@ -171,8 +157,7 @@ function ManageActivities() {
             setHasMetrics(true);
             setMetricsMultiplicative(false);
 
-            // Refresh list
-            fetchActivities();
+            // Activities list will auto-refresh via context
             setCreating(false);
         } catch (err) {
             console.error(editingId ? "Failed to update activity" : "Failed to create activity", err);
@@ -187,9 +172,9 @@ function ManageActivities() {
 
     const handleConfirmDelete = async (activityId) => {
         try {
-            await fractalApi.deleteActivity(rootId, activityId);
+            await deleteActivity(rootId, activityId);
             setDeletingId(null);
-            fetchActivities();
+            // Activities list will auto-refresh via context
         } catch (err) {
             console.error("Failed to delete activity", err);
             setError("Failed to delete activity");
@@ -202,16 +187,21 @@ function ManageActivities() {
             setCreating(true);
 
             // Create a copy with the same configuration but new ID
-            await fractalApi.createActivity(rootId, {
-                name: activity.name,
+            await createActivity(rootId, {
+                name: `${activity.name} (Copy)`,
                 description: activity.description || '',
-                metrics: activity.metric_definitions?.map(m => ({ name: m.name, unit: m.unit })) || [],
+                metrics: activity.metric_definitions?.map(m => ({
+                    name: m.name,
+                    unit: m.unit,
+                    is_top_set_metric: m.is_top_set_metric || false,
+                    is_multiplicative: m.is_multiplicative !== undefined ? m.is_multiplicative : true
+                })) || [],
                 has_sets: activity.has_sets,
-                has_metrics: activity.has_metrics
+                has_metrics: activity.has_metrics,
+                metrics_multiplicative: activity.metrics_multiplicative
             });
 
-            // Refresh list
-            fetchActivities();
+            // Activities list will auto-refresh via context
             setCreating(false);
         } catch (err) {
             console.error("Failed to duplicate activity", err);

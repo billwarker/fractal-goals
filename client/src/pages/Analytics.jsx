@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import { useActivities } from '../contexts/ActivitiesContext';
 import ScatterPlot from '../components/analytics/ScatterPlot';
 import LineGraph from '../components/analytics/LineGraph';
 import '../App.css';
@@ -11,10 +12,10 @@ import '../App.css';
 function Analytics() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const { activities, fetchActivities, loading: activitiesLoading } = useActivities();
 
     const [loading, setLoading] = useState(true);
     const [sessions, setSessions] = useState([]);
-    const [activities, setActivities] = useState([]);
     const [activeTab, setActiveTab] = useState('goals'); // 'goals', 'sessions', or 'activities'
 
     // Activities tab state
@@ -35,13 +36,10 @@ function Analytics() {
     const fetchData = async () => {
         try {
             // Fetch sessions and activities for analytics
-            const [sessionsRes, activitiesRes] = await Promise.all([
-                fractalApi.getSessions(rootId),
-                fractalApi.getActivities(rootId)
-            ]);
+            const sessionsRes = await fractalApi.getSessions(rootId);
+            await fetchActivities(rootId); // Use context method
 
             setSessions(sessionsRes.data);
-            setActivities(activitiesRes.data);
 
             // Build activity instances map from sessions
             const instancesMap = {};
@@ -101,7 +99,7 @@ function Analytics() {
         });
     };
 
-    if (loading) {
+    if (loading || activitiesLoading) {
         return (
             <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
                 Loading analytics...
