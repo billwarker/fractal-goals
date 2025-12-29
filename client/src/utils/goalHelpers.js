@@ -57,3 +57,18 @@ export const findGoalById = (node, id) => {
     }
     return null;
 };
+
+export const collectShortTermGoals = (node, collected = []) => {
+    if (!node) return collected;
+    const type = node.attributes?.type || node.type;
+    if (type === 'ShortTermGoal') {
+        collected.push({
+            id: node.attributes?.id || node.id,
+            name: node.name
+        });
+    }
+    if (node.children && node.children.length > 0) {
+        node.children.forEach(child => collectShortTermGoals(child, collected));
+    }
+    return collected;
+};
