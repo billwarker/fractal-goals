@@ -1,10 +1,14 @@
+DONE
+
 1. re-order activity order in a section (DONE)
-2. allow adjustments to estimated time in section
 3. allow for session start/end times to be adjusted at top, not just date created (DONE)
+6. have practice sessions not show age, but session start date
+7. toggle hiding practice sessions from fractal view
+
+TO-DO
+2. allow adjustments to estimated time in section
 4. card layout for activity management
 5. activity builder be its own component, will pop up. can be added from sessions
-6. have practice sessions not show age, but date of completion
-7. toggle hiding practice sessions from fractal view
 8. add immediate goals to practice sessions
 9. SMART mode for goals
 10. programming section

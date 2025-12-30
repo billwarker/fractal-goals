@@ -38,7 +38,21 @@ const CustomNode = ({ data }) => {
         return `${(diffDays / 365).toFixed(1)}y`;
     };
 
+    // Helper to format session start date
+    const getSessionStartDate = () => {
+        if (!data.session_start) return null;
+        const date = new Date(data.session_start);
+        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return `${dateStr}, ${timeStr}`;
+    };
+
     const age = getAge();
+    const sessionStartDate = getSessionStartDate();
+
+    // Determine what to show for timing info (Age vs Session Date)
+    const showSessionDate = isPracticeSession && sessionStartDate;
+    const timingLabel = showSessionDate ? `${sessionStartDate}` : (age ? `Age: ${age}` : null);
 
     // Calculate due time if deadline exists
     const getDueTime = () => {
@@ -151,7 +165,7 @@ const CustomNode = ({ data }) => {
                 >
                     {data.label}
                 </div>
-                {(age || dueTime) && (
+                {(timingLabel || dueTime) && (
                     <div
                         style={{
                             color: '#fff',
@@ -163,8 +177,8 @@ const CustomNode = ({ data }) => {
                             alignItems: 'center'
                         }}
                     >
-                        {age && <span>Age: {age}</span>}
-                        {age && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
+                        {timingLabel && <span>{timingLabel}</span>}
+                        {timingLabel && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
                         {dueTime && (
                             <span style={{
                                 color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
@@ -332,7 +346,7 @@ const getLineagePath = (treeData, targetNodeId) => {
 };
 
 // Convert tree data to ReactFlow format
-const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId = null) => {
+const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId = null, showSessions = true) => {
     const nodes = [];
     const edges = [];
     const addedNodeIds = new Set();
@@ -376,6 +390,16 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
 
         const nodeId = String(rawNodeId);
 
+        // Check if we should hide sessions
+        // Robust check for practice session type
+        const isPracticeSession = node.__isPracticeSession ||
+            node.attributes?.type === 'PracticeSession' ||
+            node.type === 'PracticeSession';
+
+        if (!showSessions && isPracticeSession) {
+            return;
+        }
+
         // Add Node only if unique
         if (addedNodeIds.has(nodeId)) {
             return;
@@ -393,8 +417,6 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
         if (parentIds && parentIds.length > 0) {
             // Multiple parents (Practice Session)
             parentIds.forEach(pid => {
-                // Ensure parent exists in traversed map or just add?
-                // Traverse visits top-down via primary. Parent should exist or be visited eventually.
                 edges.push({
                     id: `${pid}-${nodeId}`,
                     source: String(pid),
@@ -422,8 +444,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
 
 
 
-        const isPracticeSession = node.__isPracticeSession || node.attributes?.type === 'PracticeSession';
-        const nodeType = node.attributes?.type;
+        const nodeType = node.attributes?.type || node.type;
         const childType = getChildType(nodeType);
         const childTypeName = childType ? getTypeDisplayName(childType) : null;
 
@@ -437,6 +458,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
                 type: nodeType,
                 completed: node.attributes?.completed,
                 created_at: node.attributes?.created_at,
+                session_start: node.attributes?.session_start,
                 deadline: node.attributes?.deadline,
                 hasChildren: node.children && node.children.length > 0,
                 __isPracticeSession: isPracticeSession,
@@ -457,51 +479,61 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddPracticeSession, onAddChi
     return { nodes, edges };
 };
 
-const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, sidebarOpen, selectedNodeId }) => {
+const FlowTree = React.forwardRef(({ treeData, onNodeClick, selectedPracticeSession, practiceSessions = [], onAddPracticeSession, onAddChild, sidebarOpen, selectedNodeId, showSessions = true }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
+
+    // Expose immediate fade-out function to parent
+    React.useImperativeHandle(ref, () => ({
+        startFadeOut: () => {
+            setIsVisible(false);
+        }
+    }), []); // Empty deps - function never changes
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
         if (!treeData) return { nodes: [], edges: [] };
 
-        // Inject practice session if selected
+        // Inject ALL practice sessions if showSessions is true
         let dataToConvert = JSON.parse(JSON.stringify(treeData));
-        if (selectedPracticeSession) {
-            const parentIds = selectedPracticeSession.attributes?.parent_ids || [];
+        if (showSessions && practiceSessions && practiceSessions.length > 0) {
 
-            // Add practice session under ALL parents (network graph handles this!)
-            for (const parentId of parentIds) {
-                const findAndAdd = (node) => {
-                    if (!node) return false;
-                    const nodeId = node.id || node.attributes?.id;
+            for (const session of practiceSessions) {
+                const parentIds = session.attributes?.parent_ids || [];
 
-                    if (nodeId === parentId) {
-                        if (!node.children) node.children = [];
-                        const alreadyExists = node.children.some(c => c.id === selectedPracticeSession.id);
-                        if (!alreadyExists) {
-                            node.children.push({
-                                ...selectedPracticeSession,
-                                __isPracticeSession: true,
-                            });
+                // Add practice session under ALL parents
+                for (const parentId of parentIds) {
+                    const findAndAdd = (node) => {
+                        if (!node) return false;
+                        const nodeId = node.id || node.attributes?.id;
+
+                        if (nodeId === parentId) {
+                            if (!node.children) node.children = [];
+                            const alreadyExists = node.children.some(c => c.id === session.id);
+                            if (!alreadyExists) {
+                                node.children.push({
+                                    ...session,
+                                    __isPracticeSession: true,
+                                });
+                            }
+                            return true;
                         }
-                        return true;
-                    }
 
-                    if (node.children) {
-                        for (const child of node.children) {
-                            if (findAndAdd(child)) return true;
+                        if (node.children) {
+                            for (const child of node.children) {
+                                if (findAndAdd(child)) return true;
+                            }
                         }
-                    }
-                    return false;
-                };
+                        return false;
+                    };
 
-                findAndAdd(dataToConvert);
+                    findAndAdd(dataToConvert);
+                }
             }
         }
 
-        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId);
+        const { nodes, edges } = convertTreeToFlow(dataToConvert, onNodeClick, onAddPracticeSession, onAddChild, selectedNodeId, showSessions);
         return getLayoutedElements(nodes, edges);
-    }, [treeData, onNodeClick, selectedPracticeSession, onAddPracticeSession, onAddChild, selectedNodeId]);
+    }, [treeData, onNodeClick, practiceSessions, onAddPracticeSession, onAddChild, selectedNodeId, showSessions]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
@@ -550,7 +582,7 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
         }
     }, [rfInstance]);
 
-    // Re-center when nodes are laid out (handles view switches)
+    // Re-center when nodes are laid out (handles initial load and view switches)
     useEffect(() => {
         if (rfInstance && layoutedNodes.length > 0) {
             requestAnimationFrame(() => {
@@ -558,6 +590,34 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
             });
         }
     }, [layoutedNodes.length, rfInstance]);
+
+    // Animation state for toggle
+    const prevShowSessionsRef = React.useRef(showSessions);
+    const [isAnimating, setIsAnimating] = React.useState(false);
+
+    // Step 1: Fade out when user clicks
+    useEffect(() => {
+        if (prevShowSessionsRef.current !== showSessions && rfInstance) {
+            prevShowSessionsRef.current = showSessions;
+            setIsAnimating(true);
+            setIsVisible(false); // Start fade-out
+        }
+    }, [showSessions, rfInstance]);
+
+    // Step 2: Re-center and fade in after graph updates AND animation delay completes
+    useEffect(() => {
+        if (isAnimating && rfInstance && layoutedNodes.length > 0) {
+            // Wait for graph to fully update and settle
+            const timer = setTimeout(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 0 });
+                setTimeout(() => {
+                    setIsVisible(true);
+                    setIsAnimating(false);
+                }, 50); // Quick fade-in
+            }, 400); // Wait for graph update (300ms) + small buffer
+            return () => clearTimeout(timer);
+        }
+    }, [isAnimating, layoutedNodes, rfInstance]);
 
 
     return (
@@ -578,6 +638,7 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
                 attributionPosition="bottom-left"
                 minZoom={0.1}
                 maxZoom={2}
+                nodesConnectable={false}
                 defaultEdgeOptions={{
                     type: 'straight',
                     style: { stroke: '#ffffff', strokeWidth: 1.5 }
@@ -588,6 +649,6 @@ const FlowTree = ({ treeData, onNodeClick, selectedPracticeSession, onAddPractic
             </ReactFlow>
         </div>
     );
-};
+});
 
 export default FlowTree;
