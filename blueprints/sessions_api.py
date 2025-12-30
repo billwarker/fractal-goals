@@ -257,12 +257,19 @@ def create_fractal_session(root_id):
             description=data.get('description', ''),
             root_id=root_id,
             duration_minutes=data.get('duration_minutes'),
-            session_data=data.get('session_data')  # Already a JSON string or handled below
+            session_start=data.get('session_start'),  # ISO datetime string
+            session_end=data.get('session_end'),      # ISO datetime string
+            total_duration_seconds=data.get('total_duration_seconds'),
+            template_id=data.get('template_id'),
+            attributes=data.get('session_data')  # Store in attributes column
         )
         
-        # Handle session_data if not string? Original code assumes it matches model type or passed as string
-        if isinstance(new_session.session_data, dict): # If somehow passed as dict
-             new_session.session_data = json.dumps(new_session.session_data)
+        # Handle attributes if not string
+        if isinstance(new_session.attributes, dict):
+             new_session.attributes = json.dumps(new_session.attributes)
+        
+        # Keep session_data for backward compatibility
+        new_session.session_data = new_session.attributes
 
         db_session.add(new_session)
         db_session.flush()  # Get the ID before committing
@@ -286,9 +293,10 @@ def create_fractal_session(root_id):
         db_session.commit()
         
         # Sync activities to relational DB
-        if new_session.session_data:
+        session_data_json = new_session.attributes or new_session.session_data
+        if session_data_json:
              try:
-                 data_dict = json.loads(new_session.session_data) if isinstance(new_session.session_data, str) else new_session.session_data
+                 data_dict = json.loads(session_data_json) if isinstance(session_data_json, str) else session_data_json
                  sync_session_activities(db_session, new_session, data_dict)
                  db_session.commit() # Commit changes from sync
              except Exception as e:
@@ -340,12 +348,27 @@ def update_practice_session(root_id, session_id):
         if 'completed' in data:
             practice_session.completed = data['completed']
         
+        # Update session analytics fields
+        if 'session_start' in data:
+            practice_session.session_start = data['session_start']
+        
+        if 'session_end' in data:
+            practice_session.session_end = data['session_end']
+        
+        if 'total_duration_seconds' in data:
+            practice_session.total_duration_seconds = data['total_duration_seconds']
+        
+        if 'template_id' in data:
+            practice_session.template_id = data['template_id']
+        
         if 'session_data' in data:
-            # session_data should be a JSON string
+            # Store in attributes column (new) and session_data (legacy)
             if isinstance(data['session_data'], str):
+                practice_session.attributes = data['session_data']
                 practice_session.session_data = data['session_data']
             else:
-                practice_session.session_data = json.dumps(data['session_data'])
+                practice_session.attributes = json.dumps(data['session_data'])
+                practice_session.session_data = practice_session.attributes
 
             # Sync activities
             try:

@@ -35,7 +35,16 @@ class Goal(Base):
     # Practice Session specific fields (nullable for other goals)
     root_id = Column(String, nullable=True) # Useful for all goals? Or just PS?
     duration_minutes = Column(Integer, nullable=True)
-    session_data = Column(Text, nullable=True) # JSON
+    
+    # Session analytics fields (promoted from JSON for query performance)
+    session_start = Column(DateTime, nullable=True)  # When session actually started
+    session_end = Column(DateTime, nullable=True)    # When session actually ended
+    total_duration_seconds = Column(Integer, nullable=True)  # Calculated or from session_end - session_start
+    template_id = Column(String, nullable=True)      # Reference to session template
+    
+    # Flexible data storage (renamed from session_data for semantic clarity)
+    attributes = Column(Text, nullable=True)  # JSON - stores sections, exercises, notes, etc.
+    session_data = Column(Text, nullable=True)  # DEPRECATED - kept for backward compatibility, use attributes
     
     # JSON Plans/Targets
     targets = Column(Text, nullable=True)
@@ -145,14 +154,17 @@ class PracticeSession(Goal):
         result = super().to_dict(include_children)
         result["attributes"]["duration_minutes"] = self.duration_minutes
         
-        # Parse session_data if needed, or rely on relational activities now?
-        # The frontend might still expect 'session_data' blob or might expect new 'activities' list.
-        # For backward compatibility, we send session_data if explicitly asked, 
-        # OR we reconstruct it from ActivityInstances!
-        # Let's send raw session_data for now if it exists, as frontend hasn't been updated to use relational endpoints yet.
-        if self.session_data:
+        # Add session analytics fields
+        result["attributes"]["session_start"] = self.session_start.isoformat() if self.session_start else None
+        result["attributes"]["session_end"] = self.session_end.isoformat() if self.session_end else None
+        result["attributes"]["total_duration_seconds"] = self.total_duration_seconds
+        result["attributes"]["template_id"] = self.template_id
+        
+        # Parse session data from attributes (new) or session_data (legacy)
+        session_data_json = self.attributes or self.session_data
+        if session_data_json:
              try:
-                 result["attributes"]["session_data"] = json.loads(self.session_data)
+                 result["attributes"]["session_data"] = json.loads(session_data_json)
              except:
                  pass
         

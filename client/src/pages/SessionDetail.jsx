@@ -4,6 +4,8 @@ import { fractalApi } from '../utils/api';
 import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatForInput, localToISO } from '../utils/dateUtils';
 import '../App.css';
 
 /**
@@ -23,24 +25,46 @@ function calculateSectionDuration(section) {
 
 /**
  * Calculate total completed duration across all sections
+ * Falls back to session_end - session_start if no activity durations exist
  */
 function calculateTotalCompletedDuration(sessionData) {
     if (!sessionData || !sessionData.sections) return 0;
 
+    // Try to calculate from activity durations first
     let totalSeconds = 0;
     for (const section of sessionData.sections) {
         totalSeconds += calculateSectionDuration(section);
     }
-    return totalSeconds;
+
+    // If we have activity durations, return them
+    if (totalSeconds > 0) {
+        return totalSeconds;
+    }
+
+    // Fallback: Calculate from session_start and session_end
+    if (sessionData.session_start && sessionData.session_end) {
+        const start = new Date(sessionData.session_start);
+        const end = new Date(sessionData.session_end);
+        const diffSeconds = Math.floor((end - start) / 1000);
+        return diffSeconds > 0 ? diffSeconds : 0;
+    }
+
+    return 0;
 }
 
 /**
- * Format duration in seconds to MM:SS format
+ * Format duration in seconds to HH:MM:SS or MM:SS format
  */
 function formatDuration(seconds) {
     if (seconds == null || seconds === 0) return '--:--';
-    const mins = Math.floor(seconds / 60);
+
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+
+    if (hours > 0) {
+        return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
@@ -66,6 +90,7 @@ function formatDateTime(isoString) {
 function SessionDetail() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
+    const timezone = useTimezone();
 
     const [session, setSession] = useState(null);
     const [sessionData, setSessionData] = useState(null);
@@ -75,6 +100,10 @@ function SessionDetail() {
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
+
+    // Local state for editing session datetime fields
+    const [localSessionStart, setLocalSessionStart] = useState('');
+    const [localSessionEnd, setLocalSessionEnd] = useState('');
 
     // Auto-save sessionData to database whenever it changes
     useEffect(() => {
@@ -169,9 +198,64 @@ function SessionDetail() {
         }
     };
 
+    // Initialize session_start and session_end if they don't exist
+    useEffect(() => {
+        if (!sessionData || !session || loading) return;
+
+        let needsUpdate = false;
+        const updatedData = { ...sessionData };
+
+        // Initialize session_start with created_at if not set
+        if (!updatedData.session_start && session.attributes?.created_at) {
+            updatedData.session_start = session.attributes.created_at;
+            needsUpdate = true;
+        }
+
+        // Initialize session_end as session_start + total duration if not set
+        if (!updatedData.session_end && updatedData.session_start) {
+            const totalSeconds = calculateTotalCompletedDuration(sessionData);
+            const startDate = new Date(updatedData.session_start);
+            const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
+            updatedData.session_end = endDate.toISOString();
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            setSessionData(updatedData);
+        }
+    }, [session, sessionData, loading]);
+
+    // Sync local datetime fields with sessionData
+    useEffect(() => {
+        if (!sessionData) return;
+        setLocalSessionStart(sessionData.session_start ? formatForInput(sessionData.session_start, timezone) : '');
+        setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
+    }, [sessionData?.session_start, sessionData?.session_end, timezone]);
+
     const handleSectionDurationChange = (sectionIndex, value) => {
         const updatedData = { ...sessionData };
         updatedData.sections[sectionIndex].actual_duration_minutes = parseInt(value) || 0;
+        setSessionData(updatedData);
+    };
+
+    const handleSessionStartChange = (value) => {
+        const updatedData = { ...sessionData };
+        updatedData.session_start = value;
+
+        // Recalculate session_end based on new start time + duration
+        if (value) {
+            const totalSeconds = calculateTotalCompletedDuration(sessionData);
+            const startDate = new Date(value);
+            const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
+            updatedData.session_end = endDate.toISOString();
+        }
+
+        setSessionData(updatedData);
+    };
+
+    const handleSessionEndChange = (value) => {
+        const updatedData = { ...sessionData };
+        updatedData.session_end = value;
         setSessionData(updatedData);
     };
 
@@ -336,6 +420,10 @@ function SessionDetail() {
                     }
                 }
 
+                // Set session_end to current timestamp when marking as complete
+                updatedData.session_end = new Date().toISOString();
+                hasUpdates = true;
+
                 if (hasUpdates) {
                     setSessionData(updatedData);
                 }
@@ -384,6 +472,24 @@ function SessionDetail() {
         setSessionData(updatedData);
     };
 
+    const handleReorderActivity = (sectionIndex, exerciseIndex, direction) => {
+        const updatedData = { ...sessionData };
+        const exercises = updatedData.sections[sectionIndex].exercises;
+
+        // Calculate new index based on direction
+        const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
+
+        // Validate bounds
+        if (newIndex < 0 || newIndex >= exercises.length) return;
+
+        // Swap the activities
+        const temp = exercises[exerciseIndex];
+        exercises[exerciseIndex] = exercises[newIndex];
+        exercises[newIndex] = temp;
+
+        setSessionData(updatedData);
+    };
+
     if (loading) {
         return (
             <div className="page-container">
@@ -420,37 +526,108 @@ function SessionDetail() {
                     {session.name}
                 </h1>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '20px' }}>
-                    {/* Left side: Metadata grid */}
+                    {/* Left side: Metadata grid - 4 columns x 2 rows */}
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(3, auto)',
+                        gridTemplateColumns: 'auto auto auto auto',
                         gap: '12px 24px',
                         fontSize: '14px',
                         color: '#aaa'
                     }}>
-                        <div>
-                            <span style={{ color: '#666' }}>Template: </span>
+                        {/* Row 1 */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Template:</span>
                             <span style={{ color: '#ccc' }}>{sessionData.template_name}</span>
                         </div>
-                        <div>
-                            <span style={{ color: '#666' }}>Date Created: </span>
-                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.created_at)}</span>
+
+                        {/* Session Start DateTime - Editable */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ color: '#666', fontSize: '14px' }}>Session Start:</label>
+                            <input
+                                type="text"
+                                placeholder="YYYY-MM-DD HH:MM:SS"
+                                value={localSessionStart}
+                                onChange={(e) => setLocalSessionStart(e.target.value)}
+                                onBlur={(e) => {
+                                    if (e.target.value) {
+                                        try {
+                                            const isoValue = localToISO(e.target.value, timezone);
+                                            handleSessionStartChange(isoValue);
+                                        } catch (err) {
+                                            console.error('Invalid date format:', err);
+                                            // Reset to previous value
+                                            setLocalSessionStart(sessionData.session_start ? formatForInput(sessionData.session_start, timezone) : '');
+                                        }
+                                    } else {
+                                        handleSessionStartChange(null);
+                                    }
+                                }}
+                                style={{
+                                    padding: '4px 8px',
+                                    background: '#333',
+                                    border: '1px solid #555',
+                                    borderRadius: '4px',
+                                    color: '#ccc',
+                                    fontSize: '13px',
+                                    width: '180px',
+                                    fontFamily: 'monospace'
+                                }}
+                            />
                         </div>
-                        <div>
-                            <span style={{ color: '#666' }}>Total Duration (Planned): </span>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Total Duration (Planned):</span>
                             <span style={{ color: '#ccc' }}>{sessionData.total_duration_minutes} min</span>
                         </div>
 
-                        <div>
-                            <span style={{ color: '#666' }}>Sections: </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Date Created:</span>
+                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.created_at)}</span>
+                        </div>
+
+                        {/* Row 2 */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Sections:</span>
                             <span style={{ color: '#ccc' }}>{sessionData.sections?.length || 0}</span>
                         </div>
-                        <div>
-                            <span style={{ color: '#666' }}>Last Modified: </span>
-                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.updated_at)}</span>
+
+                        {/* Session End DateTime - Editable */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ color: '#666', fontSize: '14px' }}>Session End:</label>
+                            <input
+                                type="text"
+                                placeholder="YYYY-MM-DD HH:MM:SS"
+                                value={localSessionEnd}
+                                onChange={(e) => setLocalSessionEnd(e.target.value)}
+                                onBlur={(e) => {
+                                    if (e.target.value) {
+                                        try {
+                                            const isoValue = localToISO(e.target.value, timezone);
+                                            handleSessionEndChange(isoValue);
+                                        } catch (err) {
+                                            console.error('Invalid date format:', err);
+                                            // Reset to previous value
+                                            setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
+                                        }
+                                    } else {
+                                        handleSessionEndChange(null);
+                                    }
+                                }}
+                                style={{
+                                    padding: '4px 8px',
+                                    background: '#333',
+                                    border: '1px solid #555',
+                                    borderRadius: '4px',
+                                    color: '#ccc',
+                                    fontSize: '13px',
+                                    width: '180px',
+                                    fontFamily: 'monospace'
+                                }}
+                            />
                         </div>
-                        <div>
-                            <span style={{ color: '#666' }}>Total Duration (Completed): </span>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Total Duration (Completed):</span>
                             <span style={{
                                 color: '#4caf50',
                                 fontWeight: 'bold',
@@ -458,6 +635,11 @@ function SessionDetail() {
                             }}>
                                 {formatDuration(calculateTotalCompletedDuration(sessionData))}
                             </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '14px' }}>Last Modified:</span>
+                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.updated_at)}</span>
                         </div>
                     </div>
 
@@ -576,6 +758,10 @@ function SessionDetail() {
                                         onUpdate={(field, value) => handleExerciseChange(sectionIndex, exerciseIndex, field, value)}
                                         onToggleComplete={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
                                         onDelete={() => handleDeleteExercise(sectionIndex, exerciseIndex)}
+                                        onReorder={(direction) => handleReorderActivity(sectionIndex, exerciseIndex, direction)}
+                                        canMoveUp={exerciseIndex > 0}
+                                        canMoveDown={exerciseIndex < section.exercises.length - 1}
+                                        showReorderButtons={section.exercises.length > 1}
                                     />
                                 ) : (
                                     <div
