@@ -165,6 +165,140 @@ Implemented a comprehensive "splits" feature allowing users to track bilateral o
 
 Both scripts run across development, testing, and production environments.
 
+## Production Database Migration
+
+### Prerequisites
+- Ensure all code changes are deployed to production
+- Verify backend server is running in production environment
+- Have database backup ready (automatic backups should be in place)
+
+### Migration Steps
+
+**Step 1: Run First Migration (Splits Tables)**
+```bash
+# SSH into production server or run locally if database is accessible
+cd /path/to/fractal-goals
+
+# Activate virtual environment
+source fractal-goals-venv/bin/activate
+
+# Run first migration script
+python python-scripts/migrate_add_splits.py
+```
+
+**Expected Output:**
+```
+Running migration: Add splits support to activities
+Environment: production
+Database: fractal_goals_production.db
+✓ Added has_splits column to activity_definitions
+✓ Created split_definitions table
+Migration completed successfully!
+```
+
+**Step 2: Run Second Migration (Metric Values)**
+```bash
+# Run second migration script
+python python-scripts/migrate_add_split_to_metrics.py
+```
+
+**Expected Output:**
+```
+Running migration: Add split_definition_id to metric_values
+Environment: production
+Database: fractal_goals_production.db
+✓ Added split_definition_id column to metric_values
+✓ Created foreign key constraint
+Migration completed successfully!
+```
+
+**Step 3: Verify Migration**
+```bash
+# Check database schema
+sqlite3 fractal_goals_production.db
+
+# Run verification queries
+.schema activity_definitions
+.schema split_definitions
+.schema metric_values
+
+# Verify columns exist
+SELECT has_splits FROM activity_definitions LIMIT 1;
+SELECT * FROM split_definitions LIMIT 1;
+SELECT split_definition_id FROM metric_values LIMIT 1;
+
+# Exit sqlite
+.quit
+```
+
+**Step 4: Restart Production Server**
+```bash
+# Stop the production server
+./shell-scripts/kill-all.sh production
+
+# Start the production server
+./shell-scripts/start-all.sh production
+```
+
+**Step 5: Verify Application**
+- Navigate to production URL
+- Go to Manage Activities page
+- Verify "Track Splits" checkbox appears
+- Create a test activity with splits
+- Record a test session with split data
+- View the session in Sessions page
+- Check Analytics page for split filtering
+
+### Verification Checklist
+- [ ] Both migration scripts completed without errors
+- [ ] Database schema includes new columns and tables
+- [ ] Production server restarted successfully
+- [ ] Frontend loads without errors
+- [ ] "Track Splits" checkbox visible in Manage Activities
+- [ ] Can create activities with splits
+- [ ] Can record sessions with split data
+- [ ] Split data displays correctly in Sessions page
+- [ ] Split filtering works in Analytics page
+
+### Rollback Procedure (If Needed)
+
+**If migration fails or issues arise:**
+
+1. **Restore from backup:**
+   ```bash
+   # Stop production server
+   ./shell-scripts/kill-all.sh production
+   
+   # Restore database from backup
+   cp /path/to/backup/fractal_goals_production.db.backup fractal_goals_production.db
+   
+   # Restart server
+   ./shell-scripts/start-all.sh production
+   ```
+
+2. **Revert code deployment:**
+   ```bash
+   # Checkout previous commit
+   git checkout <previous-commit-hash>
+   
+   # Rebuild frontend
+   cd client
+   npm run build
+   cd ..
+   
+   # Restart server
+   ./shell-scripts/kill-all.sh production
+   ./shell-scripts/start-all.sh production
+   ```
+
+### Notes
+- Migrations are **additive only** (no data loss)
+- All new columns are **nullable** (backward compatible)
+- Existing activities will have `has_splits = NULL` (treated as false)
+- Existing metric values will have `split_definition_id = NULL` (non-split data)
+- No downtime required - migrations can run while server is running
+- Frontend gracefully handles both split and non-split activities
+
 ## Next Steps
 
 ### 1. Enhanced Split Analytics (Optional)
