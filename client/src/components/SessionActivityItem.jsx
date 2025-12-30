@@ -41,8 +41,9 @@ function SessionActivityItem({
     }, [exercise.time_stop, timezone]);
     // If we don't have definition, we can't render much (maybe just name)
     // But we should have it passed in from parent lookups
-    const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [] };
+    const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [], split_definitions: [] };
     const hasSets = exercise.has_sets; // Snapshot from creation
+    const hasSplits = def.has_splits && def.split_definitions && def.split_definitions.length > 0;
     // Check if metrics exist by looking at the definition, not just the flag
     const hasMetrics = def.metric_definitions && def.metric_definitions.length > 0;
 
@@ -63,38 +64,49 @@ function SessionActivityItem({
         onUpdate('sets', newSets);
     };
 
-    const handleSetMetricChange = (setIndex, metricId, value) => {
+    const handleSetMetricChange = (setIndex, metricId, value, splitId = null) => {
         const newSets = [...(exercise.sets || [])];
         const set = { ...newSets[setIndex] };
 
         // Find existing metric entry or add it
-        const metricIdx = set.metrics.findIndex(m => m.metric_id === metricId);
+        const metricIdx = set.metrics.findIndex(m =>
+            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+        );
+
         if (metricIdx >= 0) {
             set.metrics[metricIdx] = { ...set.metrics[metricIdx], value };
         } else {
-            set.metrics.push({ metric_id: metricId, value });
+            const newMetric = { metric_id: metricId, value };
+            if (splitId) newMetric.split_id = splitId;
+            set.metrics.push(newMetric);
         }
 
         newSets[setIndex] = set;
         onUpdate('sets', newSets);
     };
 
-    const handleSingleMetricChange = (metricId, value) => {
+    const handleSingleMetricChange = (metricId, value, splitId = null) => {
         const currentMetrics = [...(exercise.metrics || [])];
-        const metricIdx = currentMetrics.findIndex(m => m.metric_id === metricId);
+        const metricIdx = currentMetrics.findIndex(m =>
+            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+        );
 
         if (metricIdx >= 0) {
             currentMetrics[metricIdx] = { ...currentMetrics[metricIdx], value };
         } else {
-            currentMetrics.push({ metric_id: metricId, value });
+            const newMetric = { metric_id: metricId, value };
+            if (splitId) newMetric.split_id = splitId;
+            currentMetrics.push(newMetric);
         }
 
         onUpdate('metrics', currentMetrics);
     };
 
     // Helper to get value for input
-    const getMetricValue = (metricsList, metricId) => {
-        const m = metricsList?.find(x => x.metric_id === metricId);
+    const getMetricValue = (metricsList, metricId, splitId = null) => {
+        const m = metricsList?.find(x =>
+            x.metric_id === metricId && (splitId ? x.split_id === splitId : !x.split_id)
+        );
         return m ? m.value : '';
     };
 
@@ -315,18 +327,42 @@ function SessionActivityItem({
                                 <div key={set.instance_id} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#222', padding: '8px', borderRadius: '4px' }}>
                                     <div style={{ width: '30px', color: '#666', fontSize: '12px', fontWeight: 'bold' }}>#{setIdx + 1}</div>
 
-                                    {hasMetrics && def.metric_definitions.map(m => (
-                                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                            <label style={{ fontSize: '11px', color: '#888' }}>{m.name}</label>
-                                            <input
-                                                type="number"
-                                                style={{ width: '60px', padding: '4px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '3px' }}
-                                                value={getMetricValue(set.metrics, m.id)}
-                                                onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value)}
-                                            />
-                                            <span style={{ fontSize: '11px', color: '#666' }}>{m.unit}</span>
-                                        </div>
-                                    ))}
+                                    {hasMetrics && (
+                                        hasSplits ? (
+                                            // Render metrics grouped by split
+                                            def.split_definitions.map(split => (
+                                                <div key={split.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', background: '#1a1a1a', borderRadius: '3px', border: '1px solid #333' }}>
+                                                    <span style={{ fontSize: '10px', color: '#aaa', fontWeight: 'bold', minWidth: '50px' }}>{split.name}</span>
+                                                    {def.metric_definitions.map(m => (
+                                                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <label style={{ fontSize: '10px', color: '#888' }}>{m.name}</label>
+                                                            <input
+                                                                type="number"
+                                                                style={{ width: '50px', padding: '3px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '3px', fontSize: '11px' }}
+                                                                value={getMetricValue(set.metrics, m.id, split.id)}
+                                                                onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value, split.id)}
+                                                            />
+                                                            <span style={{ fontSize: '10px', color: '#666' }}>{m.unit}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            // Render metrics without splits (original behavior)
+                                            def.metric_definitions.map(m => (
+                                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                    <label style={{ fontSize: '11px', color: '#888' }}>{m.name}</label>
+                                                    <input
+                                                        type="number"
+                                                        style={{ width: '60px', padding: '4px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '3px' }}
+                                                        value={getMetricValue(set.metrics, m.id)}
+                                                        onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value)}
+                                                    />
+                                                    <span style={{ fontSize: '11px', color: '#666' }}>{m.unit}</span>
+                                                </div>
+                                            ))
+                                        )
+                                    )}
 
                                     <button onClick={() => handleRemoveSet(setIdx)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>×</button>
                                 </div>
@@ -342,19 +378,44 @@ function SessionActivityItem({
                 ) : (
                     /* SINGLE VIEW (NO SETS) */
                     hasMetrics ? (
-                        <div style={{ display: 'flex', gap: '15px' }}>
-                            {def.metric_definitions.map(m => (
-                                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '11px', color: '#888' }}>{m.name} ({m.unit})</label>
-                                    <input
-                                        type="number"
-                                        style={{ width: '80px', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px' }}
-                                        value={getMetricValue(exercise.metrics, m.id)}
-                                        onChange={(e) => handleSingleMetricChange(m.id, e.target.value)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                        hasSplits ? (
+                            // Render metrics grouped by split in a grid
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {def.split_definitions.map(split => (
+                                    <div key={split.id} style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #333' }}>
+                                        <div style={{ fontSize: '12px', color: '#aaa', fontWeight: 'bold', marginBottom: '8px' }}>{split.name}</div>
+                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                            {def.metric_definitions.map(m => (
+                                                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    <label style={{ fontSize: '11px', color: '#888' }}>{m.name} ({m.unit})</label>
+                                                    <input
+                                                        type="number"
+                                                        style={{ width: '80px', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px' }}
+                                                        value={getMetricValue(exercise.metrics, m.id, split.id)}
+                                                        onChange={(e) => handleSingleMetricChange(m.id, e.target.value, split.id)}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            // Render metrics without splits (original behavior)
+                            <div style={{ display: 'flex', gap: '15px' }}>
+                                {def.metric_definitions.map(m => (
+                                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '11px', color: '#888' }}>{m.name} ({m.unit})</label>
+                                        <input
+                                            type="number"
+                                            style={{ width: '80px', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px' }}
+                                            value={getMetricValue(exercise.metrics, m.id)}
+                                            onChange={(e) => handleSingleMetricChange(m.id, e.target.value)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )
                     ) : (
                         <div style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>
                             Track activity based on completion checkbox above.

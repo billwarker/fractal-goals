@@ -4,9 +4,10 @@ import PlotlyChart from './PlotlyChart';
 /**
  * Line Graph component for visualizing metric progression over time
  * Shows a single metric on Y-axis and time on X-axis
+ * Supports split filtering for split-enabled activities
  */
-function LineGraph({ selectedActivity, activityInstances, activities, selectedMetric, setSelectedMetric, setsHandling = 'top' }) {
-    console.log('LineGraph called', { selectedActivity, selectedMetric });
+function LineGraph({ selectedActivity, activityInstances, activities, selectedMetric, setSelectedMetric, setsHandling = 'top', selectedSplit = 'all' }) {
+    console.log('LineGraph called', { selectedActivity, selectedMetric, selectedSplit });
 
     if (!selectedActivity) {
         return (
@@ -42,6 +43,7 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
     }
 
     const metrics = activityDef.metric_definitions || [];
+    const hasSplits = activityDef.has_splits && activityDef.split_definitions?.length > 0;
 
     if (metrics.length === 0) {
         return (
@@ -70,6 +72,22 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
     // Filter metrics for product calculation (only those marked as multiplicative)
     const multiplicativeMetrics = metrics.filter(m => m.is_multiplicative !== false);
 
+    // Helper function to check if a metric should be included based on split filter
+    const shouldIncludeMetric = (metric) => {
+        if (hasSplits) {
+            if (selectedSplit !== 'all' && metric.split_id !== selectedSplit) {
+                return false; // Skip metrics that don't match selected split
+            }
+            if (selectedSplit === 'all' && !metric.split_id) {
+                return false; // Skip non-split metrics when viewing all splits
+            }
+        } else {
+            // For non-split activities, skip metrics with split_id
+            if (metric.split_id) return false;
+        }
+        return true;
+    };
+
     // Collect data points with timestamps
     const dataPoints = [];
     instances.forEach(instance => {
@@ -84,7 +102,10 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
 
                 instance.sets.forEach((set, setIdx) => {
                     if (set.metrics) {
-                        const metricValue = set.metrics.find(m => m.metric_id === (isProductMetric ? topSetMetric.id : metricToPlot.id));
+                        const metricValue = set.metrics.find(m =>
+                            m.metric_id === (isProductMetric ? topSetMetric.id : metricToPlot.id) &&
+                            shouldIncludeMetric(m)
+                        );
                         if (metricValue && metricValue.value) {
                             const value = parseFloat(metricValue.value);
                             if (value > topSetValue) {
@@ -105,7 +126,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                         let hasAllMetrics = true;
 
                         multiplicativeMetrics.forEach(metricDef => {
-                            const metricValue = topSet.metrics.find(m => m.metric_id === metricDef.id);
+                            const metricValue = topSet.metrics.find(m =>
+                                m.metric_id === metricDef.id && shouldIncludeMetric(m)
+                            );
                             if (metricValue && metricValue.value) {
                                 product *= parseFloat(metricValue.value);
                             } else {
@@ -124,7 +147,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                         }
                     } else {
                         // Normal single metric from top set
-                        const metricValue = topSet.metrics.find(m => m.metric_id === metricToPlot.id);
+                        const metricValue = topSet.metrics.find(m =>
+                            m.metric_id === metricToPlot.id && shouldIncludeMetric(m)
+                        );
                         if (metricValue && metricValue.value) {
                             dataPoints.push({
                                 timestamp,
@@ -148,7 +173,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                             let hasAllMetrics = true;
 
                             multiplicativeMetrics.forEach(metricDef => {
-                                const metricValue = set.metrics.find(m => m.metric_id === metricDef.id);
+                                const metricValue = set.metrics.find(m =>
+                                    m.metric_id === metricDef.id && shouldIncludeMetric(m)
+                                );
                                 if (metricValue && metricValue.value) {
                                     product *= parseFloat(metricValue.value);
                                 } else {
@@ -161,7 +188,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                             }
                         } else {
                             // Normal single metric
-                            const metricValue = set.metrics.find(m => m.metric_id === metricToPlot.id);
+                            const metricValue = set.metrics.find(m =>
+                                m.metric_id === metricToPlot.id && shouldIncludeMetric(m)
+                            );
                             if (metricValue && metricValue.value) {
                                 setValues.push(parseFloat(metricValue.value));
                             }
@@ -188,7 +217,9 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                 let product = 1;
                 let hasAllMetrics = true;
                 multiplicativeMetrics.forEach(metricDef => {
-                    const metricValue = instance.metrics.find(m => m.metric_id === metricDef.id);
+                    const metricValue = instance.metrics.find(m =>
+                        m.metric_id === metricDef.id && shouldIncludeMetric(m)
+                    );
                     if (metricValue && metricValue.value) {
                         product *= parseFloat(metricValue.value);
                     } else {
@@ -206,7 +237,7 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
             } else {
                 // Normal single metric
                 instance.metrics.forEach(m => {
-                    if (m.metric_id === metricToPlot.id && m.value) {
+                    if (m.metric_id === metricToPlot.id && m.value && shouldIncludeMetric(m)) {
                         dataPoints.push({
                             timestamp,
                             value: parseFloat(m.value),
@@ -273,6 +304,15 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
         ? multiplicativeMetrics.map(m => m.unit).join(' × ')
         : metricToPlot.unit;
 
+    // Get split name for title if applicable
+    let titleSuffix = '';
+    if (hasSplits && selectedSplit !== 'all') {
+        const splitDef = activityDef.split_definitions.find(s => s.id === selectedSplit);
+        if (splitDef) {
+            titleSuffix = ` - ${splitDef.name}`;
+        }
+    }
+
     const plotData = [{
         x: dataPoints.map(p => p.timestamp),
         y: dataPoints.map(p => p.value),
@@ -300,7 +340,7 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
 
     const layout = {
         title: {
-            text: `${selectedActivity.name} - ${metricLabel} Over Time`,
+            text: `${selectedActivity.name}${titleSuffix} - ${metricLabel} Over Time`,
             font: { color: '#ccc', size: 16 }
         },
         paper_bgcolor: '#1e1e1e',

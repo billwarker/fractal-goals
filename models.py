@@ -179,8 +179,10 @@ class ActivityDefinition(Base):
     has_sets = Column(Boolean, default=False)
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
+    has_splits = Column(Boolean, default=False)  # When true, activity can be split into multiple portions (e.g., left/right)
 
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
+    split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -190,8 +192,10 @@ class ActivityDefinition(Base):
             "has_sets": self.has_sets,
             "has_metrics": self.has_metrics,
             "metrics_multiplicative": self.metrics_multiplicative,
+            "has_splits": self.has_splits,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "metric_definitions": [m.to_dict() for m in self.metric_definitions]
+            "metric_definitions": [m.to_dict() for m in self.metric_definitions],
+            "split_definitions": [s.to_dict() for s in self.split_definitions]
         }
 
 class MetricDefinition(Base):
@@ -215,6 +219,22 @@ class MetricDefinition(Base):
             "is_active": self.is_active,
             "is_top_set_metric": self.is_top_set_metric,
             "is_multiplicative": self.is_multiplicative
+        }
+
+class SplitDefinition(Base):
+    __tablename__ = 'split_definitions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    name = Column(String, nullable=False)  # e.g., "Left", "Right", "Split #1"
+    order = Column(Integer, nullable=False)  # Display order
+    created_at = Column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "order": self.order
         }
 
 class ActivityInstance(Base):
@@ -251,16 +271,20 @@ class MetricValue(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False)
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)  # Nullable for non-split activities
     value = Column(Float, nullable=False)
 
     definition = relationship("MetricDefinition")
+    split = relationship("SplitDefinition")
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.definition.name if self.definition else "",
             "value": self.value,
-            "unit": self.definition.unit if self.definition else ""
+            "unit": self.definition.unit if self.definition else "",
+            "split_id": self.split_definition_id,
+            "split_name": self.split.name if self.split else None
         }
 
 class SessionTemplate(Base):

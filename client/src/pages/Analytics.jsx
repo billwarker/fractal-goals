@@ -24,6 +24,7 @@ function Analytics() {
     const [selectedGraph, setSelectedGraph] = useState('scatter'); // 'scatter', 'line'
     const [selectedMetric, setSelectedMetric] = useState(null); // For line graph
     const [setsHandling, setSetsHandling] = useState('top'); // 'top' or 'average'
+    const [selectedSplit, setSelectedSplit] = useState('all'); // 'all' or specific split ID
 
     useEffect(() => {
         if (!rootId) {
@@ -32,6 +33,11 @@ function Analytics() {
         }
         fetchData();
     }, [rootId, navigate]);
+
+    // Reset split selection when activity changes
+    useEffect(() => {
+        setSelectedSplit('all');
+    }, [selectedActivity]);
 
     const fetchData = async () => {
         try {
@@ -202,6 +208,8 @@ function Analytics() {
 
             case 'activities':
                 const sortedActivities = getSortedActivities();
+                const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
+                const hasSplits = currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0;
 
                 return (
                     <div style={{
@@ -270,7 +278,7 @@ function Analytics() {
                                     </div>
 
                                     {/* Sets Handling - only show if selected activity uses sets */}
-                                    {selectedActivity && activities.find(a => a.id === selectedActivity.id)?.has_sets && (
+                                    {selectedActivity && currentActivityDef?.has_sets && (
                                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                             <span style={{ fontSize: '12px', color: '#888' }}>
                                                 Sets Handling:
@@ -293,6 +301,33 @@ function Analytics() {
                                             </select>
                                         </div>
                                     )}
+
+                                    {/* Split Selection - only show if selected activity has splits */}
+                                    {selectedActivity && hasSplits && (
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '12px', color: '#888' }}>
+                                                Split:
+                                            </span>
+                                            <select
+                                                value={selectedSplit}
+                                                onChange={(e) => setSelectedSplit(e.target.value)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#333',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '4px',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <option value="all">All Splits (Combined)</option>
+                                                {currentActivityDef.split_definitions.map(split => (
+                                                    <option key={split.id} value={split.id}>{split.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -308,6 +343,7 @@ function Analytics() {
                                         activityInstances={activityInstances}
                                         activities={activities}
                                         setsHandling={setsHandling}
+                                        selectedSplit={selectedSplit}
                                     />
                                 ) : (
                                     <LineGraph
@@ -317,6 +353,7 @@ function Analytics() {
                                         selectedMetric={selectedMetric}
                                         setSelectedMetric={setSelectedMetric}
                                         setsHandling={setsHandling}
+                                        selectedSplit={selectedSplit}
                                     />
                                 )}
                             </div>

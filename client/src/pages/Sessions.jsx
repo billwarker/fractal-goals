@@ -486,6 +486,12 @@ function Sessions() {
                                                                             return m || { name: '', unit: '' };
                                                                         };
 
+                                                                        const getSplitInfo = (splitId) => {
+                                                                            if (!actDef || !splitId) return { name: '' };
+                                                                            const s = actDef.split_definitions?.find(sd => sd.id === splitId);
+                                                                            return s || { name: '' };
+                                                                        };
+
                                                                         return (
                                                                             <div
                                                                                 key={exerciseIndex}
@@ -541,23 +547,72 @@ function Sessions() {
                                                                                                 {/* Sets View */}
                                                                                                 {exercise.has_sets && exercise.sets && exercise.sets.length > 0 && (
                                                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px', borderLeft: '2px solid #333', marginTop: '6px' }}>
-                                                                                                        {exercise.sets.map((set, setIdx) => (
-                                                                                                            <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                                                                                <span style={{ color: '#666', fontSize: '11px', width: '40px' }}>SET {setIdx + 1}</span>
-                                                                                                                {set.metrics?.filter(m => {
-                                                                                                                    const mInfo = getMetricInfo(m.metric_id);
-                                                                                                                    return mInfo.name && m.value; // Only show if metric definition exists and has value
-                                                                                                                }).map(m => {
-                                                                                                                    const mInfo = getMetricInfo(m.metric_id);
-                                                                                                                    return (
-                                                                                                                        <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
-                                                                                                                            <span style={{ color: '#888' }}>{mInfo.name}:</span>
-                                                                                                                            <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                        {exercise.sets.map((set, setIdx) => {
+                                                                                                            const hasSplits = actDef?.has_splits && actDef?.split_definitions?.length > 0;
+
+                                                                                                            // Group metrics by split if activity has splits
+                                                                                                            const metricsToDisplay = set.metrics?.filter(m => {
+                                                                                                                const mInfo = getMetricInfo(m.metric_id);
+                                                                                                                if (hasSplits) {
+                                                                                                                    return mInfo.name && m.value && m.split_id;
+                                                                                                                }
+                                                                                                                return mInfo.name && m.value && !m.split_id;
+                                                                                                            }) || [];
+
+                                                                                                            if (hasSplits) {
+                                                                                                                // Group by split
+                                                                                                                const metricsBySplit = {};
+                                                                                                                metricsToDisplay.forEach(m => {
+                                                                                                                    if (!metricsBySplit[m.split_id]) {
+                                                                                                                        metricsBySplit[m.split_id] = [];
+                                                                                                                    }
+                                                                                                                    metricsBySplit[m.split_id].push(m);
+                                                                                                                });
+
+                                                                                                                return (
+                                                                                                                    <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                                                                                                                        <span style={{ color: '#666', fontSize: '11px', width: '40px', paddingTop: '2px' }}>SET {setIdx + 1}</span>
+                                                                                                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
+                                                                                                                            {Object.entries(metricsBySplit).map(([splitId, metrics]) => {
+                                                                                                                                const sInfo = getSplitInfo(splitId);
+                                                                                                                                return (
+                                                                                                                                    <div key={splitId} style={{ background: '#1a1a1a', padding: '6px 8px', borderRadius: '3px', border: '1px solid #333' }}>
+                                                                                                                                        <div style={{ fontSize: '11px', color: '#aaa', fontWeight: 'bold', marginBottom: '4px' }}>{sInfo.name}</div>
+                                                                                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                                                                                            {metrics.map(m => {
+                                                                                                                                                const mInfo = getMetricInfo(m.metric_id);
+                                                                                                                                                return (
+                                                                                                                                                    <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
+                                                                                                                                                        <span style={{ color: '#888' }}>{mInfo.name}:</span>
+                                                                                                                                                        <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                                                    </div>
+                                                                                                                                                );
+                                                                                                                                            })}
+                                                                                                                                        </div>
+                                                                                                                                    </div>
+                                                                                                                                );
+                                                                                                                            })}
                                                                                                                         </div>
-                                                                                                                    );
-                                                                                                                })}
-                                                                                                            </div>
-                                                                                                        ))}
+                                                                                                                    </div>
+                                                                                                                );
+                                                                                                            } else {
+                                                                                                                // No splits - original horizontal layout
+                                                                                                                return (
+                                                                                                                    <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                                                                                        <span style={{ color: '#666', fontSize: '11px', width: '40px' }}>SET {setIdx + 1}</span>
+                                                                                                                        {metricsToDisplay.map(m => {
+                                                                                                                            const mInfo = getMetricInfo(m.metric_id);
+                                                                                                                            return (
+                                                                                                                                <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
+                                                                                                                                    <span style={{ color: '#888' }}>{mInfo.name}:</span>
+                                                                                                                                    <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                                </div>
+                                                                                                                            );
+                                                                                                                        })}
+                                                                                                                    </div>
+                                                                                                                );
+                                                                                                            }
+                                                                                                        })}
                                                                                                     </div>
                                                                                                 )}
 
@@ -566,12 +621,21 @@ function Sessions() {
                                                                                                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
                                                                                                         {exercise.metrics.filter(m => {
                                                                                                             const mInfo = getMetricInfo(m.metric_id);
-                                                                                                            return mInfo.name && m.value; // Only show if metric definition exists and has value
+                                                                                                            // If activity has splits, only show metrics with split_id
+                                                                                                            // Otherwise, only show metrics without split_id
+                                                                                                            const hasSplits = actDef?.has_splits && actDef?.split_definitions?.length > 0;
+                                                                                                            if (hasSplits) {
+                                                                                                                return mInfo.name && m.value && m.split_id;
+                                                                                                            }
+                                                                                                            return mInfo.name && m.value && !m.split_id;
                                                                                                         }).map(m => {
                                                                                                             const mInfo = getMetricInfo(m.metric_id);
+                                                                                                            const sInfo = getSplitInfo(m.split_id);
                                                                                                             return (
-                                                                                                                <div key={m.metric_id} style={{ background: '#263238', padding: '2px 8px', borderRadius: '3px', border: '1px solid #37474F' }}>
-                                                                                                                    <span style={{ color: '#aaa', marginRight: '4px' }}>{mInfo.name}:</span>
+                                                                                                                <div key={`${m.metric_id}-${m.split_id || 'no-split'}`} style={{ background: '#263238', padding: '2px 8px', borderRadius: '3px', border: '1px solid #37474F' }}>
+                                                                                                                    <span style={{ color: '#aaa', marginRight: '4px' }}>
+                                                                                                                        {sInfo.name ? `${sInfo.name} - ${mInfo.name}` : mInfo.name}:
+                                                                                                                    </span>
                                                                                                                     <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
                                                                                                                 </div>
                                                                                                             )
