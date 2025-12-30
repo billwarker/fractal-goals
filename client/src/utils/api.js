@@ -156,6 +156,44 @@ export const fractalApi = {
     // ========== Activities & Metrics ==========
 
     /**
+     * Get all activity groups for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    getActivityGroups: (rootId) => axios.get(`${API_BASE}/${rootId}/activity-groups`),
+
+    /**
+     * Create a new activity group
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {name, description}
+     */
+    createActivityGroup: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activity-groups`, data),
+
+    /**
+     * Update an activity group
+     * @param {string} rootId - ID of the fractal
+     * @param {string} groupId - ID of the group
+     * @param {Object} data - {name, description}
+     */
+    updateActivityGroup: (rootId, groupId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-groups/${groupId}`, data),
+
+    /**
+     * Reorder activity groups
+     * @param {string} rootId - ID of the fractal
+     * @param {Array<string>} groupIds - List of group IDs in order
+     */
+    reorderActivityGroups: (rootId, groupIds) =>
+        axios.put(`${API_BASE}/${rootId}/activity-groups/reorder`, { group_ids: groupIds }),
+
+    /**
+     * Delete an activity group
+     * @param {string} rootId - ID of the fractal
+     * @param {string} groupId - ID of the group
+     */
+    deleteActivityGroup: (rootId, groupId) =>
+        axios.delete(`${API_BASE}/${rootId}/activity-groups/${groupId}`),
+
+    /**
      * Get all activity definitions for a fractal
      * @param {string} rootId - ID of the fractal
      */

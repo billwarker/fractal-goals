@@ -1,15 +1,138 @@
 from flask import Blueprint, request, jsonify
 from models import (
     get_engine, get_session,
-    ActivityDefinition, MetricDefinition, SplitDefinition,
+    ActivityDefinition, MetricDefinition, SplitDefinition, ActivityGroup,
     validate_root_goal
 )
+from sqlalchemy import func
 
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
 
 # Initialize database engine
 engine = get_engine()
+
+# ============================================================================
+# ============================================================================
+# ACTIVITY GROUP ENDPOINTS
+# ============================================================================
+
+@activities_bp.route('/<root_id>/activity-groups', methods=['GET'])
+def get_activity_groups(root_id):
+    """Get all activity groups for a fractal."""
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id)
+        if not root:
+             return jsonify({"error": "Fractal not found"}), 404
+        
+        groups = session.query(ActivityGroup).filter_by(root_id=root_id).order_by(ActivityGroup.sort_order, ActivityGroup.created_at).all()
+        return jsonify([g.to_dict() for g in groups])
+    finally:
+        session.close()
+
+@activities_bp.route('/<root_id>/activity-groups', methods=['POST'])
+def create_activity_group(root_id):
+    """Create a new activity group."""
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id)
+        if not root:
+             return jsonify({"error": "Fractal not found"}), 404
+        
+        data = request.get_json()
+        if not data.get('name'):
+            return jsonify({"error": "Name is required"}), 400
+        
+        # Calculate order
+        max_order = session.query(func.max(ActivityGroup.sort_order)).filter_by(root_id=root_id).scalar()
+        new_order = (max_order or 0) + 1
+
+        new_group = ActivityGroup(
+            root_id=root_id,
+            name=data['name'],
+            description=data.get('description', ''),
+            sort_order=new_order
+        )
+        session.add(new_group)
+        session.commit()
+        return jsonify(new_group.to_dict()), 201
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@activities_bp.route('/<root_id>/activity-groups/<group_id>', methods=['PUT'])
+def update_activity_group(root_id, group_id):
+    """Update an activity group."""
+    session = get_session(engine)
+    try:
+        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+        if not group:
+            return jsonify({"error": "Group not found"}), 404
+        
+        data = request.get_json()
+        if 'name' in data:
+            group.name = data['name']
+        if 'description' in data:
+            group.description = data['description']
+            
+        session.commit()
+        return jsonify(group.to_dict())
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@activities_bp.route('/<root_id>/activity-groups/<group_id>', methods=['DELETE'])
+def delete_activity_group(root_id, group_id):
+    """Delete an activity group."""
+    session = get_session(engine)
+    try:
+        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+        if not group:
+            return jsonify({"error": "Group not found"}), 404
+            
+        # Manually unlink activities to be safe/clear
+        activities = session.query(ActivityDefinition).filter_by(group_id=group_id).all()
+        for activity in activities:
+            activity.group_id = None
+            
+        session.delete(group)
+        session.commit()
+        return jsonify({"message": "Group deleted"})
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@activities_bp.route('/<root_id>/activity-groups/reorder', methods=['PUT'])
+def reorder_activity_groups(root_id):
+    """Reorder activity groups."""
+    session = get_session(engine)
+    try:
+        data = request.get_json()
+        group_ids = data.get('group_ids', [])
+        
+        if not group_ids:
+             return jsonify({"error": "No group_ids provided"}), 400
+             
+        # Update each group
+        for idx, group_id in enumerate(group_ids):
+            group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+            if group:
+                group.sort_order = idx
+                
+        session.commit()
+        return jsonify({"message": "Groups reordered"})
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # ============================================================================
 # ACTIVITY DEFINITION ENDPOINTS (Fractal-Scoped)
@@ -50,7 +173,8 @@ def create_activity(root_id):
             has_sets=data.get('has_sets', False),
             has_metrics=data.get('has_metrics', True),
             metrics_multiplicative=data.get('metrics_multiplicative', False),
-            has_splits=data.get('has_splits', False)
+            has_splits=data.get('has_splits', False),
+            group_id=data.get('group_id')
         )
         session.add(new_activity)
         session.flush() # Get ID
@@ -122,8 +246,9 @@ def update_activity(root_id, activity_id):
             activity.has_metrics = data['has_metrics']
         if 'metrics_multiplicative' in data:
             activity.metrics_multiplicative = data['metrics_multiplicative']
-        if 'has_splits' in data:
             activity.has_splits = data['has_splits']
+        if 'group_id' in data:
+            activity.group_id = data['group_id']
         
         # Update metrics if provided
         if 'metrics' in data:

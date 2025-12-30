@@ -22,7 +22,11 @@ function SessionActivityItem({
     activityDefinition,
     onUpdate,
     onToggleComplete,
-    onDelete
+    onDelete,
+    onReorder,
+    canMoveUp,
+    canMoveDown,
+    showReorderButtons
 }) {
     // Get timezone from context
     const timezone = useTimezone();
@@ -119,6 +123,55 @@ function SessionActivityItem({
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    {/* Reorder Buttons */}
+                    {showReorderButtons && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <button
+                                onClick={() => onReorder('up')}
+                                disabled={!canMoveUp}
+                                style={{
+                                    background: canMoveUp ? '#333' : 'transparent',
+                                    border: '1px solid #555',
+                                    borderRadius: '3px',
+                                    color: canMoveUp ? '#4caf50' : '#444',
+                                    cursor: canMoveUp ? 'pointer' : 'not-allowed',
+                                    fontSize: '12px',
+                                    padding: '2px 6px',
+                                    lineHeight: '1',
+                                    width: '24px',
+                                    height: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                                title="Move up"
+                            >
+                                ▲
+                            </button>
+                            <button
+                                onClick={() => onReorder('down')}
+                                disabled={!canMoveDown}
+                                style={{
+                                    background: canMoveDown ? '#333' : 'transparent',
+                                    border: '1px solid #555',
+                                    borderRadius: '3px',
+                                    color: canMoveDown ? '#4caf50' : '#444',
+                                    cursor: canMoveDown ? 'pointer' : 'not-allowed',
+                                    fontSize: '12px',
+                                    padding: '2px 6px',
+                                    lineHeight: '1',
+                                    width: '24px',
+                                    height: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                                title="Move down"
+                            >
+                                ▼
+                            </button>
+                        </div>
+                    )}
                     <div>
                         <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#4caf50' }}>
                             {exercise.name} <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(Activity)</span>

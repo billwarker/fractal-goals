@@ -121,16 +121,35 @@ function Sessions() {
             }
         }
 
-        if (totalSeconds === 0) return '-';
+        // If we have activity durations, use them
+        if (totalSeconds > 0) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
 
-        // Format as HH:MM
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-        if (hours > 0) {
-            return `${hours}:${String(minutes).padStart(2, '0')}`;
+            if (hours > 0) {
+                return `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
+            return `0:${String(minutes).padStart(2, '0')}`;
         }
-        return `0:${String(minutes).padStart(2, '0')}`;
+
+        // Fallback: Calculate from session_start and session_end
+        if (sessionData?.session_start && sessionData?.session_end) {
+            const start = new Date(sessionData.session_start);
+            const end = new Date(sessionData.session_end);
+            const diffSeconds = Math.floor((end - start) / 1000);
+
+            if (diffSeconds > 0) {
+                const hours = Math.floor(diffSeconds / 3600);
+                const minutes = Math.floor((diffSeconds % 3600) / 60);
+
+                if (hours > 0) {
+                    return `${hours}:${String(minutes).padStart(2, '0')}`;
+                }
+                return `0:${String(minutes).padStart(2, '0')}`;
+            }
+        }
+
+        return '-';
     };
 
     if (loading) {
@@ -276,7 +295,7 @@ function Sessions() {
                                         background: '#2a2a2a',
                                         borderBottom: '1px solid #333',
                                         display: 'grid',
-                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
+                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
                                         gap: '16px',
                                         alignItems: 'center'
                                     }}>
@@ -301,13 +320,34 @@ function Sessions() {
                                             )}
                                         </div>
 
-                                        {/* Date Created */}
+                                        {/* Session Start */}
                                         <div>
-                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Date Created</div>
-                                            <div style={{ fontSize: '14px' }}>{formatDate(session.attributes?.created_at)}</div>
-                                            <div style={{ fontSize: '11px', color: '#666' }}>
-                                                {formatTime(session.attributes?.created_at)}
-                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session Start</div>
+                                            {sessionData?.session_start ? (
+                                                <>
+                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_start)}</div>
+                                                    <div style={{ fontSize: '11px', color: '#666' }}>
+                                                        {formatTime(sessionData.session_start)}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div style={{ fontSize: '12px', color: '#666' }}>-</div>
+                                            )}
+                                        </div>
+
+                                        {/* Session End */}
+                                        <div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session End</div>
+                                            {sessionData?.session_end ? (
+                                                <>
+                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_end)}</div>
+                                                    <div style={{ fontSize: '11px', color: '#666' }}>
+                                                        {formatTime(sessionData.session_end)}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div style={{ fontSize: '12px', color: '#666' }}>-</div>
+                                            )}
                                         </div>
 
                                         {/* Last Modified */}

@@ -35,7 +35,16 @@ class Goal(Base):
     # Practice Session specific fields (nullable for other goals)
     root_id = Column(String, nullable=True) # Useful for all goals? Or just PS?
     duration_minutes = Column(Integer, nullable=True)
-    session_data = Column(Text, nullable=True) # JSON
+    
+    # Session analytics fields (promoted from JSON for query performance)
+    session_start = Column(DateTime, nullable=True)  # When session actually started
+    session_end = Column(DateTime, nullable=True)    # When session actually ended
+    total_duration_seconds = Column(Integer, nullable=True)  # Calculated or from session_end - session_start
+    template_id = Column(String, nullable=True)      # Reference to session template
+    
+    # Flexible data storage (renamed from session_data for semantic clarity)
+    attributes = Column(Text, nullable=True)  # JSON - stores sections, exercises, notes, etc.
+    session_data = Column(Text, nullable=True)  # DEPRECATED - kept for backward compatibility, use attributes
     
     # JSON Plans/Targets
     targets = Column(Text, nullable=True)
@@ -145,14 +154,17 @@ class PracticeSession(Goal):
         result = super().to_dict(include_children)
         result["attributes"]["duration_minutes"] = self.duration_minutes
         
-        # Parse session_data if needed, or rely on relational activities now?
-        # The frontend might still expect 'session_data' blob or might expect new 'activities' list.
-        # For backward compatibility, we send session_data if explicitly asked, 
-        # OR we reconstruct it from ActivityInstances!
-        # Let's send raw session_data for now if it exists, as frontend hasn't been updated to use relational endpoints yet.
-        if self.session_data:
+        # Add session analytics fields
+        result["attributes"]["session_start"] = self.session_start.isoformat() if self.session_start else None
+        result["attributes"]["session_end"] = self.session_end.isoformat() if self.session_end else None
+        result["attributes"]["total_duration_seconds"] = self.total_duration_seconds
+        result["attributes"]["template_id"] = self.template_id
+        
+        # Parse session data from attributes (new) or session_data (legacy)
+        session_data_json = self.attributes or self.session_data
+        if session_data_json:
              try:
-                 result["attributes"]["session_data"] = json.loads(self.session_data)
+                 result["attributes"]["session_data"] = json.loads(session_data_json)
              except:
                  pass
         
@@ -168,6 +180,28 @@ class PracticeSession(Goal):
         return result
 
 
+
+class ActivityGroup(Base):
+    __tablename__ = 'activity_groups'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    created_at = Column(DateTime, default=datetime.now)
+    sort_order = Column(Integer, default=0)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "name": self.name,
+            "description": self.description,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class ActivityDefinition(Base):
     __tablename__ = 'activity_definitions'
 
@@ -180,6 +214,9 @@ class ActivityDefinition(Base):
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
     has_splits = Column(Boolean, default=False)  # When true, activity can be split into multiple portions (e.g., left/right)
+    group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True)
+
+    group = relationship("ActivityGroup", backref="activities")
 
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
@@ -189,6 +226,7 @@ class ActivityDefinition(Base):
             "id": self.id,
             "name": self.name,
             "description": self.description,
+            "group_id": self.group_id,
             "has_sets": self.has_sets,
             "has_metrics": self.has_metrics,
             "metrics_multiplicative": self.metrics_multiplicative,
