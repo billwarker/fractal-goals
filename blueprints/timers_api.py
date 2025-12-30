@@ -122,3 +122,63 @@ def get_activity_instances(root_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
+
+@timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
+def update_activity_instance(root_id, instance_id):
+    """Update an activity instance manually (e.g. editing times)."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        data = request.get_json() or {}
+        
+        # Get the activity instance
+        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        
+        if not instance:
+            # Create if missing, but we strictly need connection IDs
+            practice_session_id = data.get('practice_session_id')
+            activity_definition_id = data.get('activity_definition_id')
+            
+            if not practice_session_id or not activity_definition_id:
+                # If we lack info to create, and it doesn't exist, that's an issue for manual updates
+                # unless we want to fail
+                return jsonify({"error": "Instance not found and missing creation details"}), 404
+            
+            instance = ActivityInstance(
+                id=instance_id,
+                practice_session_id=practice_session_id,
+                activity_definition_id=activity_definition_id
+            )
+            db_session.add(instance)
+        
+        # Update fields if present
+        if 'time_start' in data:
+            ts = data['time_start']
+            # Handle empty string or None as clearing the time
+            instance.time_start = datetime.fromisoformat(ts.replace('Z', '+00:00')) if ts else None
+            
+        if 'time_stop' in data:
+            ts = data['time_stop']
+            instance.time_stop = datetime.fromisoformat(ts.replace('Z', '+00:00')) if ts else None
+            
+        # Recalculate duration
+        if instance.time_start and instance.time_stop:
+            duration = (instance.time_stop - instance.time_start).total_seconds()
+            instance.duration_seconds = int(duration)
+        elif not instance.time_start or not instance.time_stop:
+             instance.duration_seconds = None
+        
+        db_session.commit()
+        
+        return jsonify(instance.to_dict())
+        
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
