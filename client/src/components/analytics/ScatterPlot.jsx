@@ -4,9 +4,10 @@ import PlotlyChart from './PlotlyChart';
 /**
  * Scatter Plot component for visualizing activity metrics
  * Supports both 2D and 3D scatter plots based on number of metrics
+ * Supports split filtering for split-enabled activities
  */
-function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top' }) {
-    console.log('ScatterPlot called', { selectedActivity, activityInstances });
+function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all' }) {
+    console.log('ScatterPlot called', { selectedActivity, activityInstances, selectedSplit });
 
     if (!selectedActivity) {
         return (
@@ -45,8 +46,9 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     }
 
     const metrics = activityDef.metric_definitions || [];
+    const hasSplits = activityDef.has_splits && activityDef.split_definitions?.length > 0;
 
-    console.log('Metrics:', metrics);
+    console.log('Metrics:', metrics, 'Has splits:', hasSplits);
 
     if (metrics.length === 0) {
         return (
@@ -79,6 +81,19 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 const setPoint = { ...basePoint, set_number: setIdx + 1 };
                 if (set.metrics) {
                     set.metrics.forEach(m => {
+                        // Filter by split if applicable
+                        if (hasSplits) {
+                            if (selectedSplit !== 'all' && m.split_id !== selectedSplit) {
+                                return; // Skip metrics that don't match selected split
+                            }
+                            if (selectedSplit === 'all' && !m.split_id) {
+                                return; // Skip non-split metrics when viewing all splits
+                            }
+                        } else {
+                            // For non-split activities, skip metrics with split_id
+                            if (m.split_id) return;
+                        }
+
                         const metricDef = metrics.find(md => md.id === m.metric_id);
                         if (metricDef && m.value) {
                             setPoint[metricDef.name] = parseFloat(m.value);
@@ -122,6 +137,19 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         else if (instance.metrics) {
             const point = { ...basePoint };
             instance.metrics.forEach(m => {
+                // Filter by split if applicable
+                if (hasSplits) {
+                    if (selectedSplit !== 'all' && m.split_id !== selectedSplit) {
+                        return; // Skip metrics that don't match selected split
+                    }
+                    if (selectedSplit === 'all' && !m.split_id) {
+                        return; // Skip non-split metrics when viewing all splits
+                    }
+                } else {
+                    // For non-split activities, skip metrics with split_id
+                    if (m.split_id) return;
+                }
+
                 const metricDef = metrics.find(md => md.id === m.metric_id);
                 if (metricDef && m.value) {
                     point[metricDef.name] = parseFloat(m.value);
@@ -203,9 +231,18 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
             '<extra></extra>'
     }];
 
+    // Get split name for title if applicable
+    let titleSuffix = '';
+    if (hasSplits && selectedSplit !== 'all') {
+        const splitDef = activityDef.split_definitions.find(s => s.id === selectedSplit);
+        if (splitDef) {
+            titleSuffix = ` - ${splitDef.name}`;
+        }
+    }
+
     const layout = {
         title: {
-            text: `${selectedActivity.name} - Metrics Analysis`,
+            text: `${selectedActivity.name}${titleSuffix} - Metrics Analysis`,
             font: { color: '#ccc', size: 16 }
         },
         paper_bgcolor: '#1e1e1e',

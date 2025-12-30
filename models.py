@@ -271,16 +271,20 @@ class MetricValue(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False)
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)  # Nullable for non-split activities
     value = Column(Float, nullable=False)
 
     definition = relationship("MetricDefinition")
+    split = relationship("SplitDefinition")
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.definition.name if self.definition else "",
             "value": self.value,
-            "unit": self.definition.unit if self.definition else ""
+            "unit": self.definition.unit if self.definition else "",
+            "split_id": self.split_definition_id,
+            "split_name": self.split.name if self.split else None
         }
 
 class SessionTemplate(Base):

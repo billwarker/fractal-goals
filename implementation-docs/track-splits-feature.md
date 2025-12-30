@@ -1,225 +1,255 @@
 # Track Splits Feature - Implementation Summary
 
-## ✅ Completed (Session: 2025-12-29)
+## Overview
+Implemented a comprehensive "splits" feature allowing users to track bilateral or multi-part activities (e.g., left/right leg exercises). This enables recording separate metrics for each split within a single activity.
 
-### 1. Database Schema Updates
-- ✅ Added `has_splits` boolean column to `ActivityDefinition` model
-- ✅ Created new `SplitDefinition` table with fields:
-  - `id` (primary key)
-  - `activity_id` (foreign key to activity_definitions)
-  - `name` (split name, e.g., "Left", "Right")
-  - `order` (display order)
-  - `created_at` (timestamp)
-- ✅ Added relationship between `ActivityDefinition` and `SplitDefinition`
-- ✅ Updated `to_dict()` method to include `has_splits` and `split_definitions`
-- ✅ Ran migration script across all environments (development, testing, production)
+## Completed Work
 
-### 2. Backend API Updates
-- ✅ Updated `activities_api.py` to import `SplitDefinition`
-- ✅ Modified `create_activity` endpoint to:
-  - Accept `has_splits` flag
-  - Accept `splits` array in request body
-  - Create `SplitDefinition` records (min 2, max 5 splits)
-  - Validate split count limits
-- ✅ Modified `update_activity` endpoint to:
-  - Update `has_splits` flag
-  - Handle split creation, updates, and deletion
-  - Preserve split IDs when updating existing splits
-  - Properly track split order
+### 1. Database Schema ✅
 
-### 3. Frontend - ManageActivities Page
-- ✅ Added state management for splits:
-  - `hasSplits` boolean state
-  - `splits` array state (default: 2 splits with names "Split #1", "Split #2")
-- ✅ Added handler functions:
-  - `handleAddSplit()` - adds new split (max 5)
-  - `handleRemoveSplit()` - removes split (min 2)
-  - `handleSplitChange()` - updates split name
-- ✅ Added "Track Splits" checkbox positioned between "Track Sets" and "Enable Metrics"
-- ✅ Added conditional "Splits (Min 2, Max 5)" form section with:
-  - **Horizontal layout** with flexbox wrapping (3 splits per row)
-  - Input fields (150px width) for split names
-  - Remove (×) button for splits beyond minimum of 2
-  - "+ Add Split" button that appears after the × button on the last split
-  - Proper placeholder text (`Split #1`, `Split #2`, etc.)
-- ✅ **Section ordering**: Splits section appears BEFORE Metrics section (matching checkbox order)
-- ✅ Updated form submission to include splits data
-- ✅ Updated activity loading to populate splits from existing activities
-- ✅ Updated activity duplication to copy splits
-- ✅ Added purple "Splits" badge (#7B5CFF - same as LongTermGoal) in saved activities list
+**Files Modified:**
+- `models.py` - Added `has_splits` to `ActivityDefinition`, created `SplitDefinition` model, added `split_definition_id` to `MetricValue`
+- `python-scripts/migrate_add_splits.py` - Migration for `has_splits` and `split_definitions` table
+- `python-scripts/migrate_add_split_to_metrics.py` - Migration for `split_definition_id` column
 
-### 4. UI/UX Features - Fully Implemented
-- ✅ Splits section appears/disappears when checkbox is toggled
-- ✅ Default 2 splits when enabled ("Split #1", "Split #2")
-- ✅ Can add up to 5 splits total
-- ✅ **Minimum of 2 splits enforced** - × buttons only appear when more than 2 splits exist
-- ✅ Split names are fully customizable
-- ✅ **Horizontal layout with wrapping** - splits flow left to right, wrapping after 3 per row
-- ✅ **Proper button ordering** - "+ Add Split" button always appears after the × button
-- ✅ Purple badge displays for activities with splits enabled
-- ✅ Splits are preserved when editing activities
-- ✅ Splits are copied when duplicating activities
-- ✅ Clean, intuitive UI that matches the design of other form sections
+**Schema Changes:**
+- `ActivityDefinition.has_splits` - Boolean flag for split-enabled activities
+- `SplitDefinition` table - Stores split names and order (min 2, max 5 per activity)
+- `MetricValue.split_definition_id` - Links metric values to specific splits (nullable for backward compatibility)
 
-### 5. Testing & Validation
-- ✅ Database migration runs successfully across all environments
-- ✅ Can create activity with splits enabled
-- ✅ Can add/remove splits in the UI (respecting min/max limits)
-- ✅ Can rename splits with custom names
-- ✅ Splits badge appears correctly in activity list
-- ✅ Can edit activity and modify splits
-- ✅ Can duplicate activity with splits preserved
-- ✅ UI properly enforces minimum of 2 splits
-- ✅ UI properly enforces maximum of 5 splits
-- ✅ Splits wrap to new row after 3 splits
-- ✅ Button placement is correct (× before "+ Add Split")
-- ✅ Section ordering is correct (Splits before Metrics)
-- ✅ **User tested and confirmed working well**
+### 2. Backend API ✅
 
-## 🔄 Next Steps (To Be Implemented)
+**Files Modified:**
+- `blueprints/activities_api.py` - Updated `create_activity` and `update_activity` endpoints
 
-### 1. SessionDetail Page Updates - HIGH PRIORITY
-The SessionDetail page needs to be updated to actually use splits when recording activity data.
+**Features:**
+- Create/update activities with split definitions
+- Validate split count (min 2, max 5)
+- Proper cascade handling for split deletion
+- Split data included in activity serialization
 
-**Required Changes:**
-- When an activity has `has_splits: true`, the metric input UI should be duplicated for each split
-- For example, if an activity has splits ["Left Leg", "Right Leg"] and metrics ["Reps", "Weight"]:
-  - Show "Left Leg - Reps" and "Left Leg - Weight" inputs
-  - Show "Right Leg - Reps" and "Right Leg - Weight" inputs
-- Store split data in the activity instance or metric values
-- This will require additional database schema changes to link metric values to specific splits
+### 3. Frontend - ManageActivities Page ✅
 
-**Implementation Approach:**
-1. Add `split_definition_id` column to `MetricValue` table (nullable for backward compatibility)
-2. Update SessionDetail UI to render split-specific metric inputs
-3. Update metric value creation to include split association
-4. Handle both split and non-split activities in the same UI
+**Files Modified:**
+- `client/src/pages/ManageActivities.jsx`
 
-**Files to Update:**
-- `/models.py` - Add `split_definition_id` to `MetricValue`
-- `/blueprints/sessions_api.py` - Handle split data in session endpoints
-- `/client/src/pages/SessionDetail.jsx` - Render split-specific inputs
-- Create new migration script for MetricValue schema change
+**Features:**
+- "Track Splits" checkbox positioned between "Track Sets" and "Enable Metrics"
+- Horizontal split input layout (3 per row with wrapping)
+- Minimum 2 splits enforced (× buttons hidden when at minimum)
+- Maximum 5 splits enforced (+ button hidden when at maximum)
+- Split names fully customizable (default: "Split #1", "Split #2", etc.)
+- Purple "Splits" badge (#7B5CFF) in saved activities list
+- Splits preserved when editing/duplicating activities
 
-### 2. Analytics Page Updates
-The Analytics page should display split data when analyzing activities.
+**UI Behavior:**
+- Splits section appears BEFORE Metrics section (matches checkbox order)
+- "+ Add Split" button positioned after × button on last split
+- Clean, intuitive interface matching existing design patterns
 
-**Required Changes:**
-- Show separate charts/data for each split
-- Allow filtering/comparing between splits
-- Display split names in legends and labels
-- Calculate statistics per split (e.g., "Left Leg average reps vs Right Leg average reps")
+### 4. Frontend - SessionDetail & SessionActivityItem ✅
 
-**Files to Update:**
-- `/client/src/pages/Analytics.jsx`
+**Files Modified:**
+- `client/src/pages/SessionDetail.jsx` - Added `has_splits` to activity initialization
+- `client/src/components/SessionActivityItem.jsx` - Split-aware metric rendering
 
-### 3. Sessions Page Updates
-The Sessions page (session history/list) should display split information.
+**Features:**
+- **Sets-based activities**: Each set shows metrics grouped by split with visual separation
+- **Non-sets activities**: Each split gets its own card with metrics displayed vertically
+- Split labels use neutral gray (#aaa) color for consistency
+- Backward compatible with non-split activities
 
-**Required Changes:**
-- Show split data when viewing completed sessions
-- Display which splits were tracked for each activity
-- Show summary statistics per split
+**Data Structure:**
+- Metrics stored with `split_id` when activity has splits
+- Handlers updated to accept optional `splitId` parameter
+- Proper filtering ensures only relevant metrics display
 
-**Files to Update:**
-- `/client/src/pages/Sessions.jsx`
+### 5. Frontend - Sessions Page ✅
 
-### 4. Data Storage Strategy - DECISION NEEDED
+**Files Modified:**
+- `client/src/pages/Sessions.jsx`
 
-**Option A: Split-Specific Metric Values (RECOMMENDED)**
-- Add `split_definition_id` to `MetricValue` table
-- Each metric value is associated with a specific split
-- **Pros:** 
-  - Clean, normalized data model
-  - Easy to query and aggregate
-  - Type-safe relationships
-  - Better for analytics
-- **Cons:** 
-  - Requires schema migration
-  - More complex queries for non-split activities
+**Features:**
+- Split names displayed alongside metrics (e.g., "Left Leg - Reps: 10 reps")
+- Metrics grouped by split in visual cards for better readability
+- Vertical metric layout within splits prevents text scrunching
+- Filters out non-split metrics when activity has splits (eliminates redundancy)
+- Font sizes consistent with existing sets/metrics display
 
-**Option B: Store Split Data in JSON**
-- Store split information in the existing `session_data` JSON field
-- **Pros:** 
-  - No schema changes needed
-  - Flexible structure
-- **Cons:** 
-  - Harder to query
-  - Less structured
-  - Difficult to aggregate across sessions
-  - Not ideal for analytics
+**Display Logic:**
+- Split-enabled activities: Only show metrics with `split_id`
+- Non-split activities: Only show metrics without `split_id`
+- Grouped display for multiple metrics per split
 
-**Recommendation:** **Option A** - The benefits of a clean data model far outweigh the migration effort. This will make analytics and querying much easier in the long run.
+### 6. Frontend - Analytics Page ✅
 
-## Migration Scripts
+**Files Modified:**
+- `client/src/pages/Analytics.jsx`
+- `client/src/components/analytics/ScatterPlot.jsx`
+- `client/src/components/analytics/LineGraph.jsx`
 
-### Completed
-- `/python-scripts/migrate_add_splits.py` - Adds `has_splits` and `split_definitions` table
+**Features:**
+- **Split Selection Dropdown**: Appears next to "Sets Handling" control for split-enabled activities
+- **Filter Options**: "All Splits (Combined)" + individual split names (e.g., "Left Leg", "Right Leg")
+- **Auto-Reset**: Split selection resets to "All Splits" when changing activities
+- **Dynamic Titles**: Chart titles update to show split name (e.g., "Leg Press - Left Leg - Metrics Analysis")
+- **Comprehensive Filtering**: Both ScatterPlot and LineGraph filter metrics by `split_id`
+- **Backward Compatible**: Non-split activities work normally, filtering out any split-specific data
 
-### Needed
-- Migration to add `split_definition_id` to `MetricValue` table (for SessionDetail integration)
+**Data Filtering Logic:**
+- Specific split selected: Only shows metrics with matching `split_id`
+- "All Splits (Combined)": Shows all split-specific metrics together
+- Non-split activities: Filters out metrics with `split_id` (backward compatibility)
 
-## Key Files Modified
+**Chart Support:**
+- ✅ Scatter Plot (2D/3D) with split filtering
+- ✅ Line Graph with split filtering
+- ✅ Works with "Top Set" and "Average" aggregation modes
+- ✅ Proper handling of product metrics with splits
 
-### Backend
-1. `/models.py` - Database models (ActivityDefinition, SplitDefinition)
-2. `/blueprints/activities_api.py` - Activity CRUD endpoints with split support
+### 7. Testing & Validation ✅
 
-### Frontend
-3. `/client/src/pages/ManageActivities.jsx` - Activity builder UI with splits
-
-### Scripts
-4. `/python-scripts/migrate_add_splits.py` - Database migration
+**Verified:**
+- Database migrations run successfully across all environments
+- Activity creation/editing with splits works correctly
+- Split data persists and loads properly
+- Session recording with split-specific metrics functions as expected
+- Split data displays correctly in session history
+- Analytics charts filter and display split data correctly
+- Split selection dropdown appears only for split-enabled activities
+- Chart titles update dynamically with split names
+- UI enforces min/max split constraints
+- Backward compatibility maintained for non-split activities
+- Font sizes and styling consistent across all pages
+- No console errors or runtime issues
 
 ## Design Specifications
 
-### Color Reference
-- **Splits badge color:** `#7B5CFF` (Nebula Violet - same as LongTermGoal)
-- Sets badge color: `#ff9800` (Orange)
-- Multiplicative badge color: `#f44336` (Red)
+### Color Palette
+- **Splits badge**: `#7B5CFF` (Nebula Violet - ManageActivities page only)
+- **Split labels**: `#aaa` (Gray - SessionDetail and Sessions pages)
 
-### Layout Specifications
-- **Split input width:** 150px
-- **Splits per row:** 3 (with flexbox wrapping)
-- **Minimum splits:** 2
-- **Maximum splits:** 5
-- **Section order:** Splits → Metrics (matches checkbox order)
+### Layout Rules
+- **Split input width**: 150px
+- **Splits per row**: 3 (with flexbox wrapping)
+- **Min/Max splits**: 2-5 per activity
+- **Section order**: Splits → Metrics (matches checkbox order)
 
-### UI Behavior
-- × button only appears when more than 2 splits exist
+### UI Patterns
+- × button only visible when more than 2 splits exist
 - "+ Add Split" button appears after × button on last split
 - "+ Add Split" button hidden when 5 splits reached
 - Splits section hidden when "Track Splits" unchecked
+- Split dropdown only visible when split-enabled activity selected in Analytics
 
-## Notes for Next Session
+## Architecture Decisions
 
-### Immediate Next Steps
-1. **Add `split_definition_id` to MetricValue table**
-   - Create migration script
-   - Update MetricValue model
-   - Make column nullable for backward compatibility
+### Data Storage Strategy
+**Chosen Approach**: Split-specific metric values via `split_definition_id` foreign key
 
-2. **Update SessionDetail.jsx**
-   - Detect if activity has splits
-   - Render split-specific metric inputs
-   - Update metric value creation logic
-   - Test with both split and non-split activities
+**Rationale:**
+- Clean, normalized data model
+- Type-safe relationships
+- Easy to query and aggregate
+- Better for analytics and reporting
+- Maintains referential integrity
+- Enables efficient split-based filtering in Analytics
 
-3. **Test end-to-end flow**
-   - Create activity with splits
-   - Record session with split data
-   - Verify data is stored correctly
-   - View session in Sessions page
-   - Analyze in Analytics page
+**Alternative Considered**: JSON storage in `session_data`
+- Rejected due to poor queryability and lack of structure
 
-### Questions to Consider
-- Should we allow changing splits on an activity that already has recorded data?
-- How should we handle activities where splits are added/removed after data exists?
-- Should we show a warning when modifying splits on activities with existing sessions?
+## Migration Scripts
 
-### Testing Priorities
-1. Create and save activity with splits ✅
-2. Record session with split-enabled activity ⏳
-3. View recorded split data ⏳
-4. Edit activity splits after data exists ⏳
-5. Analytics with split data ⏳
+1. `python-scripts/migrate_add_splits.py` - Adds `has_splits` column and `split_definitions` table
+2. `python-scripts/migrate_add_split_to_metrics.py` - Adds `split_definition_id` to `metric_values` table
+
+Both scripts run across development, testing, and production environments.
+
+## Next Steps
+
+### 1. Enhanced Split Analytics (Optional)
+**Potential Enhancements:**
+- Side-by-side split comparison charts
+- Asymmetry detection and alerts (e.g., "Left leg 15% weaker than right")
+- Split-specific trend lines and regression analysis
+- Export split comparison data for external analysis
+- Statistical significance testing for split differences
+
+### 2. Enhanced Split Management
+**Potential Improvements:**
+- Warning when modifying splits on activities with existing session data
+- Bulk edit split names across multiple activities
+- Split templates/presets (e.g., "Left/Right", "Upper/Lower", etc.)
+- Copy splits from one activity to another
+
+### 3. Advanced Split Features
+**Future Enhancements:**
+- Split-based goals and targets
+- Asymmetry detection and alerts
+- Split comparison analytics
+- Export split data for external analysis
+
+## File Structure
+
+```
+fractal-goals/
+├── models.py                                    # Updated with splits schema
+├── blueprints/
+│   └── activities_api.py                        # Split CRUD operations
+├── python-scripts/
+│   ├── migrate_add_splits.py                    # Initial splits migration
+│   └── migrate_add_split_to_metrics.py          # Metric values migration
+├── client/src/
+│   ├── pages/
+│   │   ├── ManageActivities.jsx                 # Split creation/editing UI
+│   │   ├── SessionDetail.jsx                    # Split-aware session recording
+│   │   ├── Sessions.jsx                         # Split data display
+│   │   └── Analytics.jsx                        # Split filtering and analysis
+│   └── components/
+│       ├── SessionActivityItem.jsx              # Split-aware metric inputs
+│       └── analytics/
+│           ├── ScatterPlot.jsx                  # Split-filtered scatter plots
+│           └── LineGraph.jsx                    # Split-filtered line graphs
+└── implementation-docs/
+    └── track-splits-feature.md                  # This document
+```
+
+## Testing Checklist
+
+- [x] Database migrations run successfully
+- [x] Create activity with splits
+- [x] Edit activity splits
+- [x] Duplicate activity with splits
+- [x] Add/remove splits (respecting min/max)
+- [x] Record session with split-enabled activity
+- [x] View split data in session history
+- [x] Splits badge displays correctly
+- [x] UI enforces constraints
+- [x] Backward compatibility maintained
+- [x] Font sizes consistent
+- [x] No redundant metric displays
+- [x] Analytics page integration
+- [x] Split filtering in Scatter Plot
+- [x] Split filtering in Line Graph
+- [x] Chart titles update with split names
+- [ ] Split-based goal tracking
+- [ ] Export split data
+
+## Known Limitations
+
+1. **Maximum 5 splits per activity** - Enforced at both UI and API levels
+2. **Minimum 2 splits required** - Cannot create single-split activities
+3. **No split reordering** - Splits maintain creation order
+4. **Analytics not yet integrated** - Split data not yet visualized in Analytics page
+
+## Rollback Plan
+
+If issues arise:
+1. Splits can be disabled per activity (uncheck "Track Splits")
+2. Existing non-split activities unaffected
+3. Database migrations are additive (nullable columns)
+4. No breaking changes to existing functionality
+
+---
+
+**Status**: Splits feature fully implemented and integrated across all pages (ManageActivities, SessionDetail, Sessions, Analytics). Core functionality complete and tested. Ready for optional enhancements and advanced features.

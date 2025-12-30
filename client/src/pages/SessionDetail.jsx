@@ -361,6 +361,7 @@ function SessionDetail() {
             description: activityDef.description,
             has_sets: activityDef.has_sets,
             has_metrics: activityDef.has_metrics,
+            has_splits: activityDef.has_splits || false,
             completed: false,
             sets: activityDef.has_sets ? [] : undefined,
             metrics: (!activityDef.has_sets && activityDef.has_metrics) ?
