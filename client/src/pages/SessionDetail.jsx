@@ -6,6 +6,7 @@ import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../utils/dateUtils';
+import ActivityBuilder from '../components/ActivityBuilder';
 import '../App.css';
 
 /**
@@ -99,6 +100,8 @@ function SessionDetail() {
     const [parentGoals, setParentGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
+    const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
 
     // Local state for editing session datetime fields
@@ -437,8 +440,35 @@ function SessionDetail() {
         }
     };
 
-    const handleAddActivity = (sectionIndex, activityId) => {
-        const activityDef = activities.find(a => a.id === activityId);
+    const handleOpenActivityBuilder = (sectionIndex) => {
+        setSectionForNewActivity(sectionIndex);
+        setShowBuilder(true);
+    };
+
+    const handleActivityCreated = (newActivity) => {
+        if (!newActivity) return;
+
+        // Add to local list of activities
+        setActivities(prev => [...prev, newActivity]);
+
+        // If we were trying to add it to a section, do that now
+        if (sectionForNewActivity !== null) {
+            // Need to wait for state update or pass the new activity object directly
+            // Since handleAddActivity looks up by ID from 'activities' state which might not be updated yet
+            // We'll modify handleAddActivity to accept an object OR wait for re-render
+            // Actually, handleAddActivity looks up using: const activity = activities.find(a => a.id === activityId);
+            // Since setState is async, 'activities' won't have the new one yet in this closure.
+
+            // So we'll manually call the logic inside handleAddActivity but with the new object
+            // Or better, update handleAddActivity to accept optional activity object
+
+            handleAddActivity(sectionForNewActivity, newActivity.id, newActivity);
+            setSectionForNewActivity(null);
+        }
+    };
+
+    const handleAddActivity = (sectionIndex, activityId, activityObject = null) => {
+        const activityDef = activityObject || activities.find(a => a.id === activityId);
         if (!activityDef) return;
 
         const newActivity = {
@@ -877,6 +907,21 @@ function SessionDetail() {
                                             </button>
                                         ))}
                                         <button
+                                            onClick={() => handleOpenActivityBuilder(sectionIndex)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: '#1a1a1a',
+                                                border: '1px dashed #666',
+                                                borderRadius: '4px',
+                                                color: '#aaa',
+                                                cursor: 'pointer',
+                                                fontSize: '13px',
+                                                fontWeight: 500
+                                            }}
+                                        >
+                                            + Create New Activity
+                                        </button>
+                                        <button
                                             onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
                                             style={{
                                                 padding: '6px 12px',
@@ -995,6 +1040,14 @@ function SessionDetail() {
                 title="Delete Session"
                 message="Are you sure you want to delete this session? This action cannot be undone."
                 confirmText="Delete"
+            />
+
+            {/* Activity Builder Modal */}
+            <ActivityBuilder
+                isOpen={showBuilder}
+                onClose={() => setShowBuilder(false)}
+                rootId={rootId}
+                onSave={handleActivityCreated}
             />
         </div>
     );

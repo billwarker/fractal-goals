@@ -134,17 +134,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 has_splits: hasSplits
             };
 
+            let result;
             if (editingActivity) {
-                await updateActivity(rootId, editingActivity.id, dataToSubmit);
+                result = await updateActivity(rootId, editingActivity.id, dataToSubmit);
             } else {
-                await createActivity(rootId, dataToSubmit);
+                result = await createActivity(rootId, dataToSubmit);
             }
 
             resetForm();
             setCreating(false);
             setPendingSubmission(null);
             setShowMetricWarning(false);
-            onSave?.();
+            onSave?.(result);
             onClose();
         } catch (err) {
             console.error(editingActivity ? "Failed to update activity" : "Failed to create activity", err);
