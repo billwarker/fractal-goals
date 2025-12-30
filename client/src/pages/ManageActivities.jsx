@@ -27,6 +27,8 @@ function ManageActivities() {
     const [hasSets, setHasSets] = useState(false);
     const [hasMetrics, setHasMetrics] = useState(true);
     const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
+    const [hasSplits, setHasSplits] = useState(false);
+    const [splits, setSplits] = useState([{ name: 'Split #1' }, { name: 'Split #2' }]);
 
     useEffect(() => {
         if (!rootId) {
@@ -64,12 +66,33 @@ function ManageActivities() {
         setMetrics(newMetrics);
     };
 
+    const handleAddSplit = () => {
+        if (splits.length < 5) {
+            setSplits([...splits, { name: `Split #${splits.length + 1}` }]);
+        }
+    };
+
+    const handleRemoveSplit = (index) => {
+        if (splits.length > 2) {
+            const newSplits = [...splits];
+            newSplits.splice(index, 1);
+            setSplits(newSplits);
+        }
+    };
+
+    const handleSplitChange = (index, value) => {
+        const newSplits = [...splits];
+        newSplits[index] = { ...newSplits[index], name: value };
+        setSplits(newSplits);
+    };
+
     const handleLoadActivity = (activity) => {
         setEditingId(activity.id);
         setName(activity.name);
         setDescription(activity.description || '');
         setHasSets(activity.has_sets);
         setMetricsMultiplicative(activity.metrics_multiplicative || false);
+        setHasSplits(activity.has_splits || false);
 
         // Set hasMetrics based on whether metrics actually exist
         const hasMetricDefinitions = activity.metric_definitions && activity.metric_definitions.length > 0;
@@ -87,6 +110,16 @@ function ManageActivities() {
         } else {
             setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
         }
+
+        // Load splits
+        if (activity.split_definitions && activity.split_definitions.length > 0) {
+            setSplits(activity.split_definitions.map(s => ({
+                id: s.id,  // Preserve the id for updates
+                name: s.name
+            })));
+        } else {
+            setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
+        }
     };
 
     const handleCancelEdit = () => {
@@ -97,6 +130,8 @@ function ManageActivities() {
         setHasSets(false);
         setHasMetrics(true);
         setMetricsMultiplicative(false);
+        setHasSplits(false);
+        setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
     };
 
     const processSubmission = async (overrideData = null) => {
@@ -106,9 +141,11 @@ function ManageActivities() {
                 name,
                 description,
                 metrics: hasMetrics ? metrics.filter(m => m.name.trim() !== '') : [],
+                splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
                 has_sets: hasSets,
                 has_metrics: hasMetrics,
-                metrics_multiplicative: metricsMultiplicative
+                metrics_multiplicative: metricsMultiplicative,
+                has_splits: hasSplits
             };
 
             if (editingId) {
@@ -125,6 +162,8 @@ function ManageActivities() {
             setHasSets(false);
             setHasMetrics(true);
             setMetricsMultiplicative(false);
+            setHasSplits(false);
+            setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
             setCreating(false);
             setPendingSubmission(null);
             setShowMetricWarning(false);
@@ -158,7 +197,14 @@ function ManageActivities() {
                         `This may affect existing session data. Metrics from old sessions will no longer display.`
                     );
                     setPendingSubmission({
-                        name, description, metrics: hasMetrics ? validMetrics : [], has_sets: hasSets, has_metrics: hasMetrics, metrics_multiplicative: metricsMultiplicative
+                        name,
+                        description,
+                        metrics: hasMetrics ? validMetrics : [],
+                        splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
+                        has_sets: hasSets,
+                        has_metrics: hasMetrics,
+                        metrics_multiplicative: metricsMultiplicative,
+                        has_splits: hasSplits
                     });
                     setShowMetricWarning(true);
                     return;
@@ -199,9 +245,13 @@ function ManageActivities() {
                     is_top_set_metric: m.is_top_set_metric || false,
                     is_multiplicative: m.is_multiplicative !== undefined ? m.is_multiplicative : true
                 })) || [],
+                splits: activity.split_definitions?.map(s => ({
+                    name: s.name
+                })) || [],
                 has_sets: activity.has_sets,
                 has_metrics: activity.has_metrics,
-                metrics_multiplicative: activity.metrics_multiplicative
+                metrics_multiplicative: activity.metrics_multiplicative,
+                has_splits: activity.has_splits || false
             });
 
             // Activities list will auto-refresh via context
@@ -291,6 +341,14 @@ function ManageActivities() {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
                                         <input
                                             type="checkbox"
+                                            checked={hasSplits}
+                                            onChange={e => setHasSplits(e.target.checked)}
+                                        />
+                                        Track Splits
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
                                             checked={hasMetrics}
                                             onChange={e => setHasMetrics(e.target.checked)}
                                         />
@@ -308,6 +366,68 @@ function ManageActivities() {
                                         </label>
                                     )}
                                 </div>
+
+                                {/* Splits Section - Conditional */}
+                                {hasSplits && (
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Splits (Min 2, Max 5)</label>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                                            {splits.map((split, idx) => (
+                                                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={split.name}
+                                                        onChange={e => handleSplitChange(idx, e.target.value)}
+                                                        placeholder={`Split #${idx + 1}`}
+                                                        style={{
+                                                            width: '150px',
+                                                            padding: '10px',
+                                                            background: '#2a2a2a',
+                                                            border: '1px solid #444',
+                                                            borderRadius: '4px',
+                                                            color: 'white'
+                                                        }}
+                                                    />
+                                                    {splits.length > 2 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveSplit(idx)}
+                                                            style={{
+                                                                padding: '10px',
+                                                                background: '#d32f2f',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                color: 'white',
+                                                                cursor: 'pointer',
+                                                                width: '40px'
+                                                            }}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
+                                                    {idx === splits.length - 1 && splits.length < 5 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddSplit}
+                                                            style={{
+                                                                padding: '10px 16px',
+                                                                background: '#333',
+                                                                border: '1px dashed #666',
+                                                                borderRadius: '4px',
+                                                                color: '#aaa',
+                                                                cursor: 'pointer',
+                                                                fontSize: '13px',
+                                                                whiteSpace: 'nowrap'
+                                                            }}
+                                                        >
+                                                            + Add Split
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Metrics Section - Conditional */}
                                 {hasMetrics && (
@@ -494,6 +614,18 @@ function ManageActivities() {
                                                         border: '1px solid #444'
                                                     }}>
                                                         Sets
+                                                    </span>
+                                                )}
+                                                {activity.has_splits && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        background: '#333',
+                                                        color: '#7B5CFF',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '3px',
+                                                        border: '1px solid #444'
+                                                    }}>
+                                                        Splits
                                                     </span>
                                                 )}
                                                 {(!activity.metric_definitions || activity.metric_definitions.length === 0) && (

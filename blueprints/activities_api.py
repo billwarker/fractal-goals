@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import (
     get_engine, get_session,
-    ActivityDefinition, MetricDefinition,
+    ActivityDefinition, MetricDefinition, SplitDefinition,
     validate_root_goal
 )
 
@@ -49,7 +49,8 @@ def create_activity(root_id):
             description=data.get('description', ''),
             has_sets=data.get('has_sets', False),
             has_metrics=data.get('has_metrics', True),
-            metrics_multiplicative=data.get('metrics_multiplicative', False)
+            metrics_multiplicative=data.get('metrics_multiplicative', False),
+            has_splits=data.get('has_splits', False)
         )
         session.add(new_activity)
         session.flush() # Get ID
@@ -70,8 +71,22 @@ def create_activity(root_id):
                 )
                 session.add(new_metric)
         
+        # Create Splits
+        splits_data = data.get('splits', [])
+        if len(splits_data) > 5:
+             return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
+
+        for idx, s in enumerate(splits_data):
+            if s.get('name'):
+                new_split = SplitDefinition(
+                    activity_id=new_activity.id,
+                    name=s['name'],
+                    order=idx
+                )
+                session.add(new_split)
+        
         session.commit()
-        session.refresh(new_activity) # refresh to load metrics
+        session.refresh(new_activity) # refresh to load metrics and splits
         return jsonify(new_activity.to_dict()), 201
 
     except Exception as e:
@@ -107,6 +122,8 @@ def update_activity(root_id, activity_id):
             activity.has_metrics = data['has_metrics']
         if 'metrics_multiplicative' in data:
             activity.metrics_multiplicative = data['metrics_multiplicative']
+        if 'has_splits' in data:
+            activity.has_splits = data['has_splits']
         
         # Update metrics if provided
         if 'metrics' in data:
@@ -164,6 +181,44 @@ def update_activity(root_id, activity_id):
             for existing_metric in existing_metrics:
                 if existing_metric.id not in updated_metric_ids:
                     session.delete(existing_metric)
+        
+        # Update splits if provided
+        if 'splits' in data:
+            splits_data = data.get('splits', [])
+            if len(splits_data) > 5:
+                return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
+            
+            # Get existing splits
+            existing_splits = session.query(SplitDefinition).filter_by(activity_id=activity_id).all()
+            existing_splits_dict = {s.id: s for s in existing_splits}
+            
+            # Track which existing splits were updated
+            updated_split_ids = set()
+            
+            # Update or create splits
+            for idx, s in enumerate(splits_data):
+                if s.get('name'):
+                    split_id = s.get('id')
+                    
+                    if split_id and split_id in existing_splits_dict:
+                        # Update existing split
+                        existing_split = existing_splits_dict[split_id]
+                        existing_split.name = s['name']
+                        existing_split.order = idx
+                        updated_split_ids.add(split_id)
+                    else:
+                        # Create new split
+                        new_split = SplitDefinition(
+                            activity_id=activity.id,
+                            name=s['name'],
+                            order=idx
+                        )
+                        session.add(new_split)
+            
+            # Delete splits that were not in the update
+            for existing_split in existing_splits:
+                if existing_split.id not in updated_split_ids:
+                    session.delete(existing_split)
         
         session.commit()
         session.refresh(activity)  # Refresh to load updated metrics
