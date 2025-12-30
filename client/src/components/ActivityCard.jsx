@@ -148,7 +148,7 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '6px' }}>
                 <button
-                    onClick={onEdit}
+                    onClick={() => onEdit(activity)}
                     style={{
                         flex: 1,
                         padding: '8px',
@@ -167,7 +167,7 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
                     Edit
                 </button>
                 <button
-                    onClick={onDuplicate}
+                    onClick={() => onDuplicate(activity)}
                     disabled={isCreating}
                     style={{
                         padding: '8px 12px',
@@ -187,7 +187,7 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
                     ⎘
                 </button>
                 <button
-                    onClick={onDelete}
+                    onClick={() => onDelete(activity)}
                     style={{
                         padding: '8px 12px',
                         background: '#d32f2f',

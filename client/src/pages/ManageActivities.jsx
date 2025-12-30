@@ -4,7 +4,9 @@ import { useActivities } from '../contexts/ActivitiesContext';
 import { useSessions } from '../contexts/SessionsContext';
 import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
+
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import '../App.css';
 
 /**
@@ -13,7 +15,8 @@ import '../App.css';
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, createActivity, deleteActivity, loading, error: contextError } = useActivities();
+    const { activities, fetchActivities, createActivity, deleteActivity, loading, error: contextError,
+        activityGroups, fetchActivityGroups, deleteActivityGroup, reorderActivityGroups } = useActivities();
     const { sessions, fetchSessions } = useSessions();
 
     const [error, setError] = useState(null);
@@ -22,6 +25,11 @@ function ManageActivities() {
     const [showBuilder, setShowBuilder] = useState(false);
     const [editingActivity, setEditingActivity] = useState(null);
 
+    // Group State
+    const [showGroupBuilder, setShowGroupBuilder] = useState(false);
+    const [editingGroup, setEditingGroup] = useState(null);
+    const [groupToDelete, setGroupToDelete] = useState(null);
+
     useEffect(() => {
         if (!rootId) {
             navigate('/');
@@ -29,7 +37,8 @@ function ManageActivities() {
         }
         fetchActivities(rootId);
         fetchSessions(rootId);
-    }, [rootId, navigate, fetchActivities, fetchSessions]);
+        fetchActivityGroups(rootId);
+    }, [rootId, navigate, fetchActivities, fetchSessions, fetchActivityGroups]);
 
     // Calculate last instantiated time for each activity
     const getLastInstantiated = (activityId) => {
@@ -57,6 +66,54 @@ function ManageActivities() {
         });
 
         return mostRecent.attributes?.session_start || mostRecent.attributes?.created_at;
+    };
+
+    // Group Handlers
+    const handleCreateGroup = () => {
+        setEditingGroup(null);
+        setShowGroupBuilder(true);
+    };
+
+    const handleEditGroup = (group) => {
+        setEditingGroup(group);
+        setShowGroupBuilder(true);
+    };
+
+    const handleDeleteGroupClick = (group) => {
+        setGroupToDelete(group);
+    };
+
+    const handleConfirmDeleteGroup = async () => {
+        if (!groupToDelete) return;
+        try {
+            await deleteActivityGroup(rootId, groupToDelete.id);
+            setGroupToDelete(null);
+        } catch (err) {
+            console.error("Failed to delete group", err);
+            setError("Failed to delete activity group");
+        }
+    };
+
+    const handleMoveGroupUp = async (index) => {
+        if (index === 0) return;
+        const newGroups = [...activityGroups];
+        const temp = newGroups[index];
+        newGroups[index] = newGroups[index - 1];
+        newGroups[index - 1] = temp;
+
+        const groupIds = newGroups.map(g => g.id);
+        await reorderActivityGroups(rootId, groupIds);
+    };
+
+    const handleMoveGroupDown = async (index) => {
+        if (index === activityGroups.length - 1) return;
+        const newGroups = [...activityGroups];
+        const temp = newGroups[index];
+        newGroups[index] = newGroups[index + 1];
+        newGroups[index + 1] = temp;
+
+        const groupIds = newGroups.map(g => g.id);
+        await reorderActivityGroups(rootId, groupIds);
     };
 
     const handleCreateClick = () => {
@@ -144,30 +201,56 @@ function ManageActivities() {
                 <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px' }}>
                     Manage Activities
                 </h1>
-                <button
-                    onClick={handleCreateClick}
-                    style={{
-                        padding: '6px 16px',
-                        background: '#333',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        color: '#ccc',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#444';
-                        e.currentTarget.style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#333';
-                        e.currentTarget.style.color = '#ccc';
-                    }}
-                >
-                    + Create Activity
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                        onClick={handleCreateGroup}
+                        style={{
+                            padding: '6px 16px',
+                            background: 'transparent',
+                            border: '1px dashed #666',
+                            borderRadius: '4px',
+                            color: '#aaa',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#aaa';
+                            e.currentTarget.style.color = 'white';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#666';
+                            e.currentTarget.style.color = '#aaa';
+                        }}
+                    >
+                        + Create Group
+                    </button>
+                    <button
+                        onClick={handleCreateClick}
+                        style={{
+                            padding: '6px 16px',
+                            background: '#333',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: '#ccc',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#444';
+                            e.currentTarget.style.color = 'white';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#333';
+                            e.currentTarget.style.color = '#ccc';
+                        }}
+                    >
+                        + Create Activity
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -176,9 +259,132 @@ function ManageActivities() {
                 </div>
             )}
 
-            {/* Activities Grid */}
+            {/* Groups and Activities Render */}
             <div style={{ padding: '0 40px 40px 40px' }}>
-                {activities.length === 0 ? (
+
+                {/* 1. Render Activity Groups */}
+                {activityGroups && activityGroups.map((group, index) => {
+                    // Filter activities in this group
+                    const groupActivities = activities.filter(a => a.group_id === group.id);
+
+                    return (
+                        <div key={group.id} style={{
+                            marginBottom: '40px',
+                            background: '#1a1a1a',
+                            borderRadius: '12px',
+                            border: '1px solid #333',
+                            padding: '24px'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                                <div>
+                                    <h2 style={{ fontSize: '20px', fontWeight: 400, margin: '0 0 6px 0', color: '#fff' }}>
+                                        {group.name}
+                                    </h2>
+                                    {group.description && (
+                                        <p style={{ fontSize: '13px', color: '#888', margin: 0, maxWidth: '600px' }}>
+                                            {group.description}
+                                        </p>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', marginRight: '8px' }}>
+                                        <button
+                                            onClick={() => handleMoveGroupUp(index)}
+                                            disabled={index === 0}
+                                            style={{
+                                                background: 'transparent', border: 'none', color: index === 0 ? '#444' : '#888',
+                                                cursor: index === 0 ? 'default' : 'pointer', fontSize: '18px', padding: '0 4px',
+                                                display: 'flex', alignItems: 'center'
+                                            }}
+                                            title="Move Up"
+                                        >
+                                            ↑
+                                        </button>
+                                        <button
+                                            onClick={() => handleMoveGroupDown(index)}
+                                            disabled={index === activityGroups.length - 1}
+                                            style={{
+                                                background: 'transparent', border: 'none', color: index === activityGroups.length - 1 ? '#444' : '#888',
+                                                cursor: index === activityGroups.length - 1 ? 'default' : 'pointer', fontSize: '18px', padding: '0 4px',
+                                                display: 'flex', alignItems: 'center'
+                                            }}
+                                            title="Move Down"
+                                        >
+                                            ↓
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => handleEditGroup(group)}
+                                        style={{ padding: '6px 12px', background: '#333', border: 'none', borderRadius: '4px', color: '#ccc', cursor: 'pointer', fontSize: '12px' }}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteGroupClick(group)}
+                                        style={{ padding: '6px 12px', background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#aaa', cursor: 'pointer', fontSize: '12px' }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+
+                            {groupActivities.length > 0 ? (
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                    gap: '20px'
+                                }}>
+                                    {groupActivities.map(activity => (
+                                        <ActivityCard
+                                            key={activity.id}
+                                            activity={activity}
+                                            lastInstantiated={getLastInstantiated(activity.id)}
+                                            onEdit={handleEditClick}
+                                            onDuplicate={handleDuplicate}
+                                            onDelete={handleDeleteClick}
+                                            isCreating={creating}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '30px', textAlign: 'center', color: '#555', border: '1px dashed #333', borderRadius: '8px' }}>
+                                    No activities in this group
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {/* 2. Render Ungrouped Activities */}
+                {activities.some(a => !a.group_id) && (
+                    <div style={{ marginTop: activityGroups?.length > 0 ? '40px' : '0' }}>
+                        {activityGroups?.length > 0 && (
+                            <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#666', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                Ungrouped Activities
+                            </h3>
+                        )}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                            gap: '20px'
+                        }}>
+                            {activities.filter(a => !a.group_id).map(activity => (
+                                <ActivityCard
+                                    key={activity.id}
+                                    activity={activity}
+                                    lastInstantiated={getLastInstantiated(activity.id)}
+                                    onEdit={handleEditClick}
+                                    onDuplicate={handleDuplicate}
+                                    onDelete={handleDeleteClick}
+                                    isCreating={creating}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Empty State (No activities and no groups) */}
+                {activities.length === 0 && (!activityGroups || activityGroups.length === 0) && (
                     <div style={{
                         textAlign: 'center',
                         padding: '60px 20px',
@@ -198,35 +404,17 @@ function ManageActivities() {
                                 borderRadius: '6px',
                                 color: 'white',
                                 fontSize: '14px',
-                                fontWeight: 600,
+                                fontWeight: 'bold',
                                 cursor: 'pointer'
                             }}
                         >
-                            Create Your First Activity
+                            + Create Activity
                         </button>
-                    </div>
-                ) : (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                        gap: '20px'
-                    }}>
-                        {activities.map(activity => (
-                            <ActivityCard
-                                key={activity.id}
-                                activity={activity}
-                                lastInstantiated={getLastInstantiated(activity.id)}
-                                onEdit={() => handleEditClick(activity)}
-                                onDuplicate={() => handleDuplicate(activity)}
-                                onDelete={() => handleDeleteClick(activity)}
-                                isCreating={creating}
-                            />
-                        ))}
                     </div>
                 )}
             </div>
 
-            {/* Activity Builder Modal */}
+            {/* Modals */}
             <ActivityBuilder
                 isOpen={showBuilder}
                 onClose={handleBuilderClose}
@@ -235,16 +423,36 @@ function ManageActivities() {
                 onSave={handleBuilderSave}
             />
 
-            {/* Delete Confirmation Modal */}
+            <GroupBuilderModal
+                isOpen={showGroupBuilder}
+                onClose={() => setShowGroupBuilder(false)}
+                editingGroup={editingGroup}
+                rootId={rootId}
+                onSave={() => {
+                    fetchActivityGroups(rootId);
+                    setShowGroupBuilder(false);
+                }}
+            />
+
             <DeleteConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}
                 onConfirm={handleConfirmDelete}
-                title="Delete Activity?"
-                message={`Are you sure you want to delete "${activityToDelete?.name}"?`}
+                title="Delete Activity"
+                message={`Are you sure you want to delete "${activityToDelete?.name}"? This cannot be undone.`}
+            />
+
+            <DeleteConfirmModal
+                isOpen={!!groupToDelete}
+                onClose={() => setGroupToDelete(null)}
+                onConfirm={handleConfirmDeleteGroup}
+                title="Delete Activity Group"
+                message={`Are you sure you want to delete "${groupToDelete?.name}"? Activities in this group will not be deleted but will become ungrouped.`}
+                confirmText="Delete Group"
             />
         </div>
     );
 }
 
 export default ManageActivities;
+

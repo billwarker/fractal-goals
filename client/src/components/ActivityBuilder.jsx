@@ -6,7 +6,7 @@ import DeleteConfirmModal from './modals/DeleteConfirmModal';
  * Activity Builder Component - Reusable form for creating/editing activities
  */
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
-    const { createActivity, updateActivity } = useActivities();
+    const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
 
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
@@ -23,6 +23,14 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
     const [hasSplits, setHasSplits] = useState(false);
     const [splits, setSplits] = useState([{ name: 'Split #1' }, { name: 'Split #2' }]);
+    const [groupId, setGroupId] = useState('');
+
+    // Fetch groups when opened
+    useEffect(() => {
+        if (isOpen && rootId) {
+            fetchActivityGroups(rootId);
+        }
+    }, [isOpen, rootId, fetchActivityGroups]);
 
     // Load activity data when editing
     useEffect(() => {
@@ -32,6 +40,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             setHasSets(editingActivity.has_sets);
             setMetricsMultiplicative(editingActivity.metrics_multiplicative || false);
             setHasSplits(editingActivity.has_splits || false);
+            setGroupId(editingActivity.group_id || '');
 
             const hasMetricDefinitions = editingActivity.metric_definitions && editingActivity.metric_definitions.length > 0;
             setHasMetrics(hasMetricDefinitions || editingActivity.has_metrics);
@@ -70,6 +79,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         setMetricsMultiplicative(false);
         setHasSplits(false);
         setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
+        setGroupId('');
         setError(null);
     };
 
@@ -130,8 +140,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
                 has_sets: hasSets,
                 has_metrics: hasMetrics,
+                has_metrics: hasMetrics,
                 metrics_multiplicative: metricsMultiplicative,
-                has_splits: hasSplits
+                has_splits: hasSplits,
+                group_id: groupId || null
             };
 
             let result;
@@ -180,8 +192,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                         splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
                         has_sets: hasSets,
                         has_metrics: hasMetrics,
+                        has_metrics: hasMetrics,
                         metrics_multiplicative: metricsMultiplicative,
-                        has_splits: hasSplits
+                        has_splits: hasSplits,
+                        group_id: groupId || null
                     });
                     setShowMetricWarning(true);
                     return;
@@ -282,6 +296,30 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                         resize: 'vertical'
                                     }}
                                 />
+                            </div>
+
+                            {/* Group Selection */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Activity Group</label>
+                                <select
+                                    value={groupId}
+                                    onChange={e => setGroupId(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        background: '#2a2a2a',
+                                        border: '1px solid #444',
+                                        borderRadius: '4px',
+                                        color: 'white'
+                                    }}
+                                >
+                                    <option value="">(No Group)</option>
+                                    {activityGroups && activityGroups.map(group => (
+                                        <option key={group.id} value={group.id}>
+                                            {group.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Flags */}

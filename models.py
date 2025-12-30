@@ -180,6 +180,28 @@ class PracticeSession(Goal):
         return result
 
 
+
+class ActivityGroup(Base):
+    __tablename__ = 'activity_groups'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    created_at = Column(DateTime, default=datetime.now)
+    sort_order = Column(Integer, default=0)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "name": self.name,
+            "description": self.description,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class ActivityDefinition(Base):
     __tablename__ = 'activity_definitions'
 
@@ -192,6 +214,9 @@ class ActivityDefinition(Base):
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
     has_splits = Column(Boolean, default=False)  # When true, activity can be split into multiple portions (e.g., left/right)
+    group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True)
+
+    group = relationship("ActivityGroup", backref="activities")
 
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
@@ -201,6 +226,7 @@ class ActivityDefinition(Base):
             "id": self.id,
             "name": self.name,
             "description": self.description,
+            "group_id": self.group_id,
             "has_sets": self.has_sets,
             "has_metrics": self.has_metrics,
             "metrics_multiplicative": self.metrics_multiplicative,

@@ -5,6 +5,7 @@ const ActivitiesContext = createContext();
 
 export function ActivitiesProvider({ children }) {
     const [activities, setActivities] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -69,6 +70,66 @@ export function ActivitiesProvider({ children }) {
         }
     }, [fetchActivities]);
 
+    // Fetch activity groups
+    const fetchActivityGroups = useCallback(async (rootId) => {
+        if (!rootId) return;
+        try {
+            const res = await fractalApi.getActivityGroups(rootId);
+            setActivityGroups(res.data);
+        } catch (err) {
+            console.error('Failed to fetch activity groups:', err);
+        }
+    }, []);
+
+    // Create activity group
+    const createActivityGroup = useCallback(async (rootId, data) => {
+        try {
+            const res = await fractalApi.createActivityGroup(rootId, data);
+            await fetchActivityGroups(rootId);
+            return res.data;
+        } catch (err) {
+            console.error('Failed to create activity group:', err);
+            throw err;
+        }
+    }, [fetchActivityGroups]);
+
+    // Update activity group
+    const updateActivityGroup = useCallback(async (rootId, groupId, data) => {
+        try {
+            const res = await fractalApi.updateActivityGroup(rootId, groupId, data);
+            await fetchActivityGroups(rootId);
+            return res.data;
+        } catch (err) {
+            console.error('Failed to update activity group:', err);
+            throw err;
+        }
+    }, [fetchActivityGroups]);
+
+    // Delete activity group
+    const deleteActivityGroup = useCallback(async (rootId, groupId) => {
+        try {
+            await fractalApi.deleteActivityGroup(rootId, groupId);
+            await fetchActivityGroups(rootId);
+            // Also refresh activities as their group_id might have been nulled?
+            // Yes, backend unlinks them.
+            await fetchActivities(rootId);
+        } catch (err) {
+            console.error('Failed to delete activity group:', err);
+            throw err;
+        }
+    }, [fetchActivityGroups, fetchActivities]);
+
+    // Reorder activity groups
+    const reorderActivityGroups = useCallback(async (rootId, groupIds) => {
+        try {
+            await fractalApi.reorderActivityGroups(rootId, groupIds);
+            await fetchActivityGroups(rootId);
+        } catch (err) {
+            console.error('Failed to reorder activity groups:', err);
+            throw err;
+        }
+    }, [fetchActivityGroups]);
+
     // Get a specific activity by ID
     const getActivityById = useCallback((activityId) => {
         return activities.find(a => a.id === activityId);
@@ -82,7 +143,13 @@ export function ActivitiesProvider({ children }) {
         createActivity,
         updateActivity,
         deleteActivity,
-        getActivityById
+        getActivityById,
+        activityGroups,
+        fetchActivityGroups,
+        createActivityGroup,
+        updateActivityGroup,
+        deleteActivityGroup,
+        reorderActivityGroups
     };
 
     return (

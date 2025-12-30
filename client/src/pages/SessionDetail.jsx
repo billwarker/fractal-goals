@@ -97,8 +97,10 @@ function SessionDetail() {
     const [sessionData, setSessionData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activities, setActivities] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
     const [parentGoals, setParentGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
+    const [selectorState, setSelectorState] = useState({}); // { sectionIndex: groupId | null }
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
@@ -155,10 +157,14 @@ function SessionDetail() {
 
     const fetchActivities = async () => {
         try {
-            const res = await fractalApi.getActivities(rootId);
-            setActivities(res.data);
+            const [actRes, groupRes] = await Promise.all([
+                fractalApi.getActivities(rootId),
+                fractalApi.getActivityGroups(rootId)
+            ]);
+            setActivities(actRes.data);
+            setActivityGroups(groupRes.data);
         } catch (err) {
-            console.error("Failed to fetch activities", err);
+            console.error("Failed to fetch activities or groups", err);
         }
     };
 
@@ -887,54 +893,125 @@ function SessionDetail() {
                         <div style={{ marginTop: '15px' }}>
                             {showActivitySelector[sectionIndex] ? (
                                 <div style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #444' }}>
-                                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity to add:</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                        {activities.map(act => (
-                                            <button
-                                                key={act.id}
-                                                onClick={() => handleAddActivity(sectionIndex, act.id)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: '#333',
-                                                    border: '1px solid #555',
-                                                    borderRadius: '4px',
-                                                    color: 'white',
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px'
-                                                }}
-                                            >
-                                                {act.name}
-                                            </button>
-                                        ))}
-                                        <button
-                                            onClick={() => handleOpenActivityBuilder(sectionIndex)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                background: '#1a1a1a',
-                                                border: '1px dashed #666',
-                                                borderRadius: '4px',
-                                                color: '#aaa',
-                                                cursor: 'pointer',
-                                                fontSize: '13px',
-                                                fontWeight: 500
-                                            }}
-                                        >
-                                            + Create New Activity
-                                        </button>
-                                        <button
-                                            onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
-                                            style={{
-                                                padding: '6px 12px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                color: '#888',
-                                                cursor: 'pointer',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
+
+                                    {selectorState[sectionIndex] ? (
+                                        // Specific Group View
+                                        <>
+                                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                                                <button
+                                                    onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: null }))}
+                                                    style={{ marginRight: '10px', background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}
+                                                >
+                                                    ← Back to Groups
+                                                </button>
+                                                <div style={{ fontSize: '12px', color: '#888', fontWeight: 'bold' }}>
+                                                    {activityGroups.find(g => g.id === selectorState[sectionIndex])?.name || 'Group'}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                {/* Activities in Group */}
+                                                {activities.filter(a => a.group_id === selectorState[sectionIndex]).map(act => (
+                                                    <button
+                                                        key={act.id}
+                                                        onClick={() => handleAddActivity(sectionIndex, act.id)}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            background: '#333',
+                                                            border: '1px solid #555',
+                                                            borderRadius: '4px',
+                                                            color: 'white',
+                                                            cursor: 'pointer',
+                                                            fontSize: '13px'
+                                                        }}
+                                                    >
+                                                        {act.name}
+                                                    </button>
+                                                ))}
+                                                {activities.filter(a => a.group_id === selectorState[sectionIndex]).length === 0 && (
+                                                    <div style={{ color: '#666', fontSize: '12px', width: '100%', fontStyle: 'italic' }}>No activities in this group</div>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        // Top Level View
+                                        <>
+                                            <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity group or ungrouped activity:</div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                {/* Groups */}
+                                                {activityGroups.map(group => (
+                                                    <button
+                                                        key={group.id}
+                                                        onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: group.id }))}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            background: '#1a1a1a',
+                                                            border: '1px solid #666',
+                                                            borderRadius: '4px',
+                                                            color: '#fff',
+                                                            cursor: 'pointer',
+                                                            fontSize: '13px',
+                                                            fontWeight: 'bold',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        {group.name} ›
+                                                    </button>
+                                                ))}
+
+                                                {/* Ungrouped */}
+                                                {activities.filter(a => !a.group_id).map(act => (
+                                                    <button
+                                                        key={act.id}
+                                                        onClick={() => handleAddActivity(sectionIndex, act.id)}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            background: '#333',
+                                                            border: '1px solid #555',
+                                                            borderRadius: '4px',
+                                                            color: 'white',
+                                                            cursor: 'pointer',
+                                                            fontSize: '13px'
+                                                        }}
+                                                    >
+                                                        {act.name}
+                                                    </button>
+                                                ))}
+
+                                                <div style={{ width: '100%', height: '1px', background: '#333', margin: '4px 0' }}></div>
+
+                                                <button
+                                                    onClick={() => handleOpenActivityBuilder(sectionIndex)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: '#1a1a1a',
+                                                        border: '1px dashed #666',
+                                                        borderRadius: '4px',
+                                                        color: '#aaa',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px',
+                                                        fontWeight: 500
+                                                    }}
+                                                >
+                                                    + Create New Activity
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: '#888',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px'
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <button
