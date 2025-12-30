@@ -1,34 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
+import { useSessions } from '../contexts/SessionsContext';
+import ActivityBuilder from '../components/ActivityBuilder';
+import ActivityCard from '../components/ActivityCard';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import '../App.css';
 
 /**
- * Manage Activities Page - Create and manage activity definitions
+ * Manage Activities Page - Grid view of activity tiles with modal builder
  */
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, createActivity, updateActivity, deleteActivity, loading, error: contextError } = useActivities();
+    const { activities, fetchActivities, createActivity, deleteActivity, loading, error: contextError } = useActivities();
+    const { sessions, fetchSessions } = useSessions();
 
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
     const [activityToDelete, setActivityToDelete] = useState(null);
-    const [editingId, setEditingId] = useState(null);
-    const [pendingSubmission, setPendingSubmission] = useState(null);
-    const [showMetricWarning, setShowMetricWarning] = useState(false);
-    const [metricWarningMessage, setMetricWarningMessage] = useState('');
-
-    // Form State
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [metrics, setMetrics] = useState([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
-    const [hasSets, setHasSets] = useState(false);
-    const [hasMetrics, setHasMetrics] = useState(true);
-    const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
-    const [hasSplits, setHasSplits] = useState(false);
-    const [splits, setSplits] = useState([{ name: 'Split #1' }, { name: 'Split #2' }]);
+    const [showBuilder, setShowBuilder] = useState(false);
+    const [editingActivity, setEditingActivity] = useState(null);
 
     useEffect(() => {
         if (!rootId) {
@@ -36,183 +28,56 @@ function ManageActivities() {
             return;
         }
         fetchActivities(rootId);
-    }, [rootId, navigate, fetchActivities]);
+        fetchSessions(rootId);
+    }, [rootId, navigate, fetchActivities, fetchSessions]);
 
-    const handleAddMetric = () => {
-        if (metrics.length < 3) {
-            setMetrics([...metrics, { name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
-        }
+    // Calculate last instantiated time for each activity
+    const getLastInstantiated = (activityId) => {
+        if (!sessions || sessions.length === 0) return null;
+
+        // Find all sessions that use this activity
+        const activitySessions = sessions.filter(session => {
+            // Session data is in attributes.session_data
+            const sessionData = session.attributes?.session_data;
+            if (!sessionData || !sessionData.sections) return false;
+
+            // Check all sections for exercises with this activity_id
+            return sessionData.sections.some(section =>
+                section.exercises?.some(exercise => exercise.activity_id === activityId)
+            );
+        });
+
+        if (activitySessions.length === 0) return null;
+
+        // Get the most recent session
+        const mostRecent = activitySessions.reduce((latest, current) => {
+            const currentStart = new Date(current.attributes?.session_start || current.attributes?.created_at);
+            const latestStart = new Date(latest.attributes?.session_start || latest.attributes?.created_at);
+            return currentStart > latestStart ? current : latest;
+        });
+
+        return mostRecent.attributes?.session_start || mostRecent.attributes?.created_at;
     };
 
-    const handleRemoveMetric = (index) => {
-        const newMetrics = [...metrics];
-        newMetrics.splice(index, 1);
-        setMetrics(newMetrics);
+    const handleCreateClick = () => {
+        setEditingActivity(null);
+        setShowBuilder(true);
     };
 
-    const handleMetricChange = (index, field, value) => {
-        const newMetrics = [...metrics];
-
-        // If setting is_top_set_metric to true, unset it for all other metrics
-        if (field === 'is_top_set_metric' && value === true) {
-            newMetrics.forEach((m, i) => {
-                if (i !== index) {
-                    m.is_top_set_metric = false;
-                }
-            });
-        }
-
-        newMetrics[index] = { ...newMetrics[index], [field]: value };
-        setMetrics(newMetrics);
+    const handleEditClick = (activity) => {
+        setEditingActivity(activity);
+        setShowBuilder(true);
     };
 
-    const handleAddSplit = () => {
-        if (splits.length < 5) {
-            setSplits([...splits, { name: `Split #${splits.length + 1}` }]);
-        }
+    const handleBuilderClose = () => {
+        setShowBuilder(false);
+        setEditingActivity(null);
     };
 
-    const handleRemoveSplit = (index) => {
-        if (splits.length > 2) {
-            const newSplits = [...splits];
-            newSplits.splice(index, 1);
-            setSplits(newSplits);
-        }
-    };
-
-    const handleSplitChange = (index, value) => {
-        const newSplits = [...splits];
-        newSplits[index] = { ...newSplits[index], name: value };
-        setSplits(newSplits);
-    };
-
-    const handleLoadActivity = (activity) => {
-        setEditingId(activity.id);
-        setName(activity.name);
-        setDescription(activity.description || '');
-        setHasSets(activity.has_sets);
-        setMetricsMultiplicative(activity.metrics_multiplicative || false);
-        setHasSplits(activity.has_splits || false);
-
-        // Set hasMetrics based on whether metrics actually exist
-        const hasMetricDefinitions = activity.metric_definitions && activity.metric_definitions.length > 0;
-        setHasMetrics(hasMetricDefinitions || activity.has_metrics);
-
-        // Load metrics
-        if (activity.metric_definitions && activity.metric_definitions.length > 0) {
-            setMetrics(activity.metric_definitions.map(m => ({
-                id: m.id,  // Preserve the id for updates
-                name: m.name,
-                unit: m.unit,
-                is_top_set_metric: m.is_top_set_metric || false,
-                is_multiplicative: m.is_multiplicative !== undefined ? m.is_multiplicative : true
-            })));
-        } else {
-            setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
-        }
-
-        // Load splits
-        if (activity.split_definitions && activity.split_definitions.length > 0) {
-            setSplits(activity.split_definitions.map(s => ({
-                id: s.id,  // Preserve the id for updates
-                name: s.name
-            })));
-        } else {
-            setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
-        }
-    };
-
-    const handleCancelEdit = () => {
-        setEditingId(null);
-        setName('');
-        setDescription('');
-        setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
-        setHasSets(false);
-        setHasMetrics(true);
-        setMetricsMultiplicative(false);
-        setHasSplits(false);
-        setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
-    };
-
-    const processSubmission = async (overrideData = null) => {
-        try {
-            setCreating(true);
-            const dataToSubmit = overrideData || {
-                name,
-                description,
-                metrics: hasMetrics ? metrics.filter(m => m.name.trim() !== '') : [],
-                splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
-                has_sets: hasSets,
-                has_metrics: hasMetrics,
-                metrics_multiplicative: metricsMultiplicative,
-                has_splits: hasSplits
-            };
-
-            if (editingId) {
-                await updateActivity(rootId, editingId, dataToSubmit);
-            } else {
-                await createActivity(rootId, dataToSubmit);
-            }
-
-            // Reset form
-            setEditingId(null);
-            setName('');
-            setDescription('');
-            setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
-            setHasSets(false);
-            setHasMetrics(true);
-            setMetricsMultiplicative(false);
-            setHasSplits(false);
-            setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
-            setCreating(false);
-            setPendingSubmission(null);
-            setShowMetricWarning(false);
-        } catch (err) {
-            console.error(editingId ? "Failed to update activity" : "Failed to create activity", err);
-            setError(editingId ? "Failed to update activity" : "Failed to create activity");
-            setCreating(false);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        // Filter out empty metrics
-        const validMetrics = metrics.filter(m => m.name.trim() !== '');
-
-        if (editingId) {
-            // Check if metrics are being removed
-            const originalActivity = activities.find(a => a.id === editingId);
-            if (originalActivity && originalActivity.metric_definitions) {
-                const removedMetrics = originalActivity.metric_definitions.filter(
-                    oldMetric => !validMetrics.find(
-                        newMetric => newMetric.name === oldMetric.name && newMetric.unit === oldMetric.unit
-                    )
-                );
-
-                if (removedMetrics.length > 0) {
-                    const metricNames = removedMetrics.map(m => `"${m.name}"`).join(', ');
-                    setMetricWarningMessage(
-                        `You are removing ${removedMetrics.length} metric(s): ${metricNames}. ` +
-                        `This may affect existing session data. Metrics from old sessions will no longer display.`
-                    );
-                    setPendingSubmission({
-                        name,
-                        description,
-                        metrics: hasMetrics ? validMetrics : [],
-                        splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
-                        has_sets: hasSets,
-                        has_metrics: hasMetrics,
-                        metrics_multiplicative: metricsMultiplicative,
-                        has_splits: hasSplits
-                    });
-                    setShowMetricWarning(true);
-                    return;
-                }
-            }
-        }
-
-        processSubmission();
+    const handleBuilderSave = () => {
+        // Activities will auto-refresh via context
+        setShowBuilder(false);
+        setEditingActivity(null);
     };
 
     const handleDeleteClick = (activity) => {
@@ -235,7 +100,6 @@ function ManageActivities() {
         try {
             setCreating(true);
 
-            // Create a copy with the same configuration but new ID
             await createActivity(rootId, {
                 name: `${activity.name} (Copy)`,
                 description: activity.description || '',
@@ -254,7 +118,6 @@ function ManageActivities() {
                 has_splits: activity.has_splits || false
             });
 
-            // Activities list will auto-refresh via context
             setCreating(false);
         } catch (err) {
             console.error("Failed to duplicate activity", err);
@@ -269,482 +132,116 @@ function ManageActivities() {
 
     return (
         <div className="page-container" style={{ color: 'white' }}>
-            <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '20px' }}>
-                Manage Activities
-            </h1>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-                {/* Activity Builder */}
-                <div>
-                    <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>
-                            {editingId ? 'Edit Activity' : 'Activity Builder'}
-                        </h2>
-
-                        {error && (
-                            <div style={{ padding: '10px', background: 'rgba(255,0,0,0.1)', color: '#f44336', marginBottom: '20px', borderRadius: '4px' }}>
-                                {error}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ display: 'grid', gap: '15px' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Activity Name</label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={e => setName(e.target.value)}
-                                        placeholder="e.g. Scale Practice"
-                                        style={{
-                                            width: '100%',
-                                            padding: '10px',
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            color: 'white'
-                                        }}
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Description</label>
-                                    <textarea
-                                        value={description}
-                                        onChange={e => setDescription(e.target.value)}
-                                        placeholder="Optional description"
-                                        style={{
-                                            width: '100%',
-                                            minHeight: '80px',
-                                            padding: '10px',
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontFamily: 'inherit',
-                                            resize: 'vertical'
-                                        }}
-                                    />
-                                </div>
-
-                                {/* Flags */}
-                                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={hasSets}
-                                            onChange={e => setHasSets(e.target.checked)}
-                                        />
-                                        Track Sets
-                                    </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={hasSplits}
-                                            onChange={e => setHasSplits(e.target.checked)}
-                                        />
-                                        Track Splits
-                                    </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={hasMetrics}
-                                            onChange={e => setHasMetrics(e.target.checked)}
-                                        />
-                                        Enable Metrics
-                                    </label>
-                                    {/* Show multiplicative checkbox when 2+ metric fields exist */}
-                                    {metrics.length >= 2 && (
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={metricsMultiplicative}
-                                                onChange={e => setMetricsMultiplicative(e.target.checked)}
-                                            />
-                                            Metrics are multiplicative
-                                        </label>
-                                    )}
-                                </div>
-
-                                {/* Splits Section - Conditional */}
-                                {hasSplits && (
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Splits (Min 2, Max 5)</label>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                                            {splits.map((split, idx) => (
-                                                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <input
-                                                        type="text"
-                                                        value={split.name}
-                                                        onChange={e => handleSplitChange(idx, e.target.value)}
-                                                        placeholder={`Split #${idx + 1}`}
-                                                        style={{
-                                                            width: '150px',
-                                                            padding: '10px',
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white'
-                                                        }}
-                                                    />
-                                                    {splits.length > 2 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveSplit(idx)}
-                                                            style={{
-                                                                padding: '10px',
-                                                                background: '#d32f2f',
-                                                                border: 'none',
-                                                                borderRadius: '4px',
-                                                                color: 'white',
-                                                                cursor: 'pointer',
-                                                                width: '40px'
-                                                            }}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    )}
-                                                    {idx === splits.length - 1 && splits.length < 5 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleAddSplit}
-                                                            style={{
-                                                                padding: '10px 16px',
-                                                                background: '#333',
-                                                                border: '1px dashed #666',
-                                                                borderRadius: '4px',
-                                                                color: '#aaa',
-                                                                cursor: 'pointer',
-                                                                fontSize: '13px',
-                                                                whiteSpace: 'nowrap'
-                                                            }}
-                                                        >
-                                                            + Add Split
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Metrics Section - Conditional */}
-                                {hasMetrics && (
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Metrics (Max 3)</label>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {metrics.map((metric, idx) => (
-                                                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', background: '#252525', borderRadius: '4px', border: '1px solid #333' }}>
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                        <input
-                                                            type="text"
-                                                            value={metric.name}
-                                                            onChange={e => handleMetricChange(idx, 'name', e.target.value)}
-                                                            placeholder="Metric Name (e.g. Speed)"
-                                                            style={{
-                                                                flex: 1,
-                                                                padding: '10px',
-                                                                background: '#2a2a2a',
-                                                                border: '1px solid #444',
-                                                                borderRadius: '4px',
-                                                                color: 'white'
-                                                            }}
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={metric.unit}
-                                                            onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
-                                                            placeholder="Unit (e.g. bpm)"
-                                                            style={{
-                                                                width: '100px',
-                                                                padding: '10px',
-                                                                background: '#2a2a2a',
-                                                                border: '1px solid #444',
-                                                                borderRadius: '4px',
-                                                                color: 'white'
-                                                            }}
-                                                        />
-                                                        {metrics.length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleRemoveMetric(idx)}
-                                                                style={{
-                                                                    padding: '10px',
-                                                                    background: '#d32f2f',
-                                                                    border: 'none',
-                                                                    borderRadius: '4px',
-                                                                    color: 'white',
-                                                                    cursor: 'pointer',
-                                                                    width: '40px'
-                                                                }}
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Metric Flags */}
-                                                    <div style={{ display: 'flex', gap: '16px', paddingLeft: '4px' }}>
-                                                        {hasSets && (
-                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={metric.is_top_set_metric || false}
-                                                                    onChange={e => handleMetricChange(idx, 'is_top_set_metric', e.target.checked)}
-                                                                />
-                                                                Top Set Metric
-                                                            </label>
-                                                        )}
-                                                        {metricsMultiplicative && (
-                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={metric.is_multiplicative !== undefined ? metric.is_multiplicative : true}
-                                                                    onChange={e => handleMetricChange(idx, 'is_multiplicative', e.target.checked)}
-                                                                />
-                                                                Multiplicative
-                                                            </label>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {metrics.length < 3 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddMetric}
-                                                    style={{
-                                                        padding: '10px',
-                                                        background: '#333',
-                                                        border: '1px dashed #666',
-                                                        borderRadius: '4px',
-                                                        color: '#aaa',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px'
-                                                    }}
-                                                >
-                                                    + Add Metric
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-                                    {editingId && (
-                                        <button
-                                            type="button"
-                                            onClick={handleCancelEdit}
-                                            style={{
-                                                flex: 1,
-                                                padding: '12px',
-                                                background: '#666',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    )}
-                                    <button
-                                        type="submit"
-                                        disabled={creating}
-                                        style={{
-                                            flex: 1,
-                                            padding: '12px',
-                                            background: creating ? '#666' : '#4caf50',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontWeight: 'bold',
-                                            cursor: creating ? 'not-allowed' : 'pointer',
-                                            opacity: creating ? 0.5 : 1
-                                        }}
-                                    >
-                                        {creating ? (editingId ? 'Saving...' : 'Creating...') : (editingId ? 'Save Activity' : 'Create Activity')}
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {/* Existing Activities */}
-                <div>
-                    <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Saved Activities</h2>
-
-                        {activities.length === 0 ? (
-                            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
-                                No activities defined yet
-                            </p>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {activities.map(activity => (
-                                    <div
-                                        key={activity.id}
-                                        style={{
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            padding: '12px'
-                                        }}
-                                    >
-                                        <div style={{ marginBottom: '8px' }}>
-                                            <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px' }}>
-                                                {activity.name}
-                                            </div>
-                                            {activity.description && (
-                                                <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
-                                                    {activity.description}
-                                                </div>
-                                            )}
-                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                                {/* Indicators */}
-                                                {activity.has_sets && (
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        background: '#333',
-                                                        color: '#ff9800',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '3px',
-                                                        border: '1px solid #444'
-                                                    }}>
-                                                        Sets
-                                                    </span>
-                                                )}
-                                                {activity.has_splits && (
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        background: '#333',
-                                                        color: '#7B5CFF',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '3px',
-                                                        border: '1px solid #444'
-                                                    }}>
-                                                        Splits
-                                                    </span>
-                                                )}
-                                                {(!activity.metric_definitions || activity.metric_definitions.length === 0) && (
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        background: '#333',
-                                                        color: '#888',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '3px',
-                                                        border: '1px solid #444'
-                                                    }}>
-                                                        No Metrics
-                                                    </span>
-                                                )}
-                                                {activity.metrics_multiplicative && (
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        background: '#333',
-                                                        color: '#f44336',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '3px',
-                                                        border: '1px solid #444'
-                                                    }}>
-                                                        Multiplicative
-                                                    </span>
-                                                )}
-                                                {activity.metric_definitions?.map(m => (
-                                                    <span
-                                                        key={m.id}
-                                                        style={{
-                                                            fontSize: '11px',
-                                                            background: '#1a1a1a',
-                                                            padding: '3px 8px',
-                                                            borderRadius: '3px',
-                                                            color: '#4caf50',
-                                                            border: '1px solid #333'
-                                                        }}
-                                                    >
-                                                        {m.name} ({m.unit})
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button
-                                                onClick={() => handleLoadActivity(activity)}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '6px',
-                                                    background: '#2196f3',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    color: 'white',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDuplicate(activity)}
-                                                disabled={creating}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: creating ? '#666' : '#ff9800',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    color: 'white',
-                                                    fontSize: '12px',
-                                                    cursor: creating ? 'not-allowed' : 'pointer',
-                                                    opacity: creating ? 0.5 : 1
-                                                }}
-                                                title="Duplicate this activity"
-                                            >
-                                                ⎘
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteClick(activity)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: '#d32f2f',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    color: 'white',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+            {/* Header with Create Button */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '80px 40px 20px 40px', // Top padding to clear fixed nav
+                borderBottom: '1px solid #333',
+                marginBottom: '30px'
+            }}>
+                <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px' }}>
+                    Manage Activities
+                </h1>
+                <button
+                    onClick={handleCreateClick}
+                    style={{
+                        padding: '6px 16px',
+                        background: '#333',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        color: '#ccc',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#444';
+                        e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#333';
+                        e.currentTarget.style.color = '#ccc';
+                    }}
+                >
+                    + Create Activity
+                </button>
             </div>
-            {/* Modal for Deleting Activity */}
+
+            {error && (
+                <div style={{ padding: '10px', background: 'rgba(255,0,0,0.1)', color: '#f44336', margin: '0 40px 20px 40px', borderRadius: '4px' }}>
+                    {error}
+                </div>
+            )}
+
+            {/* Activities Grid */}
+            <div style={{ padding: '0 40px 40px 40px' }}>
+                {activities.length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        background: '#1e1e1e',
+                        border: '1px dashed #444',
+                        borderRadius: '8px'
+                    }}>
+                        <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
+                            No activities defined yet
+                        </p>
+                        <button
+                            onClick={handleCreateClick}
+                            style={{
+                                padding: '12px 24px',
+                                background: '#4caf50',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: 'white',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Create Your First Activity
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                        gap: '20px'
+                    }}>
+                        {activities.map(activity => (
+                            <ActivityCard
+                                key={activity.id}
+                                activity={activity}
+                                lastInstantiated={getLastInstantiated(activity.id)}
+                                onEdit={() => handleEditClick(activity)}
+                                onDuplicate={() => handleDuplicate(activity)}
+                                onDelete={() => handleDeleteClick(activity)}
+                                isCreating={creating}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Activity Builder Modal */}
+            <ActivityBuilder
+                isOpen={showBuilder}
+                onClose={handleBuilderClose}
+                editingActivity={editingActivity}
+                rootId={rootId}
+                onSave={handleBuilderSave}
+            />
+
+            {/* Delete Confirmation Modal */}
             <DeleteConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Activity?"
                 message={`Are you sure you want to delete "${activityToDelete?.name}"?`}
-            />
-
-            {/* Modal for Metric Removal Warning */}
-            <DeleteConfirmModal
-                isOpen={showMetricWarning}
-                onClose={() => {
-                    setShowMetricWarning(false);
-                    setPendingSubmission(null);
-                    setCreating(false);
-                }}
-                onConfirm={() => processSubmission(pendingSubmission)}
-                title="Removing Metrics"
-                message={metricWarningMessage}
             />
         </div>
     );
