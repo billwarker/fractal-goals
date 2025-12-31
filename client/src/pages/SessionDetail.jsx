@@ -355,6 +355,22 @@ function SessionDetail() {
             }
 
             setSessionData(updatedData);
+
+            // Persist to backend immediately (creates instance if missing)
+            if (exercise.instance_id) {
+                try {
+                    await fractalApi.updateActivityInstance(rootId, exercise.instance_id, {
+                        practice_session_id: sessionId,
+                        activity_definition_id: exercise.activity_id,
+                        time_start: exercise.time_start,
+                        time_stop: exercise.time_stop,
+                        duration_seconds: exercise.duration_seconds
+                    });
+                } catch (err) {
+                    console.error('Error syncing manual time update:', err);
+                    // Ideally show a toast or error indicator
+                }
+            }
             return;
         }
 

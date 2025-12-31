@@ -242,6 +242,15 @@ export const fractalApi = {
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`),
 
     /**
+     * Update activity instance manually (e.g. set times)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - {time_start, time_stop, practice_session_id, activity_definition_id}
+     */
+    updateActivityInstance: (rootId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}`, data),
+
+    /**
      * Get all activity instances for a fractal
      * @param {string} rootId - ID of the fractal
      */
