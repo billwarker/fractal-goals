@@ -53,10 +53,18 @@
 - Template creation from existing sessions
 - Template editing and management
 
-### 6. Multi-Environment Support
+### 6. Programs (Composable Session Templates)
+- Create reusable practice session templates with components
+- Component types: Warm-up, Drill, Practice, Cool-down
+- Visual template builder with drag-and-drop ordering
+- JSON export for template sharing
+- Load and edit existing templates
+
+### 7. Multi-Environment Support
 - Development, Testing, and Production environments
 - Separate databases per environment (goals_dev.db, goals_test.db, goals_prod.db)
 - Environment-specific configuration via .env files
+- Environment indicator in UI
 
 ---
 
@@ -347,13 +355,52 @@ Analytics and reporting page.
 - Session statistics
 
 #### `Programming.jsx`
-Programming-specific features (future expansion).
+Composable practice session template builder.
+
+**Features:**
+- Create session templates with multiple components
+- Component types with color coding (warmup, drill, practice, cooldown)
+- Reorder components within template
+- Duration tracking and calculation
+- Save and load templates
+- Export templates as JSON
+- Custom modals for alerts and confirmations
+
+#### `Programs.jsx`
+Programs list and management page.
+
+**Features:**
+- List all saved programs/templates
+- Create new programs
+- Edit existing programs
+- Delete programs
+- Navigate to program detail view
+
+#### `ProgramDetail.jsx`
+Detailed view of a single program/template.
+
+**Features:**
+- View program components
+- Edit program structure
+- Component reordering
+- Duration management
 
 #### `Log.jsx`
-Activity log and history.
+Activity log and practice session creation.
+
+**Features:**
+- Create new practice sessions
+- Quick session logging
+- Activity history
 
 #### `Selection.jsx`
-Fractal selection page.
+Fractal selection/home page.
+
+**Features:**
+- List all fractals
+- Create new fractal
+- Delete fractal
+- Navigate to fractal view
 
 ### Components (in `/client/src/components/`)
 
@@ -376,6 +423,8 @@ Fractal selection page.
 - **`EditGoalModal.jsx`** - Modal for editing goal details
 - **`SessionCreationModal.jsx`** - Modal for creating sessions
 - **`TemplateSelectionModal.jsx`** - Modal for selecting templates
+- **`AlertModal.jsx`** - Reusable alert/notification modal
+- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal
 
 #### Analytics Components (in `/client/src/components/analytics/`)
 
@@ -387,6 +436,7 @@ Fractal selection page.
 - **`SessionContext.jsx`** - Global state for sessions
 - **`ActivityContext.jsx`** - Global state for activities
 - **`TimezoneContext.jsx`** - Global timezone management
+- **`HeaderContext.jsx`** - Dynamic header actions for page-specific controls
 
 ### Utilities (in `/client/src/utils/`)
 
@@ -493,19 +543,26 @@ From `/my-implementation-plans/features.txt`:
 - ✅ Card layout for activity management
 - ✅ Activity builder as separate component
 - ✅ Activity groups (families)
+- ✅ Practice sessions show session start date instead of age
+- ✅ Programming section (composable session templates)
+
+**In Progress:**
+- 🔄 Programs feature integration with backend
+- 🔄 Navigation improvements (Programs tab added)
 
 **To-Do:**
 - ⏳ Allow adjustments to estimated time in sessions
-- ⏳ Practice sessions show session start date instead of age
 - ⏳ Toggle hiding practice sessions from fractal view
 - ⏳ Add immediate goals to practice sessions
 - ⏳ SMART mode for goals
-- ⏳ Programming section enhancements
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
-- ⏳ Additional programming features
+- ⏳ Additional programming features (backend integration)
 - ⏳ Search functionality for activities
 - ⏳ Improve "add practice session" functionality in fractal UI
 - ⏳ Make duration updates more sensible
+- ⏳ Fix nav bar alignment (selected section slightly lower)
+- ⏳ Add session button text always white (not just on hover)
+- ⏳ Dark/light theme toggle
 
 ---
 
@@ -584,5 +641,26 @@ python python-scripts/migrate_<name>.py
 ---
 
 **Last Updated:** 2025-12-31  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Maintained By:** Project AI Agents
+
+---
+
+## Recent Development Notes
+
+### Programming/Programs Feature (Dec 31, 2025)
+- Added `Programming.jsx` page with composable session template builder
+- Added `Programs.jsx` and `ProgramDetail.jsx` for program management
+- Implemented component-based template system (warmup, drill, practice, cooldown)
+- Added visual template builder with reordering and duration tracking
+- JSON export functionality for templates
+- Custom modal components (`AlertModal`, `DeleteConfirmModal`) for better UX
+- Navigation updated to include "PROGRAMS" tab
+- **Note:** Currently frontend-only, backend integration pending
+
+### Navigation Improvements
+- Added `HeaderContext` for dynamic page-specific actions
+- Fractal name displayed in navigation header
+- Environment indicator shows current environment (development/testing/production)
+- "+ ADD SESSION" button with improved styling
+- Programs tab added to main navigation
