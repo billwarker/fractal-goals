@@ -16,6 +16,60 @@ engine = get_engine()
 # ACTIVITY INSTANCE TIME TRACKING ENDPOINTS
 # ============================================================================
 
+@timers_bp.route('/<root_id>/activity-instances', methods=['GET', 'POST'])
+def activity_instances(root_id):
+    """Get all activity instances (GET) or create a new one (POST)."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        if request.method == 'POST':
+            # Create new activity instance
+            data = request.get_json() or {}
+            instance_id = data.get('instance_id')
+            practice_session_id = data.get('practice_session_id')
+            activity_definition_id = data.get('activity_definition_id')
+            
+            if not instance_id or not practice_session_id or not activity_definition_id:
+                return jsonify({"error": "instance_id, practice_session_id, and activity_definition_id required"}), 400
+            
+            # Check if instance already exists
+            existing = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+            if existing:
+                return jsonify(existing.to_dict())
+            
+            # Create new instance
+            instance = ActivityInstance(
+                id=instance_id,
+                practice_session_id=practice_session_id,
+                activity_definition_id=activity_definition_id
+            )
+            db_session.add(instance)
+            db_session.commit()
+            
+            return jsonify(instance.to_dict()), 201
+        
+        else:  # GET
+            # Get all practice sessions for this fractal
+            sessions = db_session.query(PracticeSession).filter_by(root_id=root_id).all()
+            session_ids = [s.id for s in sessions]
+            
+            # Get all activity instances for these sessions
+            instances = db_session.query(ActivityInstance).filter(
+                ActivityInstance.practice_session_id.in_(session_ids)
+            ).all()
+            
+            return jsonify([inst.to_dict() for inst in instances])
+        
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/start', methods=['POST'])
 def start_activity_timer(root_id, instance_id):
     """Start the timer for an activity instance."""
@@ -74,17 +128,41 @@ def stop_activity_timer(root_id, instance_id):
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         if not instance:
-            return jsonify({"error": "Activity instance not found"}), 404
+            # Instance doesn't exist - create it with current time as both start and stop
+            # This handles the case where the page was refreshed or the instance creation is still pending
+            data = request.get_json() or {}
+            practice_session_id = data.get('practice_session_id')
+            activity_definition_id = data.get('activity_definition_id')
+            
+            if not practice_session_id or not activity_definition_id:
+                return jsonify({"error": "Activity instance not found and missing creation details (practice_session_id, activity_definition_id)"}), 404
+            
+            # Create instance with current time as both start and stop (0 duration)
+            now = datetime.now()
+            instance = ActivityInstance(
+                id=instance_id,
+                practice_session_id=practice_session_id,
+                activity_definition_id=activity_definition_id,
+                time_start=now,
+                time_stop=now,
+                duration_seconds=0
+            )
+            db_session.add(instance)
+            db_session.commit()
+            
+            return jsonify(instance.to_dict())
         
         if not instance.time_start:
-            return jsonify({"error": "Timer was not started"}), 400
-        
-        # Set stop time to now
-        instance.time_stop = datetime.now()
-        
-        # Calculate duration in seconds
-        duration = (instance.time_stop - instance.time_start).total_seconds()
-        instance.duration_seconds = int(duration)
+            # Timer was never started - set both start and stop to now (0 duration)
+            now = datetime.now()
+            instance.time_start = now
+            instance.time_stop = now
+            instance.duration_seconds = 0
+        else:
+            # Normal case - timer was started, now stopping it
+            instance.time_stop = datetime.now()
+            duration = (instance.time_stop - instance.time_start).total_seconds()
+            instance.duration_seconds = int(duration)
         
         db_session.commit()
         
@@ -96,32 +174,6 @@ def stop_activity_timer(root_id, instance_id):
     finally:
         db_session.close()
 
-
-@timers_bp.route('/<root_id>/activity-instances', methods=['GET'])
-def get_activity_instances(root_id):
-    """Get all activity instances for a fractal's practice sessions."""
-    db_session = get_session(engine)
-    try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        # Get all practice sessions for this fractal
-        sessions = db_session.query(PracticeSession).filter_by(root_id=root_id).all()
-        session_ids = [s.id for s in sessions]
-        
-        # Get all activity instances for these sessions
-        instances = db_session.query(ActivityInstance).filter(
-            ActivityInstance.practice_session_id.in_(session_ids)
-        ).all()
-        
-        return jsonify([inst.to_dict() for inst in instances])
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
 
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])

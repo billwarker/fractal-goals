@@ -225,6 +225,14 @@ export const fractalApi = {
     // ========== Activity Instance Time Tracking ==========
 
     /**
+     * Create an activity instance (without starting timer)
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {instance_id, practice_session_id, activity_definition_id}
+     */
+    createActivityInstance: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances`, data),
+
+    /**
      * Start timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
@@ -237,9 +245,10 @@ export const fractalApi = {
      * Stop timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
      */
-    stopActivityTimer: (rootId, instanceId) =>
-        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`),
+    stopActivityTimer: (rootId, instanceId, data = {}) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`, data),
 
     /**
      * Update activity instance manually (e.g. set times)

@@ -241,6 +241,42 @@ function SessionDetail() {
         setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
     }, [sessionData?.session_start, sessionData?.session_end, timezone]);
 
+    // Create activity instances for any activities that don't have them yet
+    const instancesCreatedRef = React.useRef(false);
+    useEffect(() => {
+        if (!sessionData || !sessionId || loading || instancesCreatedRef.current) return;
+
+        const createMissingInstances = async () => {
+            console.log('Creating missing activity instances...');
+            let createdCount = 0;
+
+            for (const section of sessionData.sections || []) {
+                for (const exercise of section.exercises || []) {
+                    // Only process activities (not rest periods, etc.)
+                    if (exercise.type === 'activity' && exercise.instance_id && exercise.activity_id) {
+                        try {
+                            // Try to create the instance - backend will return existing if already created
+                            await fractalApi.createActivityInstance(rootId, {
+                                instance_id: exercise.instance_id,
+                                practice_session_id: sessionId,
+                                activity_definition_id: exercise.activity_id
+                            });
+                            createdCount++;
+                            console.log(`Created/verified instance ${exercise.instance_id.substring(0, 8)}... for activity ${exercise.name}`);
+                        } catch (err) {
+                            // Silently fail - instance might already exist or will be created on timer start
+                            console.debug(`Instance ${exercise.instance_id} already exists or error:`, err.message);
+                        }
+                    }
+                }
+            }
+            console.log(`Finished creating instances. Total processed: ${createdCount}`);
+            instancesCreatedRef.current = true;
+        };
+
+        createMissingInstances();
+    }, [sessionData, sessionId, rootId, loading]);
+
     const handleSectionDurationChange = (sectionIndex, value) => {
         const updatedData = { ...sessionData };
         updatedData.sections[sectionIndex].actual_duration_minutes = parseInt(value) || 0;
@@ -293,7 +329,10 @@ function SessionDetail() {
 
                 } else if (value === 'stop') {
 
-                    response = await fractalApi.stopActivityTimer(rootId, instanceId);
+                    response = await fractalApi.stopActivityTimer(rootId, instanceId, {
+                        practice_session_id: sessionId,
+                        activity_definition_id: exercise.activity_id
+                    });
 
                 } else if (value === 'reset') {
                     // Reset: clear time_start and time_stop locally
@@ -332,7 +371,20 @@ function SessionDetail() {
                 });
 
                 const errorMsg = err.response?.data?.error || err.message;
-                alert(`Error updating timer: ${errorMsg}\n\nInstance ID: ${instanceId}\nAction: ${value}`);
+
+                // Special handling for "Activity instance not found" error
+                if (errorMsg.includes('Activity instance not found')) {
+                    alert(
+                        `Timer Error: Activity instance not found\n\n` +
+                        `This usually happens when:\n` +
+                        `• The page was refreshed before starting the timer\n` +
+                        `• The "Start" button was never clicked\n\n` +
+                        `Solution: Click the "Start" button first, then "Stop".\n\n` +
+                        `Alternatively, you can manually enter the start and stop times below the timer buttons.`
+                    );
+                } else {
+                    alert(`Error updating timer: ${errorMsg}\n\nInstance ID: ${instanceId}\nAction: ${value}`);
+                }
             }
             return;
         }
@@ -428,7 +480,10 @@ function SessionDetail() {
                         // Check if this is an activity with a running timer
                         if (exercise.instance_id && exercise.time_start && !exercise.time_stop) {
                             try {
-                                const response = await fractalApi.stopActivityTimer(rootId, exercise.instance_id);
+                                const response = await fractalApi.stopActivityTimer(rootId, exercise.instance_id, {
+                                    practice_session_id: sessionId,
+                                    activity_definition_id: exercise.activity_id
+                                });
                                 if (response && response.data) {
                                     updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
                                         ...exercise,
@@ -489,15 +544,16 @@ function SessionDetail() {
         }
     };
 
-    const handleAddActivity = (sectionIndex, activityId, activityObject = null) => {
+    const handleAddActivity = async (sectionIndex, activityId, activityObject = null) => {
         const activityDef = activityObject || activities.find(a => a.id === activityId);
         if (!activityDef) return;
 
+        const instanceId = crypto.randomUUID();
         const newActivity = {
             type: 'activity',
             name: activityDef.name,
             activity_id: activityDef.id,
-            instance_id: crypto.randomUUID(),
+            instance_id: instanceId,
             description: activityDef.description,
             has_sets: activityDef.has_sets,
             has_metrics: activityDef.has_metrics,
@@ -507,6 +563,18 @@ function SessionDetail() {
             metrics: (!activityDef.has_sets && activityDef.has_metrics) ?
                 activityDef.metric_definitions.map(m => ({ metric_id: m.id, value: '' })) : undefined
         };
+
+        // Create the activity instance in the database immediately
+        try {
+            await fractalApi.createActivityInstance(rootId, {
+                instance_id: instanceId,
+                practice_session_id: sessionId,
+                activity_definition_id: activityDef.id
+            });
+        } catch (err) {
+            console.error('Error creating activity instance:', err);
+            // Continue anyway - the instance will be created when timer starts if needed
+        }
 
         const updatedData = { ...sessionData };
         if (!updatedData.sections[sectionIndex].exercises) {
