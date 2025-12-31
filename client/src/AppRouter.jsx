@@ -8,6 +8,8 @@ import './App.css';
 // Import page components
 import Selection from './pages/Selection';
 import FractalGoals from './pages/FractalGoals';
+import Programs from './pages/Programs';
+import ProgramDetail from './pages/ProgramDetail';
 import Sessions from './pages/Sessions';
 import SessionDetail from './pages/SessionDetail';
 import Log from './pages/Log';
@@ -112,6 +114,7 @@ function App() {
 
         const navItems = [
             { path: `/${rootId}/fractal-goals`, label: 'FRACTAL VIEW' },
+            { path: `/${rootId}/programs`, label: 'PROGRAMS' },
             { path: `/${rootId}/sessions`, label: 'SESSIONS' },
             { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
         ];
@@ -177,6 +180,8 @@ function App() {
                                 path="/:rootId/fractal-goals"
                                 element={<FractalGoals />}
                             />
+                            <Route path="/:rootId/programs" element={<Programs />} />
+                            <Route path="/:rootId/programs/:programId" element={<ProgramDetail />} />
                             <Route path="/:rootId/sessions" element={<Sessions />} />
                             <Route path="/:rootId/analytics" element={<Analytics />} />
                             <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />

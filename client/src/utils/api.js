@@ -256,6 +256,69 @@ export const fractalApi = {
      */
     getActivityInstances: (rootId) =>
         axios.get(`${API_BASE}/${rootId}/activity-instances`),
+
+    // ========== Programs ==========
+
+    /**
+     * Get all programs for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    getPrograms: (rootId) => axios.get(`${API_BASE}/${rootId}/programs`),
+
+    /**
+     * Get a specific program
+     * @param {string} rootId - ID of the fractal
+     * @param {string} programId - ID of the program
+     */
+    getProgram: (rootId, programId) =>
+        axios.get(`${API_BASE}/${rootId}/programs/${programId}`),
+
+    /**
+     * Create a new program
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {name, description, start_date, end_date, selectedGoals, weeklySchedule}
+     */
+    createProgram: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs`, data),
+
+    /**
+     * Update a program
+     * @param {string} rootId - ID of the fractal
+     * @param {string} programId - ID of the program
+     * @param {Object} data - {name, description, start_date, end_date, selectedGoals, weeklySchedule, is_active}
+     */
+    updateProgram: (rootId, programId, data) =>
+        axios.put(`${API_BASE}/${rootId}/programs/${programId}`, data),
+
+    /**
+     * Delete a program
+     * @param {string} rootId - ID of the fractal
+     * @param {string} programId - ID of the program to delete
+     */
+    deleteProgram: (rootId, programId) =>
+        axios.delete(`${API_BASE}/${rootId}/programs/${programId}`),
+
+    /**
+     * Add a configured day to a program block
+     * @param {string} rootId
+     * @param {string} programId
+     * @param {string} blockId
+     * @param {Object} data - {name, template_id, day_of_week, cascade}
+     */
+    addBlockDay: (rootId, programId, blockId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days`, data),
+
+    updateBlockDay: (rootId, programId, blockId, dayId, data) =>
+        axios.put(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`, data),
+
+    copyBlockDay: (rootId, programId, blockId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/copy`, data),
+
+    attachGoalToBlock: (rootId, programId, blockId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/goals`, data),
+
+    deleteBlockDay: (rootId, programId, blockId, dayId) =>
+        axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
 };
 
 /**

@@ -71,9 +71,15 @@ def create_practice_session(root_id):
     return render_template_string(REACT_APP_TEMPLATE)
 
 
+@pages_bp.route('/<root_id>/programs')
+def programs_page(root_id):
+    """Programs - Future home for programming-related features."""
+    return render_template_string(REACT_APP_TEMPLATE)
+
+
 @pages_bp.route('/<root_id>/create-session-template')
 def create_session_template(root_id):
-    """Programming - Placeholder for future programming features."""
+    """Create Session Template - Manage session templates."""
     return render_template_string(REACT_APP_TEMPLATE)
 
 

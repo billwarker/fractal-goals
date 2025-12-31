@@ -1,5 +1,5 @@
 
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Float, Text
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Table, CheckConstraint, Float, Text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
 from datetime import datetime
 import uuid
@@ -337,6 +337,124 @@ class SessionTemplate(Base):
     
     def to_dict(self):
         return {"id": self.id, "name": self.name, "template_data": json.loads(self.template_data) if self.template_data else {}}
+
+
+class Program(Base):
+    __tablename__ = 'programs'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    is_active = Column(Boolean, default=True)
+    
+    # JSON fields (Legacy/Deprecated in favor of relational structure)
+    goal_ids = Column(Text, nullable=False)  # JSON array of goal IDs
+    weekly_schedule = Column(Text, nullable=False)  # JSON object with days -> template IDs
+    
+    # Relationships
+    blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "name": self.name,
+            "description": self.description,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "is_active": self.is_active,
+            "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
+            "weekly_schedule": json.loads(self.weekly_schedule) if self.weekly_schedule else {},
+            # Include blocks summary if needed, but usually fetched via separate endpoint or expansive query
+            "blocks": [b.to_dict() for b in self.blocks]
+        }
+
+class ProgramBlock(Base):
+    __tablename__ = 'program_blocks'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_id = Column(String, ForeignKey('programs.id'), nullable=False)
+    
+    name = Column(String, nullable=False)
+    start_date = Column(Date, nullable=True) # Nullable for abstract blocks
+    end_date = Column(Date, nullable=True)   # Nullable for abstract blocks
+    color = Column(String)
+    
+    # JSON List of Goal IDs specific to this block
+    goal_ids = Column(Text) 
+    
+    program = relationship("Program", back_populates="blocks")
+    days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "program_id": self.program_id,
+            "name": self.name,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "color": self.color,
+            "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
+            # Include nested days for UI
+            "days": [d.to_dict() for d in self.days]
+        }
+
+class ProgramDay(Base):
+    __tablename__ = 'program_days'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    block_id = Column(String, ForeignKey('program_blocks.id'), nullable=False)
+    
+    date = Column(Date, nullable=True) # Abstract days don't have concrete dates
+    day_number = Column(Integer, nullable=True) # Order within block (1, 2, 3...)
+    name = Column(String) # Optional
+    notes = Column(Text)
+    
+    block = relationship("ProgramBlock", back_populates="days")
+    sessions = relationship("ScheduledSession", back_populates="day", cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "block_id": self.block_id,
+            "date": self.date.isoformat() if self.date else None,
+            "day_number": self.day_number,
+            "name": self.name,
+            "notes": self.notes,
+            # Include sessions
+            "sessions": [s.to_dict() for s in self.sessions]
+        }
+
+class ScheduledSession(Base):
+    __tablename__ = 'scheduled_sessions'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    day_id = Column(String, ForeignKey('program_days.id'), nullable=False)
+    
+    session_template_id = Column(String, ForeignKey('session_templates.id'), nullable=True)
+    
+    is_completed = Column(Boolean, default=False)
+    completion_data = Column(Text) # JSON
+    
+    day = relationship("ProgramDay", back_populates="sessions")
+    template = relationship("SessionTemplate")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "day_id": self.day_id,
+            "session_template_id": self.session_template_id,
+            "is_completed": self.is_completed,
+            "completion_data": json.loads(self.completion_data) if self.completion_data else {},
+            "template_name": self.template.name if self.template else None
+        }
 
 
 # Database Helper Functions
