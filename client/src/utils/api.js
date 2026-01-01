@@ -112,6 +112,44 @@ export const fractalApi = {
     deleteSession: (rootId, sessionId) =>
         axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
 
+    // ========== Session Activity Instances (Database-Only Architecture) ==========
+
+    /**
+     * Get all activity instances for a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     */
+    getSessionActivities: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/activities`),
+
+    /**
+     * Add an activity instance to a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {Object} data - {activity_definition_id, instance_id (optional)}
+     */
+    addActivityToSession: (rootId, sessionId, data) =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/activities`, data),
+
+    /**
+     * Remove an activity instance from a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} instanceId - ID of the activity instance
+     */
+    removeActivityFromSession: (rootId, sessionId, instanceId) =>
+        axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}/activities/${instanceId}`),
+
+    /**
+     * Update metric values for an activity instance
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - {metrics: [{metric_id, split_id, value}]}
+     */
+    updateActivityMetrics: (rootId, sessionId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/sessions/${sessionId}/activities/${instanceId}/metrics`, data),
+
     // ========== Session Templates ==========
 
     /**
@@ -225,6 +263,14 @@ export const fractalApi = {
     // ========== Activity Instance Time Tracking ==========
 
     /**
+     * Create an activity instance (without starting timer)
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {instance_id, practice_session_id, activity_definition_id}
+     */
+    createActivityInstance: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances`, data),
+
+    /**
      * Start timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
@@ -237,9 +283,10 @@ export const fractalApi = {
      * Stop timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
      */
-    stopActivityTimer: (rootId, instanceId) =>
-        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`),
+    stopActivityTimer: (rootId, instanceId, data = {}) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`, data),
 
     /**
      * Update activity instance manually (e.g. set times)

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 import json
+import uuid
 from models import (
     get_engine, get_session,
     PracticeSession, Goal, ActivityInstance, MetricValue,
@@ -102,10 +103,14 @@ def sync_session_activities(db_session, practice_session, session_data_dict):
                                     pass # Ignore non-numeric values
     
     # Clean up orphans for this session
+    # BUT: Don't delete instances that have timer data (time_start/time_stop)
+    # These are managed by the timer API, not the session_data JSON
     existing_for_session = db_session.query(ActivityInstance).filter_by(practice_session_id=practice_session.id).all()
     for ex_inst in existing_for_session:
         if ex_inst.id not in found_instances:
-            db_session.delete(ex_inst)
+            # Only delete if this instance has no timer data
+            if ex_inst.time_start is None and ex_inst.time_stop is None:
+                db_session.delete(ex_inst)
 
 
 def check_and_complete_goals(db_session, practice_session):
@@ -292,15 +297,6 @@ def create_fractal_session(root_id):
         
         db_session.commit()
         
-        # Sync activities to relational DB
-        session_data_json = new_session.attributes or new_session.session_data
-        if session_data_json:
-             try:
-                 data_dict = json.loads(session_data_json) if isinstance(session_data_json, str) else session_data_json
-                 sync_session_activities(db_session, new_session, data_dict)
-                 db_session.commit() # Commit changes from sync
-             except Exception as e:
-                 print(f"Warning: Failed to sync activities: {e}")
 
         # Return the created session
         result = build_practice_session_tree(db_session, new_session)
@@ -370,20 +366,8 @@ def update_practice_session(root_id, session_id):
                 practice_session.attributes = json.dumps(data['session_data'])
                 practice_session.session_data = practice_session.attributes
 
-            # Sync activities
-            try:
-                # If string, parse it first
-                if isinstance(data['session_data'], str):
-                     s_data = json.loads(data['session_data'])
-                else:
-                     s_data = data['session_data']
-                
-                sync_session_activities(db_session, practice_session, s_data)
-                
-                # Check if any targets are met and auto-complete goals
-                check_and_complete_goals(db_session, practice_session)
-            except Exception as e:
-                print(f"Warning: Failed to sync activities in update: {e}")
+            # NOTE: session_data now only contains UI metadata (section names, notes, display order)
+            # Activity instances are managed separately via dedicated endpoints (lines 440+)
         
         db_session.commit()
         
@@ -426,6 +410,188 @@ def delete_practice_session(root_id, session_id):
         db_session.commit()
         
         return jsonify({"message": "Practice session deleted successfully"})
+        
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+# ============================================================================
+# SESSION ACTIVITY INSTANCE ENDPOINTS (Database-Only Architecture)
+# ============================================================================
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['GET'])
+def get_session_activities(root_id, session_id):
+    """Get all activity instances for a session in display order."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Validate session exists
+        practice_session = db_session.query(PracticeSession).filter_by(
+            id=session_id,
+            root_id=root_id
+        ).first()
+        
+        if not practice_session:
+            return jsonify({"error": "Practice session not found"}), 404
+        
+        # Get all activity instances for this session, ordered by created_at
+        instances = db_session.query(ActivityInstance).filter_by(
+            practice_session_id=session_id
+        ).order_by(ActivityInstance.created_at).all()
+        
+        return jsonify([inst.to_dict() for inst in instances])
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['POST'])
+def add_activity_to_session(root_id, session_id):
+    """Add a new activity instance to a session."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Validate session exists
+        practice_session = db_session.query(PracticeSession).filter_by(
+            id=session_id,
+            root_id=root_id
+        ).first()
+        
+        if not practice_session:
+            return jsonify({"error": "Practice session not found"}), 404
+        
+        data = request.get_json()
+        activity_definition_id = data.get('activity_definition_id')
+        instance_id = data.get('instance_id') or str(uuid.uuid4())
+        
+        if not activity_definition_id:
+            return jsonify({"error": "activity_definition_id required"}), 400
+        
+        # Create the activity instance
+        instance = ActivityInstance(
+            id=instance_id,
+            practice_session_id=session_id,
+            activity_definition_id=activity_definition_id
+        )
+        
+        db_session.add(instance)
+        db_session.commit()
+        
+        return jsonify(instance.to_dict()), 201
+        
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['DELETE'])
+def remove_activity_from_session(root_id, session_id, instance_id):
+    """Remove an activity instance from a session."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Get the activity instance
+        instance = db_session.query(ActivityInstance).filter_by(
+            id=instance_id,
+            practice_session_id=session_id
+        ).first()
+        
+        if not instance:
+            return jsonify({"error": "Activity instance not found"}), 404
+        
+        db_session.delete(instance)
+        db_session.commit()
+        
+        return jsonify({"message": "Activity instance deleted successfully"})
+        
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics', methods=['PUT'])
+def update_activity_metrics(root_id, session_id, instance_id):
+    """Update metric values for an activity instance."""
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Get the activity instance
+        instance = db_session.query(ActivityInstance).filter_by(
+            id=instance_id,
+            practice_session_id=session_id
+        ).first()
+        
+        if not instance:
+            return jsonify({"error": "Activity instance not found"}), 404
+        
+        data = request.get_json()
+        metrics = data.get('metrics', [])
+        
+        # Update or create metric values
+        for metric_data in metrics:
+            metric_id = metric_data.get('metric_id')
+            split_id = metric_data.get('split_id')
+            value = metric_data.get('value')
+            
+            if not metric_id or value is None or str(value).strip() == '':
+                continue
+            
+            try:
+                float_val = float(value)
+                
+                # Find existing metric value
+                query = db_session.query(MetricValue).filter_by(
+                    activity_instance_id=instance_id,
+                    metric_definition_id=metric_id
+                )
+                
+                if split_id:
+                    query = query.filter_by(split_definition_id=split_id)
+                else:
+                    query = query.filter_by(split_definition_id=None)
+                
+                metric_val = query.first()
+                
+                if metric_val:
+                    metric_val.value = float_val
+                else:
+                    new_metric = MetricValue(
+                        activity_instance_id=instance_id,
+                        metric_definition_id=metric_id,
+                        split_definition_id=split_id,
+                        value=float_val
+                    )
+                    db_session.add(new_metric)
+            except ValueError:
+                continue
+        
+        db_session.commit()
+        
+        return jsonify(instance.to_dict())
         
     except Exception as e:
         db_session.rollback()
