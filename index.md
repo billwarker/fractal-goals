@@ -929,6 +929,7 @@ python python-scripts/migrate_<name>.py
 - **API client:** `/client/src/utils/api.js`
 - **Environment config:** `/.env.*` files
 - **Logs:** `/logs/`
+- **Database backups:** `/backups/` (gitignored)
 - **Documentation:** `/docs/` (organized by category)
   - Architecture docs: `/docs/architecture/`
   - Migration docs: `/docs/migrations/`

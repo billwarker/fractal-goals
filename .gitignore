@@ -46,6 +46,7 @@ logs/
 *.backup
 *.old
 *.deprecated
+backups/
 
 # IDE & Editor
 .vscode/
