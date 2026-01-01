@@ -30,7 +30,9 @@ class Goal(Base):
     completed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
     parent_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=True)
+    sort_order = Column(Integer, default=0)  # Sibling order for UI display
     
     # Practice Session specific fields (nullable for other goals)
     root_id = Column(String, nullable=True) # Useful for all goals? Or just PS?
@@ -219,6 +221,8 @@ class ActivityGroup(Base):
     name = Column(String, nullable=False)
     description = Column(String, default='')
     created_at = Column(DateTime, default=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
     sort_order = Column(Integer, default=0)
 
     def to_dict(self):
@@ -240,6 +244,8 @@ class ActivityDefinition(Base):
     name = Column(String, nullable=False)
     description = Column(String, default='')
     created_at = Column(DateTime, default=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
     has_sets = Column(Boolean, default=False)
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
@@ -271,13 +277,16 @@ class MetricDefinition(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)
     unit = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
     deleted_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
     is_active = Column(Boolean, default=True)
     is_top_set_metric = Column(Boolean, default=False)  # Determines which metric defines "top set"
     is_multiplicative = Column(Boolean, default=True)   # Include in product calculations
+    sort_order = Column(Integer, default=0)  # UI display order
 
     def to_dict(self):
         return {
@@ -294,9 +303,12 @@ class SplitDefinition(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)  # e.g., "Left", "Right", "Split #1"
     order = Column(Integer, nullable=False)  # Display order
     created_at = Column(DateTime, default=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
 
     def to_dict(self):
         return {
@@ -312,10 +324,14 @@ class ActivityInstance(Base):
     # practice_session_id points to goals.id because PracticeSession is a Goal
     practice_session_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     created_at = Column(DateTime, default=datetime.now)
     time_start = Column(DateTime, nullable=True)
     time_stop = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    sort_order = Column(Integer, default=0)  # UI display order within session
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     definition = relationship("ActivityDefinition")
@@ -350,7 +366,10 @@ class MetricValue(Base):
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False)
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
     split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)  # Nullable for non-split activities
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     value = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
 
     definition = relationship("MetricDefinition")
     split = relationship("SplitDefinition")
@@ -374,6 +393,8 @@ class SessionTemplate(Base):
     description = Column(String, default='')
     root_id = Column(String, ForeignKey('goals.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
     template_data = Column(String, nullable=False)
     
     def to_dict(self):

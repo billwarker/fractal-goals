@@ -188,6 +188,7 @@ def create_activity(root_id):
             if m.get('name') and m.get('unit'):
                 new_metric = MetricDefinition(
                     activity_id=new_activity.id,
+                    root_id=root_id,  # Add root_id for performance
                     name=m['name'],
                     unit=m['unit'],
                     is_top_set_metric=m.get('is_top_set_metric', False),
@@ -204,6 +205,7 @@ def create_activity(root_id):
             if s.get('name'):
                 new_split = SplitDefinition(
                     activity_id=new_activity.id,
+                    root_id=root_id,  # Add root_id for performance
                     name=s['name'],
                     order=idx
                 )
@@ -295,6 +297,7 @@ def update_activity(root_id, activity_id):
                             # Create new metric
                             new_metric = MetricDefinition(
                                 activity_id=activity.id,
+                                root_id=root_id,  # Add root_id for performance
                                 name=m['name'],
                                 unit=m['unit'],
                                 is_top_set_metric=m.get('is_top_set_metric', False),
@@ -335,6 +338,7 @@ def update_activity(root_id, activity_id):
                         # Create new split
                         new_split = SplitDefinition(
                             activity_id=activity.id,
+                            root_id=root_id,  # Add root_id for performance
                             name=s['name'],
                             order=idx
                         )

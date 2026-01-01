@@ -46,7 +46,8 @@ def activity_instances(root_id):
             instance = ActivityInstance(
                 id=instance_id,
                 practice_session_id=practice_session_id,
-                activity_definition_id=activity_definition_id
+                activity_definition_id=activity_definition_id,
+                root_id=root_id  # Add root_id for performance
             )
             db_session.add(instance)
             db_session.commit()
@@ -101,7 +102,8 @@ def start_activity_timer(root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 practice_session_id=practice_session_id,
-                activity_definition_id=activity_definition_id
+                activity_definition_id=activity_definition_id,
+                root_id=root_id  # Add root_id for performance
             )
             db_session.add(instance)
             print(f"[START TIMER] Instance added to session")
@@ -206,7 +208,8 @@ def update_activity_instance(root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 practice_session_id=practice_session_id,
-                activity_definition_id=activity_definition_id
+                activity_definition_id=activity_definition_id,
+                root_id=root_id  # Add root_id for performance
             )
             db_session.add(instance)
         

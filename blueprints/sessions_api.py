@@ -66,6 +66,7 @@ def sync_session_activities(db_session, practice_session, session_data_dict):
                             id=instance_id,
                             practice_session_id=practice_session.id,
                             activity_definition_id=activity_def_id,
+                            root_id=practice_session.root_id,  # Add root_id for performance
                             created_at=practice_session.created_at # Approximate timestamp
                         )
                         db_session.add(instance)
@@ -96,6 +97,7 @@ def sync_session_activities(db_session, practice_session, session_data_dict):
                                         new_mv = MetricValue(
                                             activity_instance_id=instance_id,
                                             metric_definition_id=m_def_id,
+                                            root_id=practice_session.root_id,  # Add root_id for performance
                                             value=float_val
                                         )
                                         db_session.add(new_mv)
@@ -483,7 +485,8 @@ def add_activity_to_session(root_id, session_id):
         instance = ActivityInstance(
             id=instance_id,
             practice_session_id=session_id,
-            activity_definition_id=activity_definition_id
+            activity_definition_id=activity_definition_id,
+            root_id=root_id  # Add root_id for performance
         )
         
         db_session.add(instance)
@@ -583,6 +586,7 @@ def update_activity_metrics(root_id, session_id, instance_id):
                         activity_instance_id=instance_id,
                         metric_definition_id=metric_id,
                         split_definition_id=split_id,
+                        root_id=root_id,  # Add root_id for performance
                         value=float_val
                     )
                     db_session.add(new_metric)

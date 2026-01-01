@@ -261,15 +261,17 @@ def phase_4_soft_deletes(conn, dry_run=False):
         "metric_values",
     ]
     
+    # SQLite limitation: Cannot add columns with DEFAULT CURRENT_TIMESTAMP
+    # Add as NULL, application layer will handle timestamps
     for table in tables_needing_updated_at:
         execute_sql(conn,
-            f"ALTER TABLE {table} ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+            f"ALTER TABLE {table} ADD COLUMN updated_at DATETIME NULL",
             f"Add updated_at to {table}",
             dry_run)
     
     # Add created_at to metric_values if it doesn't exist
     execute_sql(conn,
-        "ALTER TABLE metric_values ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE metric_values ADD COLUMN created_at DATETIME NULL",
         "Add created_at to metric_values",
         dry_run)
     
