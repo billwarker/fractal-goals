@@ -599,6 +599,15 @@ Fractal selection/home page.
        - `/models.py` line 190
 
 
+12. **API Hardening & Test Coverage** (Jan 01, 2026):
+     - **Integration Tests**: Achieved 100% pass rate for Goals, Sessions, and Timers API tests.
+     - **Database Constraints**: Resolved NOT NULL constraint failures for `MetricDefinition` and `MetricValue` by enforcing `root_id` propagation.
+     - **Timers API**: Fixed timezone mismatch (Local vs UTC) and added auto-generation of Activity Instance IDs.
+     - **Sessions API**: Added missing endpoints (`GET session`, `PUT activity`, `POST reorder`) and improved validation for session creation (parsing ISO dates).
+     - **Models**: Updated `to_dict` methods to ensure top-level field consistency across all API responses.
+     - **Test Coverage Expansion**: Created integration tests for `programs_api`, `activities_api`, and `templates_api` (previously 0-17% covered). Overall project coverage increased from 55% to 73%.
+
+
 ### Database Improvements (Jan 01, 2026)
 
 **Status:** ✅ **FULLY COMPLETED** - Development & Production (2026-01-01 16:00)  

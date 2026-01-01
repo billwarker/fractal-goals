@@ -240,7 +240,8 @@ class TestMetricValue:
             activity_instance_id=sample_activity_instance.id,
             metric_definition_id=metric_def.id,
             value=225.0,  # 225 lbs
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            root_id=sample_activity_instance.root_id
         )
         db_session.add(metric_value)
         db_session.commit()
@@ -260,7 +261,8 @@ class TestMetricValue:
             activity_instance_id=sample_activity_instance.id,
             metric_definition_id=metric_def.id,
             value=10.0,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            root_id=sample_activity_instance.root_id
         )
         db_session.add(metric_value)
         db_session.commit()

@@ -34,6 +34,7 @@ from blueprints.sessions_api import sessions_bp
 from blueprints.goals_api import goals_bp
 from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
+from blueprints.programs_api import programs_bp
 
 
 @pytest.fixture(scope='function')
@@ -61,6 +62,7 @@ def app():
     test_app.register_blueprint(goals_bp)
     test_app.register_blueprint(templates_bp)
     test_app.register_blueprint(timers_bp)
+    test_app.register_blueprint(programs_bp)
     
     # Patch get_engine to use test database
     original_get_engine = models.get_engine
