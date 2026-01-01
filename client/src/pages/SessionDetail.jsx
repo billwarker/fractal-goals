@@ -12,13 +12,14 @@ import '../App.css';
 /**
  * Calculate total duration in seconds for a section based on activity instances
  */
-function calculateSectionDuration(section) {
-    if (!section || !section.exercises) return 0;
+function calculateSectionDuration(section, activityInstances) {
+    if (!section || !section.activity_ids || !activityInstances) return 0;
 
     let totalSeconds = 0;
-    for (const exercise of section.exercises) {
-        if (exercise.instance_id && exercise.duration_seconds != null) {
-            totalSeconds += exercise.duration_seconds;
+    for (const instanceId of section.activity_ids) {
+        const instance = activityInstances.find(inst => inst.id === instanceId);
+        if (instance && instance.duration_seconds != null) {
+            totalSeconds += instance.duration_seconds;
         }
     }
     return totalSeconds;
@@ -28,13 +29,13 @@ function calculateSectionDuration(section) {
  * Calculate total completed duration across all sections
  * Falls back to session_end - session_start if no activity durations exist
  */
-function calculateTotalCompletedDuration(sessionData) {
+function calculateTotalCompletedDuration(sessionData, activityInstances) {
     if (!sessionData || !sessionData.sections) return 0;
 
     // Try to calculate from activity durations first
     let totalSeconds = 0;
     for (const section of sessionData.sections) {
-        totalSeconds += calculateSectionDuration(section);
+        totalSeconds += calculateSectionDuration(section, activityInstances);
     }
 
     // If we have activity durations, return them
@@ -94,7 +95,8 @@ function SessionDetail() {
     const timezone = useTimezone();
 
     const [session, setSession] = useState(null);
-    const [sessionData, setSessionData] = useState(null);
+    const [sessionData, setSessionData] = useState(null); // UI metadata only (section names, notes, ordering)
+    const [activityInstances, setActivityInstances] = useState([]); // Activity data from database
     const [loading, setLoading] = useState(true);
     const [activities, setActivities] = useState([]);
     const [activityGroups, setActivityGroups] = useState([]);
@@ -110,15 +112,29 @@ function SessionDetail() {
     const [localSessionStart, setLocalSessionStart] = useState('');
     const [localSessionEnd, setLocalSessionEnd] = useState('');
 
-    // Auto-save sessionData to database whenever it changes
+    // Auto-save sessionData (UI metadata only) to database whenever it changes
     useEffect(() => {
         if (!sessionData || loading) return;
 
         setAutoSaveStatus('saving');
         const timeoutId = setTimeout(async () => {
             try {
+                // Only save UI metadata - activity data is managed separately
+                const metadataOnly = {
+                    sections: sessionData.sections?.map(section => ({
+                        name: section.name,
+                        notes: section.notes,
+                        estimated_duration_minutes: section.estimated_duration_minutes,
+                        activity_ids: section.activity_ids || [] // Just IDs for ordering
+                    })),
+                    template_name: sessionData.template_name,
+                    total_duration_minutes: sessionData.total_duration_minutes,
+                    session_start: sessionData.session_start,
+                    session_end: sessionData.session_end
+                };
+
                 const response = await fractalApi.updateSession(rootId, sessionId, {
-                    session_data: JSON.stringify(sessionData)
+                    session_data: JSON.stringify(metadataOnly)
                 });
 
                 // Update the session's updated_at timestamp from the response
@@ -153,7 +169,17 @@ function SessionDetail() {
         }
         fetchSession();
         fetchActivities();
+        fetchActivityInstances();
     }, [rootId, sessionId, navigate]);
+
+    const fetchActivityInstances = async () => {
+        try {
+            const response = await fractalApi.getSessionActivities(rootId, sessionId);
+            setActivityInstances(response.data);
+        } catch (err) {
+            console.error("Failed to fetch activity instances", err);
+        }
+    };
 
     const fetchActivities = async () => {
         try {
@@ -184,6 +210,17 @@ function SessionDetail() {
             // Parse session_data
             const parsedData = foundSession.attributes?.session_data;
             if (parsedData) {
+                // Backwards compatibility: Populate activity_ids from exercises if missing
+                // This ensures sessions created before the migration still display their activities
+                if (parsedData.sections) {
+                    parsedData.sections.forEach(section => {
+                        if ((!section.activity_ids || section.activity_ids.length === 0) && section.exercises) {
+                            section.activity_ids = section.exercises
+                                .filter(e => e.type === 'activity' && e.instance_id)
+                                .map(e => e.instance_id);
+                        }
+                    });
+                }
                 setSessionData(parsedData);
             }
 
@@ -241,13 +278,13 @@ function SessionDetail() {
         setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
     }, [sessionData?.session_start, sessionData?.session_end, timezone]);
 
-    // Create activity instances for any activities that don't have them yet
+    // Create activity instances for any activities that don't have them yet (e.g. from templates or old sessions)
     const instancesCreatedRef = React.useRef(false);
     useEffect(() => {
         if (!sessionData || !sessionId || loading || instancesCreatedRef.current) return;
 
         const createMissingInstances = async () => {
-            console.log('Creating missing activity instances...');
+            console.log('Verifying/Creating activity instances from session data...');
             let createdCount = 0;
 
             for (const section of sessionData.sections || []) {
@@ -255,10 +292,10 @@ function SessionDetail() {
                     // Only process activities (not rest periods, etc.)
                     if (exercise.type === 'activity' && exercise.instance_id && exercise.activity_id) {
                         try {
-                            // Try to create the instance - backend will return existing if already created
-                            await fractalApi.createActivityInstance(rootId, {
+                            // Try to create the instance - backend will fail if already created (which is expected)
+                            // We catch the error
+                            await fractalApi.addActivityToSession(rootId, sessionId, {
                                 instance_id: exercise.instance_id,
-                                practice_session_id: sessionId,
                                 activity_definition_id: exercise.activity_id
                             });
                             createdCount++;
@@ -289,7 +326,7 @@ function SessionDetail() {
 
         // Recalculate session_end based on new start time + duration
         if (value) {
-            const totalSeconds = calculateTotalCompletedDuration(sessionData);
+            const totalSeconds = calculateTotalCompletedDuration(sessionData, activityInstances);
             const startDate = new Date(value);
             const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
             updatedData.session_end = endDate.toISOString();
@@ -305,75 +342,64 @@ function SessionDetail() {
     };
 
     const handleExerciseChange = async (sectionIndex, exerciseIndex, field, value) => {
+        // Get the instance ID from the section's activity_ids array
+        const section = sessionData.sections[sectionIndex];
+        const instanceId = section.activity_ids?.[exerciseIndex];
+
+        if (!instanceId) {
+            console.error('No instance ID found');
+            return;
+        }
+
         // Handle timer actions specially
         if (field === 'timer_action') {
-            const exercise = sessionData.sections[sectionIndex].exercises[exerciseIndex];
-            const instanceId = exercise.instance_id;
-
-            if (!instanceId) {
-                console.error('No instance_id for timer action');
-                alert('Error: Activity instance ID is missing. Please refresh the page.');
-                return;
-            }
-
-
-
             try {
                 let response;
                 if (value === 'start') {
-
+                    const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.startActivityTimer(rootId, instanceId, {
                         practice_session_id: sessionId,
-                        activity_definition_id: exercise.activity_id
+                        activity_definition_id: instance.activity_definition_id
                     });
-
                 } else if (value === 'stop') {
-
+                    const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.stopActivityTimer(rootId, instanceId, {
                         practice_session_id: sessionId,
-                        activity_definition_id: exercise.activity_id
+                        activity_definition_id: instance.activity_definition_id
                     });
-
                 } else if (value === 'reset') {
-                    // Reset: clear time_start and time_stop locally
-                    const updatedData = { ...sessionData };
-                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
-                        ...exercise,
+                    // Reset: update instance in database to clear times
+                    const instance = activityInstances.find(inst => inst.id === instanceId);
+                    response = await fractalApi.updateActivityInstance(rootId, instanceId, {
+                        practice_session_id: sessionId,
+                        activity_definition_id: instance.activity_definition_id,
                         time_start: null,
                         time_stop: null,
                         duration_seconds: null
-                    };
-                    setSessionData(updatedData);
-                    return;
+                    });
                 }
 
-                // Update the exercise with the new time data
+                // Update local activityInstances state
                 if (response && response.data) {
-                    const updatedData = { ...sessionData };
-                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
-                        ...exercise,
-                        instance_id: response.data.id, // CRITICAL: Update with backend's actual instance ID
-                        time_start: response.data.time_start,
-                        time_stop: response.data.time_stop,
-                        duration_seconds: response.data.duration_seconds
-                    };
-                    setSessionData(updatedData);
-
+                    setActivityInstances(prev => prev.map(inst =>
+                        inst.id === instanceId ? response.data : inst
+                    ));
                 }
             } catch (err) {
                 console.error('Error with timer action:', err);
-                console.error('Error details:', {
-                    action: value,
-                    instanceId,
-                    activityId: exercise.activity_id,
-                    sessionId,
-                    errorResponse: err.response?.data
-                });
-
                 const errorMsg = err.response?.data?.error || err.message;
 
-                // Special handling for "Activity instance not found" error
-                if (errorMsg.includes('Activity instance not found')) {
+                // Special handling for "Timer was never started" error
+                if (errorMsg.includes('Timer was never started')) {
+                    alert(
+                        `Timer Error: Timer was never started\n\n` +
+                        `You clicked "Stop" without first clicking "Start".\n\n` +
+                        `Solution:\n` +
+                        `1. Click the "Start" button first, then "Stop"\n` +
+                        `   OR\n` +
+                        `2. Manually enter the start and stop times in the fields below the timer buttons.`
+                    );
+                } else if (errorMsg.includes('Activity instance not found')) {
                     alert(
                         `Timer Error: Activity instance not found\n\n` +
                         `This usually happens when:\n` +
@@ -391,52 +417,105 @@ function SessionDetail() {
 
         // Handle manual datetime field updates (time_start, time_stop)
         if (field === 'time_start' || field === 'time_stop') {
-            const updatedData = { ...sessionData };
-            const exercise = updatedData.sections[sectionIndex].exercises[exerciseIndex];
+            const instance = activityInstances.find(inst => inst.id === instanceId);
+            if (!instance) return;
 
-            // Update the field
-            exercise[field] = value;
+            // Update locally first
+            const updatedInstance = { ...instance, [field]: value };
 
             // Recalculate duration if both times are set
-            if (exercise.time_start && exercise.time_stop) {
-                const start = new Date(exercise.time_start);
-                const stop = new Date(exercise.time_stop);
-                exercise.duration_seconds = Math.floor((stop - start) / 1000);
+            if (updatedInstance.time_start && updatedInstance.time_stop) {
+                const start = new Date(updatedInstance.time_start);
+                const stop = new Date(updatedInstance.time_stop);
+                updatedInstance.duration_seconds = Math.floor((stop - start) / 1000);
             } else {
-                exercise.duration_seconds = null;
+                updatedInstance.duration_seconds = null;
             }
 
-            setSessionData(updatedData);
+            // Update local state
+            setActivityInstances(prev => prev.map(inst =>
+                inst.id === instanceId ? updatedInstance : inst
+            ));
 
-            // Persist to backend immediately (creates instance if missing)
-            if (exercise.instance_id) {
-                try {
-                    await fractalApi.updateActivityInstance(rootId, exercise.instance_id, {
-                        practice_session_id: sessionId,
-                        activity_definition_id: exercise.activity_id,
-                        time_start: exercise.time_start,
-                        time_stop: exercise.time_stop,
-                        duration_seconds: exercise.duration_seconds
-                    });
-                } catch (err) {
-                    console.error('Error syncing manual time update:', err);
-                    // Ideally show a toast or error indicator
-                }
+            // Persist to backend
+            try {
+                await fractalApi.updateActivityInstance(rootId, instanceId, {
+                    practice_session_id: sessionId,
+                    activity_definition_id: instance.activity_definition_id,
+                    time_start: updatedInstance.time_start,
+                    time_stop: updatedInstance.time_stop,
+                    duration_seconds: updatedInstance.duration_seconds
+                });
+            } catch (err) {
+                console.error('Error syncing manual time update:', err);
             }
             return;
         }
 
-        // Normal field update
-        const updatedData = { ...sessionData };
-        updatedData.sections[sectionIndex].exercises[exerciseIndex][field] = value;
-        setSessionData(updatedData);
+        // Handle metric updates
+        if (field === 'metrics') {
+            try {
+                await fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, {
+                    metrics: value
+                });
+
+                // Update local state
+                setActivityInstances(prev => prev.map(inst =>
+                    inst.id === instanceId ? { ...inst, metric_values: value } : inst
+                ));
+            } catch (err) {
+                console.error('Error updating metrics:', err);
+                alert(`Failed to update metrics: ${err.response?.data?.error || err.message}`);
+            }
+            return;
+        }
+
+        // For other fields (notes, completed, etc.), update the instance
+        const instance = activityInstances.find(inst => inst.id === instanceId);
+        if (!instance) return;
+
+        const updatedInstance = { ...instance, [field]: value };
+        setActivityInstances(prev => prev.map(inst =>
+            inst.id === instanceId ? updatedInstance : inst
+        ));
+
+        // Persist to backend (for fields like notes, completed)
+        try {
+            await fractalApi.updateActivityInstance(rootId, instanceId, {
+                practice_session_id: sessionId,
+                activity_definition_id: instance.activity_definition_id,
+                [field]: value
+            });
+        } catch (err) {
+            console.error(`Error updating ${field}:`, err);
+        }
     };
 
-    const handleToggleExerciseComplete = (sectionIndex, exerciseIndex) => {
-        const updatedData = { ...sessionData };
-        const exercise = updatedData.sections[sectionIndex].exercises[exerciseIndex];
-        exercise.completed = !exercise.completed;
-        setSessionData(updatedData);
+    const handleToggleExerciseComplete = async (sectionIndex, exerciseIndex) => {
+        const section = sessionData.sections[sectionIndex];
+        const instanceId = section.activity_ids?.[exerciseIndex];
+        if (!instanceId) return;
+
+        const instance = activityInstances.find(inst => inst.id === instanceId);
+        if (!instance) return;
+
+        const newCompleted = !instance.completed;
+
+        // Update local state
+        setActivityInstances(prev => prev.map(inst =>
+            inst.id === instanceId ? { ...inst, completed: newCompleted } : inst
+        ));
+
+        // Persist to backend
+        try {
+            await fractalApi.updateActivityInstance(rootId, instanceId, {
+                practice_session_id: sessionId,
+                activity_definition_id: instance.activity_definition_id,
+                completed: newCompleted
+            });
+        } catch (err) {
+            console.error('Error updating completed status:', err);
+        }
     };
 
     const handleSaveSession = async () => {
@@ -464,47 +543,38 @@ function SessionDetail() {
 
         try {
             const newCompleted = !session.attributes.completed;
+            let updatedInstances = [...activityInstances];
+            let activityUpdatesOccurred = false;
 
             // If marking as complete, stop all running timers first
-            if (newCompleted && sessionData) {
-                const updatedData = { ...sessionData };
-                let hasUpdates = false;
+            if (newCompleted) {
+                // Find running timers in activityInstances
+                for (let i = 0; i < updatedInstances.length; i++) {
+                    const instance = updatedInstances[i];
+                    if (instance.time_start && !instance.time_stop) {
+                        try {
+                            const response = await fractalApi.stopActivityTimer(rootId, instance.id, {
+                                practice_session_id: sessionId,
+                                activity_definition_id: instance.activity_definition_id
+                            });
 
-                for (let sectionIndex = 0; sectionIndex < updatedData.sections.length; sectionIndex++) {
-                    const section = updatedData.sections[sectionIndex];
-                    if (!section.exercises) continue;
-
-                    for (let exerciseIndex = 0; exerciseIndex < section.exercises.length; exerciseIndex++) {
-                        const exercise = section.exercises[exerciseIndex];
-
-                        // Check if this is an activity with a running timer
-                        if (exercise.instance_id && exercise.time_start && !exercise.time_stop) {
-                            try {
-                                const response = await fractalApi.stopActivityTimer(rootId, exercise.instance_id, {
-                                    practice_session_id: sessionId,
-                                    activity_definition_id: exercise.activity_id
-                                });
-                                if (response && response.data) {
-                                    updatedData.sections[sectionIndex].exercises[exerciseIndex] = {
-                                        ...exercise,
-                                        time_start: response.data.time_start,
-                                        time_stop: response.data.time_stop,
-                                        duration_seconds: response.data.duration_seconds
-                                    };
-                                    hasUpdates = true;
-                                }
-                            } catch (err) {
-                                console.error(`Error stopping timer for activity ${exercise.instance_id}:`, err);
+                            if (response && response.data) {
+                                updatedInstances[i] = response.data;
+                                activityUpdatesOccurred = true;
                             }
+                        } catch (err) {
+                            console.error(`Error stopping timer for instance ${instance.id}:`, err);
                         }
                     }
                 }
 
-                // Set session_end to current timestamp when marking as complete
-                updatedData.session_end = new Date().toISOString();
-                hasUpdates = true;
+                if (activityUpdatesOccurred) {
+                    setActivityInstances(updatedInstances);
+                }
 
-                if (hasUpdates) {
+                // Update session_end locally if we have sessionData
+                if (sessionData) {
+                    const updatedData = { ...sessionData, session_end: new Date().toISOString() };
                     setSessionData(updatedData);
                 }
             }
@@ -548,65 +618,73 @@ function SessionDetail() {
         const activityDef = activityObject || activities.find(a => a.id === activityId);
         if (!activityDef) return;
 
-        const instanceId = crypto.randomUUID();
-        const newActivity = {
-            type: 'activity',
-            name: activityDef.name,
-            activity_id: activityDef.id,
-            instance_id: instanceId,
-            description: activityDef.description,
-            has_sets: activityDef.has_sets,
-            has_metrics: activityDef.has_metrics,
-            has_splits: activityDef.has_splits || false,
-            completed: false,
-            sets: activityDef.has_sets ? [] : undefined,
-            metrics: (!activityDef.has_sets && activityDef.has_metrics) ?
-                activityDef.metric_definitions.map(m => ({ metric_id: m.id, value: '' })) : undefined
-        };
-
-        // Create the activity instance in the database immediately
+        // Create the activity instance in the database via new endpoint
         try {
-            await fractalApi.createActivityInstance(rootId, {
-                instance_id: instanceId,
-                practice_session_id: sessionId,
+            const response = await fractalApi.addActivityToSession(rootId, sessionId, {
                 activity_definition_id: activityDef.id
             });
-        } catch (err) {
-            console.error('Error creating activity instance:', err);
-            // Continue anyway - the instance will be created when timer starts if needed
-        }
 
-        const updatedData = { ...sessionData };
-        if (!updatedData.sections[sectionIndex].exercises) {
-            updatedData.sections[sectionIndex].exercises = [];
+            const newInstance = response.data;
+
+            // Add to local activityInstances state
+            setActivityInstances(prev => [...prev, newInstance]);
+
+            // Update sessionData to include instance ID in the section's activity_ids array
+            const updatedData = { ...sessionData };
+            if (!updatedData.sections[sectionIndex].activity_ids) {
+                updatedData.sections[sectionIndex].activity_ids = [];
+            }
+            updatedData.sections[sectionIndex].activity_ids.push(newInstance.id);
+            setSessionData(updatedData);
+            setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
+        } catch (err) {
+            console.error('Error adding activity to session:', err);
+            alert(`Failed to add activity: ${err.response?.data?.error || err.message}`);
         }
-        updatedData.sections[sectionIndex].exercises.push(newActivity);
-        setSessionData(updatedData);
-        setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
     };
 
-    const handleDeleteExercise = (sectionIndex, exerciseIndex) => {
-        // Same as removing from array
-        const updatedData = { ...sessionData };
-        updatedData.sections[sectionIndex].exercises.splice(exerciseIndex, 1);
-        setSessionData(updatedData);
+    const handleDeleteExercise = async (sectionIndex, exerciseIndex) => {
+        const section = sessionData.sections[sectionIndex];
+        const instanceId = section.activity_ids?.[exerciseIndex];
+
+        if (!instanceId) {
+            console.error('No instance ID found for exercise');
+            return;
+        }
+
+        try {
+            // Delete from database
+            await fractalApi.removeActivityFromSession(rootId, sessionId, instanceId);
+
+            // Remove from local activityInstances state
+            setActivityInstances(prev => prev.filter(inst => inst.id !== instanceId));
+
+            // Remove from sessionData activity_ids array
+            const updatedData = { ...sessionData };
+            updatedData.sections[sectionIndex].activity_ids.splice(exerciseIndex, 1);
+            setSessionData(updatedData);
+        } catch (err) {
+            console.error('Error deleting activity:', err);
+            alert(`Failed to delete activity: ${err.response?.data?.error || err.message}`);
+        }
     };
 
     const handleReorderActivity = (sectionIndex, exerciseIndex, direction) => {
         const updatedData = { ...sessionData };
-        const exercises = updatedData.sections[sectionIndex].exercises;
+        const activityIds = updatedData.sections[sectionIndex].activity_ids || [];
 
         // Calculate new index based on direction
         const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
 
         // Validate bounds
-        if (newIndex < 0 || newIndex >= exercises.length) return;
+        if (newIndex < 0 || newIndex >= activityIds.length) return;
 
-        // Swap the activities
-        const temp = exercises[exerciseIndex];
-        exercises[exerciseIndex] = exercises[newIndex];
-        exercises[newIndex] = temp;
+        // Swap the activity IDs
+        const temp = activityIds[exerciseIndex];
+        activityIds[exerciseIndex] = activityIds[newIndex];
+        activityIds[newIndex] = temp;
 
+        updatedData.sections[sectionIndex].activity_ids = activityIds;
         setSessionData(updatedData);
     };
 
@@ -867,255 +945,193 @@ function SessionDetail() {
                             </div>
                         </div>
 
-                        {/* Exercises */}
+                        {/* Activities */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {section.exercises?.map((exercise, exerciseIndex) => (
-                                exercise.type === 'activity' ? (
+                            {section.activity_ids?.map((instanceId, exerciseIndex) => {
+                                // Look up the instance data from activityInstances state
+                                const instance = activityInstances.find(inst => inst.id === instanceId);
+                                if (!instance) return null; // Instance not loaded yet
+
+                                // Look up the activity definition
+                                const activityDef = activities.find(a => a.id === instance.activity_definition_id);
+                                if (!activityDef) return null;
+
+                                // Build exercise object for SessionActivityItem
+                                const exercise = {
+                                    type: 'activity',
+                                    name: activityDef.name,
+                                    activity_id: instance.activity_definition_id,
+                                    instance_id: instance.id,
+                                    description: activityDef.description,
+                                    has_sets: activityDef.has_sets,
+                                    has_metrics: activityDef.has_metrics,
+                                    has_splits: activityDef.has_splits || false,
+                                    time_start: instance.time_start,
+                                    time_stop: instance.time_stop,
+                                    duration_seconds: instance.duration_seconds,
+                                    metric_values: instance.metric_values || [],
+                                    metrics: instance.metric_values || [], // Map for compatibility with SessionActivityItem
+                                    sets: instance.sets || [], // Map sets from instance data
+                                    completed: instance.completed, // Add completed status
+                                    notes: instance.notes // Add notes
+                                };
+
+                                return (
                                     <SessionActivityItem
-                                        key={exercise.instance_id || exerciseIndex}
+                                        key={instance.id}
                                         exercise={exercise}
-                                        activityDefinition={activities.find(a => a.id === exercise.activity_id)}
+                                        activityDefinition={activityDef}
                                         onUpdate={(field, value) => handleExerciseChange(sectionIndex, exerciseIndex, field, value)}
                                         onToggleComplete={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
                                         onDelete={() => handleDeleteExercise(sectionIndex, exerciseIndex)}
                                         onReorder={(direction) => handleReorderActivity(sectionIndex, exerciseIndex, direction)}
                                         canMoveUp={exerciseIndex > 0}
-                                        canMoveDown={exerciseIndex < section.exercises.length - 1}
-                                        showReorderButtons={section.exercises.length > 1}
+                                        canMoveDown={exerciseIndex < section.activity_ids.length - 1}
+                                        showReorderButtons={section.activity_ids.length > 1}
                                     />
-                                ) : (
-                                    <div
-                                        key={exerciseIndex}
-                                        style={{
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '6px',
-                                            padding: '16px'
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                                            {/* Checkbox */}
-                                            <div
-                                                onClick={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
-                                                style={{
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    borderRadius: '4px',
-                                                    border: `2px solid ${exercise.completed ? '#4caf50' : '#666'}`,
-                                                    background: exercise.completed ? '#4caf50' : 'transparent',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: 'pointer',
-                                                    flexShrink: 0,
-                                                    marginTop: '2px'
-                                                }}
+                                );
+                            })}
+                        </div>
+                        {showActivitySelector[sectionIndex] ? (
+                            <div style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #444' }}>
+
+                                {selectorState[sectionIndex] ? (
+                                    // Specific Group View
+                                    <>
+                                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                                            <button
+                                                onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: null }))}
+                                                style={{ marginRight: '10px', background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}
                                             >
-                                                {exercise.completed && (
-                                                    <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>✓</span>
-                                                )}
-                                            </div>
-
-                                            {/* Exercise Content */}
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{
-                                                    fontWeight: 'bold',
-                                                    fontSize: '16px',
-                                                    marginBottom: '8px',
-                                                    textDecoration: exercise.completed ? 'line-through' : 'none',
-                                                    opacity: exercise.completed ? 0.6 : 1
-                                                }}>
-                                                    {exercise.name}
-                                                </div>
-
-                                                {exercise.description && (
-                                                    <div style={{
-                                                        fontSize: '13px',
-                                                        color: '#aaa',
-                                                        marginBottom: '12px'
-                                                    }}>
-                                                        {exercise.description}
-                                                    </div>
-                                                )}
-
-                                                {/* Notes Field */}
-                                                <div>
-                                                    <label style={{
-                                                        display: 'block',
-                                                        fontSize: '12px',
-                                                        color: '#888',
-                                                        marginBottom: '4px'
-                                                    }}>
-                                                        Notes:
-                                                    </label>
-                                                    <textarea
-                                                        value={exercise.notes || ''}
-                                                        onChange={(e) => handleExerciseChange(sectionIndex, exerciseIndex, 'notes', e.target.value)}
-                                                        placeholder="Add notes about this exercise..."
-                                                        style={{
-                                                            width: '100%',
-                                                            minHeight: '60px',
-                                                            padding: '8px',
-                                                            background: '#1e1e1e',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white',
-                                                            fontSize: '13px',
-                                                            fontFamily: 'inherit',
-                                                            resize: 'vertical'
-                                                        }}
-                                                    />
-                                                </div>
+                                                ← Back to Groups
+                                            </button>
+                                            <div style={{ fontSize: '12px', color: '#888', fontWeight: 'bold' }}>
+                                                {activityGroups.find(g => g.id === selectorState[sectionIndex])?.name || 'Group'}
                                             </div>
                                         </div>
-                                    </div>
-                                )
-                            ))}
-                        </div>
-
-                        {/* Add Activity Button */}
-                        <div style={{ marginTop: '15px' }}>
-                            {showActivitySelector[sectionIndex] ? (
-                                <div style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #444' }}>
-
-                                    {selectorState[sectionIndex] ? (
-                                        // Specific Group View
-                                        <>
-                                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                            {/* Activities in Group */}
+                                            {activities.filter(a => a.group_id === selectorState[sectionIndex]).map(act => (
                                                 <button
-                                                    onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: null }))}
-                                                    style={{ marginRight: '10px', background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}
-                                                >
-                                                    ← Back to Groups
-                                                </button>
-                                                <div style={{ fontSize: '12px', color: '#888', fontWeight: 'bold' }}>
-                                                    {activityGroups.find(g => g.id === selectorState[sectionIndex])?.name || 'Group'}
-                                                </div>
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                {/* Activities in Group */}
-                                                {activities.filter(a => a.group_id === selectorState[sectionIndex]).map(act => (
-                                                    <button
-                                                        key={act.id}
-                                                        onClick={() => handleAddActivity(sectionIndex, act.id)}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            background: '#333',
-                                                            border: '1px solid #555',
-                                                            borderRadius: '4px',
-                                                            color: 'white',
-                                                            cursor: 'pointer',
-                                                            fontSize: '13px'
-                                                        }}
-                                                    >
-                                                        {act.name}
-                                                    </button>
-                                                ))}
-                                                {activities.filter(a => a.group_id === selectorState[sectionIndex]).length === 0 && (
-                                                    <div style={{ color: '#666', fontSize: '12px', width: '100%', fontStyle: 'italic' }}>No activities in this group</div>
-                                                )}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        // Top Level View
-                                        <>
-                                            <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity group or ungrouped activity:</div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                {/* Groups */}
-                                                {activityGroups.map(group => (
-                                                    <button
-                                                        key={group.id}
-                                                        onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: group.id }))}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            background: '#1a1a1a',
-                                                            border: '1px solid #666',
-                                                            borderRadius: '4px',
-                                                            color: '#fff',
-                                                            cursor: 'pointer',
-                                                            fontSize: '13px',
-                                                            fontWeight: 'bold',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px'
-                                                        }}
-                                                    >
-                                                        {group.name} ›
-                                                    </button>
-                                                ))}
-
-                                                {/* Ungrouped */}
-                                                {activities.filter(a => !a.group_id).map(act => (
-                                                    <button
-                                                        key={act.id}
-                                                        onClick={() => handleAddActivity(sectionIndex, act.id)}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            background: '#333',
-                                                            border: '1px solid #555',
-                                                            borderRadius: '4px',
-                                                            color: 'white',
-                                                            cursor: 'pointer',
-                                                            fontSize: '13px'
-                                                        }}
-                                                    >
-                                                        {act.name}
-                                                    </button>
-                                                ))}
-
-                                                <div style={{ width: '100%', height: '1px', background: '#333', margin: '4px 0' }}></div>
-
-                                                <button
-                                                    onClick={() => handleOpenActivityBuilder(sectionIndex)}
+                                                    key={act.id}
+                                                    onClick={() => handleAddActivity(sectionIndex, act.id)}
                                                     style={{
                                                         padding: '6px 12px',
-                                                        background: '#1a1a1a',
-                                                        border: '1px dashed #666',
+                                                        background: '#333',
+                                                        border: '1px solid #555',
                                                         borderRadius: '4px',
-                                                        color: '#aaa',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    + Create New Activity
-                                                </button>
-                                                <button
-                                                    onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: 'transparent',
-                                                        border: 'none',
-                                                        color: '#888',
+                                                        color: 'white',
                                                         cursor: 'pointer',
                                                         fontSize: '13px'
                                                     }}
                                                 >
-                                                    Cancel
+                                                    {act.name}
                                                 </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px dashed #444',
-                                        color: '#888',
-                                        padding: '8px 16px',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        width: '100%',
-                                        textAlign: 'center'
-                                    }}
-                                >
-                                    + Add Activity
-                                </button>
-                            )}
-                        </div>
+                                            ))}
+                                            {activities.filter(a => a.group_id === selectorState[sectionIndex]).length === 0 && (
+                                                <div style={{ color: '#666', fontSize: '12px', width: '100%', fontStyle: 'italic' }}>No activities in this group</div>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    // Top Level View
+                                    <>
+                                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity group or ungrouped activity:</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                            {/* Groups */}
+                                            {activityGroups.map(group => (
+                                                <button
+                                                    key={group.id}
+                                                    onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: group.id }))}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: '#1a1a1a',
+                                                        border: '1px solid #666',
+                                                        borderRadius: '4px',
+                                                        color: '#fff',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px',
+                                                        fontWeight: 'bold',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    {group.name} ›
+                                                </button>
+                                            ))}
+
+                                            {/* Ungrouped */}
+                                            {activities.filter(a => !a.group_id).map(act => (
+                                                <button
+                                                    key={act.id}
+                                                    onClick={() => handleAddActivity(sectionIndex, act.id)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: '#333',
+                                                        border: '1px solid #555',
+                                                        borderRadius: '4px',
+                                                        color: 'white',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px'
+                                                    }}
+                                                >
+                                                    {act.name}
+                                                </button>
+                                            ))}
+
+                                            <div style={{ width: '100%', height: '1px', background: '#333', margin: '4px 0' }}></div>
+
+                                            <button
+                                                onClick={() => handleOpenActivityBuilder(sectionIndex)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#1a1a1a',
+                                                    border: '1px dashed #666',
+                                                    borderRadius: '4px',
+                                                    color: '#aaa',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                + Create New Activity
+                                            </button>
+                                            <button
+                                                onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: '#888',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px'
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
+                                style={{
+                                    background: 'transparent',
+                                    border: '1px dashed #444',
+                                    color: '#888',
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    textAlign: 'center'
+                                }}
+                            >
+                                + Add Activity
+                            </button>
+                        )}
                     </div>
                 ))}
 
@@ -1193,6 +1209,7 @@ function SessionDetail() {
                     </button>
                 </div>
             </div>
+
             {/* Confirmation Modal */}
             <ConfirmationModal
                 isOpen={showDeleteConfirm}
@@ -1210,7 +1227,7 @@ function SessionDetail() {
                 rootId={rootId}
                 onSave={handleActivityCreated}
             />
-        </div>
+        </div >
     );
 }
 

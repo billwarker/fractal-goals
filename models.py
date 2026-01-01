@@ -164,7 +164,37 @@ class PracticeSession(Goal):
         session_data_json = self.attributes or self.session_data
         if session_data_json:
              try:
-                 result["attributes"]["session_data"] = json.loads(session_data_json)
+                 data_obj = json.loads(session_data_json)
+                 result["attributes"]["session_data"] = data_obj
+                 
+                 # Hydrate "exercises" from database ActivityInstances (Database-Only Architecture)
+                 if "sections" in data_obj:
+                     # Pre-fetch instances to a map
+                     # Note: This might trigger lazy loads. For performance, ensure joinedload usage in queries.
+                     instance_map = {inst.id: inst for inst in self.activity_instances}
+                     
+                     for section in data_obj["sections"]:
+                         # Only hydrate if this is a migrated session (has activity_ids)
+                         # Otherwise preserve legacy 'exercises' data for display
+                         if "activity_ids" in section:
+                             activity_ids = section["activity_ids"]
+                             exercises = []
+                             for inst_id in activity_ids:
+                                 if inst_id in instance_map:
+                                     inst = instance_map[inst_id]
+                                     # Convert to dict and add compatibility fields for frontend
+                                     ex = inst.to_dict()
+                                     ex['type'] = 'activity'
+                                     ex['name'] = ex.get('definition_name', 'Unknown Activity')
+                                     ex['activity_id'] = inst.activity_definition_id
+                                 
+                                     # Set has_sets flag so frontend knows how to render
+                                     ex['has_sets'] = len(ex.get('sets', [])) > 0
+                                 
+                                     # Map metric_values to metrics for frontend list compatibility
+                                     ex['metrics'] = ex['metric_values']
+                                     exercises.append(ex)
+                             section["exercises"] = exercises
              except:
                  pass
         
@@ -290,7 +320,13 @@ class ActivityInstance(Base):
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     definition = relationship("ActivityDefinition")
 
+    # Additional fields for state persistence
+    completed = Column(Boolean, default=False)
+    notes = Column(String, nullable=True)
+    data = Column(String, nullable=True)  # JSON store for sets and other extended attributes
+
     def to_dict(self):
+        data_dict = json.loads(self.data) if self.data else {}
         return {
             "id": self.id,
             "practice_session_id": self.practice_session_id,
@@ -300,6 +336,10 @@ class ActivityInstance(Base):
             "time_start": self.time_start.isoformat() if self.time_start else None,
             "time_stop": self.time_stop.isoformat() if self.time_stop else None,
             "duration_seconds": self.duration_seconds,
+            "completed": self.completed,
+            "notes": self.notes,
+            "sets": data_dict.get('sets', []),
+            "data": data_dict,
             "metric_values": [m.to_dict() for m in self.metric_values]
         }
 
@@ -319,6 +359,7 @@ class MetricValue(Base):
         return {
             "id": self.id,
             "name": self.definition.name if self.definition else "",
+            "metric_definition_id": self.metric_definition_id,
             "value": self.value,
             "unit": self.definition.unit if self.definition else "",
             "split_id": self.split_definition_id,

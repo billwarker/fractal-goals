@@ -112,6 +112,44 @@ export const fractalApi = {
     deleteSession: (rootId, sessionId) =>
         axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
 
+    // ========== Session Activity Instances (Database-Only Architecture) ==========
+
+    /**
+     * Get all activity instances for a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     */
+    getSessionActivities: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/activities`),
+
+    /**
+     * Add an activity instance to a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {Object} data - {activity_definition_id, instance_id (optional)}
+     */
+    addActivityToSession: (rootId, sessionId, data) =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/activities`, data),
+
+    /**
+     * Remove an activity instance from a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} instanceId - ID of the activity instance
+     */
+    removeActivityFromSession: (rootId, sessionId, instanceId) =>
+        axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}/activities/${instanceId}`),
+
+    /**
+     * Update metric values for an activity instance
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} instanceId - ID of the activity instance
+     * @param {Object} data - {metrics: [{metric_id, split_id, value}]}
+     */
+    updateActivityMetrics: (rootId, sessionId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/sessions/${sessionId}/activities/${instanceId}/metrics`, data),
+
     // ========== Session Templates ==========
 
     /**

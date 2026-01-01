@@ -451,8 +451,7 @@ Fractal selection page.
 
 - `goals_dev.db` - Development database
 - `goals_test.db` - Testing database
-- `goals_prod.db` - Production database
-- `goals.db` - Legacy/default database (avoid using)
+- `goals.db` - Main database used by all environments (development, testing, production)
 
 ---
 
@@ -482,6 +481,32 @@ Fractal selection page.
    - Added `created_at` to Goal model
    - Created age calculation helper in frontend
    - Display age in fractal UI and sidebar
+
+6. **Timer Stop Validation** - Fixed timer stop behavior (Dec 31, 2025):
+   - Modified `stop_activity_timer` endpoint to return error when timer was never started
+   - Prevents setting both `time_start` and `time_stop` to the same value
+   - Added clear error messages guiding users to click "Start" first or use manual time entry
+   - Ensures data integrity for session duration tracking
+
+7. **Activity Instance Deletion Bug** - Fixed critical auto-save issue (Dec 31, 2025):
+   - **Root Cause**: `sync_session_activities` was deleting instances with timer data during auto-save
+   - **Fix**: Modified orphan cleanup to preserve instances with `time_start` or `time_stop` set
+   - **Location**: `/blueprints/sessions_api.py` lines 104-112
+   - **Architectural Note**: See `ARCHITECTURE_NOTES.md` for discussion of dual source of truth issue
+   - This was a recurring problem due to storing activity data in both JSON and relational tables
+
+8. **Activity Instance Architecture Migration** (Jan 01, 2026):
+   - Fully migrated from dual source of truth (JSON + DB) to **Database-Only Architecture** (Option A).
+   - `ActivityInstance` data is now SOLELY managed in the relational database.
+   - `session_data` JSON now only stores UI metadata (section names, ordering via `activity_ids`).
+   - Refactored `SessionDetail.jsx` to fetch instances separately and use specific API endpoints for all modifications.
+   - Removed fragile synchronization logic (`sync_session_activities`) from session auto-save.
+   - Implemented **Read-Time Hydration** in `PracticeSession.to_dict()`: `session_data.sections[].exercises` are now reconstructed on-the-fly from `ActivityInstances` to ensure listing pages (like `/sessions`) work correctly without duplication.
+
+9. **Database Schema Update for Activity Persistence** (Jan 01, 2026):
+   - Added `completed` (BOOLEAN), `notes` (TEXT), and `data` (TEXT/JSON) columns to `activity_instances` table.
+   - This prevents data loss for "sets" and other activity-specific data that isn't native to the relational model but was supported in the old JSON architecture.
+   - Updated `models.py` and `timers_api.py` to handle these fields.
 
 ### Known Issues & To-Do Items
 
@@ -574,6 +599,7 @@ python python-scripts/migrate_<name>.py
 ### Important File Locations
 
 - **Database models:** `/models.py`
+- **Migration Guides:** `/MIGRATION_GUIDE.md`
 - **Flask app:** `/app.py`
 - **API blueprints:** `/blueprints/`
 - **Frontend entry:** `/client/src/main.jsx`

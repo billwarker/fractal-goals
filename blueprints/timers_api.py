@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+import json
 from models import (
     get_engine, get_session,
     ActivityInstance, PracticeSession,
@@ -75,6 +76,8 @@ def start_activity_timer(root_id, instance_id):
     """Start the timer for an activity instance."""
     db_session = get_session(engine)
     try:
+        print(f"[START TIMER] Instance ID: {instance_id}")
+        
         # Validate root goal exists
         root = validate_root_goal(db_session, root_id)
         if not root:
@@ -82,11 +85,15 @@ def start_activity_timer(root_id, instance_id):
         
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        print(f"[START TIMER] Instance found: {instance is not None}")
+        
         if not instance:
             # Instance doesn't exist yet - create it
             data = request.get_json() or {}
             practice_session_id = data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
+            
+            print(f"[START TIMER] Creating new instance - session: {practice_session_id}, activity: {activity_definition_id}")
             
             if not practice_session_id or not activity_definition_id:
                 return jsonify({"error": "practice_session_id and activity_definition_id required"}), 400
@@ -97,18 +104,32 @@ def start_activity_timer(root_id, instance_id):
                 activity_definition_id=activity_definition_id
             )
             db_session.add(instance)
+            print(f"[START TIMER] Instance added to session")
         
         # Set start time to now
-        instance.time_start = datetime.now()
+        start_time = datetime.now()
+        instance.time_start = start_time
         # Clear stop time and duration if restarting
         instance.time_stop = None
         instance.duration_seconds = None
         
+        print(f"[START TIMER] Set time_start to: {start_time}")
+        print(f"[START TIMER] Instance time_start before commit: {instance.time_start}")
+        
         db_session.commit()
         
-        return jsonify(instance.to_dict())
+        print(f"[START TIMER] Committed successfully")
+        print(f"[START TIMER] Instance time_start after commit: {instance.time_start}")
+        
+        result = instance.to_dict()
+        print(f"[START TIMER] Returning: {result}")
+        
+        return jsonify(result)
         
     except Exception as e:
+        print(f"[START TIMER ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
@@ -128,41 +149,22 @@ def stop_activity_timer(root_id, instance_id):
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         if not instance:
-            # Instance doesn't exist - create it with current time as both start and stop
-            # This handles the case where the page was refreshed or the instance creation is still pending
-            data = request.get_json() or {}
-            practice_session_id = data.get('practice_session_id')
-            activity_definition_id = data.get('activity_definition_id')
-            
-            if not practice_session_id or not activity_definition_id:
-                return jsonify({"error": "Activity instance not found and missing creation details (practice_session_id, activity_definition_id)"}), 404
-            
-            # Create instance with current time as both start and stop (0 duration)
-            now = datetime.now()
-            instance = ActivityInstance(
-                id=instance_id,
-                practice_session_id=practice_session_id,
-                activity_definition_id=activity_definition_id,
-                time_start=now,
-                time_stop=now,
-                duration_seconds=0
-            )
-            db_session.add(instance)
-            db_session.commit()
-            
-            return jsonify(instance.to_dict())
+            # Instance doesn't exist - this is an error condition
+            # The instance should have been created when the activity was added to the session
+            return jsonify({
+                "error": "Activity instance not found. Please refresh the page and try again, or manually enter start and stop times."
+            }), 404
         
         if not instance.time_start:
-            # Timer was never started - set both start and stop to now (0 duration)
-            now = datetime.now()
-            instance.time_start = now
-            instance.time_stop = now
-            instance.duration_seconds = 0
-        else:
-            # Normal case - timer was started, now stopping it
-            instance.time_stop = datetime.now()
-            duration = (instance.time_stop - instance.time_start).total_seconds()
-            instance.duration_seconds = int(duration)
+            # Timer was never started - return error instead of setting both times to now
+            return jsonify({
+                "error": "Cannot stop timer: Timer was never started. Please click 'Start' first, or manually enter start and stop times."
+            }), 400
+        
+        # Normal case - timer was started, now stopping it
+        instance.time_stop = datetime.now()
+        duration = (instance.time_stop - instance.time_start).total_seconds()
+        instance.duration_seconds = int(duration)
         
         db_session.commit()
         
@@ -209,6 +211,7 @@ def update_activity_instance(root_id, instance_id):
             db_session.add(instance)
         
         # Update fields if present
+        # Update fields if present
         if 'time_start' in data:
             ts = data['time_start']
             # Handle empty string or None as clearing the time
@@ -217,6 +220,23 @@ def update_activity_instance(root_id, instance_id):
         if 'time_stop' in data:
             ts = data['time_stop']
             instance.time_stop = datetime.fromisoformat(ts.replace('Z', '+00:00')) if ts else None
+
+        if 'completed' in data:
+            instance.completed = bool(data['completed'])
+
+        if 'notes' in data:
+             instance.notes = data['notes']
+
+        # Handle extended data (sets, etc)
+        current_data = json.loads(instance.data) if instance.data else {}
+        data_changed = False
+
+        if 'sets' in data:
+            current_data['sets'] = data['sets']
+            data_changed = True
+        
+        if data_changed:
+            instance.data = json.dumps(current_data)
             
         # Recalculate duration
         if instance.time_start and instance.time_stop:
