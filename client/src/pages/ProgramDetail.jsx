@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import { GOAL_COLORS, getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -9,16 +10,6 @@ import ProgramBuilder from '../components/modals/ProgramBuilder';
 import TrainingBlockModal from '../components/modals/TrainingBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
-
-const GOAL_COLORS = {
-    Amercement: '#FF6B6B',
-    Anchoring: '#4ECDC4',
-    Balance: '#FFE66D',
-    ShortTermGoal: '#FF9F1C',
-    ImmediateGoal: '#FFD166',
-    Value: '#A06CD5',
-    Vision: '#3A86FF'
-};
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
@@ -395,15 +386,15 @@ const ProgramDetail = () => {
                             {programGoals.length === 0 ? (
                                 <div style={{ color: '#666', fontStyle: 'italic', fontSize: '13px' }}>No goals associated</div>
                             ) : programGoals.map(goal => {
-                                const typeColors = { 'LongTermGoal': '#7B5CFF', 'MidTermGoal': '#3A86FF', 'ShortTermGoal': '#4ECDC4' };
-                                const color = typeColors[goal.attributes?.type] || '#666';
+                                const goalType = goal.type || goal.attributes?.type;
+                                const color = getGoalColor(goalType);
 
                                 return (
                                     <div key={goal.id} style={{ background: '#252525', borderLeft: `3px solid ${color}`, padding: '10px', borderRadius: '0 4px 4px 0' }}>
                                         <div style={{ color: color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
-                                            {goal.attributes?.type?.replace(/([A-Z])/g, ' $1').trim()}
+                                            {goalType?.replace(/([A-Z])/g, ' $1').trim()}
                                         </div>
-                                        <div style={{ color: 'white', fontSize: '13px' }}>{goal.name}</div>
+                                        <div style={{ color: 'white', fontSize: '13px', fontWeight: 400 }}>{goal.name}</div>
                                         {goal.deadline && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Target: {formatDate(goal.deadline)}</div>}
                                     </div>
                                 );
@@ -460,16 +451,20 @@ const ProgramDetail = () => {
                                                     {formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days
                                                 </div>
                                                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                    {blockAttachedGoals.map(g => (
-                                                        <div key={g.id} style={{
-                                                            background: GOAL_COLORS[g.type] || '#333',
-                                                            color: '#000',
-                                                            padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6
-                                                        }}>
-                                                            <span>{g.name}</span>
-                                                            {g.deadline && <span style={{ opacity: 0.7, fontSize: 10 }}>{formatDate(g.deadline, 'MMM D')}</span>}
-                                                        </div>
-                                                    ))}
+                                                    {blockAttachedGoals.map(g => {
+                                                        const goalColor = getGoalColor(g.type);
+                                                        return (
+                                                            <div key={g.id} style={{
+                                                                background: '#2a2a2a',
+                                                                border: `1.5px solid ${goalColor}`,
+                                                                color: goalColor,
+                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6
+                                                            }}>
+                                                                <span>{g.name}</span>
+                                                                {g.deadline && <span style={{ opacity: 0.7, fontSize: 10 }}>{formatDate(g.deadline, 'MMM D')}</span>}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', gap: '10px' }}>
