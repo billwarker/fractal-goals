@@ -80,9 +80,13 @@ class Goal(Base):
         result = {
             "name": self.name,
             "id": self.id,
+            "description": self.description,
+            "deadline": self.deadline.isoformat() if self.deadline else None,
             "attributes": {
                 "id": self.id,
                 "type": self.type,
+                "parent_id": self.parent_id,
+                "root_id": self.root_id,
                 "description": self.description,
                 "deadline": self.deadline.isoformat() if self.deadline else None,
                 "completed": self.completed,
@@ -154,6 +158,10 @@ class PracticeSession(Goal):
     def to_dict(self, include_children=True):
         # Result uses basic Goal structure but adds PS fields
         result = super().to_dict(include_children)
+        result["session_start"] = self.session_start.isoformat() if self.session_start else None
+        result["session_end"] = self.session_end.isoformat() if self.session_end else None
+        result["template_id"] = self.template_id
+        result["total_duration_seconds"] = self.total_duration_seconds
         result["attributes"]["duration_minutes"] = self.duration_minutes
         
         # Add session analytics fields

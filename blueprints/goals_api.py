@@ -2,8 +2,9 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import json
 import uuid
+import models
 from models import (
-    get_engine, get_session,
+    get_session,
     Goal, PracticeSession,
     get_all_root_goals, get_goal_by_id, get_practice_session_by_id,
     get_immediate_goals_for_session,
@@ -14,8 +15,8 @@ from models import (
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
 
-# Initialize database engine
-engine = get_engine()
+# Global engine removed to ensure tests use patched get_engine()
+# engine = get_engine()
 
 # ============================================================================
 # GLOBAL GOAL ENDPOINTS
@@ -24,6 +25,7 @@ engine = get_engine()
 @goals_bp.route('/goals', methods=['GET'])
 def get_goals():
     """Get all root goals with their complete trees."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         roots = get_all_root_goals(session)
@@ -39,8 +41,7 @@ def create_goal():
     """Create a new goal."""
     data = request.get_json()
     
-    print(f"DEBUG: Creating goal of type {data.get('type')}, parent_id: {data.get('parent_id')}")
-    
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         parent = None
@@ -69,7 +70,9 @@ def create_goal():
         deadline = None
         if data.get('deadline'):
             try:
-                deadline = datetime.strptime(data['deadline'], '%Y-%m-%d').date()
+                d_str = data['deadline']
+                if 'T' in d_str: d_str = d_str.split('T')[0]
+                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
             except ValueError:
                 return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
         
@@ -108,6 +111,7 @@ def create_practice_session():
     
     print(f"DEBUG: Creating practice session with {len(data.get('parent_ids', []))} parents")
     
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         parent_ids = data.get('parent_ids', [])
@@ -202,6 +206,7 @@ def delete_goal_endpoint(goal_id: str):
     """Delete a goal or practice session and all its children."""
     print(f"DEBUG: Attempting to delete goal/session with ID: {goal_id}")
     
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Try to find as a goal first
@@ -239,18 +244,41 @@ def delete_goal_endpoint(goal_id: str):
         session.close()
 
 
+
+@goals_bp.route('/goals/<goal_id>', methods=['GET'])
+def get_goal_endpoint(goal_id: str):
+    """Get a goal or practice session by ID."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = get_goal_by_id(session, goal_id)
+        if goal:
+            return jsonify(goal.to_dict(include_children=False))
+        
+        ps = get_practice_session_by_id(session, goal_id)
+        if ps:
+            return jsonify(ps.to_dict(include_children=False))
+            
+        return jsonify({"error": "Goal not found"}), 404
+    finally:
+        session.close()
+
+
 @goals_bp.route('/goals/<goal_id>', methods=['PUT'])
 def update_goal_endpoint(goal_id: str):
     """Update goal or practice session details."""
     data = request.get_json()
     
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Parse deadline if provided
         deadline = None
         if 'deadline' in data and data['deadline']:
             try:
-                deadline = datetime.strptime(data['deadline'], '%Y-%m-%d').date()
+                d_str = data['deadline']
+                if 'T' in d_str: d_str = d_str.split('T')[0]
+                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
             except ValueError:
                 return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
         
@@ -270,7 +298,7 @@ def update_goal_endpoint(goal_id: str):
                 print(f"DEBUG: Stored targets in goal: {goal.targets}")
             session.commit()
             print(f"DEBUG: Committed changes. Goal targets after commit: {goal.targets}")
-            return jsonify({"status": "success", "message": "Goal updated"})
+            return jsonify(goal.to_dict(include_children=False))
         
         # Try finding as PracticeSession
         ps = get_practice_session_by_id(session, goal_id)
@@ -281,7 +309,7 @@ def update_goal_endpoint(goal_id: str):
                 ps.description = data['description']
             # PracticeSession has no deadline
             session.commit()
-            return jsonify({"status": "success", "message": "Practice Session updated"})
+            return jsonify(ps.to_dict(include_children=False))
         
         return jsonify({"error": "Goal or session not found"}), 404
         
@@ -293,34 +321,92 @@ def update_goal_endpoint(goal_id: str):
         session.close()
 
 
+
+@goals_bp.route('/goals/<goal_id>/targets', methods=['POST'])
+def add_goal_target(goal_id):
+    """Add a target to a goal."""
+    data = request.get_json()
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = get_goal_by_id(session, goal_id)
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+        
+        current_targets = json.loads(goal.targets) if goal.targets else []
+        if 'id' not in data:
+            data['id'] = str(uuid.uuid4())
+            
+        current_targets.append(data)
+        goal.targets = json.dumps(current_targets)
+        session.commit()
+        
+        return jsonify({"targets": current_targets, "id": data['id']}), 201
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['DELETE'])
+def remove_goal_target(goal_id, target_id):
+    """Remove a target from a goal."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = get_goal_by_id(session, goal_id)
+        if not goal: return jsonify({"error": "Goal not found"}), 404
+        
+        current_targets = json.loads(goal.targets) if goal.targets else []
+        new_targets = [t for t in current_targets if t.get('id') != target_id]
+        
+        if len(new_targets) == len(current_targets):
+             return jsonify({"error": "Target not found"}), 404
+             
+        goal.targets = json.dumps(new_targets)
+        session.commit()
+        return jsonify({"targets": new_targets}), 200
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
 @goals_bp.route('/goals/<goal_id>/complete', methods=['PATCH'])
 @goals_bp.route('/<root_id>/goals/<goal_id>/complete', methods=['PATCH'])
 def update_goal_completion_endpoint(goal_id: str, root_id=None):
     """Update goal or practice session completion status."""
-    data = request.get_json()
-    completed = data.get('completed', False)
+    data = request.get_json(silent=True) or {}
     
-    print(f"DEBUG: Updating completion status for {goal_id} to {completed}")
-    
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Try to find as a goal
         goal = get_goal_by_id(session, goal_id)
         if goal:
-            goal.completed = completed
+            if 'completed' in data:
+                goal.completed = data['completed']
+            else:
+                goal.completed = not goal.completed
+                
             session.commit()
             session.refresh(goal)
             result = build_goal_tree(session, goal)
-            return jsonify({"status": "success", "goal": result})
+            return jsonify(result)
         
         # Try to find as a practice session
         ps = get_practice_session_by_id(session, goal_id)
         if ps:
-            ps.completed = completed
+            if 'completed' in data:
+                ps.completed = data['completed']
+            else:
+                ps.completed = not ps.completed
+                
             session.commit()
             session.refresh(ps)
             result = build_practice_session_tree(session, ps)
-            return jsonify({"status": "success", "goal": result})
+            return jsonify(result)
         
         return jsonify({"error": "Goal or practice session not found"}), 404
         
@@ -339,6 +425,7 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
 @goals_bp.route('/fractals', methods=['GET'])
 def get_all_fractals():
     """Get all fractals (root goals) for the selection page."""
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         roots = get_all_root_goals(db_session)
@@ -378,6 +465,7 @@ def create_fractal():
     """Create a new fractal (root goal)."""
     data = request.get_json()
     
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Validate allowed types for root goals
@@ -399,11 +487,7 @@ def create_fractal():
         session.commit()
         session.refresh(new_fractal)
         
-        return jsonify({
-            "id": new_fractal.id,
-            "name": new_fractal.name,
-            "description": new_fractal.description
-        }), 201
+        return jsonify(new_fractal.to_dict(include_children=False)), 201
         
     except Exception as e:
         session.rollback()
@@ -415,6 +499,7 @@ def create_fractal():
 @goals_bp.route('/fractals/<root_id>', methods=['DELETE'])
 def delete_fractal(root_id):
     """Delete an entire fractal and all its data."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -437,6 +522,7 @@ def delete_fractal(root_id):
 @goals_bp.route('/<root_id>/goals', methods=['GET'])
 def get_fractal_goals(root_id):
     """Get the complete goal tree for a specific fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -454,6 +540,7 @@ def get_fractal_goals(root_id):
 @goals_bp.route('/<root_id>/goals', methods=['POST'])
 def create_fractal_goal(root_id):
     """Create a new goal within a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -496,6 +583,7 @@ def create_fractal_goal(root_id):
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['GET'])
 def get_fractal_goal(root_id, goal_id):
     """Get a specific goal by ID within a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Validate root goal exists
@@ -521,6 +609,7 @@ def get_fractal_goal(root_id, goal_id):
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['DELETE'])
 def delete_fractal_goal(root_id, goal_id):
     """Delete a goal within a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -548,6 +637,7 @@ def delete_fractal_goal(root_id, goal_id):
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['PUT'])
 def update_fractal_goal(root_id, goal_id):
     """Update a goal within a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)

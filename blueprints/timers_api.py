@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 import json
+import uuid
+import models
 from models import (
-    get_engine, get_session,
+    get_session,
     ActivityInstance, PracticeSession,
     validate_root_goal
 )
@@ -10,8 +12,8 @@ from models import (
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
 
-# Initialize database engine
-engine = get_engine()
+# Global engine removed
+# engine = get_engine()
 
 # ============================================================================
 # ACTIVITY INSTANCE TIME TRACKING ENDPOINTS
@@ -20,6 +22,7 @@ engine = get_engine()
 @timers_bp.route('/<root_id>/activity-instances', methods=['GET', 'POST'])
 def activity_instances(root_id):
     """Get all activity instances (GET) or create a new one (POST)."""
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         # Validate root goal exists
@@ -34,8 +37,11 @@ def activity_instances(root_id):
             practice_session_id = data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
             
-            if not instance_id or not practice_session_id or not activity_definition_id:
-                return jsonify({"error": "instance_id, practice_session_id, and activity_definition_id required"}), 400
+            if not instance_id:
+                instance_id = str(uuid.uuid4())
+            
+            if not practice_session_id or not activity_definition_id:
+                return jsonify({"error": "practice_session_id and activity_definition_id required"}), 400
             
             # Check if instance already exists
             existing = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
@@ -75,6 +81,7 @@ def activity_instances(root_id):
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/start', methods=['POST'])
 def start_activity_timer(root_id, instance_id):
     """Start the timer for an activity instance."""
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         print(f"[START TIMER] Instance ID: {instance_id}")
@@ -90,7 +97,7 @@ def start_activity_timer(root_id, instance_id):
         
         if not instance:
             # Instance doesn't exist yet - create it
-            data = request.get_json() or {}
+            data = request.get_json(silent=True) or {}
             practice_session_id = data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
             
@@ -109,7 +116,7 @@ def start_activity_timer(root_id, instance_id):
             print(f"[START TIMER] Instance added to session")
         
         # Set start time to now
-        start_time = datetime.now()
+        start_time = datetime.utcnow()
         instance.time_start = start_time
         # Clear stop time and duration if restarting
         instance.time_stop = None
@@ -141,6 +148,7 @@ def start_activity_timer(root_id, instance_id):
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/stop', methods=['POST'])
 def stop_activity_timer(root_id, instance_id):
     """Stop the timer for an activity instance and calculate duration."""
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         # Validate root goal exists
@@ -164,7 +172,7 @@ def stop_activity_timer(root_id, instance_id):
             }), 400
         
         # Normal case - timer was started, now stopping it
-        instance.time_stop = datetime.now()
+        instance.time_stop = datetime.utcnow()
         duration = (instance.time_stop - instance.time_start).total_seconds()
         instance.duration_seconds = int(duration)
         
@@ -183,6 +191,7 @@ def stop_activity_timer(root_id, instance_id):
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
 def update_activity_instance(root_id, instance_id):
     """Update an activity instance manually (e.g. editing times)."""
+    engine = models.get_engine()
     db_session = get_session(engine)
     try:
         # Validate root goal exists

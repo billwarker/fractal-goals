@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
+import models
 from models import (
-    get_engine, get_session,
+    get_session,
     ActivityDefinition, MetricDefinition, SplitDefinition, ActivityGroup,
     validate_root_goal
 )
@@ -9,8 +10,8 @@ from sqlalchemy import func
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
 
-# Initialize database engine
-engine = get_engine()
+# Global engine removed
+# engine = get_engine()
 
 # ============================================================================
 # ============================================================================
@@ -20,6 +21,7 @@ engine = get_engine()
 @activities_bp.route('/<root_id>/activity-groups', methods=['GET'])
 def get_activity_groups(root_id):
     """Get all activity groups for a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -34,6 +36,7 @@ def get_activity_groups(root_id):
 @activities_bp.route('/<root_id>/activity-groups', methods=['POST'])
 def create_activity_group(root_id):
     """Create a new activity group."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -66,6 +69,7 @@ def create_activity_group(root_id):
 @activities_bp.route('/<root_id>/activity-groups/<group_id>', methods=['PUT'])
 def update_activity_group(root_id, group_id):
     """Update an activity group."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
@@ -89,6 +93,7 @@ def update_activity_group(root_id, group_id):
 @activities_bp.route('/<root_id>/activity-groups/<group_id>', methods=['DELETE'])
 def delete_activity_group(root_id, group_id):
     """Delete an activity group."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
@@ -112,6 +117,7 @@ def delete_activity_group(root_id, group_id):
 @activities_bp.route('/<root_id>/activity-groups/reorder', methods=['PUT'])
 def reorder_activity_groups(root_id):
     """Reorder activity groups."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         data = request.get_json()
@@ -141,6 +147,7 @@ def reorder_activity_groups(root_id):
 @activities_bp.route('/<root_id>/activities', methods=['GET'])
 def get_activities(root_id):
     """Get all activity definitions for a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -155,6 +162,7 @@ def get_activities(root_id):
 @activities_bp.route('/<root_id>/activities', methods=['POST'])
 def create_activity(root_id):
     """Create a new activity definition with metrics."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -224,6 +232,7 @@ def create_activity(root_id):
 @activities_bp.route('/<root_id>/activities/<activity_id>', methods=['PUT'])
 def update_activity(root_id, activity_id):
     """Update an activity definition and its metrics."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -362,6 +371,7 @@ def update_activity(root_id, activity_id):
 @activities_bp.route('/<root_id>/activities/<activity_id>', methods=['DELETE'])
 def delete_activity(root_id, activity_id):
     """Delete an activity definition."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Check ownership via root_id

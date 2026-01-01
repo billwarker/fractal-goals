@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
 import json
 import uuid
+import models
 from models import (
-    get_engine, get_session,
+    get_session,
     SessionTemplate,
     validate_root_goal
 )
@@ -10,8 +11,8 @@ from models import (
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
 
-# Initialize database engine
-engine = get_engine()
+# Global engine removed
+# engine = get_engine()
 
 # ============================================================================
 # SESSION TEMPLATE ENDPOINTS (Fractal-Scoped)
@@ -20,6 +21,7 @@ engine = get_engine()
 @templates_bp.route('/<root_id>/session-templates', methods=['GET'])
 def get_session_templates(root_id):
     """Get all session templates for a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -37,6 +39,7 @@ def get_session_templates(root_id):
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['GET'])
 def get_session_template(root_id, template_id):
     """Get a specific session template."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -56,6 +59,7 @@ def get_session_template(root_id, template_id):
 @templates_bp.route('/<root_id>/session-templates', methods=['POST'])
 def create_session_template(root_id):
     """Create a new session template."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -95,6 +99,7 @@ def create_session_template(root_id):
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['PUT'])
 def update_session_template(root_id, template_id):
     """Update a session template."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -129,6 +134,7 @@ def update_session_template(root_id, template_id):
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['DELETE'])
 def delete_session_template(root_id, template_id):
     """Delete a session template."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)

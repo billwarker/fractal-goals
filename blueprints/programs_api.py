@@ -2,8 +2,9 @@ from flask import Blueprint, request, jsonify
 import json
 import uuid
 from datetime import datetime, timedelta
+import models
 from models import (
-    get_engine, get_session,
+    get_session,
     Program, ProgramBlock, ProgramDay, ScheduledSession, Goal,
     validate_root_goal
 )
@@ -11,8 +12,8 @@ from models import (
 # Create blueprint
 programs_bp = Blueprint('programs', __name__, url_prefix='/api')
 
-# Initialize database engine
-engine = get_engine()
+# Global engine removed
+# engine = get_engine()
 
 # Helper to sync nested structure (Shadow Write)
 def sync_program_structure(session, program, schedule_list):
@@ -143,6 +144,7 @@ def sync_program_structure(session, program, schedule_list):
 @programs_bp.route('/<root_id>/programs', methods=['GET'])
 def get_programs(root_id):
     """Get all training programs for a fractal."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -160,6 +162,7 @@ def get_programs(root_id):
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['GET'])
 def get_program(root_id, program_id):
     """Get a specific training program."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -179,6 +182,7 @@ def get_program(root_id, program_id):
 @programs_bp.route('/<root_id>/programs', methods=['POST'])
 def create_program(root_id):
     """Create a new training program."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -239,6 +243,7 @@ def create_program(root_id):
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['PUT'])
 def update_program(root_id, program_id):
     """Update a training program."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -296,6 +301,7 @@ def update_program(root_id, program_id):
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['DELETE'])
 def delete_program(root_id, program_id):
     """Delete a training program."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         root = validate_root_goal(session, root_id)
@@ -320,6 +326,7 @@ def delete_program(root_id, program_id):
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days', methods=['POST'])
 def add_block_day(root_id, program_id, block_id):
     """Add a configured day to a program block (and optionally cascade)."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         # Validate hierarchy
@@ -405,6 +412,7 @@ def add_block_day(root_id, program_id, block_id):
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['PUT'])
 def update_block_day(root_id, program_id, block_id, day_id):
     """Update a specific program day."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
@@ -476,6 +484,7 @@ def update_block_day(root_id, program_id, block_id, day_id):
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['DELETE'])
 def delete_block_day(root_id, program_id, block_id, day_id):
     """Delete a program day."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
@@ -492,6 +501,7 @@ def delete_block_day(root_id, program_id, block_id, day_id):
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy', methods=['POST'])
 def copy_block_day(root_id, program_id, block_id, day_id):
     """Copy a day to other blocks."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         source_day = session.query(ProgramDay).filter_by(id=day_id).first()
@@ -552,6 +562,7 @@ def copy_block_day(root_id, program_id, block_id, day_id):
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/goals', methods=['POST'])
 def attach_goal_to_block(root_id, program_id, block_id):
     """Attach a goal to a block and update its deadline."""
+    engine = models.get_engine()
     session = get_session(engine)
     try:
         block = session.query(ProgramBlock).filter_by(id=block_id).first()
