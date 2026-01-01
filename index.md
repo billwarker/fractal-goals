@@ -758,6 +758,137 @@ From `/my-implementation-plans/features.txt`:
 
 ---
 
+## Documentation Protocol for AI Agents
+
+### 📁 Documentation Organization
+
+All project documentation is organized in the `/docs/` directory. **NEVER create documentation files in the project root** (except `index.md` and `README.md`).
+
+#### Directory Structure
+
+```
+/docs/
+├── README.md                    # Documentation organization guide
+├── /architecture/               # System design & architecture decisions
+├── /migrations/                 # Database migration docs & reports
+├── /features/                   # Feature implementation docs
+├── /planning/                   # Roadmaps, backlogs, planning docs
+└── /guides/                     # How-to guides & tutorials
+```
+
+### 📝 When to Create Documentation
+
+| Situation | Location | Example Filename |
+|-----------|----------|------------------|
+| Planning a new feature | `/docs/features/` | `timer-controls-plan.md` |
+| Documenting feature completion | `/docs/features/` | `timer-controls-complete.md` |
+| Planning a database migration | `/docs/migrations/` | `MIGRATION_SCHEMA_V2_PLAN.md` |
+| Completing a migration | `/docs/migrations/` | `MIGRATION_SCHEMA_V2_REPORT.md` |
+| Architectural decisions | `/docs/architecture/` | `ACTIVITY_INSTANCE_ARCHITECTURE.md` |
+| Adding to feature backlog | `/docs/planning/` | `features.txt` |
+| Creating setup guide | `/docs/guides/` | `ENVIRONMENT_SETUP.md` |
+
+### 🎯 Documentation Workflow
+
+#### 1. Before Creating Documentation
+
+- ✅ Search `/docs/` to avoid duplication
+- ✅ Choose the appropriate subdirectory
+- ✅ Use descriptive, consistent naming
+- ✅ Check if existing docs need updating instead
+
+#### 2. During Implementation
+
+- ✅ Create planning docs in `/docs/features/` or `/docs/planning/`
+- ✅ Update implementation docs as you progress
+- ✅ Document architectural decisions in `/docs/architecture/`
+- ✅ Keep migration docs in `/docs/migrations/`
+
+#### 3. After Completion
+
+- ✅ Create completion summary in `/docs/features/`
+- ✅ Update `/docs/planning/features.txt` to mark feature complete
+- ✅ Update `/index.md` if core components changed
+- ✅ Cross-reference related documentation
+
+### 📋 Naming Conventions
+
+**Architecture & Migration Docs (UPPERCASE):**
+- `ARCHITECTURE_NAME.md`
+- `MIGRATION_DESCRIPTION_TYPE.md`
+- `DATABASE_IMPROVEMENTS.md`
+- `MULTI_USER_ARCHITECTURE.md`
+
+**Feature & Planning Docs (lowercase-with-hyphens):**
+- `feature-name-implementation.md`
+- `feature-name-complete.md`
+- `features.txt`
+
+**Guides (UPPERCASE):**
+- `SETUP_GUIDE.md`
+- `DEPLOYMENT_GUIDE.md`
+
+### 🚫 What NOT to Do
+
+❌ **NEVER** create documentation in project root  
+❌ **NEVER** use vague names like `notes.md`, `temp.md`, `doc.md`  
+❌ **NEVER** duplicate information across multiple docs  
+❌ **NEVER** leave orphaned docs without context  
+❌ **NEVER** mix implementation plans with completion reports in same file  
+
+### ✅ What TO Do
+
+✅ **ALWAYS** place docs in appropriate `/docs/` subdirectory  
+✅ **ALWAYS** use clear, descriptive filenames  
+✅ **ALWAYS** include creation/update dates in documents  
+✅ **ALWAYS** cross-reference related documentation  
+✅ **ALWAYS** update `/index.md` when core components change  
+✅ **ALWAYS** archive obsolete docs (add `_ARCHIVED` suffix)  
+
+### 📊 Required Updates Checklist
+
+When making changes, update these files as needed:
+
+- [ ] `/index.md` - Update if core features, APIs, or components changed
+- [ ] `/docs/planning/features.txt` - Mark features complete or add new ones
+- [ ] `/docs/README.md` - Update if adding new doc categories
+- [ ] Cross-reference related docs with relative links
+
+### 🗂️ File Lifecycle Example
+
+**Planning Phase:**
+1. Create `/docs/features/timer-controls-plan.md`
+2. Add to `/docs/planning/features.txt`
+
+**Implementation Phase:**
+1. Update `/docs/features/timer-controls-plan.md` with progress
+2. Create `/docs/architecture/TIMER_ARCHITECTURE.md` if needed
+
+**Completion Phase:**
+1. Create `/docs/features/timer-controls-complete.md`
+2. Update `/docs/planning/features.txt` (mark ✅)
+3. Update `/index.md` with new API endpoints/components
+4. Archive plan: rename to `timer-controls-plan_ARCHIVED.md`
+
+**Migration Phase (if needed):**
+1. Create `/docs/migrations/MIGRATION_TIMER_SCHEMA_PLAN.md`
+2. Run migration
+3. Create `/docs/migrations/MIGRATION_TIMER_SCHEMA_REPORT.md`
+
+### 📚 Quick Reference
+
+**Need to document something?** → Check `/docs/README.md` for detailed guidelines
+
+**Completed a feature?** → Update `/docs/planning/features.txt` and create summary in `/docs/features/`
+
+**Made architecture changes?** → Document in `/docs/architecture/`
+
+**Ran a migration?** → Create report in `/docs/migrations/`
+
+**Root directory getting messy?** → Move docs to appropriate `/docs/` subdirectory immediately
+
+---
+
 ## Quick Reference
 
 ### Common Tasks
@@ -798,16 +929,50 @@ python python-scripts/migrate_<name>.py
 - **API client:** `/client/src/utils/api.js`
 - **Environment config:** `/.env.*` files
 - **Logs:** `/logs/`
+- **Documentation:** `/docs/` (organized by category)
+  - Architecture docs: `/docs/architecture/`
+  - Migration docs: `/docs/migrations/`
+  - Feature docs: `/docs/features/`
+  - Planning docs: `/docs/planning/`
+  - Guides: `/docs/guides/`
+- **Python Scripts:** `/python-scripts/` (organized by purpose)
+  - Migrations: `/python-scripts/migrations/`
+  - Debug tools: `/python-scripts/debug/`
+  - Demo data: `/python-scripts/demo-data/`
+  - Utilities: `/python-scripts/utilities/`
 
 ---
 
-**Last Updated:** 2025-12-31  
-**Version:** 1.1.0  
+**Last Updated:** 2026-01-01  
+**Version:** 1.2.0  
 **Maintained By:** Project AI Agents
+
+**Recent Changes:**
+- Reorganized all documentation into `/docs/` directory structure
+- Added comprehensive Documentation Protocol for AI Agents
+- Organized python-scripts into categorized subdirectories
+- Created README files for `/docs/` and `/python-scripts/`
 
 ---
 
 ## Recent Development Notes
+
+### Documentation Reorganization (Jan 01, 2026)
+- **Created `/docs/` directory** with organized subdirectories:
+  - `/docs/architecture/` - System design & architecture decisions
+  - `/docs/migrations/` - Database migration docs & reports
+  - `/docs/features/` - Feature implementation documentation
+  - `/docs/planning/` - Roadmaps, backlogs, planning docs
+  - `/docs/guides/` - How-to guides & tutorials
+- **Moved all documentation** from project root to appropriate subdirectories
+- **Organized `/python-scripts/`** into categorized subdirectories:
+  - `/python-scripts/migrations/` - Database migration scripts
+  - `/python-scripts/debug/` - Debugging & inspection tools
+  - `/python-scripts/demo-data/` - Demo data creation scripts
+  - `/python-scripts/utilities/` - General utility scripts
+- **Created comprehensive README files** for both `/docs/` and `/python-scripts/`
+- **Added Documentation Protocol** to `index.md` with clear guidelines for AI agents
+- **Root directory cleanup** - Removed obsolete `migrations/` and `implementation-docs/` folders
 
 ### Programming/Programs Feature (Dec 31, 2025)
 - Added `Programming.jsx` page with composable session template builder
