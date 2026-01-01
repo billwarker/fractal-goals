@@ -133,9 +133,26 @@ function SessionDetail() {
                     session_end: sessionData.session_end
                 };
 
-                const response = await fractalApi.updateSession(rootId, sessionId, {
+                // Send session_start and session_end as top-level fields to save to DB columns
+                // Only include timing fields if they have values to avoid backend errors
+                const updatePayload = {
                     session_data: JSON.stringify(metadataOnly)
-                });
+                };
+
+                // Normalize datetime formats to standard ISO (backend expects consistent format)
+                if (sessionData.session_start) {
+                    const startDate = new Date(sessionData.session_start);
+                    updatePayload.session_start = startDate.toISOString();
+                }
+                if (sessionData.session_end) {
+                    const endDate = new Date(sessionData.session_end);
+                    updatePayload.session_end = endDate.toISOString();
+                }
+                if (sessionData.total_duration_seconds != null) {
+                    updatePayload.total_duration_seconds = sessionData.total_duration_seconds;
+                }
+
+                const response = await fractalApi.updateSession(rootId, sessionId, updatePayload);
 
                 // Update the session's updated_at timestamp from the response
                 if (response.data && response.data.attributes) {
@@ -291,18 +308,22 @@ function SessionDetail() {
                 for (const exercise of section.exercises || []) {
                     // Only process activities (not rest periods, etc.)
                     if (exercise.type === 'activity' && exercise.instance_id && exercise.activity_id) {
-                        try {
-                            // Try to create the instance - backend will fail if already created (which is expected)
-                            // We catch the error
-                            await fractalApi.addActivityToSession(rootId, sessionId, {
-                                instance_id: exercise.instance_id,
-                                activity_definition_id: exercise.activity_id
-                            });
-                            createdCount++;
-                            console.log(`Created/verified instance ${exercise.instance_id.substring(0, 8)}... for activity ${exercise.name}`);
-                        } catch (err) {
-                            // Silently fail - instance might already exist or will be created on timer start
-                            console.debug(`Instance ${exercise.instance_id} already exists or error:`, err.message);
+                        // Check if instance already exists in our state
+                        const instanceExists = activityInstances.some(inst => inst.id === exercise.instance_id);
+
+                        if (!instanceExists) {
+                            try {
+                                // Try to create the instance
+                                await fractalApi.addActivityToSession(rootId, sessionId, {
+                                    instance_id: exercise.instance_id,
+                                    activity_definition_id: exercise.activity_id
+                                });
+                                createdCount++;
+                                console.log(`Created instance ${exercise.instance_id.substring(0, 8)}... for activity ${exercise.name}`);
+                            } catch (err) {
+                                // Silently fail - instance might already exist in DB
+                                console.debug(`Instance ${exercise.instance_id} already exists or error:`, err.message);
+                            }
                         }
                     }
                 }
@@ -312,7 +333,7 @@ function SessionDetail() {
         };
 
         createMissingInstances();
-    }, [sessionData, sessionId, rootId, loading]);
+    }, [sessionData, sessionId, rootId, loading, activityInstances]);
 
     const handleSectionDurationChange = (sectionIndex, value) => {
         const updatedData = { ...sessionData };
@@ -572,9 +593,19 @@ function SessionDetail() {
                     setActivityInstances(updatedInstances);
                 }
 
-                // Update session_end locally if we have sessionData
+                // Update session_end and calculate total duration when completing
                 if (sessionData) {
-                    const updatedData = { ...sessionData, session_end: new Date().toISOString() };
+                    const sessionEndTime = new Date().toISOString();
+                    const updatedData = { ...sessionData, session_end: sessionEndTime };
+
+                    // Calculate total duration if we have session_start
+                    if (sessionData.session_start) {
+                        const startTime = new Date(sessionData.session_start);
+                        const endTime = new Date(sessionEndTime);
+                        const durationSeconds = Math.floor((endTime - startTime) / 1000);
+                        updatedData.total_duration_seconds = durationSeconds;
+                    }
+
                     setSessionData(updatedData);
                 }
             }

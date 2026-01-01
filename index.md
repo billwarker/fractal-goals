@@ -62,7 +62,7 @@
 
 ### 7. Multi-Environment Support
 - Development, Testing, and Production environments
-- Separate databases per environment (goals_dev.db, goals_test.db, goals_prod.db)
+- Separate databases per environment (goals_dev.db, goals_test.db, goals.db)
 - Environment-specific configuration via .env files
 - Environment indicator in UI
 
@@ -486,7 +486,7 @@ Fractal selection/home page.
 
 - **`.env.development`** - Development settings (uses `goals_dev.db`)
 - **`.env.testing`** - Testing settings (uses `goals_test.db`)
-- **`.env.production`** - Production settings (uses `goals_prod.db`)
+- **`.env.production`** - Production settings (uses `goals.db`)
 - **`.env.example`** - Template for environment files
 
 ### Key Environment Variables
@@ -563,6 +563,40 @@ Fractal selection/home page.
      - **Time Restoration**: Created `backfill_session_times.py` to restore missing session start/end times from JSON history to database columns.
      - **Display Fixes**: Updated hydration logic to correctly map activity names and set `has_sets` flags, ensuring metrics and "Previous Exercises" are visible.
      - **Result**: All historical sessions are now fully compatible with the new Database-Only architecture.
+
+11. **Session Timing & Activity Duration Persistence Fix** (Jan 01, 2026):
+     - **Problems Identified**:
+       1. Session start/end times not saved to database columns (only in JSON)
+       2. Activity instance durations not displaying on `/sessions/` page
+       3. Auto-save causing 500 errors preventing all data persistence
+       4. Unnecessary instance creation attempts causing console errors
+     - **Root Causes**:
+       1. Frontend sending `session_start`/`session_end` inside `session_data` JSON instead of as top-level fields
+       2. Frontend sending `undefined` values for timing fields → backend 500 error
+       3. Backend receiving ISO datetime strings but SQLAlchemy expecting Python datetime objects
+       4. Hydrated exercises missing `instance_id` field that frontend checks for
+       5. `createMissingInstances` attempting to recreate all instances on session load
+     - **Fixes Applied**:
+       1. **Frontend** (`SessionDetail.jsx`):
+          - Modified auto-save to send timing fields as top-level parameters (not just in JSON)
+          - Added conditional checks to only send timing fields when they have values
+          - Normalized datetime formats to standard ISO before sending
+          - Calculate and save `total_duration_seconds` when marking session complete
+          - Check if instances exist before attempting to create them
+       2. **Backend** (`sessions_api.py`):
+          - Parse ISO datetime strings to Python datetime objects using `datetime.fromisoformat()`
+          - Handle 'Z' timezone indicator by replacing with '+00:00'
+       3. **Models** (`models.py`):
+          - Added `instance_id` field to hydrated exercise objects for frontend compatibility
+     - **Impact**: 
+       - Session timing data now properly saved to database columns for analytics
+       - Activity durations now display correctly on `/sessions/` page
+       - No more 500 errors blocking data persistence
+       - Clean console with no unnecessary API calls
+     - **Locations**: 
+       - `/client/src/pages/SessionDetail.jsx` lines 136-154, 300-337, 580-594
+       - `/blueprints/sessions_api.py` lines 349-363
+       - `/models.py` line 190
 
 
 ### Database Improvements (Jan 01, 2026)
@@ -727,26 +761,150 @@ From `/my-implementation-plans/features.txt`:
 
 ---
 
-## Development Guidelines
+### AI Agent Development Protocol
+
+**⚠️ CRITICAL: Follow this protocol for EVERY code change request to prevent breaking existing functionality.**
+
+#### Phase 1: Investigation (REQUIRED BEFORE ANY CODE CHANGES)
+
+When a user reports an issue or requests a fix:
+
+1. **Ask Clarifying Questions First**
+   - What is the exact behavior you're seeing?
+   - What did you expect to happen?
+   - Are there any error messages in the browser console or backend logs?
+   - Can you reproduce this consistently?
+   - When did this start happening? (Was it working before?)
+
+2. **Investigate the Current State**
+   - Read the relevant code sections
+   - Trace the data flow from frontend → API → database
+   - Check browser console for errors
+   - Verify what's actually in the database (if applicable)
+   - Review recent changes in this file that might be related
+
+3. **Provide a Diagnosis**
+   - Explain what you found during investigation
+   - Show the user the relevant code sections
+   - Describe the root cause with evidence
+   - Explain what is working vs. what is broken
+   - **DO NOT make changes yet**
+
+4. **Wait for User Confirmation**
+   - Present your diagnosis to the user
+   - Ask: "Does this match what you're experiencing?"
+   - Get explicit approval before proceeding to fixes
+
+#### Phase 2: Planning the Fix
+
+1. **Propose the Minimal Change**
+   - Identify the smallest possible fix
+   - Explain exactly what you'll change and why
+   - List any files that will be modified
+   - Describe potential risks or side effects
+
+2. **One Change at a Time**
+   - If multiple issues exist, fix them separately
+   - Never bundle unrelated changes together
+   - Each fix should be independently testable
+
+3. **Get Approval**
+   - Wait for user to approve the proposed fix
+   - User may ask you to adjust the approach
+
+#### Phase 3: Implementation
+
+1. **Make the Minimal Change**
+   - Change only what's necessary
+   - Don't "improve" working code unless explicitly asked
+   - Don't refactor while fixing bugs
+   - Preserve existing behavior wherever possible
+
+2. **Update Documentation**
+   - Add entry to "Recent Fixes" section
+   - Update relevant sections of this file
+   - Document what was changed and why
+
+3. **Provide Testing Instructions**
+   - Tell the user exactly how to test the fix
+   - List the expected behavior
+   - Suggest edge cases to check
+
+#### Phase 4: Verification
+
+1. **Wait for User Testing**
+   - Don't assume the fix worked
+   - Don't make additional changes until user confirms
+
+2. **If Issues Persist**
+   - Return to Phase 1: Investigation
+   - Don't guess - investigate further
+   - Ask for more details about what's not working
+
+#### Red Flags - STOP and Investigate If:
+
+- ❌ You're changing code you haven't fully read and understood
+- ❌ You're making multiple unrelated changes at once
+- ❌ You're "improving" code that wasn't mentioned in the issue
+- ❌ You haven't verified the issue actually exists
+- ❌ You're guessing at the solution without evidence
+- ❌ You're changing API contracts without checking all callers
+- ❌ You haven't considered what might break
+
+#### Example Good Workflow:
+
+```
+User: "Metrics don't seem to save"
+
+Agent: "Let me investigate this. I'll check:
+1. The browser console for errors
+2. The API call being made
+3. The backend endpoint handling metrics
+4. What's actually in the database
+
+[After investigation]
+
+I found that metrics ARE being saved to the database correctly. 
+The issue appears to be that the UI isn't refreshing after save.
+Here's the code flow: [shows code]
+
+Does this match what you're seeing? If so, I can fix the UI refresh 
+issue with a small change to SessionDetail.jsx line 467."
+```
+
+#### Example Bad Workflow (DON'T DO THIS):
+
+```
+User: "Metrics don't seem to save"
+
+Agent: "I'll fix the metrics saving and also improve the session 
+timing persistence while I'm at it."
+
+[Makes multiple changes without investigation]
+[Breaks working functionality]
+```
+
+---
 
 ### For AI Agents Working on This Project
 
 1. **Always read this file first** to understand the current state of the project
-2. **Check recent changes** section to avoid re-implementing fixes
-3. **Update this file** after making significant changes to:
+2. **Follow the AI Agent Development Protocol above** - it is MANDATORY
+3. **Check recent changes** section to avoid re-implementing fixes
+4. **Update this file** after making significant changes to:
    - Database schema
    - API endpoints
    - Frontend components
    - Features
    - Known issues
-4. **Follow existing patterns:**
+5. **Follow existing patterns:**
    - Use blueprint structure for new API endpoints
    - Follow Single Table Inheritance for goal types
    - Use context providers for global state
    - Maintain environment separation
-5. **Test across environments** when making infrastructure changes
-6. **Document breaking changes** in this file
-7. **Keep the To-Do list updated** as features are completed
+6. **Test across environments** when making infrastructure changes
+7. **Document breaking changes** in this file
+8. **Keep the To-Do list updated** as features are completed
 
 ### Code Organization Principles
 

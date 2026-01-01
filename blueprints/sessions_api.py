@@ -348,10 +348,18 @@ def update_practice_session(root_id, session_id):
         
         # Update session analytics fields
         if 'session_start' in data:
-            practice_session.session_start = data['session_start']
+            # Parse ISO string to datetime object (SQLAlchemy requires datetime objects)
+            if isinstance(data['session_start'], str):
+                practice_session.session_start = datetime.fromisoformat(data['session_start'].replace('Z', '+00:00'))
+            else:
+                practice_session.session_start = data['session_start']
         
         if 'session_end' in data:
-            practice_session.session_end = data['session_end']
+            # Parse ISO string to datetime object (SQLAlchemy requires datetime objects)
+            if isinstance(data['session_end'], str):
+                practice_session.session_end = datetime.fromisoformat(data['session_end'].replace('Z', '+00:00'))
+            else:
+                practice_session.session_end = data['session_end']
         
         if 'total_duration_seconds' in data:
             practice_session.total_duration_seconds = data['total_duration_seconds']

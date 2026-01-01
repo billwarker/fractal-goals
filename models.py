@@ -187,6 +187,7 @@ class PracticeSession(Goal):
                                      # Convert to dict and add compatibility fields for frontend
                                      ex = inst.to_dict()
                                      ex['type'] = 'activity'
+                                     ex['instance_id'] = inst.id  # Frontend looks for instance_id
                                      ex['name'] = ex.get('definition_name', 'Unknown Activity')
                                      ex['activity_id'] = inst.activity_definition_id
                                  
