@@ -188,12 +188,46 @@ def stop_activity_timer(root_id, instance_id):
 
 
 
+def parse_iso_datetime(iso_string):
+    """
+    Parse ISO datetime string, handling various formats including milliseconds and 'Z' timezone.
+    Returns timezone-naive UTC datetime object or None if empty/None.
+    Raises ValueError if parsing fails.
+    """
+    if not iso_string:
+        return None
+    
+    try:
+        # Strip milliseconds if present (e.g., "2026-01-02T06:04:04.000Z" -> "2026-01-02T06:04:04Z")
+        if '.' in iso_string and iso_string.endswith('Z'):
+            iso_string = iso_string.split('.')[0] + 'Z'
+        elif '.' in iso_string and '+' in iso_string:
+            # Handle format like "2026-01-02T06:04:04.000+00:00"
+            iso_string = iso_string.split('.')[0] + iso_string[iso_string.rfind('+'):]
+        
+        # Replace 'Z' with '+00:00' for compatibility
+        normalized = iso_string.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(normalized)
+        
+        # Convert to timezone-naive UTC (to match database format from datetime.utcnow())
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        
+        return dt
+    except Exception as e:
+        print(f"[DATETIME PARSE ERROR] Failed to parse '{iso_string}': {str(e)}")
+        raise ValueError(f"Invalid datetime format: {iso_string}")
+
+
+
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
 def update_activity_instance(root_id, instance_id):
     """Update an activity instance manually (e.g. editing times)."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        print(f"[UPDATE INSTANCE] Instance ID: {instance_id}")
+        print(f"[UPDATE INSTANCE] Request data: {request.get_json()}")
         # Validate root goal exists
         root = validate_root_goal(db_session, root_id)
         if not root:
@@ -223,15 +257,25 @@ def update_activity_instance(root_id, instance_id):
             db_session.add(instance)
         
         # Update fields if present
-        # Update fields if present
         if 'time_start' in data:
             ts = data['time_start']
-            # Handle empty string or None as clearing the time
-            instance.time_start = datetime.fromisoformat(ts.replace('Z', '+00:00')) if ts else None
+            print(f"[UPDATE INSTANCE] Parsing time_start: {ts}")
+            try:
+                instance.time_start = parse_iso_datetime(ts)
+                print(f"[UPDATE INSTANCE] Parsed time_start: {instance.time_start}")
+            except ValueError as e:
+                print(f"[UPDATE INSTANCE ERROR] {str(e)}")
+                return jsonify({"error": str(e)}), 400
             
         if 'time_stop' in data:
             ts = data['time_stop']
-            instance.time_stop = datetime.fromisoformat(ts.replace('Z', '+00:00')) if ts else None
+            print(f"[UPDATE INSTANCE] Parsing time_stop: {ts}")
+            try:
+                instance.time_stop = parse_iso_datetime(ts)
+                print(f"[UPDATE INSTANCE] Parsed time_stop: {instance.time_stop}")
+            except ValueError as e:
+                print(f"[UPDATE INSTANCE ERROR] {str(e)}")
+                return jsonify({"error": str(e)}), 400
 
         if 'completed' in data:
             instance.completed = bool(data['completed'])
@@ -254,14 +298,19 @@ def update_activity_instance(root_id, instance_id):
         if instance.time_start and instance.time_stop:
             duration = (instance.time_stop - instance.time_start).total_seconds()
             instance.duration_seconds = int(duration)
+            print(f"[UPDATE INSTANCE] Calculated duration: {instance.duration_seconds}s")
         elif not instance.time_start or not instance.time_stop:
              instance.duration_seconds = None
         
         db_session.commit()
+        print(f"[UPDATE INSTANCE] Successfully updated instance")
         
         return jsonify(instance.to_dict())
         
     except Exception as e:
+        print(f"[UPDATE INSTANCE ERROR] Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
