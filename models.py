@@ -14,6 +14,14 @@ practice_session_goals = Table(
     Column('short_term_goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True)
 )
 
+# Junction table for linking ProgramDays to multiple SessionTemplates (many-to-many)
+program_day_templates = Table(
+    'program_day_templates', Base.metadata,
+    Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
+    Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
+    Column('order', Integer, default=0)  # For ordering templates within a day
+)
+
 class Goal(Base):
     """
     Represents all nodes in the fractal goal tree, including Practice Sessions.
@@ -43,6 +51,7 @@ class Goal(Base):
     session_end = Column(DateTime, nullable=True)    # When session actually ended
     total_duration_seconds = Column(Integer, nullable=True)  # Calculated or from session_end - session_start
     template_id = Column(String, nullable=True)      # Reference to session template
+    program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True)  # Link to program day if created from program
     
     # Flexible data storage (renamed from session_data for semantic clarity)
     attributes = Column(Text, nullable=True)  # JSON - stores sections, exercises, notes, etc.
@@ -155,6 +164,30 @@ class PracticeSession(Goal):
         viewonly=False # explicit
     )
     
+    # Relationship to ProgramDay (if session was created from a program)
+    program_day = relationship("ProgramDay", back_populates="completed_sessions", foreign_keys=[Goal.program_day_id])
+    
+    def get_program_info(self):
+        """Get full program context for this session"""
+        if not self.program_day:
+            return None
+        
+        day = self.program_day
+        block = day.block
+        program = block.program
+        
+        return {
+            "program_id": program.id,
+            "program_name": program.name,
+            "block_id": block.id,
+            "block_name": block.name,
+            "block_color": block.color,
+            "day_id": day.id,
+            "day_name": day.name,
+            "day_number": day.day_number,
+            "day_date": day.date.isoformat() if day.date else None
+        }
+    
     def to_dict(self, include_children=True):
         # Result uses basic Goal structure but adds PS fields
         result = super().to_dict(include_children)
@@ -218,6 +251,11 @@ class PracticeSession(Goal):
              p_ids.append(self.parent_id)
         
         result["attributes"]["parent_ids"] = p_ids
+        
+        # Add program info if linked to program day
+        program_info = self.get_program_info()
+        if program_info:
+            result["program_info"] = program_info
         
         return result
 
@@ -489,9 +527,24 @@ class ProgramDay(Base):
     day_number = Column(Integer, nullable=True) # Order within block (1, 2, 3...)
     name = Column(String) # Optional
     notes = Column(Text)
+    is_completed = Column(Boolean, default=False)  # Track if all templates have been completed
     
+    # Relationships
     block = relationship("ProgramBlock", back_populates="days")
-    sessions = relationship("ScheduledSession", back_populates="day", cascade="all, delete-orphan")
+    templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
+    completed_sessions = relationship("PracticeSession", back_populates="program_day", foreign_keys="[Goal.program_day_id]")
+
+    def check_completion(self):
+        """Check if all templates have been completed"""
+        if not self.templates:
+            return False
+        
+        # Get template IDs from completed sessions
+        completed_template_ids = {s.template_id for s in self.completed_sessions if s.template_id}
+        required_template_ids = {t.id for t in self.templates}
+        
+        # Day is complete if all required templates have been done
+        return required_template_ids.issubset(completed_template_ids)
 
     def to_dict(self):
         return {
@@ -501,32 +554,11 @@ class ProgramDay(Base):
             "day_number": self.day_number,
             "name": self.name,
             "notes": self.notes,
-            # Include sessions
-            "sessions": [s.to_dict() for s in self.sessions]
-        }
-
-class ScheduledSession(Base):
-    __tablename__ = 'scheduled_sessions'
-    
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    day_id = Column(String, ForeignKey('program_days.id'), nullable=False)
-    
-    session_template_id = Column(String, ForeignKey('session_templates.id'), nullable=True)
-    
-    is_completed = Column(Boolean, default=False)
-    completion_data = Column(Text) # JSON
-    
-    day = relationship("ProgramDay", back_populates="sessions")
-    template = relationship("SessionTemplate")
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "day_id": self.day_id,
-            "session_template_id": self.session_template_id,
             "is_completed": self.is_completed,
-            "completion_data": json.loads(self.completion_data) if self.completion_data else {},
-            "template_name": self.template.name if self.template else None
+            # Include templates
+            "templates": [{"id": t.id, "name": t.name, "description": t.description} for t in self.templates],
+            # Include completed sessions summary
+            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": s.created_at.isoformat() if s.created_at else None} for s in self.completed_sessions]
         }
 
 

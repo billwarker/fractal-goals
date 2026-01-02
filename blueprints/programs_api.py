@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import models
 from models import (
     get_session,
-    Program, ProgramBlock, ProgramDay, ScheduledSession, Goal,
+    Program, ProgramBlock, ProgramDay, Goal, SessionTemplate,
     validate_root_goal
 )
 
@@ -90,44 +90,13 @@ def sync_program_structure(session, program, schedule_list):
                 # Note: We must add to the relationship or session to track it for this loop if we access it?
                 # Usually safely handled by generic append or session add.
             
-            # SYNC SESSIONS
-            # day.sessions...
-            # This is tricky because we don't have IDs for these generated sessions in the incoming JSON 
-            # (since JSON is Template-based, not Instance-based).
-            # Strategy: Delete all sessions for this day and recreate based on template.
-            # This destroys completion data! 
-            # BETTER STRATEGY: Match by template_id? 
-            # If we are "applying template", we probably want to preserve completion if template matches.
-            
-            # Get existing sessions for day
-            existing_sessions = {s.session_template_id: s for s in day.sessions}
-            active_template_ids = []
-            
-            for tid in day_templates:
-                if tid in existing_sessions:
-                    # Keep it
-                    active_template_ids.append(tid)
-                else:
-                    # Create new
-                    new_session = ScheduledSession(
-                        id=str(uuid.uuid4()),
-                        day_id=day.id,
-                        session_template_id=tid,
-                        is_completed=False
-                    )
-                    session.add(new_session)
-                    # We need to associate it with day if day is new (and thus not in DB/relations yet fully?)
-                    # If day is in session, assigning day_id is enough? 
-                    # Assigning `day=day` is safer.
-                    new_session.day = day
-                    active_template_ids.append(tid)
-            
-            # Remove sessions that are no longer in the template for this day
-            for s in day.sessions:
-                if s.session_template_id not in active_template_ids:
-                     # Only remove if it's not completed? Or strictly enforce template?
-                     # Strictly enforce template for now.
-                     session.delete(s)
+            # SYNC TEMPLATES
+            if day_templates:
+                # Fetch SessionTemplate objects corresponding to the IDs
+                templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(day_templates)).all()
+                day.templates = templates
+            else:
+                day.templates = []
             
             curr += timedelta(days=1)
             day_index += 1
@@ -385,16 +354,10 @@ def add_block_day(root_id, program_id, block_id):
                 else:
                     if name: day.name = name
                 
-                # Add Sessions
-                for tid in template_ids:
-                     new_session = ScheduledSession(
-                        id=str(uuid.uuid4()),
-                        day_id=day.id,
-                        session_template_id=tid,
-                        is_completed=False
-                    )
-                     new_session.day = day
-                     session.add(new_session)
+                # Add Templates
+                if template_ids:
+                    templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
+                    day.templates = templates
                 
                 created_count += 1
 
@@ -435,17 +398,10 @@ def update_block_day(root_id, program_id, block_id, day_id):
                  template_ids.append(data['template_id'])
 
         if update_sessions:
-            for s in day.sessions: session.delete(s)
-            
-            for tid in template_ids:
-                new_session = ScheduledSession(
-                    id=str(uuid.uuid4()),
-                    day_id=day.id,
-                    session_template_id=tid,
-                    is_completed=False
-                )
-                new_session.day = day
-                session.add(new_session)
+            new_templates = []
+            if template_ids:
+                new_templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
+            day.templates = new_templates
         
         # Cascade Updates
         if cascade:
@@ -461,16 +417,9 @@ def update_block_day(root_id, program_id, block_id, day_id):
                     if t_day:
                         if 'name' in data: t_day.name = data['name']
                         if update_sessions:
-                             for s in t_day.sessions: session.delete(s)
-                             for tid in template_ids:
-                                 ns = ScheduledSession(
-                                     id=str(uuid.uuid4()),
-                                     day_id=t_day.id,
-                                     session_template_id=tid,
-                                     is_completed=False
-                                 )
-                                 ns.day = t_day
-                                 session.add(ns)
+                             # Re-use fetched templates if valid, or refetch if session constraints require generic objects
+                             # SQLA objects attached to session can be assigned to multiple parents' relationships generally
+                             t_day.templates = new_templates
             except StopIteration: pass
         
         session.commit()
@@ -535,19 +484,11 @@ def copy_block_day(root_id, program_id, block_id, day_id):
              else:
                   target_day.name = source_day.name
              
-             # Copy Sessions
-             for s in target_day.sessions:
-                  session.delete(s)
-             
-             for s in source_day.sessions:
-                  new_s = ScheduledSession(
-                      id=str(uuid.uuid4()),
-                      day_id=target_day.id,
-                      session_template_id=s.session_template_id,
-                      is_completed=False
-                  )
-                  new_s.day = target_day
-                  session.add(new_s)
+             # Copy Templates
+             if source_day.templates:
+                  target_day.templates = list(source_day.templates)
+             else:
+                  target_day.templates = []
              
              copied_count += 1
              
@@ -591,44 +532,34 @@ def get_active_program_days(root_id):
             for block in program.blocks:
                 if block.start_date and block.end_date:
                     if block.start_date <= today <= block.end_date:
-                        # Find days within this block that have sessions
+                        # Find days within this block that have templates
                         for day in block.days:
-                            # Only include days with scheduled sessions that have templates
-                            sessions_with_templates = [
-                                s for s in day.sessions 
-                                if s.session_template_id and not s.is_completed
-                            ]
-                            
-                            if sessions_with_templates:
-                                # Fetch template details for each session
+                            # Only include days with templates assigned
+                            if day.templates:
+                                # Get template details
                                 session_details = []
-                                for scheduled_session in sessions_with_templates:
-                                    template = session.query(SessionTemplate).filter_by(
-                                        id=scheduled_session.session_template_id
-                                    ).first()
-                                    
-                                    if template:
-                                        session_details.append({
-                                            "scheduled_session_id": scheduled_session.id,
-                                            "template_id": template.id,
-                                            "template_name": template.name,
-                                            "template_description": template.description,
-                                            "template_data": json.loads(template.template_data) if template.template_data else {}
-                                        })
-                                
-                                if session_details:
-                                    result.append({
-                                        "program_id": program.id,
-                                        "program_name": program.name,
-                                        "block_id": block.id,
-                                        "block_name": block.name,
-                                        "block_color": block.color,
-                                        "day_id": day.id,
-                                        "day_name": day.name,
-                                        "day_number": day.day_number,
-                                        "day_date": day.date.isoformat() if day.date else None,
-                                        "sessions": session_details
+                                for template in day.templates:
+                                    session_details.append({
+                                        "template_id": template.id,
+                                        "template_name": template.name,
+                                        "template_description": template.description,
+                                        "template_data": json.loads(template.template_data) if template.template_data else {}
                                     })
+                                
+                                result.append({
+                                    "program_id": program.id,
+                                    "program_name": program.name,
+                                    "block_id": block.id,
+                                    "block_name": block.name,
+                                    "block_color": block.color,
+                                    "day_id": day.id,
+                                    "day_name": day.name,
+                                    "day_number": day.day_number,
+                                    "day_date": day.date.isoformat() if day.date else None,
+                                    "is_completed": day.is_completed,
+                                    "sessions": session_details,
+                                    "completed_session_count": len(day.completed_sessions)
+                                })
         
         return jsonify(result)
         

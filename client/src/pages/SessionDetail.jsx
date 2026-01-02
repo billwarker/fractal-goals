@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
@@ -769,6 +769,24 @@ function SessionDetail() {
                             <span style={{ color: '#666', fontSize: '14px' }}>Template:</span>
                             <span style={{ color: '#ccc' }}>{sessionData.template_name}</span>
                         </div>
+
+                        {/* Program Info */}
+                        {session.program_info && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ color: '#666', fontSize: '14px' }}>Program:</span>
+                                <div>
+                                    <Link
+                                        to={`/${rootId}/programs/${session.program_info.program_id}`}
+                                        style={{ color: '#2196f3', textDecoration: 'none', fontWeight: '500' }}
+                                    >
+                                        {session.program_info.program_name}
+                                    </Link>
+                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                        {session.program_info.block_name} • {session.program_info.day_name}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Session Start DateTime - Editable */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

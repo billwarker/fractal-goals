@@ -37,7 +37,13 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                     setDayOfWeek('');
                 }
 
-                const tids = initialData.sessions?.map(s => s.session_template_id).filter(Boolean) || [];
+                // Handle new templates structure or fallback to legacy sessions
+                let tids = [];
+                if (initialData.templates) {
+                    tids = initialData.templates.map(t => t.id);
+                } else if (initialData.sessions) {
+                    tids = initialData.sessions.map(s => s.session_template_id).filter(Boolean);
+                }
                 setSelectedTemplates(tids);
                 setCascade(false);
             } else {

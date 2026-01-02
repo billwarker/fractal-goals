@@ -280,14 +280,46 @@ const ProgramDetail = () => {
                 if (day.date) {
                     calendarEvents.push({
                         id: `day-${day.id}`,
-                        title: day.name,
+                        title: day.name + (day.is_completed ? ' ✅' : ''),
                         start: day.date,
                         allDay: true,
                         backgroundColor: 'transparent',
                         borderColor: 'transparent',
-                        textColor: 'rgba(255,255,255,0.9)',
+                        textColor: day.is_completed ? '#4caf50' : 'rgba(255,255,255,0.9)',
                         classNames: ['day-label-event']
                     });
+
+                    // Add events for Templates (The Plan)
+                    if (day.templates) {
+                        day.templates.forEach(t => {
+                            calendarEvents.push({
+                                id: `template-${day.id}-${t.id}`,
+                                title: t.name,
+                                start: day.date,
+                                allDay: true,
+                                backgroundColor: day.is_completed ? '#2e7d32' : '#37474F',
+                                borderColor: 'transparent',
+                                textColor: day.is_completed ? '#E8F5E9' : '#CFD8DC',
+                                extendedProps: { type: 'template', ...t }
+                            });
+                        });
+                    }
+
+                    // Add events for Completed Sessions (The Reality)
+                    if (day.completed_sessions) {
+                        day.completed_sessions.forEach(s => {
+                            calendarEvents.push({
+                                id: `session-${s.id}`,
+                                title: `✓ ${s.name}`,
+                                start: s.created_at ? s.created_at.split('T')[0] : day.date,
+                                allDay: true,
+                                backgroundColor: '#1b5e20', // Darker Green
+                                borderColor: '#4caf50',
+                                textColor: 'white',
+                                extendedProps: { type: 'session', ...s }
+                            });
+                        });
+                    }
                 }
             });
         }
@@ -518,11 +550,20 @@ const ProgramDetail = () => {
                                                         )}
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        {day.sessions?.length > 0 ? day.sessions.map(session => (
-                                                            <div key={session.id} style={{ fontSize: '11px', color: session.is_completed ? '#4ECDC4' : '#ddd', background: '#383838', padding: '4px 6px', borderRadius: '4px' }}>
-                                                                {session.template_name || 'Session'}
-                                                            </div>
-                                                        )) : (<div style={{ fontSize: '11px', color: '#555', fontStyle: 'italic' }}>Rest</div>)}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            {day.templates?.length > 0 ? day.templates.map(template => (
+                                                                <div key={template.id} style={{
+                                                                    fontSize: '11px',
+                                                                    color: day.is_completed ? '#81c784' : '#ddd',
+                                                                    background: day.is_completed ? '#1b5e20' : '#383838',
+                                                                    padding: '4px 6px',
+                                                                    borderRadius: '4px',
+                                                                    border: day.is_completed ? '1px solid #2e7d32' : '1px solid transparent'
+                                                                }}>
+                                                                    {template.name}
+                                                                </div>
+                                                            )) : (<div style={{ fontSize: '11px', color: '#555', fontStyle: 'italic' }}>Rest</div>)}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}

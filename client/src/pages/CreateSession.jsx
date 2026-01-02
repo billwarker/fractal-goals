@@ -213,8 +213,7 @@ function Log() {
                         block_id: selectedProgramDay.block_id,
                         block_name: selectedProgramDay.block_name,
                         day_id: selectedProgramDay.day_id,
-                        day_name: selectedProgramDay.day_name,
-                        scheduled_session_id: selectedProgramSession?.scheduled_session_id
+                        day_name: selectedProgramDay.day_name
                     } : null,
                     sections: sectionsWithExercises,
                     total_duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0
@@ -619,11 +618,11 @@ function Log() {
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                         {programDay.sessions.map((session, idx) => {
-                                                            const isSessionSelected = selectedProgramSession?.scheduled_session_id === session.scheduled_session_id;
+                                                            const isSessionSelected = selectedProgramSession?.template_id === session.template_id;
 
                                                             return (
                                                                 <div
-                                                                    key={session.scheduled_session_id}
+                                                                    key={session.template_id}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleSelectProgramSession(session);

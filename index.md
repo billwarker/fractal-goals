@@ -1318,3 +1318,23 @@ python python-scripts/migrate_<name>.py
         - `/docs/features/program-session-creation.md` - Feature documentation
         - `/index.md` - Updated documentation
 
+
+16. **Refactor Program Day Templates** (Jan 02, 2026):
+      - **Objective**: Simplify database schema by removing `ScheduledSession` intermediary model.
+      - **Changes**:
+        - **Database**:
+          - Created `program_day_templates` junction table for Many-to-Many relationship.
+          - Added `is_completed` column to `program_days` table.
+          - Added `program_day_id` to `goals` (PracticeSession) table.
+          - Dropped `scheduled_sessions` table.
+        - **Backend**:
+          - Updated `programs_api.py` to use `day.templates` relationship.
+          - Updated `ProgramDay` model to include `templates` and `completed_sessions`.
+          - Updated `PracticeSession` model to link directly to `ProgramDay`.
+          - Migrated existing data via `migrate_program_day_templates.py`.
+        - **Frontend**:
+          - Updated `CreateSession.jsx` to use `template_id` and pass `program_day_id` context.
+          - Updated `SessionDetail.jsx` to display Program/Block/Day info.
+          - Updated `Sessions.jsx` to show Program column.
+          - Updated `ProgramDetail.jsx` calendar to show planned templates and completed sessions.
+          - Updated `ProgramDayModal.jsx` to handle template selection directly.
