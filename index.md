@@ -472,6 +472,11 @@ Fractal selection/home page.
   - Kills Flask and Vite processes
   - Cleans up background jobs
 
+- **`copy-db-to-envs.sh`** - Copy production database to dev/test environments
+  - Copies `goals.db` to `goals_dev.db` and `goals_test.db`
+  - Creates timestamped backups of existing databases
+  - Useful for syncing production data to development/testing
+
 ### Python Utility Scripts (in `/python-scripts/`)
 
 - **Migration Scripts:** `migrate_*.py` - Database schema migrations
@@ -1085,6 +1090,11 @@ tail -f logs/development_frontend.log
 ```bash
 source fractal-goals-venv/bin/activate
 python python-scripts/migrate_<name>.py
+```
+
+**Copy production database to dev/test:**
+```bash
+./shell-scripts/copy-db-to-envs.sh
 ```
 
 ### Important File Locations
