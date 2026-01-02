@@ -559,6 +559,86 @@ def copy_block_day(root_id, program_id, block_id, day_id):
     finally:
         session.close()
 
+@programs_bp.route('/<root_id>/programs/active-days', methods=['GET'])
+def get_active_program_days(root_id):
+    """
+    Get program days from active programs where current date falls within the block's date range.
+    Returns days that have at least one scheduled session with a template.
+    """
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        from datetime import date
+        from models import SessionTemplate
+        import json
+        
+        root = validate_root_goal(session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        today = date.today()
+        
+        # Get all active programs for this fractal
+        active_programs = session.query(Program).filter_by(
+            root_id=root_id,
+            is_active=True
+        ).all()
+        
+        result = []
+        
+        for program in active_programs:
+            # Find blocks that contain today's date
+            for block in program.blocks:
+                if block.start_date and block.end_date:
+                    if block.start_date <= today <= block.end_date:
+                        # Find days within this block that have sessions
+                        for day in block.days:
+                            # Only include days with scheduled sessions that have templates
+                            sessions_with_templates = [
+                                s for s in day.sessions 
+                                if s.session_template_id and not s.is_completed
+                            ]
+                            
+                            if sessions_with_templates:
+                                # Fetch template details for each session
+                                session_details = []
+                                for scheduled_session in sessions_with_templates:
+                                    template = session.query(SessionTemplate).filter_by(
+                                        id=scheduled_session.session_template_id
+                                    ).first()
+                                    
+                                    if template:
+                                        session_details.append({
+                                            "scheduled_session_id": scheduled_session.id,
+                                            "template_id": template.id,
+                                            "template_name": template.name,
+                                            "template_description": template.description,
+                                            "template_data": json.loads(template.template_data) if template.template_data else {}
+                                        })
+                                
+                                if session_details:
+                                    result.append({
+                                        "program_id": program.id,
+                                        "program_name": program.name,
+                                        "block_id": block.id,
+                                        "block_name": block.name,
+                                        "block_color": block.color,
+                                        "day_id": day.id,
+                                        "day_name": day.name,
+                                        "day_number": day.day_number,
+                                        "day_date": day.date.isoformat() if day.date else None,
+                                        "sessions": session_details
+                                    })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/goals', methods=['POST'])
 def attach_goal_to_block(root_id, program_id, block_id):
     """Attach a goal to a block and update its deadline."""

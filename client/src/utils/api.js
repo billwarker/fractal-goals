@@ -366,6 +366,14 @@ export const fractalApi = {
 
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
+
+    /**
+     * Get active program days for the current date
+     * Returns days from active programs where today falls within the block's date range
+     * @param {string} rootId - ID of the fractal
+     */
+    getActiveProgramDays: (rootId) =>
+        axios.get(`${API_BASE}/${rootId}/programs/active-days`),
 };
 
 /**

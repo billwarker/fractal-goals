@@ -5,7 +5,7 @@ import '../App.css';
 
 /**
  * Create Practice Session Page
- * Simple 3-step flow: Select template → Associate with goal → Create session
+ * Enhanced flow: Select from program day OR select template → Associate with goal → Create session
  */
 function Log() {
     const { rootId } = useParams();
@@ -14,8 +14,14 @@ function Log() {
 
     const [templates, setTemplates] = useState([]);
     const [goals, setGoals] = useState([]);
+    const [programDays, setProgramDays] = useState([]);
+    const [programsByName, setProgramsByName] = useState({}); // NEW: group days by program
+    const [selectedProgram, setSelectedProgram] = useState(null); // NEW: selected program name
     const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [selectedProgramDay, setSelectedProgramDay] = useState(null);
+    const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
+    const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
 
@@ -29,13 +35,31 @@ function Log() {
 
     const fetchData = async () => {
         try {
-            // Fetch templates and goals in parallel
-            const [templatesRes, goalsRes] = await Promise.all([
+            // Fetch templates, goals, and active program days in parallel
+            const [templatesRes, goalsRes, programDaysRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
-                fractalApi.getGoals(rootId)
+                fractalApi.getGoals(rootId),
+                fractalApi.getActiveProgramDays(rootId)
             ]);
 
             setTemplates(templatesRes.data);
+            const allProgramDays = programDaysRes.data || [];
+            setProgramDays(allProgramDays);
+
+            // Group program days by program name
+            const grouped = {};
+            allProgramDays.forEach(day => {
+                const programName = day.program_name;
+                if (!grouped[programName]) {
+                    grouped[programName] = {
+                        program_id: day.program_id,
+                        program_name: programName,
+                        days: []
+                    };
+                }
+                grouped[programName].days.push(day);
+            });
+            setProgramsByName(grouped);
 
             // Extract all short-term goals from the tree
             const shortTermGoals = extractShortTermGoals(goalsRes.data);
@@ -45,6 +69,20 @@ function Log() {
             const goalIdFromUrl = searchParams.get('goalId');
             if (goalIdFromUrl && shortTermGoals.some(g => g.id === goalIdFromUrl)) {
                 setSelectedGoalIds([goalIdFromUrl]);
+            }
+
+            // Auto-select session source and program if only one option is available
+            const programNames = Object.keys(grouped);
+            if (programNames.length === 1 && templatesRes.data.length === 0) {
+                // Only one program, no templates → auto-select program
+                setSessionSource('program');
+                setSelectedProgram(programNames[0]);
+            } else if (programNames.length === 1 && templatesRes.data.length > 0) {
+                // One program and templates → auto-select the program for "From Program" option
+                setSelectedProgram(programNames[0]);
+            } else if (programNames.length === 0 && templatesRes.data.length > 0) {
+                // No programs, only templates → auto-select template source
+                setSessionSource('template');
             }
 
             setLoading(false);
@@ -82,9 +120,54 @@ function Log() {
         );
     };
 
+    const handleSelectProgramDay = (programDay) => {
+        setSelectedProgramDay(programDay);
+        setSelectedProgramSession(null); // Reset session selection
+        setSelectedTemplate(null); // Reset template
+
+        // If only one session, auto-select it
+        if (programDay.sessions && programDay.sessions.length === 1) {
+            const session = programDay.sessions[0];
+            setSelectedProgramSession(session);
+            setSelectedTemplate({
+                id: session.template_id,
+                name: session.template_name,
+                description: session.template_description,
+                template_data: session.template_data
+            });
+        }
+    };
+
+    const handleSelectProgramSession = (session) => {
+        setSelectedProgramSession(session);
+        setSelectedTemplate({
+            id: session.template_id,
+            name: session.template_name,
+            description: session.template_description,
+            template_data: session.template_data
+        });
+    };
+
+    const handleSelectSource = (source) => {
+        // Reset selections when switching sources
+        setSelectedTemplate(null);
+        setSelectedProgramDay(null);
+        setSelectedProgramSession(null);
+        setSessionSource(source);
+    };
+
+    const handleSelectProgram = (programName) => {
+        // Reset day/session selections when switching programs
+        setSelectedProgramDay(null);
+        setSelectedProgramSession(null);
+        setSelectedTemplate(null);
+        setSelectedProgram(programName);
+        setSessionSource('program'); // Auto-select program source
+    };
+
     const handleCreateSession = async () => {
         if (!selectedTemplate) {
-            alert('Please select a template');
+            alert('Please select a template or program day');
             return;
         }
 
@@ -124,6 +207,15 @@ function Log() {
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
+                    program_context: selectedProgramDay ? {
+                        program_id: selectedProgramDay.program_id,
+                        program_name: selectedProgramDay.program_name,
+                        block_id: selectedProgramDay.block_id,
+                        block_name: selectedProgramDay.block_name,
+                        day_id: selectedProgramDay.day_id,
+                        day_name: selectedProgramDay.day_name,
+                        scheduled_session_id: selectedProgramSession?.scheduled_session_id
+                    } : null,
                     sections: sectionsWithExercises,
                     total_duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0
                 })
@@ -153,6 +245,17 @@ function Log() {
         );
     }
 
+    const hasProgramDays = programDays.length > 0;
+    const hasTemplates = templates.length > 0;
+    const programNames = Object.keys(programsByName);
+    const hasMultiplePrograms = programNames.length > 1;
+    const hasSingleProgram = programNames.length === 1;
+    const showSourceChoice = hasSingleProgram && hasTemplates;
+    const showProgramChoice = hasMultiplePrograms;
+
+    // Get the days for the currently selected program
+    const currentProgramDays = selectedProgram ? (programsByName[selectedProgram]?.days || []) : [];
+
     return (
         <div className="page-container" style={{ color: 'white' }}>
             <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '30px' }}>
@@ -160,84 +263,78 @@ function Log() {
             </h1>
 
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                {/* Step 1: Select Template */}
-                <div style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    marginBottom: '24px'
-                }}>
-                    <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                            background: '#2196f3',
-                            color: 'white',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}>1</span>
-                        Select a Template
-                    </h2>
+                {/* Step 0a: Choose Program (if multiple programs available) */}
+                {showProgramChoice && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>0</span>
+                            Choose a Program
+                        </h2>
 
-                    {templates.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '20px' }}>
-                            <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
-                            <button
-                                onClick={() => navigate(`/${rootId}/manage-session-templates`)}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: '#2196f3',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 'bold'
-                                }}
-                            >
-                                Create a Template
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
-                            {templates.map(template => {
-                                const isSelected = selectedTemplate?.id === template.id;
-                                const sectionCount = template.template_data?.sections?.length || 0;
-                                const duration = template.template_data?.total_duration_minutes || 0;
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {programNames.map(programName => {
+                                const program = programsByName[programName];
+                                const isSelected = selectedProgram === programName;
+                                const dayCount = program.days.length;
 
                                 return (
                                     <div
-                                        key={template.id}
-                                        onClick={() => setSelectedTemplate(template)}
+                                        key={programName}
+                                        onClick={() => handleSelectProgram(programName)}
                                         style={{
                                             background: isSelected ? '#2a3f5f' : '#2a2a2a',
                                             border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
                                             borderRadius: '6px',
-                                            padding: '16px',
+                                            padding: '16px 20px',
                                             cursor: 'pointer',
-                                            transition: 'all 0.2s'
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!isSelected) {
+                                                e.currentTarget.style.borderColor = '#2196f3';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!isSelected) {
+                                                e.currentTarget.style.borderColor = '#444';
+                                            }
                                         }}
                                     >
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
-                                            {template.name}
-                                        </div>
-                                        <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
-                                            {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
-                                        </div>
-                                        {template.description && (
-                                            <div style={{ fontSize: '12px', color: '#888' }}>
-                                                {template.description}
+                                        <div>
+                                            <div style={{ fontSize: '48px', marginRight: '16px', display: 'inline' }}>📅</div>
+                                            <div style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: '18px' }}>
+                                                    {programName}
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: '#aaa', marginTop: '4px' }}>
+                                                    {dayCount} active day{dayCount !== 1 ? 's' : ''} available
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
                                         {isSelected && (
                                             <div style={{
-                                                marginTop: '8px',
                                                 color: '#2196f3',
-                                                fontSize: '12px',
+                                                fontSize: '14px',
                                                 fontWeight: 'bold'
                                             }}>
                                                 ✓ Selected
@@ -247,143 +344,567 @@ function Log() {
                                 );
                             })}
                         </div>
-                    )}
-                </div>
 
-                {/* Step 2: Associate with Short-Term Goal */}
-                <div style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    marginBottom: '24px'
-                }}>
-                    <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                            background: '#2196f3',
-                            color: 'white',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}>2</span>
-                        Associate with Short-Term Goal(s)
-                    </h2>
+                        {hasTemplates && (
+                            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>or</div>
+                                <button
+                                    onClick={() => handleSelectSource('template')}
+                                    style={{
+                                        padding: '10px 20px',
+                                        background: sessionSource === 'template' ? '#2196f3' : 'transparent',
+                                        border: '1px solid #2196f3',
+                                        borderRadius: '4px',
+                                        color: sessionSource === 'template' ? 'white' : '#2196f3',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        fontSize: '14px',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (sessionSource !== 'template') {
+                                            e.currentTarget.style.background = 'rgba(33, 150, 243, 0.1)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (sessionSource !== 'template') {
+                                            e.currentTarget.style.background = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    📋 Select Template Manually Instead
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                    {goals.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                            <p>No short-term goals found. Create goals in the Fractal View first.</p>
+                {/* Step 0b: Choose Session Source (if single program and templates available) */}
+                {showSourceChoice && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>0</span>
+                            Choose Session Source
+                        </h2>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div
+                                onClick={() => handleSelectSource('program')}
+                                style={{
+                                    background: sessionSource === 'program' ? '#2a3f5f' : '#2a2a2a',
+                                    border: `2px solid ${sessionSource === 'program' ? '#2196f3' : '#444'}`,
+                                    borderRadius: '8px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (sessionSource !== 'program') {
+                                        e.currentTarget.style.borderColor = '#2196f3';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (sessionSource !== 'program') {
+                                        e.currentTarget.style.borderColor = '#444';
+                                    }
+                                }}
+                            >
+                                <div style={{ fontSize: '48px', marginBottom: '12px' }}>📅</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>
+                                    From Active Program
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#aaa' }}>
+                                    Select a day from your current training program
+                                </div>
+                                {sessionSource === 'program' && (
+                                    <div style={{
+                                        marginTop: '12px',
+                                        color: '#2196f3',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
+                            </div>
+
+                            <div
+                                onClick={() => handleSelectSource('template')}
+                                style={{
+                                    background: sessionSource === 'template' ? '#2a3f5f' : '#2a2a2a',
+                                    border: `2px solid ${sessionSource === 'template' ? '#2196f3' : '#444'}`,
+                                    borderRadius: '8px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (sessionSource !== 'template') {
+                                        e.currentTarget.style.borderColor = '#2196f3';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (sessionSource !== 'template') {
+                                        e.currentTarget.style.borderColor = '#444';
+                                    }
+                                }}
+                            >
+                                <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>
+                                    From Template
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#aaa' }}>
+                                    Choose any template manually
+                                </div>
+                                {sessionSource === 'template' && (
+                                    <div style={{
+                                        marginTop: '12px',
+                                        color: '#2196f3',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {goals.map(goal => {
-                                const isSelected = selectedGoalIds.includes(goal.id);
+                    </div>
+                )}
 
-                                return (
-                                    <div
-                                        key={goal.id}
-                                        onClick={() => handleToggleGoal(goal.id)}
+                {/* Step 1: Select Program Day OR Template */}
+                {(sessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>1</span>
+                            Select a Day from Your Program
+                        </h2>
+
+                        {currentProgramDays.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px' }}>
+                                <p style={{ color: '#666', marginBottom: '16px' }}>No active program days available for today</p>
+                                {hasTemplates && (
+                                    <button
+                                        onClick={() => setSessionSource('template')}
                                         style={{
-                                            background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                            border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
-                                            borderRadius: '6px',
-                                            padding: '12px 16px',
+                                            padding: '10px 20px',
+                                            background: '#2196f3',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            color: 'white',
                                             cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '12px',
-                                            transition: 'all 0.2s'
+                                            fontWeight: 'bold'
                                         }}
                                     >
-                                        <div style={{
-                                            width: '20px',
-                                            height: '20px',
-                                            borderRadius: '4px',
-                                            border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
-                                            background: isSelected ? '#4caf50' : 'transparent',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            fontWeight: 'bold',
-                                            flexShrink: 0
-                                        }}>
-                                            {isSelected && '✓'}
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
-                                                {goal.name}
+                                        Select Template Instead
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {currentProgramDays.map(programDay => {
+                                    const isSelected = selectedProgramDay?.day_id === programDay.day_id;
+                                    const hasMultipleSessions = programDay.sessions.length > 1;
+
+                                    return (
+                                        <div key={programDay.day_id}>
+                                            <div
+                                                onClick={() => handleSelectProgramDay(programDay)}
+                                                style={{
+                                                    background: isSelected ? '#2a3f5f' : '#2a2a2a',
+                                                    border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                                    borderRadius: '6px',
+                                                    padding: '16px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                                    <div style={{
+                                                        width: '4px',
+                                                        height: '40px',
+                                                        background: programDay.block_color || '#2196f3',
+                                                        borderRadius: '2px'
+                                                    }} />
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                                                            {programDay.program_name} - {programDay.block_name}
+                                                        </div>
+                                                        <div style={{ fontSize: '13px', color: '#aaa' }}>
+                                                            {programDay.day_name} (Day {programDay.day_number})
+                                                            {hasMultipleSessions && (
+                                                                <span style={{ marginLeft: '8px', color: '#2196f3' }}>
+                                                                    • {programDay.sessions.length} sessions
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {!hasMultipleSessions && (
+                                                    <div style={{ marginLeft: '16px', fontSize: '14px' }}>
+                                                        <div style={{
+                                                            padding: '8px',
+                                                            background: 'rgba(33, 150, 243, 0.1)',
+                                                            borderRadius: '4px'
+                                                        }}>
+                                                            <div style={{ fontWeight: 'bold' }}>{programDay.sessions[0].template_name}</div>
+                                                            {programDay.sessions[0].template_description && (
+                                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                                    {programDay.sessions[0].template_description}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {isSelected && !hasMultipleSessions && (
+                                                    <div style={{
+                                                        marginTop: '8px',
+                                                        color: '#2196f3',
+                                                        fontSize: '12px',
+                                                        fontWeight: 'bold',
+                                                        textAlign: 'right'
+                                                    }}>
+                                                        ✓ Selected
+                                                    </div>
+                                                )}
                                             </div>
-                                            {goal.description && (
-                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                                                    {goal.description}
+
+                                            {/* Show session selection for multi-session days */}
+                                            {isSelected && hasMultipleSessions && (
+                                                <div style={{
+                                                    marginTop: '12px',
+                                                    marginLeft: '20px',
+                                                    paddingLeft: '16px',
+                                                    borderLeft: `3px solid ${programDay.block_color || '#2196f3'}`
+                                                }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#aaa' }}>
+                                                        Select a session from this day:
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {programDay.sessions.map((session, idx) => {
+                                                            const isSessionSelected = selectedProgramSession?.scheduled_session_id === session.scheduled_session_id;
+
+                                                            return (
+                                                                <div
+                                                                    key={session.scheduled_session_id}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleSelectProgramSession(session);
+                                                                    }}
+                                                                    style={{
+                                                                        padding: '12px',
+                                                                        background: isSessionSelected ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.05)',
+                                                                        border: `2px solid ${isSessionSelected ? '#2196f3' : 'transparent'}`,
+                                                                        borderRadius: '4px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                                                                        {session.template_name}
+                                                                    </div>
+                                                                    {session.template_description && (
+                                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                                            {session.template_description}
+                                                                        </div>
+                                                                    )}
+                                                                    {isSessionSelected && (
+                                                                        <div style={{
+                                                                            marginTop: '6px',
+                                                                            color: '#2196f3',
+                                                                            fontSize: '12px',
+                                                                            fontWeight: 'bold'
+                                                                        }}>
+                                                                            ✓ Selected
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {(sessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>1</span>
+                            Select a Template
+                        </h2>
+
+                        {templates.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px' }}>
+                                <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
+                                <button
+                                    onClick={() => navigate(`/${rootId}/manage-session-templates`)}
+                                    style={{
+                                        padding: '10px 20px',
+                                        background: '#2196f3',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    Create a Template
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
+                                {templates.map(template => {
+                                    const isSelected = selectedTemplate?.id === template.id;
+                                    const sectionCount = template.template_data?.sections?.length || 0;
+                                    const duration = template.template_data?.total_duration_minutes || 0;
+
+                                    return (
+                                        <div
+                                            key={template.id}
+                                            onClick={() => {
+                                                setSelectedTemplate(template);
+                                                setSelectedProgramDay(null); // Clear program day selection
+                                                setSelectedProgramSession(null);
+                                            }}
+                                            style={{
+                                                background: isSelected ? '#2a3f5f' : '#2a2a2a',
+                                                border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                                borderRadius: '6px',
+                                                padding: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+                                                {template.name}
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
+                                                {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
+                                            </div>
+                                            {template.description && (
+                                                <div style={{ fontSize: '12px', color: '#888' }}>
+                                                    {template.description}
+                                                </div>
+                                            )}
+                                            {isSelected && (
+                                                <div style={{
+                                                    marginTop: '8px',
+                                                    color: '#2196f3',
+                                                    fontSize: '12px',
+                                                    fontWeight: 'bold'
+                                                }}>
+                                                    ✓ Selected
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 2: Associate with Short-Term Goal */}
+                {(selectedTemplate || selectedProgramDay) && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>2</span>
+                            Associate with Short-Term Goal(s)
+                        </h2>
+
+                        {goals.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                                <p>No short-term goals found. Create goals in the Fractal View first.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {goals.map(goal => {
+                                    const isSelected = selectedGoalIds.includes(goal.id);
+
+                                    return (
+                                        <div
+                                            key={goal.id}
+                                            onClick={() => handleToggleGoal(goal.id)}
+                                            style={{
+                                                background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                                borderRadius: '6px',
+                                                padding: '12px 16px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                borderRadius: '4px',
+                                                border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
+                                                background: isSelected ? '#4caf50' : 'transparent',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: 'white',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                flexShrink: 0
+                                            }}>
+                                                {isSelected && '✓'}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                                                    {goal.name}
+                                                </div>
+                                                {goal.description && (
+                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                        {goal.description}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Step 3: Create Session Button */}
-                <div style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    textAlign: 'center'
-                }}>
-                    <h2 style={{ fontSize: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        <span style={{
-                            background: '#2196f3',
-                            color: 'white',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}>3</span>
-                        Create Practice Session
-                    </h2>
+                {(selectedTemplate || selectedProgramDay) && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        textAlign: 'center'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>3</span>
+                            Create Practice Session
+                        </h2>
 
-                    <button
-                        onClick={handleCreateSession}
-                        disabled={!selectedTemplate || selectedGoalIds.length === 0 || creating}
-                        style={{
-                            padding: '16px 48px',
-                            background: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? '#666' : '#4caf50',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '18px',
-                            fontWeight: 'bold',
-                            cursor: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 'not-allowed' : 'pointer',
-                            opacity: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 0.5 : 1,
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        {creating ? 'Creating...' : '✓ Create Session'}
-                    </button>
+                        <button
+                            onClick={handleCreateSession}
+                            disabled={!selectedTemplate || selectedGoalIds.length === 0 || creating}
+                            style={{
+                                padding: '16px 48px',
+                                background: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? '#666' : '#4caf50',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: 'white',
+                                fontSize: '18px',
+                                fontWeight: 'bold',
+                                cursor: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 'not-allowed' : 'pointer',
+                                opacity: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 0.5 : 1,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            {creating ? 'Creating...' : '✓ Create Session'}
+                        </button>
 
-                    {selectedTemplate && selectedGoalIds.length > 0 && (
-                        <div style={{ marginTop: '16px', fontSize: '14px', color: '#aaa' }}>
-                            Creating: <strong style={{ color: 'white' }}>{selectedTemplate.name}</strong>
-                            {' '}associated with{' '}
-                            <strong style={{ color: 'white' }}>{selectedGoalIds.length}</strong>
-                            {' '}goal{selectedGoalIds.length !== 1 ? 's' : ''}
-                        </div>
-                    )}
-                </div>
+                        {selectedTemplate && selectedGoalIds.length > 0 && (
+                            <div style={{ marginTop: '16px', fontSize: '14px', color: '#aaa' }}>
+                                Creating: <strong style={{ color: 'white' }}>{selectedTemplate.name}</strong>
+                                {selectedProgramDay && (
+                                    <span> from <strong style={{ color: '#2196f3' }}>{selectedProgramDay.program_name}</strong></span>
+                                )}
+                                {' '}associated with{' '}
+                                <strong style={{ color: 'white' }}>{selectedGoalIds.length}</strong>
+                                {' '}goal{selectedGoalIds.length !== 1 ? 's' : ''}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

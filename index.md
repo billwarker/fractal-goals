@@ -282,6 +282,22 @@ Manages session templates.
 - `PUT /api/<root_id>/session-templates/<template_id>` - Update template
 - `DELETE /api/<root_id>/session-templates/<template_id>` - Delete template
 
+#### `programs_api.py`
+Manages training programs, blocks, and scheduled sessions.
+
+**Key Endpoints:**
+- `GET /api/<root_id>/programs` - Get all programs
+- `GET /api/<root_id>/programs/<program_id>` - Get specific program
+- `POST /api/<root_id>/programs` - Create program
+- `PUT /api/<root_id>/programs/<program_id>` - Update program
+- `DELETE /api/<root_id>/programs/<program_id>` - Delete program
+- `GET /api/<root_id>/programs/active-days` - Get active program days for current date
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days` - Add day to block
+- `PUT /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Update program day
+- `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
+
 #### `pages.py`
 Serves static pages (minimal usage, mostly SPA).
 
@@ -389,9 +405,13 @@ Detailed view of a single program/template.
 Activity log and practice session creation.
 
 **Features:**
-- Create new practice sessions
-- Quick session logging
-- Activity history
+- Enhanced session creation flow with dual-source support
+- Option to create sessions from active program days
+- Option to create sessions from templates directly
+- Auto-detection of available sources (program days vs templates)
+- Program context tracking (links sessions to program/block/day)
+- Associate sessions with multiple short-term goals
+- Smart UI that adapts based on available options
 
 #### `Selection.jsx`
 Fractal selection/home page.
@@ -1236,4 +1256,65 @@ python python-scripts/migrate_<name>.py
       - **Location**: `/python-scripts/utilities/cleanup_duplicate_roots.py`
       - **Impact**: Database now clean, UI should show correct fractal list
       - **TODO**: Investigate and fix frontend rapid-fire creation bug to prevent recurrence
+
+
+15. **Program-Based Session Creation Enhancement** (Jan 02, 2026):
+      - **Feature**: Enhanced session creation flow to support creating sessions from active program days
+      - **User Flow**:
+        - When user has active program(s) with blocks containing the current date
+        - Session creation page offers adaptive options based on available programs and templates:
+          - **Multiple programs**: Step 0 shows program selector, user chooses which program
+          - **Single program + templates**: Step 0 shows "From Program" vs "From Template" choice
+          - **No programs**: Skips directly to template selection
+        - **Multi-template support**: Days with multiple sessions show expandable template picker
+        - **Always-visible Step 0**: Users can switch between programs/sources without navigation
+        - Program context is saved with the session for tracking
+      - **Backend Changes**:
+        - Added `GET /api/<root_id>/programs/active-days` endpoint
+        - Returns program days from active programs where today falls within block date range
+        - Filters for days with scheduled sessions that have templates
+        - Includes full program/block/day context and template details
+        - Supports multiple scheduled sessions per day
+        - **Scoped to fractal**: Only returns programs for the current root_id
+      - **Frontend Changes**:
+        - Updated `Log.jsx` with intelligent multi-source session creation flow
+        - Added `getActiveProgramDays()` to `api.js`
+        - **Program grouping**: Days organized by program name for multi-program support
+        - **Smart UI adaptation**: Shows program selector, source selector, or template selector based on context
+        - **Multi-session day handling**: Expandable session picker when day has multiple templates
+        - **Persistent Step 0**: Source/program selection remains visible, allows switching without back button
+        - **Auto-selection logic**: Automatically selects source when only one option available
+        - Program context displayed when creating from program day
+        - Session metadata includes program_context with scheduled_session_id for tracking
+      - **UX Improvements**:
+        - Hover effects on all selection cards
+        - Visual indicator for days with multiple sessions ("• X sessions")
+        - Nested session selection UI with color-coded borders matching block colors
+        - Selected state with blue background and checkmark on all selectors
+        - Auto-selection for single-session days
+        - "Select Template Manually Instead" option when programs available
+        - Smooth transitions on all state changes
+        - Step 0 always visible when multiple options exist
+      - **State Management**:
+        - `programsByName`: Groups program days by program name
+        - `selectedProgram`: Tracks which program user has chosen
+        - `selectedProgramDay`: Tracks which day within program is selected
+        - `selectedProgramSession`: Tracks which session within multi-session day is selected
+        - `sessionSource`: Tracks whether using 'program' or 'template' source
+        - Automatic state clearing when switching between programs/sources
+      - **Benefits**:
+        - Seamless integration between programs and session creation
+        - Users can follow their program schedule more easily
+        - Support for complex programs with multiple daily sessions
+        - Support for users with multiple concurrent programs within a fractal
+        - Sessions maintain link to program structure for analytics
+        - Flexible fallback to manual template selection
+        - Better UX with persistent source selection and no back buttons needed
+        - All data properly scoped to current fractal (root_id)
+      - **Locations**:
+        - `/blueprints/programs_api.py` - New endpoint at line 562
+        - `/client/src/utils/api.js` - New API helper
+        - `/client/src/pages/Log.jsx` - Complete rewrite with enhanced flow
+        - `/docs/features/program-session-creation.md` - Feature documentation
+        - `/index.md` - Updated documentation
 
