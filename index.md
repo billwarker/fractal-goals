@@ -474,7 +474,7 @@ Fractal selection/home page.
 
 - **`copy-db-to-envs.sh`** - Copy production database to dev/test environments
   - Copies `goals.db` to `goals_dev.db` and `goals_test.db`
-  - Creates timestamped backups of existing databases
+  - Creates timestamped backups in `/backups/` folder (gitignored)
   - Useful for syncing production data to development/testing
 
 ### Python Utility Scripts (in `/python-scripts/`)

@@ -15,6 +15,9 @@ SOURCE_DB="$PROJECT_ROOT/goals.db"
 DEV_DB="$PROJECT_ROOT/goals_dev.db"
 TEST_DB="$PROJECT_ROOT/goals_test.db"
 
+# Backup directory
+BACKUP_DIR="$PROJECT_ROOT/backups"
+
 # Timestamp for backups
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
@@ -32,6 +35,14 @@ fi
 echo "✓ Source database found: goals.db"
 echo ""
 
+# Create backups directory if it doesn't exist
+if [ ! -d "$BACKUP_DIR" ]; then
+    echo "Creating backups directory..."
+    mkdir -p "$BACKUP_DIR"
+    echo "✓ Backups directory created: backups/"
+    echo ""
+fi
+
 # Function to backup and copy database
 copy_database() {
     local target_db=$1
@@ -41,8 +52,8 @@ copy_database() {
     
     # Create backup if target exists
     if [ -f "$target_db" ]; then
-        local backup_file="${target_db}.backup_${TIMESTAMP}"
-        echo "  → Creating backup: $(basename $backup_file)"
+        local backup_file="$BACKUP_DIR/${db_name}.backup_${TIMESTAMP}"
+        echo "  → Creating backup: backups/$(basename $backup_file)"
         cp "$target_db" "$backup_file"
         if [ $? -ne 0 ]; then
             echo "  ❌ Failed to create backup"
@@ -88,9 +99,13 @@ echo "  Source:      goals.db"
 echo "  Copied to:   goals_dev.db"
 echo "  Copied to:   goals_test.db"
 echo ""
-if [ -f "${DEV_DB}.backup_${TIMESTAMP}" ] || [ -f "${TEST_DB}.backup_${TIMESTAMP}" ]; then
+
+# Check if backups were created
+BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.backup_${TIMESTAMP} 2>/dev/null | wc -l)
+if [ $BACKUP_COUNT -gt 0 ]; then
     echo "Backups created with timestamp: $TIMESTAMP"
-    echo "  Location: $PROJECT_ROOT/*.backup_$TIMESTAMP"
+    echo "  Location: backups/*.backup_$TIMESTAMP"
+    echo "  Count: $BACKUP_COUNT file(s)"
 fi
 echo ""
 echo "=================================================="
