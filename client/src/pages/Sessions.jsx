@@ -105,20 +105,37 @@ function Sessions() {
 
     // Helper to get formatted duration from activity instances
     const getDuration = (session) => {
+        // Priority 1: Use total_duration_seconds if available (set when session is completed)
+        const totalDurationSeconds = session.attributes?.total_duration_seconds;
+        if (totalDurationSeconds != null && totalDurationSeconds > 0) {
+            const hours = Math.floor(totalDurationSeconds / 3600);
+            const minutes = Math.floor((totalDurationSeconds % 3600) / 60);
+
+            if (hours > 0) {
+                return `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
+            return `0:${String(minutes).padStart(2, '0')}`;
+        }
+
         const sessionData = session.attributes?.session_data;
 
-        // Calculate total duration from all activity instances across all sections
+        // Priority 2: Calculate total duration from all activity instances across all sections
         let totalSeconds = 0;
         if (sessionData?.sections) {
             for (const section of sessionData.sections) {
                 if (section.exercises) {
                     for (const exercise of section.exercises) {
                         if (exercise.instance_id && exercise.duration_seconds != null) {
+                            console.log(`[Duration Debug] Found exercise with duration: ${exercise.name}, ${exercise.duration_seconds}s`);
                             totalSeconds += exercise.duration_seconds;
                         }
                     }
                 }
             }
+        }
+
+        if (totalSeconds === 0) {
+            console.log(`[Duration Debug] Session ${session.name}: No activity durations found. sessionData:`, sessionData);
         }
 
         // If we have activity durations, use them
@@ -132,7 +149,7 @@ function Sessions() {
             return `0:${String(minutes).padStart(2, '0')}`;
         }
 
-        // Fallback: Calculate from session_start and session_end
+        // Priority 3: Fallback - Calculate from session_start and session_end
         if (sessionData?.session_start && sessionData?.session_end) {
             const start = new Date(sessionData.session_start);
             const end = new Date(sessionData.session_end);
