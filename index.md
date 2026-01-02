@@ -1215,3 +1215,25 @@ python python-scripts/migrate_<name>.py
         - `/blueprints/timers_api.py` - Added `parse_iso_datetime()` helper, enhanced error logging
         - `/models.py` line 361-363 - Updated datetime serialization
         - `/client/src/pages/SessionDetail.jsx` line 614 - Fixed response handling
+
+
+14. **Duplicate Root Goals Cleanup** (Jan 01, 2026):
+      - **Problem**: Database had 253 root goals, with 235 being duplicates of "Master Software Engineering"
+        - All duplicates created at 2026-01-01 22:06:09 with millisecond differences
+        - Indicates a rapid-fire creation bug (likely frontend button not debounced)
+      - **Root Cause**: Frontend likely triggered multiple simultaneous API calls when creating fractals
+      - **Solution**: Created `cleanup_duplicate_roots.py` utility script
+        - Identifies duplicate root goals by name
+        - Keeps the root with most children (or earliest created if tied)
+        - Recursively deletes orphaned duplicates and their descendants
+        - Creates automatic backup before cleanup
+      - **Results**:
+        - Removed 243 duplicate root goals
+        - Deleted 763 total goals (including descendants)
+        - Reduced from 253 to 10 unique root goals
+        - Cleaned duplicates: "Master Software Engineering" (235→1), "LinkedIn Job Hunting" (4→1), others
+      - **Backup**: `backups/goals.db.backup_cleanup_20260101_224953`
+      - **Location**: `/python-scripts/utilities/cleanup_duplicate_roots.py`
+      - **Impact**: Database now clean, UI should show correct fractal list
+      - **TODO**: Investigate and fix frontend rapid-fire creation bug to prevent recurrence
+
