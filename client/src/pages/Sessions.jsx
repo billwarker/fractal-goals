@@ -126,16 +126,11 @@ function Sessions() {
                 if (section.exercises) {
                     for (const exercise of section.exercises) {
                         if (exercise.instance_id && exercise.duration_seconds != null) {
-                            console.log(`[Duration Debug] Found exercise with duration: ${exercise.name}, ${exercise.duration_seconds}s`);
                             totalSeconds += exercise.duration_seconds;
                         }
                     }
                 }
             }
-        }
-
-        if (totalSeconds === 0) {
-            console.log(`[Duration Debug] Session ${session.name}: No activity durations found. sessionData:`, sessionData);
         }
 
         // If we have activity durations, use them
