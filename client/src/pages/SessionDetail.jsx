@@ -611,7 +611,8 @@ function SessionDetail() {
             }
 
             const res = await fractalApi.toggleGoalCompletion(rootId, sessionId, newCompleted);
-            setSession(res.data.goal); // Endpoint returns { status: 'success', goal: ... }
+            // The endpoint returns the practice session tree directly, not wrapped in {goal: ...}
+            setSession(res.data);
         } catch (err) {
             console.error('Error toggling completion:', err);
             alert('Error updating completion status');
