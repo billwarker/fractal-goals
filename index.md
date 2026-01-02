@@ -1181,3 +1181,27 @@ python python-scripts/migrate_<name>.py
 - Environment indicator shows current environment (development/testing/production)
 - "+ ADD SESSION" button with improved styling
 - Programs tab added to main navigation
+
+13. **Session Page Manual Time Edit & Completion Fixes** (Jan 01, 2026):
+      - **Problem 1**: Manual editing of activity instance start/stop times caused 500 error
+        - **Root Cause**: Timezone-aware/naive datetime mismatch - frontend sent ISO strings with milliseconds (e.g., `2026-01-02T06:04:04.000Z`), backend mixed timezone-aware and timezone-naive datetimes
+        - **Error**: `TypeError: can't subtract offset-naive and offset-aware datetimes`
+      - **Problem 2**: Marking session complete caused page to go blank
+        - **Root Cause**: Frontend expected `res.data.goal` but backend returned practice session tree directly in `res.data`
+        - **Error**: `TypeError: Cannot read properties of undefined (reading 'attributes')`
+      - **Fixes Applied**:
+        1. Created `parse_iso_datetime()` helper in `timers_api.py` that:
+           - Strips milliseconds from ISO strings (`.000` removed)
+           - Converts timezone-aware datetimes to timezone-naive UTC (matching database format)
+           - Handles both `Z` and `+00:00` timezone formats
+        2. Updated `ActivityInstance.to_dict()` to serialize datetimes without milliseconds using `timespec='seconds'`
+        3. Fixed `handleToggleSessionComplete` to use `res.data` instead of `res.data.goal`
+        4. Added comprehensive error logging for datetime parsing issues
+      - **Impact**:
+        - Manual time editing now works correctly without timezone errors
+        - Session completion updates UI properly without breaking the page
+        - Consistent datetime format throughout application (no milliseconds)
+      - **Locations**:
+        - `/blueprints/timers_api.py` - Added `parse_iso_datetime()` helper, enhanced error logging
+        - `/models.py` line 361-363 - Updated datetime serialization
+        - `/client/src/pages/SessionDetail.jsx` line 614 - Fixed response handling
