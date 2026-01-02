@@ -401,8 +401,8 @@ Detailed view of a single program/template.
 - Component reordering
 - Duration management
 
-#### `Log.jsx`
-Activity log and practice session creation.
+#### `CreateSession.jsx`
+Session creation page.
 
 **Features:**
 - Enhanced session creation flow with dual-source support
@@ -1277,7 +1277,7 @@ python python-scripts/migrate_<name>.py
         - Supports multiple scheduled sessions per day
         - **Scoped to fractal**: Only returns programs for the current root_id
       - **Frontend Changes**:
-        - Updated `Log.jsx` with intelligent multi-source session creation flow
+        - Updated `CreateSession.jsx` with intelligent multi-source session creation flow
         - Added `getActiveProgramDays()` to `api.js`
         - **Program grouping**: Days organized by program name for multi-program support
         - **Smart UI adaptation**: Shows program selector, source selector, or template selector based on context
@@ -1314,7 +1314,7 @@ python python-scripts/migrate_<name>.py
       - **Locations**:
         - `/blueprints/programs_api.py` - New endpoint at line 562
         - `/client/src/utils/api.js` - New API helper
-        - `/client/src/pages/Log.jsx` - Complete rewrite with enhanced flow
+        - `/client/src/pages/CreateSession.jsx` - Complete rewrite with enhanced flow
         - `/docs/features/program-session-creation.md` - Feature documentation
         - `/index.md` - Updated documentation
 

@@ -4,7 +4,7 @@ import { fractalApi } from '../utils/api';
 import '../App.css';
 
 /**
- * Create Practice Session Page
+ * Create Session Page
  * Enhanced flow: Select from program day OR select template → Associate with goal → Create session
  */
 function Log() {
@@ -259,7 +259,7 @@ function Log() {
     return (
         <div className="page-container" style={{ color: 'white' }}>
             <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '30px' }}>
-                Create Practice Session
+                Create Session
             </h1>
 
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -870,7 +870,7 @@ function Log() {
                                 fontSize: '14px',
                                 fontWeight: 'bold'
                             }}>3</span>
-                            Create Practice Session
+                            Create Session
                         </h2>
 
                         <button

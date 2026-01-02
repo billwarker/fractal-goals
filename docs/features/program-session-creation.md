@@ -62,7 +62,7 @@ Enhanced the session creation flow to support creating practice sessions directl
 
 ### Frontend Changes
 
-#### Updated Component: `Log.jsx`
+#### Updated Component: `CreateSession.jsx`
 
 **New Flow:**
 
@@ -95,7 +95,7 @@ Enhanced the session creation flow to support creating practice sessions directl
 - Graceful fallback to template selection
 - **Fractal-scoped**: All programs filtered by current root_id
 
-**File:** `/client/src/pages/Log.jsx` (complete rewrite)
+**File:** `/client/src/pages/CreateSession.jsx` (complete rewrite)
 
 #### Updated API Helper: `api.js`
 
@@ -324,7 +324,7 @@ Potential improvements for future iterations:
 
 - `/blueprints/programs_api.py` - New endpoint
 - `/client/src/utils/api.js` - New API helper
-- `/client/src/pages/Log.jsx` - Complete rewrite
+- `/client/src/pages/CreateSession.jsx` - Complete rewrite
 - `/index.md` - Updated documentation
 
 ## Related Features
