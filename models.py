@@ -182,6 +182,7 @@ class PracticeSession(Goal):
                      # Pre-fetch instances to a map
                      # Note: This might trigger lazy loads. For performance, ensure joinedload usage in queries.
                      instance_map = {inst.id: inst for inst in self.activity_instances}
+                     print(f"DEBUG: Hydration instance_map keys: {list(instance_map.keys())}")
                      
                      for section in data_obj["sections"]:
                          # Only hydrate if this is a migrated session (has activity_ids)
@@ -388,6 +389,7 @@ class MetricValue(Base):
             "id": self.id,
             "name": self.definition.name if self.definition else "",
             "metric_definition_id": self.metric_definition_id,
+            "metric_id": self.metric_definition_id, # Frontend alias
             "value": self.value,
             "unit": self.definition.unit if self.definition else "",
             "split_id": self.split_definition_id,

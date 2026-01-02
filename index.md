@@ -1142,6 +1142,12 @@ python python-scripts/migrate_<name>.py
 - **Added Documentation Protocol** to `index.md` with clear guidelines for AI agents
 - **Root directory cleanup** - Removed obsolete `migrations/` and `implementation-docs/` folders
 
+### Metric Persistence & Display Fix (Jan 01, 2026)
+- **Problem:** Metrics for activities without sets were not visible in the frontend sessions table, causing user concern about data loss.
+- **Root Cause:** Mismatch between backend API response (`metric_definition_id`) and frontend expectation (`metric_id`). Frontend components `Sessions.jsx` and `SessionActivityItem.jsx` relied on `metric_id`.
+- **Fix:** Updated `MetricValue.to_dict()` in `models.py` to include `metric_id` as an alias for `metric_definition_id`, ensuring backward compatibility and fixing the display issue.
+- **Verification:** verified via `repro_metrics.py` script that both sets validation and single-metric validation function correctly.
+
 ### Programming/Programs Feature (Dec 31, 2025)
 - Added `Programming.jsx` page with composable session template builder
 - Added `Programs.jsx` and `ProgramDetail.jsx` for program management
