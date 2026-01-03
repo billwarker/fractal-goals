@@ -7,6 +7,8 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../utils/dateUtils';
 import ActivityBuilder from '../components/ActivityBuilder';
+import GoalDetailModal from '../components/GoalDetailModal';
+import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import '../App.css';
 
 /**
@@ -26,32 +28,30 @@ function calculateSectionDuration(section, activityInstances) {
 }
 
 /**
- * Calculate total completed duration across all sections
- * Falls back to session_end - session_start if no activity durations exist
+ * Calculate total completed duration
+ * - If session_end is set: use session_end - session_start
+ * - If session_end is NULL: sum all section durations
  */
 function calculateTotalCompletedDuration(sessionData, activityInstances) {
-    if (!sessionData || !sessionData.sections) return 0;
+    if (!sessionData) return 0;
 
-    // Try to calculate from activity durations first
-    let totalSeconds = 0;
-    for (const section of sessionData.sections) {
-        totalSeconds += calculateSectionDuration(section, activityInstances);
-    }
-
-    // If we have activity durations, return them
-    if (totalSeconds > 0) {
-        return totalSeconds;
-    }
-
-    // Fallback: Calculate from session_start and session_end
-    if (sessionData.session_start && sessionData.session_end) {
+    // Priority 1: If session_end is set, use session_end - session_start
+    if (sessionData.session_end && sessionData.session_start) {
         const start = new Date(sessionData.session_start);
         const end = new Date(sessionData.session_end);
         const diffSeconds = Math.floor((end - start) / 1000);
         return diffSeconds > 0 ? diffSeconds : 0;
     }
 
-    return 0;
+    // Priority 2: Sum all section durations from activity instances
+    if (!sessionData.sections) return 0;
+
+    let totalSeconds = 0;
+    for (const section of sessionData.sections) {
+        totalSeconds += calculateSectionDuration(section, activityInstances);
+    }
+
+    return totalSeconds;
 }
 
 /**
@@ -107,6 +107,7 @@ function SessionDetail() {
     const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
+    const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
 
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
@@ -261,7 +262,7 @@ function SessionDetail() {
         }
     };
 
-    // Initialize session_start and session_end if they don't exist
+    // Initialize session_start if it doesn't exist
     useEffect(() => {
         if (!sessionData || !session || loading) return;
 
@@ -274,14 +275,7 @@ function SessionDetail() {
             needsUpdate = true;
         }
 
-        // Initialize session_end as session_start + total duration if not set
-        if (!updatedData.session_end && updatedData.session_start) {
-            const totalSeconds = calculateTotalCompletedDuration(sessionData);
-            const startDate = new Date(updatedData.session_start);
-            const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
-            updatedData.session_end = endDate.toISOString();
-            needsUpdate = true;
-        }
+        // DO NOT auto-initialize session_end - leave it NULL until user sets it
 
         if (needsUpdate) {
             setSessionData(updatedData);
@@ -720,6 +714,30 @@ function SessionDetail() {
         setSessionData(updatedData);
     };
 
+    const handleUpdateGoal = async (goalId, updates) => {
+        try {
+            await fractalApi.updateGoal(goalId, updates);
+
+            // Update local state
+            if (selectedGoal && selectedGoal.id === goalId) {
+                setSelectedGoal({ ...selectedGoal, ...updates, attributes: { ...selectedGoal.attributes, ...updates } });
+            }
+
+            // Update parent goals if it's one of them
+            setParentGoals(prev => prev.map(g =>
+                g.id === goalId ? { ...g, ...updates, attributes: { ...g.attributes, ...updates } } : g
+            ));
+
+            // Refresh session to get updated immediate goals
+            fetchSession();
+
+            setSelectedGoal(null);
+        } catch (err) {
+            console.error('Error updating goal:', err);
+            alert(`Failed to update goal: ${err.response?.data?.error || err.message}`);
+        }
+    };
+
     if (loading) {
         return (
             <div className="page-container">
@@ -987,7 +1005,7 @@ function SessionDetail() {
                                     fontWeight: 'bold',
                                     fontFamily: 'monospace'
                                 }}>
-                                    {formatDuration(calculateSectionDuration(section))}
+                                    {formatDuration(calculateSectionDuration(section, activityInstances))}
                                 </span>
                                 <span style={{ color: '#666', fontSize: '14px' }}>
                                     (planned: {section.duration_minutes} min)

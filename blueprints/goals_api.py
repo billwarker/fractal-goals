@@ -86,6 +86,10 @@ def create_goal():
             parent_id=parent_id  # Can be goal ID or practice session ID
         )
         
+        # Handle targets if provided
+        if 'targets' in data and data['targets']:
+            new_goal.targets = json.dumps(data['targets'])
+        
         session.add(new_goal)
         session.commit()
         session.refresh(new_goal)
@@ -566,6 +570,10 @@ def create_fractal_goal(root_id):
             deadline=data.get('deadline'),
             completed=False
         )
+        
+        # Handle targets if provided
+        if 'targets' in data and data['targets']:
+            new_goal.targets = json.dumps(data['targets'])
         
         session.add(new_goal)
         session.commit()

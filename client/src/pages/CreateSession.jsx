@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import GoalModal from '../components/modals/GoalModal';
 import '../App.css';
 
 /**
@@ -21,6 +22,11 @@ function Log() {
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
+    const [immediateGoals, setImmediateGoals] = useState([]); // NEW: immediate goals to attach
+    const [existingImmediateGoals, setExistingImmediateGoals] = useState([]); // NEW: existing immediate goals from tree
+    const [activityDefinitions, setActivityDefinitions] = useState([]); // NEW: for target creation
+    const [showGoalModal, setShowGoalModal] = useState(false); // NEW: control goal creation modal
+    const [showSelectGoalModal, setShowSelectGoalModal] = useState(false); // NEW: control goal selection modal
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -35,11 +41,12 @@ function Log() {
 
     const fetchData = async () => {
         try {
-            // Fetch templates, goals, and active program days in parallel
-            const [templatesRes, goalsRes, programDaysRes] = await Promise.all([
+            // Fetch templates, goals, active program days, and activities in parallel
+            const [templatesRes, goalsRes, programDaysRes, activitiesRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
                 fractalApi.getGoals(rootId),
-                fractalApi.getActiveProgramDays(rootId)
+                fractalApi.getActiveProgramDays(rootId),
+                fractalApi.getActivities(rootId)
             ]);
 
             setTemplates(templatesRes.data);
@@ -64,6 +71,13 @@ function Log() {
             // Extract all short-term goals from the tree
             const shortTermGoals = extractShortTermGoals(goalsRes.data);
             setGoals(shortTermGoals);
+
+            // Extract all immediate goals from the tree
+            const immediateGoalsFromTree = extractImmediateGoals(goalsRes.data);
+            setExistingImmediateGoals(immediateGoalsFromTree);
+
+            // Set activity definitions for target creation
+            setActivityDefinitions(activitiesRes.data || []);
 
             // Pre-select goal from URL if provided
             const goalIdFromUrl = searchParams.get('goalId');
@@ -110,6 +124,27 @@ function Log() {
 
         traverse(goalTree);
         return shortTermGoals;
+    };
+
+    const extractImmediateGoals = (goalTree) => {
+        const immediateGoals = [];
+
+        const traverse = (node) => {
+            if (node.attributes?.type === 'ImmediateGoal') {
+                immediateGoals.push({
+                    id: node.id,
+                    name: node.name,
+                    description: node.attributes?.description,
+                    deadline: node.attributes?.deadline
+                });
+            }
+            if (node.children) {
+                node.children.forEach(child => traverse(child));
+            }
+        };
+
+        traverse(goalTree);
+        return immediateGoals;
     };
 
     const handleToggleGoal = (goalId) => {
@@ -163,6 +198,31 @@ function Log() {
         setSelectedTemplate(null);
         setSelectedProgram(programName);
         setSessionSource('program'); // Auto-select program source
+    };
+
+    const handleCreateImmediateGoal = (goalData) => {
+        // Add the goal to our list with a temporary ID
+        const newGoal = {
+            ...goalData,
+            tempId: crypto.randomUUID(),
+            type: 'ImmediateGoal',
+            isNew: true // Mark as new so we know to create it
+        };
+        setImmediateGoals(prev => [...prev, newGoal]);
+        setShowGoalModal(false);
+    };
+
+    const handleSelectExistingGoal = (goal) => {
+        // Check if already added
+        if (immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id)) {
+            return; // Already added
+        }
+        // Add existing goal to the list
+        setImmediateGoals(prev => [...prev, { ...goal, tempId: goal.id, isNew: false }]);
+    };
+
+    const handleRemoveImmediateGoal = (tempId) => {
+        setImmediateGoals(prev => prev.filter(g => g.tempId !== tempId));
     };
 
     const handleCreateSession = async () => {
@@ -224,6 +284,40 @@ function Log() {
 
             // Get the created session ID from the response
             const createdSessionId = response.data.id;
+
+            // Create immediate goals as children of the practice session
+            if (immediateGoals.length > 0) {
+                // Separate new goals from existing goals
+                const newGoals = immediateGoals.filter(g => g.isNew);
+                const existingGoals = immediateGoals.filter(g => !g.isNew);
+
+                // Create new immediate goals
+                if (newGoals.length > 0) {
+                    await Promise.all(
+                        newGoals.map(goal =>
+                            fractalApi.createGoal(rootId, {
+                                name: goal.name,
+                                description: goal.description || '',
+                                deadline: goal.deadline || null,
+                                type: 'ImmediateGoal',
+                                parent_id: createdSessionId,
+                                targets: goal.targets || []
+                            })
+                        )
+                    );
+                }
+
+                // Update existing goals to add this session as a parent
+                if (existingGoals.length > 0) {
+                    await Promise.all(
+                        existingGoals.map(goal =>
+                            fractalApi.updateGoal(goal.id, {
+                                parent_id: createdSessionId
+                            })
+                        )
+                    );
+                }
+            }
 
             // Navigate to the session detail page to fill in details
             navigate(`/${rootId}/session/${createdSessionId}`);
@@ -847,7 +941,142 @@ function Log() {
                     </div>
                 )}
 
-                {/* Step 3: Create Session Button */}
+                {/* Step 3: Attach Immediate Goals (Optional) */}
+                {(selectedTemplate || selectedProgramDay) && selectedGoalIds.length > 0 && (
+                    <div style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        marginBottom: '24px'
+                    }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                                background: '#2196f3',
+                                color: 'white',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            }}>3</span>
+                            Attach Immediate Goals (Optional)
+                        </h2>
+
+                        <div style={{ marginBottom: '16px', color: '#aaa', fontSize: '14px' }}>
+                            Add immediate goals that you want to accomplish during this practice session.
+                        </div>
+
+                        {immediateGoals.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                                {immediateGoals.map(goal => (
+                                    <div
+                                        key={goal.tempId}
+                                        style={{
+                                            background: '#2a2a2a',
+                                            border: '2px solid #9c27b0',
+                                            borderRadius: '6px',
+                                            padding: '12px 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px'
+                                        }}
+                                    >
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#9c27b0' }}>
+                                                {goal.name}
+                                            </div>
+                                            {goal.description && (
+                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                    {goal.description}
+                                                </div>
+                                            )}
+                                            {goal.deadline && (
+                                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                                    📅 {new Date(goal.deadline).toLocaleDateString()}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => handleRemoveImmediateGoal(goal.tempId)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: '#d32f2f',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <button
+                                onClick={() => setShowSelectGoalModal(true)}
+                                disabled={existingImmediateGoals.length === 0}
+                                style={{
+                                    padding: '12px 24px',
+                                    background: existingImmediateGoals.length === 0 ? '#555' : '#2196f3',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: 'white',
+                                    fontSize: '16px',
+                                    fontWeight: 'bold',
+                                    cursor: existingImmediateGoals.length === 0 ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s',
+                                    opacity: existingImmediateGoals.length === 0 ? 0.5 : 1
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (existingImmediateGoals.length > 0) {
+                                        e.currentTarget.style.background = '#1976d2';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (existingImmediateGoals.length > 0) {
+                                        e.currentTarget.style.background = '#2196f3';
+                                    }
+                                }}
+                            >
+                                📎 Add Existing Goal
+                            </button>
+
+                            <button
+                                onClick={() => setShowGoalModal(true)}
+                                style={{
+                                    padding: '12px 24px',
+                                    background: '#9c27b0',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: 'white',
+                                    fontSize: '16px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#7b1fa2';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#9c27b0';
+                                }}
+                            >
+                                + Create New Goal
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 4: Create Session Button */}
                 {(selectedTemplate || selectedProgramDay) && (
                     <div style={{
                         background: '#1e1e1e',
@@ -868,7 +1097,7 @@ function Log() {
                                 justifyContent: 'center',
                                 fontSize: '14px',
                                 fontWeight: 'bold'
-                            }}>3</span>
+                            }}>4</span>
                             Create Session
                         </h2>
 
@@ -905,6 +1134,90 @@ function Log() {
                     </div>
                 )}
             </div>
+
+            {/* Goal Creation Modal */}
+            <GoalModal
+                isOpen={showGoalModal}
+                onClose={() => setShowGoalModal(false)}
+                onSubmit={handleCreateImmediateGoal}
+                parent={{
+                    name: selectedTemplate?.name || 'Practice Session',
+                    type: 'PracticeSession',
+                    attributes: { type: 'PracticeSession' }
+                }}
+                activityDefinitions={activityDefinitions}
+            />
+
+            {/* Goal Selection Modal */}
+            {showSelectGoalModal && (
+                <div className="modal-overlay" onClick={() => setShowSelectGoalModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                        <h2>Select Existing Immediate Goal</h2>
+
+                        {existingImmediateGoals.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                                <p>No existing immediate goals found.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+                                {existingImmediateGoals.map(goal => {
+                                    const isAlreadyAdded = immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id);
+
+                                    return (
+                                        <div
+                                            key={goal.id}
+                                            onClick={() => {
+                                                if (!isAlreadyAdded) {
+                                                    handleSelectExistingGoal(goal);
+                                                    setShowSelectGoalModal(false);
+                                                }
+                                            }}
+                                            style={{
+                                                background: isAlreadyAdded ? '#2a2a2a' : '#1e1e1e',
+                                                border: `2px solid ${isAlreadyAdded ? '#666' : '#9c27b0'}`,
+                                                borderRadius: '6px',
+                                                padding: '12px 16px',
+                                                cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
+                                                opacity: isAlreadyAdded ? 0.5 : 1,
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!isAlreadyAdded) {
+                                                    e.currentTarget.style.borderColor = '#7b1fa2';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!isAlreadyAdded) {
+                                                    e.currentTarget.style.borderColor = '#9c27b0';
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#9c27b0' }}>
+                                                {goal.name}
+                                                {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
+                                            </div>
+                                            {goal.description && (
+                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                    {goal.description}
+                                                </div>
+                                            )}
+                                            {goal.deadline && (
+                                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                                    📅 {new Date(goal.deadline).toLocaleDateString()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="actions" style={{ marginTop: '20px' }}>
+                            <button type="button" onClick={() => setShowSelectGoalModal(false)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
