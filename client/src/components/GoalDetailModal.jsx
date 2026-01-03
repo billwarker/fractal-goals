@@ -10,11 +10,33 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
 
+    // Target editing state
+    const [targets, setTargets] = useState([]);
+    const [isAddingTarget, setIsAddingTarget] = useState(false);
+    const [newTargetName, setNewTargetName] = useState('');
+    const [newTargetDesc, setNewTargetDesc] = useState('');
+    const [newTargetMetricValue, setNewTargetMetricValue] = useState('');
+    const [newTargetMetricUnit, setNewTargetMetricUnit] = useState('');
+
     useEffect(() => {
         if (goal) {
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
             setDeadline(goal.attributes?.deadline || goal.deadline || '');
+
+            // Parse targets
+            let parsedTargets = [];
+            if (goal.attributes?.targets) {
+                try {
+                    parsedTargets = typeof goal.attributes.targets === 'string'
+                        ? JSON.parse(goal.attributes.targets)
+                        : goal.attributes.targets;
+                } catch (e) {
+                    console.error('Error parsing targets:', e);
+                    parsedTargets = [];
+                }
+            }
+            setTargets(parsedTargets);
         }
     }, [goal]);
 
@@ -24,35 +46,65 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
         onUpdate(goal.id, {
             name,
             description,
-            deadline: deadline || null
+            deadline: deadline || null,
+            targets: targets
         });
         setIsEditing(false);
+        setIsAddingTarget(false);
     };
 
     const handleCancel = () => {
         // Reset to original values
-        setName(goal.name || '');
-        setDescription(goal.attributes?.description || goal.description || '');
-        setDeadline(goal.attributes?.deadline || goal.deadline || '');
+        if (goal) {
+            setName(goal.name || '');
+            setDescription(goal.attributes?.description || goal.description || '');
+            setDeadline(goal.attributes?.deadline || goal.deadline || '');
+
+            let parsedTargets = [];
+            if (goal.attributes?.targets) {
+                try {
+                    parsedTargets = typeof goal.attributes.targets === 'string'
+                        ? JSON.parse(goal.attributes.targets)
+                        : goal.attributes.targets;
+                } catch (e) {
+                    parsedTargets = [];
+                }
+            }
+            setTargets(parsedTargets);
+        }
         setIsEditing(false);
+        setIsAddingTarget(false);
+    };
+
+    const handleAddTarget = () => {
+        if (!newTargetName.trim()) return;
+
+        const newTarget = {
+            name: newTargetName,
+            description: newTargetDesc,
+            metrics: newTargetMetricValue ? [{
+                value: newTargetMetricValue,
+                unit: newTargetMetricUnit
+            }] : []
+        };
+
+        setTargets([...targets, newTarget]);
+        setNewTargetName('');
+        setNewTargetDesc('');
+        setNewTargetMetricValue('');
+        setNewTargetMetricUnit('');
+        setIsAddingTarget(false);
+    };
+
+    const handleRemoveTarget = (index) => {
+        const updatedTargets = [...targets];
+        updatedTargets.splice(index, 1);
+        setTargets(updatedTargets);
     };
 
     const goalType = goal.attributes?.type || goal.type;
     const goalColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
-
-    // Parse targets - they might be stored as JSON string
-    let targets = [];
-    if (goal.attributes?.targets) {
-        try {
-            targets = typeof goal.attributes.targets === 'string'
-                ? JSON.parse(goal.attributes.targets)
-                : goal.attributes.targets;
-        } catch (e) {
-            console.error('Error parsing targets:', e);
-            targets = [];
-        }
-    }
 
     return (
         <div
@@ -80,9 +132,12 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                     padding: '24px',
                     maxWidth: '600px',
                     width: '90%',
-                    maxHeight: '80vh',
+                    maxHeight: '85vh',
                     overflowY: 'auto',
-                    color: 'white'
+                    color: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
                 }}
             >
                 {/* Header */}
@@ -90,7 +145,6 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    marginBottom: '20px',
                     paddingBottom: '16px',
                     borderBottom: `2px solid ${goalColor}`
                 }}>
@@ -120,7 +174,7 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                 </div>
 
                 {/* Name */}
-                <div style={{ marginBottom: '16px' }}>
+                <div>
                     <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
                         Name:
                     </label>
@@ -148,7 +202,7 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                 </div>
 
                 {/* Description */}
-                <div style={{ marginBottom: '16px' }}>
+                <div>
                     <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
                         Description:
                     </label>
@@ -156,7 +210,7 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
+                            rows={3}
                             style={{
                                 width: '100%',
                                 padding: '8px',
@@ -177,7 +231,7 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
 
                 {/* Deadline */}
                 {(isEditing || goal.attributes?.deadline || goal.deadline) && (
-                    <div style={{ marginBottom: '16px' }}>
+                    <div>
                         <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
                             Deadline:
                         </label>
@@ -203,21 +257,42 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                     </div>
                 )}
 
-                {/* Targets */}
-                {targets.length > 0 && (
-                    <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: '#aaa' }}>
-                            Targets:
-                        </label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {targets.map((target, idx) => (
+                {/* Targets Section */}
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label style={{ fontSize: '13px', color: '#aaa' }}>Targets:</label>
+                        {isEditing && !isAddingTarget && (
+                            <button
+                                onClick={() => setIsAddingTarget(true)}
+                                style={{
+                                    background: '#333',
+                                    border: '1px solid #555',
+                                    color: '#ccc',
+                                    fontSize: '11px',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                + Add Target
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Target List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {targets.length === 0 && !isAddingTarget ? (
+                            <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>No targets defined</div>
+                        ) : (
+                            targets.map((target, idx) => (
                                 <div
                                     key={idx}
                                     style={{
                                         padding: '10px',
                                         background: '#2a2a2a',
                                         border: '1px solid #4caf50',
-                                        borderRadius: '4px'
+                                        borderRadius: '4px',
+                                        position: 'relative'
                                     }}
                                 >
                                     <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#4caf50', marginBottom: '4px' }}>
@@ -238,15 +313,92 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                                             ))}
                                         </div>
                                     )}
+                                    {isEditing && (
+                                        <button
+                                            onClick={() => handleRemoveTarget(idx)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '8px',
+                                                right: '8px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#f44336',
+                                                cursor: 'pointer',
+                                                fontSize: '16px'
+                                            }}
+                                            title="Remove Target"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
+                            ))
+                        )}
                     </div>
-                )}
+
+                    {/* Add Target Form */}
+                    {isEditing && isAddingTarget && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '12px',
+                            background: '#252525',
+                            border: '1px dashed #666',
+                            borderRadius: '4px'
+                        }}>
+                            <div style={{ marginBottom: '8px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Target Name (e.g., Hit 100kg)"
+                                    value={newTargetName}
+                                    onChange={(e) => setNewTargetName(e.target.value)}
+                                    style={{ width: '100%', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px', fontSize: '13px' }}
+                                />
+                            </div>
+                            <div style={{ marginBottom: '8px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Description (Optional)"
+                                    value={newTargetDesc}
+                                    onChange={(e) => setNewTargetDesc(e.target.value)}
+                                    style={{ width: '100%', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px', fontSize: '13px' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <input
+                                    type="number"
+                                    placeholder="Value"
+                                    value={newTargetMetricValue}
+                                    onChange={(e) => setNewTargetMetricValue(e.target.value)}
+                                    style={{ flex: 1, padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px', fontSize: '13px' }}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Unit (kg, min)"
+                                    value={newTargetMetricUnit}
+                                    onChange={(e) => setNewTargetMetricUnit(e.target.value)}
+                                    style={{ flex: 1, padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px', fontSize: '13px' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button
+                                    onClick={() => setIsAddingTarget(false)}
+                                    style={{ padding: '4px 12px', background: 'transparent', border: '1px solid #666', color: '#ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddTarget}
+                                    style={{ padding: '4px 12px', background: '#4caf50', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Created/Updated Info */}
                 <div style={{
-                    marginTop: '20px',
                     paddingTop: '16px',
                     borderTop: '1px solid #333',
                     fontSize: '12px',
@@ -263,7 +415,7 @@ function GoalDetailModal({ isOpen, onClose, goal, onUpdate }) {
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                     {isEditing ? (
                         <>
                             <button
