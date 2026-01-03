@@ -6,18 +6,25 @@ DONE
 5. activity builder be its own component, will pop up. can be added from sessions (DONE)
 14. organize activities by family (Activity Groups - DONE)
 6. have practice sessions not show age, but session start date (DONE)
+10. programming section
+12. add programming features
+7. toggle hiding practice sessions from fractal view
 
 TO-DO
-2. allow adjustments to estimated time in section
-7. toggle hiding practice sessions from fractal view
-8. add immediate goals to practice sessions
-9. SMART mode for goals
-10. programming section
-11. add more detailed notes interface, notes for each set. multiple notes. add as new db table
-12. add programming features
-15. implement search for activities
-16. change the add practice session functionality in the fractal UI
 17. have duration be updated to for the latest change. make this more sensible
+2. allow adjustments to estimated time in section
+8. add immediate goals to practice sessions
+16. change the add practice session functionality in the fractal UI
+9. SMART mode for goals
+11. add more detailed notes interface, notes for each set. multiple notes. add as new db table
+15. implement search for activities
 18. fix nav bar to not have selected section be slightly lower than others
 19. have add session text always be white, not just on hover
 20. dark/light theme toggle
+
+TO-DO for v 0.1.0
+1. add immediate goals to practice sessions
+2. have immediate goals show up in fractal view under practice sessions
+3. fix duration and end time for goals not behaving correctly
+4. remove plotly from analytics page and replace with better component
+5. fix add session functionality in fractal view
