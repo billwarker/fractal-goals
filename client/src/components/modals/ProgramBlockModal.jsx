@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
 
-const TrainingBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
+const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
     const [formData, setFormData] = useState({
         name: '',
         startDate: '',
@@ -14,6 +14,7 @@ const TrainingBlockModal = ({ isOpen, onClose, onSave, initialData = null, progr
         if (isOpen) {
             if (initialData) {
                 setFormData({
+                    id: initialData.id, // Preserve id for editing
                     name: initialData.name || '',
                     startDate: initialData.startDate || '',
                     endDate: initialData.endDate || '',
@@ -99,7 +100,7 @@ const TrainingBlockModal = ({ isOpen, onClose, onSave, initialData = null, progr
                     alignItems: 'center'
                 }}>
                     <h2 style={{ margin: 0, fontSize: '20px', color: 'white', fontWeight: 500 }}>
-                        {initialData?.id ? 'Edit Training Block' : 'Add Training Block'}
+                        {initialData?.id ? 'Edit Program Block' : 'Add Program Block'}
                     </h2>
                     <button
                         onClick={onClose}
@@ -262,4 +263,4 @@ const TrainingBlockModal = ({ isOpen, onClose, onSave, initialData = null, progr
     );
 };
 
-export default TrainingBlockModal;
+export default ProgramBlockModal;

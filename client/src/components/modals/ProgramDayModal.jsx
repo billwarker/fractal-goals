@@ -6,7 +6,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
     const [name, setName] = useState('');
     const [selectedTemplates, setSelectedTemplates] = useState([]);
     const [dayOfWeek, setDayOfWeek] = useState('');
-    const [cascade, setCascade] = useState(false);
+
     const [sessionTemplates, setSessionTemplates] = useState([]);
     const [copyStatus, setCopyStatus] = useState('');
     const [copyMode, setCopyMode] = useState('all');
@@ -45,12 +45,12 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                     tids = initialData.sessions.map(s => s.session_template_id).filter(Boolean);
                 }
                 setSelectedTemplates(tids);
-                setCascade(false);
+
             } else {
                 setName('');
                 setDayOfWeek('');
                 setSelectedTemplates([]);
-                setCascade(false);
+
             }
             setCopyStatus('');
         }
@@ -60,8 +60,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         onSave({
             name,
             template_ids: selectedTemplates,
-            day_of_week: dayOfWeek,
-            cascade
+            day_of_week: dayOfWeek
         });
     };
 
@@ -169,35 +168,17 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                     </div>
                 )}
 
-                <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input
-                        type="checkbox"
-                        checked={cascade}
-                        onChange={e => setCascade(e.target.checked)}
-                        id="cascade-check"
-                    />
-                    <label htmlFor="cascade-check" style={{ color: '#ddd', fontSize: '13px' }}>
-                        Cascade this day to subsequent blocks
-                    </label>
-                </div>
+
 
                 {isEdit && (
                     <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px solid #333' }}>
                         <label style={label}>Copy to Other Blocks</label>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <label style={{ color: '#ddd', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input type="radio" checked={copyMode === 'all'} onChange={() => setCopyMode('all')} />
-                                    All Blocks
-                                </label>
-                            </div>
-                            <button
-                                onClick={handleCopy}
-                                style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                            >
-                                {copyStatus || 'Copy Now'}
-                            </button>
-                        </div>
+                        <button
+                            onClick={handleCopy}
+                            style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                            {copyStatus || 'Copy to Other Blocks'}
+                        </button>
                     </div>
                 )}
 

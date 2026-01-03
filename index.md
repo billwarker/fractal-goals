@@ -396,10 +396,15 @@ Programs list and management page.
 Detailed view of a single program/template.
 
 **Features:**
-- View program components
-- Edit program structure
-- Component reordering
-- Duration management
+- Calendar and blocks view modes
+- Create and edit training blocks with custom colors and date ranges
+- User-controlled day creation (days not auto-populated)
+- Edit existing blocks (name, dates, color)
+- Delete blocks with confirmation dialog
+- Add and edit program days within blocks
+- Attach goals to blocks with deadline management
+- Copy days to other blocks
+- View completed sessions linked to program days
 
 #### `CreateSession.jsx`
 Session creation page.
@@ -445,6 +450,11 @@ Fractal selection/home page.
 - **`TemplateSelectionModal.jsx`** - Modal for selecting templates
 - **`AlertModal.jsx`** - Reusable alert/notification modal
 - **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal
+- **`ProgramBuilder.jsx`** - Modal for creating/editing programs
+- **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
+- **`ProgramDayModal.jsx`** - Modal for creating/editing program days
+- **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
+- **`DeleteProgramModal.jsx`** - Modal for confirming program deletion with session count warning
 
 #### Analytics Components (in `/client/src/components/analytics/`)
 

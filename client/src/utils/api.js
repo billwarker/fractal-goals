@@ -346,6 +346,14 @@ export const fractalApi = {
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}`),
 
     /**
+     * Get the count of sessions associated with a program
+     * @param {string} rootId - ID of the fractal
+     * @param {string} programId - ID of the program
+     */
+    getProgramSessionCount: (rootId, programId) =>
+        axios.get(`${API_BASE}/${rootId}/programs/${programId}/session-count`),
+
+    /**
      * Add a configured day to a program block
      * @param {string} rootId
      * @param {string} programId

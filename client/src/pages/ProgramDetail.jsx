@@ -7,7 +7,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import moment from 'moment';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
-import TrainingBlockModal from '../components/modals/TrainingBlockModal';
+import ProgramBlockModal from '../components/modals/ProgramBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
 
@@ -127,18 +127,46 @@ const ProgramDetail = () => {
         setShowBlockModal(true);
     };
 
-    const handleSaveBlock = async (blockData) => {
-        const newBlock = {
-            id: Date.now().toString(),
-            name: blockData.name,
-            startDate: blockData.startDate,
-            endDate: blockData.endDate,
-            color: blockData.color,
-            weeklySchedule: { daily: [] }
-        };
+    const handleEditBlockClick = (block) => {
+        setBlockModalData({
+            id: block.id,
+            name: block.name,
+            startDate: block.start_date,
+            endDate: block.end_date,
+            color: block.color || '#3A86FF'
+        });
+        setShowBlockModal(true);
+    };
 
+    const handleSaveBlock = async (blockData) => {
         const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
-        const updatedSchedule = [...currentSchedule, newBlock];
+        let updatedSchedule;
+
+        if (blockData.id) {
+            // Update existing block
+            updatedSchedule = currentSchedule.map(block =>
+                block.id === blockData.id
+                    ? {
+                        ...block,
+                        name: blockData.name,
+                        startDate: blockData.startDate,
+                        endDate: blockData.endDate,
+                        color: blockData.color
+                    }
+                    : block
+            );
+        } else {
+            // Create new block
+            const newBlock = {
+                id: Date.now().toString(),
+                name: blockData.name,
+                startDate: blockData.startDate,
+                endDate: blockData.endDate,
+                color: blockData.color,
+                weeklySchedule: { daily: [] }
+            };
+            updatedSchedule = [...currentSchedule, newBlock];
+        }
 
         try {
             const apiData = {
@@ -155,8 +183,34 @@ const ProgramDetail = () => {
             setShowBlockModal(false);
             setBlockModalData(null);
         } catch (err) {
-            console.error('Failed to create training block:', err);
-            alert('Failed to create training block');
+            console.error('Failed to save training block:', err);
+            alert('Failed to save training block');
+        }
+    };
+
+    const handleDeleteBlock = async (blockId) => {
+        if (!window.confirm('Are you sure you want to delete this block? All days within this block will also be deleted.')) {
+            return;
+        }
+
+        const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
+        const updatedSchedule = currentSchedule.filter(block => block.id !== blockId);
+
+        try {
+            const apiData = {
+                name: program.name,
+                description: program.description || '',
+                start_date: program.start_date,
+                end_date: program.end_date,
+                selectedGoals: program.goal_ids || [],
+                weeklySchedule: updatedSchedule
+            };
+
+            await fractalApi.updateProgram(rootId, program.id, apiData);
+            fetchProgramData();
+        } catch (err) {
+            console.error('Failed to delete block:', err);
+            alert('Failed to delete block');
         }
     };
 
@@ -507,6 +561,18 @@ const ProgramDetail = () => {
                                                     Attach Goal
                                                 </button>
                                                 <button
+                                                    onClick={() => handleEditBlockClick(block)}
+                                                    style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                                                >
+                                                    Edit Block
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteBlock(block.id)}
+                                                    style={{ background: '#d32f2f', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                                                >
+                                                    Delete Block
+                                                </button>
+                                                <button
                                                     onClick={() => handleAddDayClick(block.id)}
                                                     style={{ background: '#3A86FF', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
                                                 >
@@ -582,7 +648,7 @@ const ProgramDetail = () => {
             </div>
 
             <ProgramBuilder isOpen={showEditBuilder} onClose={() => setShowEditBuilder(false)} onSave={handleSaveProgram} initialData={program} />
-            <TrainingBlockModal isOpen={showBlockModal} onClose={() => setShowBlockModal(false)} onSave={handleSaveBlock} initialData={blockModalData} programDates={{ start: program.start_date, end: program.end_date }} />
+            <ProgramBlockModal isOpen={showBlockModal} onClose={() => setShowBlockModal(false)} onSave={handleSaveBlock} initialData={blockModalData} programDates={{ start: program.start_date, end: program.end_date }} />
             <ProgramDayModal
                 isOpen={showDayModal}
                 onClose={() => setShowDayModal(false)}

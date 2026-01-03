@@ -55,51 +55,9 @@ def sync_program_structure(session, program, schedule_list):
         
         processed_block_ids.add(block.id)
         
-        # SYNC DAYS (Instantiate Templates)
-        # block_data['weeklySchedule'] is e.g. { 'monday': ['id1'], 'tuesday': [] }
-        templates_map = block_data.get('weeklySchedule', {})
-        
-        # We need to ensure the block is flushed to DB to have ID if needed? 
-        # (It has ID assigned above).
-        
-        # Get existing days
-        # We need to query them or access via relationship? 
-        # Accessing via relationship is loaded.
-        existing_days = {(d.date): d for d in block.days}
-        
-        # Iterate date range
-        curr = start_dt
-        day_index = 1
-        while curr <= end_dt:
-            day_name = curr.strftime('%A').lower() # monday, tuesday...
-            day_templates = templates_map.get(day_name, [])
-            
-            # Ensure day exists
-            if curr in existing_days:
-                day = existing_days[curr]
-                day.day_number = day_index
-            else:
-                day = ProgramDay(
-                    id=str(uuid.uuid4()),
-                    block_id=block.id,
-                    date=curr,
-                    day_number=day_index,
-                    name=day_name.capitalize()
-                )
-                session.add(day)
-                # Note: We must add to the relationship or session to track it for this loop if we access it?
-                # Usually safely handled by generic append or session add.
-            
-            # SYNC TEMPLATES
-            if day_templates:
-                # Fetch SessionTemplate objects corresponding to the IDs
-                templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(day_templates)).all()
-                day.templates = templates
-            else:
-                day.templates = []
-            
-            curr += timedelta(days=1)
-            day_index += 1
+        # NOTE: Days are no longer auto-populated from the block's date range.
+        # Users must explicitly add days using the "+ Add Day" button.
+        # This gives users full control over which days to configure in each block.
 
     # Cleanup deleted blocks
     for bid, blk in existing_blocks.items():
@@ -281,13 +239,46 @@ def delete_program(root_id, program_id):
         if not program:
             return jsonify({"error": "Program not found"}), 404
         
+        # Count sessions that will be affected (lose their program association)
+        # Sessions are linked via program_day_id -> ProgramDay -> ProgramBlock -> Program
+        affected_sessions_count = 0
+        for block in program.blocks:
+            for day in block.days:
+                affected_sessions_count += len(day.completed_sessions)
+        
         session.delete(program)
         session.commit()
         
-        return jsonify({"message": "Program deleted successfully"})
+        return jsonify({
+            "message": "Program deleted successfully",
+            "affected_sessions": affected_sessions_count
+        })
         
     except Exception as e:
         session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@programs_bp.route('/<root_id>/programs/<program_id>/session-count', methods=['GET'])
+def get_program_session_count(root_id, program_id):
+    """Get the count of sessions associated with a program."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        if not program:
+            return jsonify({"error": "Program not found"}), 404
+        
+        # Count sessions linked to this program
+        session_count = 0
+        for block in program.blocks:
+            for day in block.days:
+                session_count += len(day.completed_sessions)
+        
+        return jsonify({"session_count": session_count})
+        
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
+import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import '../App.css';
 
 const GOAL_COLORS = {
@@ -27,6 +28,11 @@ function Programs() {
     const [goals, setGoals] = useState([]);
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Delete modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [programToDelete, setProgramToDelete] = useState(null);
+    const [deleteSessionCount, setDeleteSessionCount] = useState(0);
 
     useEffect(() => {
         if (rootId) {
@@ -112,6 +118,39 @@ function Programs() {
             day: 'numeric',
             year: 'numeric'
         });
+    };
+
+    const handleDeleteProgram = async (e, program) => {
+        e.stopPropagation(); // Prevent navigation to program detail
+
+        try {
+            // Get the session count first
+            const countRes = await fractalApi.getProgramSessionCount(rootId, program.id);
+            const sessionCount = countRes.data.session_count;
+
+            // Set state and open modal
+            setProgramToDelete(program);
+            setDeleteSessionCount(sessionCount);
+            setShowDeleteModal(true);
+        } catch (err) {
+            console.error('Failed to fetch session count:', err);
+            alert('Failed to fetch session count: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const confirmDeleteProgram = async () => {
+        if (!programToDelete) return;
+
+        try {
+            await fractalApi.deleteProgram(rootId, programToDelete.id);
+            setShowDeleteModal(false);
+            setProgramToDelete(null);
+            setDeleteSessionCount(0);
+            fetchPrograms(); // Refresh the list
+        } catch (err) {
+            console.error('Failed to delete program:', err);
+            alert('Failed to delete program: ' + (err.response?.data?.error || err.message));
+        }
     };
 
     return (
@@ -253,6 +292,36 @@ function Programs() {
                                         e.currentTarget.style.transform = 'translateY(0)';
                                     }}
                                 >
+                                    {/* Delete Button - Top Right */}
+                                    <button
+                                        onClick={(e) => handleDeleteProgram(e, program)}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '12px',
+                                            right: '12px',
+                                            background: '#d32f2f',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            padding: '6px 10px',
+                                            cursor: 'pointer',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            zIndex: 10,
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.stopPropagation();
+                                            e.target.style.background = '#c62828';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.stopPropagation();
+                                            e.target.style.background = '#d32f2f';
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+
                                     {/* Program Header */}
                                     <div style={{ marginBottom: '16px' }}>
                                         <h3 style={{
@@ -368,6 +437,19 @@ function Programs() {
                 }}
                 onSave={handleSaveProgram}
                 initialData={selectedProgram}
+            />
+
+            {/* Delete Program Modal */}
+            <DeleteProgramModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setProgramToDelete(null);
+                    setDeleteSessionCount(0);
+                }}
+                onConfirm={confirmDeleteProgram}
+                programName={programToDelete?.name || ''}
+                sessionCount={deleteSessionCount}
             />
         </div>
     );
