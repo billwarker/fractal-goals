@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
+import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils';
 import '../App.css';
 
 const GOAL_COLORS = {
@@ -356,22 +357,30 @@ function Programs() {
                                             Selected Goals
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                            {progGoals.length > 0 ? (
-                                                Object.entries(progGoals.reduce((acc, g) => {
-                                                    acc[g.type] = (acc[g.type] || 0) + 1;
+                                            {(() => {
+                                                const grouped = progGoals.reduce((acc, g) => {
+                                                    const goalType = g.attributes?.type || g.type; // Try attributes.type first, fallback to g.type
+                                                    if (goalType) {  // Only count goals with a defined type
+                                                        acc[goalType] = (acc[goalType] || 0) + 1;
+                                                    }
                                                     return acc;
-                                                }, {})).map(([type, count]) => (
-                                                    <div key={type} style={{
-                                                        color: GOAL_COLORS[type] || '#ccc',
-                                                        fontSize: '13px',
-                                                        fontWeight: 500
-                                                    }}>
-                                                        {count} {type.replace(/([A-Z])/g, ' $1').trim()}{count !== 1 ? 's' : ''}
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div style={{ fontSize: '13px', color: '#666' }}>No goals selected</div>
-                                            )}
+                                                }, {});
+                                                const entries = Object.entries(grouped);
+
+                                                return progGoals.length > 0 ? (
+                                                    entries.map(([type, count]) => (
+                                                        <div key={type} style={{
+                                                            color: GOAL_COLORS[type] || '#ccc',
+                                                            fontSize: '13px',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            {count} {type.replace(/([A-Z])/g, ' $1').trim()}{count !== 1 ? 's' : ''}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div style={{ fontSize: '13px', color: '#666' }}>No goals selected</div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
 
@@ -392,18 +401,30 @@ function Programs() {
                                             Blocks
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            {blocks.length > 0 ? blocks.map(b => (
-                                                <div key={b.id} style={{
-                                                    display: 'flex', justifyContent: 'space-between',
-                                                    fontSize: '12px', color: '#ccc',
-                                                    borderBottom: '1px solid #333', paddingBottom: '4px'
-                                                }}>
-                                                    <span>{b.name}</span>
-                                                    <span style={{ color: '#888', fontSize: '11px' }}>
-                                                        {b.start_date ? `${formatDate(b.start_date)}` : 'Flexible'}
-                                                    </span>
-                                                </div>
-                                            )) : (
+                                            {blocks.length > 0 ? blocks.map(b => {
+                                                const isActive = isBlockActive(b);
+                                                return (
+                                                    <div key={b.id} style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        fontSize: '12px',
+                                                        color: '#ccc',
+                                                        borderBottom: '1px solid #333',
+                                                        paddingBottom: '4px',
+                                                        gap: '8px'
+                                                    }}>
+                                                        <span style={{ flex: 1 }}>{b.name}</span>
+                                                        {isActive && <ActiveBlockBadge />}
+                                                        <span style={{ color: '#888', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                                            {b.start_date && b.end_date
+                                                                ? `${formatDate(b.start_date)} - ${formatDate(b.end_date)}`
+                                                                : 'Flexible'
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }) : (
                                                 <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>No blocks defined</div>
                                             )}
                                         </div>

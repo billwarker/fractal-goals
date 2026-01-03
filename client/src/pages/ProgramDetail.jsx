@@ -10,6 +10,7 @@ import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockModal from '../components/modals/ProgramBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
+import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
@@ -532,8 +533,11 @@ const ProgramDetail = () => {
                                     }}>
                                         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
-                                                <h3 style={{ margin: 0, color: 'white', fontSize: '16px' }}>{block.name}</h3>
-                                                <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                    <h3 style={{ margin: 0, color: 'white', fontSize: '16px' }}>{block.name}</h3>
+                                                    {isBlockActive(block) && <ActiveBlockBadge />}
+                                                </div>
+                                                <div style={{ color: '#666', fontSize: '12px' }}>
                                                     {formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days
                                                 </div>
                                                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
