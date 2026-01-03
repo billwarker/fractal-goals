@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
-import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils';
+import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import '../App.css';
 
 const GOAL_COLORS = {

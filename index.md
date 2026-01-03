@@ -389,21 +389,30 @@ Programs list and management page.
 - List all saved programs/templates
 - Create new programs
 - Edit existing programs
-- Delete programs
+- Delete programs with custom modal and session impact warning
 - Navigate to program detail view
+- Visual improvements:
+  - Block date ranges and active status indicators
+  - Correct grouping of attached goals
 
 #### `ProgramDetail.jsx`
 Detailed view of a single program/template.
 
 **Features:**
 - Calendar and blocks view modes
-- Create and edit training blocks with custom colors and date ranges
-- User-controlled day creation (days not auto-populated)
-- Edit existing blocks (name, dates, color)
-- Delete blocks with confirmation dialog
-- Add and edit program days within blocks
+- **Calendar View updates:**
+  - Toggle between "Select Dates to Add Block" mode and Day View mode
+  - Comprehensive Day View Modal showing schedule, templates, and goals due
+  - Set goal deadlines directly from Day View
+  - Dynamic calendar events (hiding planned templates if session matches, showing all goal deadlines)
+- **Block Interaction:**
+  - Create and edit training blocks with custom colors and date ranges
+  - User-controlled day creation (days not auto-populated)
+  - Edit existing blocks (name, dates, color)
+  - Delete blocks with confirmation dialog and cascade warning
+  - Active block indicators
+- Add and edit program days with efficient copy functionality
 - Attach goals to blocks with deadline management
-- Copy days to other blocks
 - View completed sessions linked to program days
 
 #### `CreateSession.jsx`
@@ -455,6 +464,7 @@ Fractal selection/home page.
 - **`ProgramDayModal.jsx`** - Modal for creating/editing program days
 - **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
 - **`DeleteProgramModal.jsx`** - Modal for confirming program deletion with session count warning
+- **`DayViewModal.jsx`** - Detailed view of a calendar day (schedule + goal deadlines)
 
 #### Analytics Components (in `/client/src/components/analytics/`)
 
@@ -476,6 +486,7 @@ Fractal selection/home page.
 - **`goalHelpers.js`** - Goal hierarchy and validation helpers
 - **`metricsHelpers.js`** - Metric calculation utilities
 - **`targetUtils.js`** - Target validation and progress calculation
+- **`programUtils.jsx`** - Shared utilities for program block status (Active badges)
 
 ---
 

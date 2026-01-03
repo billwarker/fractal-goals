@@ -10,7 +10,8 @@ import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockModal from '../components/modals/ProgramBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
-import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils';
+import DayViewModal from '../components/modals/DayViewModal';
+import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
@@ -35,6 +36,13 @@ const ProgramDetail = () => {
     // Attach Goal Modal State
     const [showAttachModal, setShowAttachModal] = useState(false);
     const [attachBlockId, setAttachBlockId] = useState(null);
+
+    // Block Creation Mode (for calendar date selection)
+    const [blockCreationMode, setBlockCreationMode] = useState(false);
+
+    // Day View Modal State (for viewing/adding days to a specific date)
+    const [showDayViewModal, setShowDayViewModal] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(null);
 
     useEffect(() => {
         if (rootId && programId) {
@@ -106,16 +114,25 @@ const ProgramDetail = () => {
     const handleDateSelect = (selectInfo) => {
         const calendarApi = selectInfo.view.calendar;
         calendarApi.unselect();
-        const startDate = selectInfo.startStr;
-        const endDate = moment(selectInfo.endStr).subtract(1, 'days').format('YYYY-MM-DD');
 
-        setBlockModalData({
-            name: '',
-            startDate,
-            endDate,
-            color: '#3A86FF'
-        });
-        setShowBlockModal(true);
+        // If block creation mode is enabled, create a new block
+        if (blockCreationMode) {
+            const startDate = selectInfo.startStr;
+            const endDate = moment(selectInfo.endStr).subtract(1, 'days').format('YYYY-MM-DD');
+
+            setBlockModalData({
+                name: '',
+                startDate,
+                endDate,
+                color: '#3A86FF'
+            });
+            setShowBlockModal(true);
+        } else {
+            // Otherwise, show the day view modal for the clicked date
+            const clickedDate = selectInfo.startStr;
+            setSelectedDate(clickedDate);
+            setShowDayViewModal(true);
+        }
     };
 
     const handleAddBlockClick = () => {
@@ -183,6 +200,7 @@ const ProgramDetail = () => {
             fetchProgramData();
             setShowBlockModal(false);
             setBlockModalData(null);
+            setBlockCreationMode(false); // Turn off block creation mode after creating a block
         } catch (err) {
             console.error('Failed to save training block:', err);
             alert('Failed to save training block');
@@ -289,6 +307,17 @@ const ProgramDetail = () => {
         return 0;
     });
 
+    const handleSetGoalDeadline = async (goalId, deadline) => {
+        try {
+            await fractalApi.updateGoal(rootId, goalId, { deadline });
+            fetchProgramData(); // Refresh to show updated goal deadlines
+            fetchGoals(); // Refresh goals list
+        } catch (err) {
+            console.error('Failed to set goal deadline:', err);
+            alert('Failed to set goal deadline');
+        }
+    };
+
     const calendarEvents = [];
     sortedBlocks.forEach(block => {
         if (!block.start_date || !block.end_date) return;
@@ -307,27 +336,8 @@ const ProgramDetail = () => {
             extendedProps: block
         });
 
-        // Goal Events (if deadline in block)
-        const blockGoalIds = [];
-        try { blockGoalIds.push(...(JSON.parse(block.goal_ids || '[]'))); } catch (e) { }
-        blockGoalIds.forEach(gid => {
-            const goal = getGoalDetails(gid);
-            if (goal && goal.deadline) {
-                const d = moment(goal.deadline);
-                if (d.isSameOrAfter(block.start_date) && d.isSameOrBefore(block.end_date)) {
-                    calendarEvents.push({
-                        id: `goal-${gid}-${block.id}`,
-                        title: `🎯 ${goal.name}`,
-                        start: goal.deadline,
-                        allDay: true,
-                        backgroundColor: GOAL_COLORS[goal.type] || '#ff9800',
-                        borderColor: 'transparent',
-                        textColor: 'black',
-                        className: 'goal-event-badge'
-                    });
-                }
-            }
-        });
+        // Goal Events logic moved outside to ensure all goals with deadlines are shown
+
 
         // Day Events
         if (block.days) {
@@ -344,31 +354,33 @@ const ProgramDetail = () => {
                         classNames: ['day-label-event']
                     });
 
-                    // Add events for Templates (The Plan)
-                    if (day.templates) {
+                    const hasCompletedSessions = day.completed_sessions && day.completed_sessions.length > 0;
+
+                    // Add events for Templates (The Plan) - only if there are NO completed sessions
+                    if (day.templates && !hasCompletedSessions) {
                         day.templates.forEach(t => {
                             calendarEvents.push({
                                 id: `template-${day.id}-${t.id}`,
                                 title: t.name,
                                 start: day.date,
                                 allDay: true,
-                                backgroundColor: day.is_completed ? '#2e7d32' : '#37474F',
+                                backgroundColor: '#37474F',
                                 borderColor: 'transparent',
-                                textColor: day.is_completed ? '#E8F5E9' : '#CFD8DC',
+                                textColor: '#CFD8DC',
                                 extendedProps: { type: 'template', ...t }
                             });
                         });
                     }
 
-                    // Add events for Completed Sessions (The Reality)
-                    if (day.completed_sessions) {
+                    // Add events for Completed Sessions (The Reality) - always show if they exist
+                    if (hasCompletedSessions) {
                         day.completed_sessions.forEach(s => {
                             calendarEvents.push({
                                 id: `session-${s.id}`,
                                 title: `✓ ${s.name}`,
                                 start: s.created_at ? s.created_at.split('T')[0] : day.date,
                                 allDay: true,
-                                backgroundColor: '#1b5e20', // Darker Green
+                                backgroundColor: '#2e7d32',
                                 borderColor: '#4caf50',
                                 textColor: 'white',
                                 extendedProps: { type: 'session', ...s }
@@ -376,6 +388,23 @@ const ProgramDetail = () => {
                         });
                     }
                 }
+            });
+        }
+    });
+
+    // Add Goal Events (for all program goals with deadlines)
+    goals.forEach(goal => {
+        if (goal.deadline) {
+            calendarEvents.push({
+                id: `goal-${goal.id}`,
+                title: `🎯 ${goal.name}`,
+                start: goal.deadline, // The deadline is the date
+                allDay: true,
+                backgroundColor: GOAL_COLORS[goal.type] || '#ff9800',
+                borderColor: 'transparent',
+                textColor: 'black',
+                className: 'goal-event-badge',
+                extendedProps: { type: 'goal', ...goal }
             });
         }
     });
@@ -495,7 +524,22 @@ const ProgramDetail = () => {
                     {viewMode === 'calendar' ? (
                         <div style={{ height: '100%', minHeight: '600px', background: '#1e1e1e', padding: '20px', borderRadius: '12px', position: 'relative' }}>
                             <div style={{ position: 'absolute', zIndex: 10, top: '20px', right: '250px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <div style={{ fontSize: '13px', color: '#888' }}>Select dates to add block</div>
+                                <button
+                                    onClick={() => setBlockCreationMode(!blockCreationMode)}
+                                    style={{
+                                        background: blockCreationMode ? '#3A86FF' : 'transparent',
+                                        border: `1px solid ${blockCreationMode ? '#3A86FF' : '#444'}`,
+                                        borderRadius: '4px',
+                                        color: blockCreationMode ? 'white' : '#888',
+                                        padding: '6px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        fontWeight: 500,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {blockCreationMode ? '✓ Block Creation Mode' : 'Select Dates to Add Block'}
+                                </button>
                                 <div style={{ color: '#444' }}>|</div>
                                 <button onClick={handleAddBlockClick} style={{ background: '#3A86FF', border: 'none', borderRadius: '4px', color: 'white', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>+ Add Block</button>
                             </div>
@@ -669,6 +713,17 @@ const ProgramDetail = () => {
                 onSave={handleSaveAttachedGoal}
                 goals={programGoals}
                 block={attachBlock}
+            />
+            <DayViewModal
+                isOpen={showDayViewModal}
+                onClose={() => {
+                    setShowDayViewModal(false);
+                    setSelectedDate(null);
+                }}
+                date={selectedDate}
+                program={program}
+                goals={programGoals}
+                onSetGoalDeadline={handleSetGoalDeadline}
             />
         </div>
     );
