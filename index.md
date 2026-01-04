@@ -490,8 +490,10 @@ Fractal selection/home page.
 #### Core Components
 
 - **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
-- **`GoalDetailModal.jsx`** - Unified goal viewing/editing component with dual display modes (modal/panel):
+- **`GoalDetailModal.jsx`** - Unified goal viewing/editing/creating component with dual display modes (modal/panel):
+  - **Mode support:** 'view', 'edit', or 'create' mode via `mode` prop
   - View/Edit goal name, description, deadline
+  - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
   - **Associated/Targeting Programs display**
   - Inline target builder (add/edit/delete targets)
   - Completion confirmation flow with program/target summary
