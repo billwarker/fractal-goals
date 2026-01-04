@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getGoalColor, getGoalTextColor } from '../../utils/goalColors';
 
 /**
  * DayViewModal - Modal for viewing and managing program days on a specific date
@@ -123,27 +124,33 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                 Goals Due
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {goalsDueOnDate.map(g => (
-                                    <div key={g.id} style={{
-                                        background: '#252525',
-                                        border: '1px solid #FFD700',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px'
-                                    }}>
-                                        <div style={{ fontSize: '20px' }}>🎯</div>
-                                        <div>
-                                            <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
-                                                {g.name}
-                                            </div>
-                                            <div style={{ color: '#FFD700', fontSize: '11px', marginTop: '2px' }}>
-                                                Deadline: Today
+                                {goalsDueOnDate.map(g => {
+                                    const goalType = g.attributes?.type || g.type;
+                                    const bgColor = getGoalColor(goalType);
+                                    const textColor = getGoalTextColor(goalType);
+
+                                    return (
+                                        <div key={g.id} style={{
+                                            background: bgColor,
+                                            border: `1px solid ${bgColor}`,
+                                            borderRadius: '6px',
+                                            padding: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px'
+                                        }}>
+                                            <div style={{ fontSize: '20px' }}>🎯</div>
+                                            <div>
+                                                <div style={{ color: textColor, fontSize: '14px', fontWeight: 500 }}>
+                                                    {g.name}
+                                                </div>
+                                                <div style={{ color: textColor, opacity: 0.8, fontSize: '11px', marginTop: '2px' }}>
+                                                    Deadline: Today
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

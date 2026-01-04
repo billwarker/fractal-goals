@@ -11,6 +11,7 @@ import ProgramBlockModal from '../components/modals/ProgramBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
 import DayViewModal from '../components/modals/DayViewModal';
+import GoalDetailModal from '../components/GoalDetailModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 
 const ProgramDetail = () => {
@@ -19,6 +20,7 @@ const ProgramDetail = () => {
     const [program, setProgram] = useState(null);
     const [loading, setLoading] = useState(true);
     const [goals, setGoals] = useState([]);
+    const [activities, setActivities] = useState([]);
     const [showEditBuilder, setShowEditBuilder] = useState(false);
 
     // View Mode
@@ -44,10 +46,15 @@ const ProgramDetail = () => {
     const [showDayViewModal, setShowDayViewModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
 
+    // Goal Detail Modal State (for calendar clicks)
+    const [showGoalModal, setShowGoalModal] = useState(false);
+    const [selectedGoal, setSelectedGoal] = useState(null);
+
     useEffect(() => {
         if (rootId && programId) {
             fetchProgramData();
             fetchGoals();
+            fetchActivities();
         }
     }, [rootId, programId]);
 
@@ -69,6 +76,15 @@ const ProgramDetail = () => {
             setGoals(allGoals);
         } catch (err) {
             console.error('Failed to fetch goals:', err);
+        }
+    };
+
+    const fetchActivities = async () => {
+        try {
+            const res = await fractalApi.getActivities(rootId);
+            setActivities(res.data);
+        } catch (err) {
+            console.error('Failed to fetch activities:', err);
         }
     };
 
@@ -297,6 +313,67 @@ const ProgramDetail = () => {
         }
     };
 
+    // Goal Detail Handlers
+    const handleEventClick = (info) => {
+        // info.event.extendedProps contains the properties we spread in calendarEvents
+        const type = info.event.extendedProps.type;
+
+        if (type === 'goal') {
+            // Find the full goal object from our state to ensure we have the latest data
+            // (although extendedProps has a snapshot, state is safer)
+            const goalId = info.event.extendedProps.id;
+            const goal = goals.find(g => g.id === goalId);
+
+            if (goal) {
+                setSelectedGoal(goal);
+                setShowGoalModal(true);
+            }
+        }
+    };
+
+    const handleGoalUpdate = async (goalId, updates) => {
+        try {
+            await fractalApi.updateGoal(rootId, goalId, updates);
+            await fetchGoals(); // Refresh goals (deadlines/names)
+            // No need to fetchProgramData unless we think goals affect program top-level props (unlikely)
+            // But we should update local selectedGoal if needed, though mostly GoalDetail handles its own optimistic filtering?
+            // Actually GoalDetailModal manages its own form state but we should update the source.
+            // also update selectedGoal in case modal stays open? 
+            // The modal uses the `goal` prop. If `goals` updates, `selectedGoal` (ref from `goals`) might need update?
+            // `goals` is an array of objects. `goals.find` returns a reference. 
+            // After `fetchGoals`, `goals` is a NEW array with NEW objects.
+            // So `selectedGoal` will be stale. We need to update it.
+            const res = await fractalApi.getGoal(rootId, rootId); // or just reuse fetchGoals logic
+            const allGoals = collectGoals(res.data);
+            setGoals(allGoals);
+            const updated = allGoals.find(g => g.id === goalId);
+            if (updated) setSelectedGoal(updated);
+
+        } catch (err) {
+            console.error("Failed to update goal:", err);
+            alert("Failed to update goal");
+        }
+    };
+
+    const handleGoalCompletion = async (goalId, currentStatus) => {
+        try {
+            // GoalDetailModal passes the CURRENT status, so we need to toggle it
+            await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
+
+            // Re-fetch to update UI
+            const res = await fractalApi.getGoal(rootId, rootId);
+            const allGoals = collectGoals(res.data);
+            setGoals(allGoals);
+
+            // Update selected goal if open
+            const updated = allGoals.find(g => g.id === goalId);
+            if (updated) setSelectedGoal(updated);
+        } catch (err) {
+            console.error("Failed to toggle completion:", err);
+            alert("Failed to toggle completion");
+        }
+    };
+
 
     if (loading) return <div style={{ padding: '40px', color: 'white' }}>Loading...</div>;
     if (!program) return <div style={{ padding: '40px', color: 'white' }}>Program not found</div>;
@@ -395,16 +472,18 @@ const ProgramDetail = () => {
     // Add Goal Events (for all program goals with deadlines)
     goals.forEach(goal => {
         if (goal.deadline) {
+            const goalType = goal.attributes?.type || goal.type;
             calendarEvents.push({
                 id: `goal-${goal.id}`,
                 title: `🎯 ${goal.name}`,
                 start: goal.deadline, // The deadline is the date
                 allDay: true,
-                backgroundColor: GOAL_COLORS[goal.type] || '#ff9800',
-                borderColor: 'transparent',
-                textColor: 'black',
-                className: 'goal-event-badge',
-                extendedProps: { type: 'goal', ...goal }
+                backgroundColor: getGoalColor(goalType),
+                borderColor: getGoalColor(goalType),
+                textColor: getGoalTextColor(goalType),
+                extendedProps: { type: 'goal', ...goal },
+                // Use classNames for styling
+                classNames: ['clickable-goal-event']
             });
         }
     });
@@ -427,6 +506,7 @@ const ProgramDetail = () => {
                     .fc-daygrid-day-number, .fc-col-header-cell-cushion { color: #ccc; text-decoration: none; }
                     .fc-day-today { background-color: #2a2a2a !important; }
                     .fc-theme-standard td, .fc-theme-standard th { border-color: #333; }
+                    .clickable-goal-event { cursor: pointer; }
                 `}
             </style>
 
@@ -552,6 +632,7 @@ const ProgramDetail = () => {
                                 height="100%"
                                 selectable={true}
                                 select={handleDateSelect}
+                                eventClick={handleEventClick}
                             />
                         </div>
                     ) : (
@@ -724,6 +805,18 @@ const ProgramDetail = () => {
                 program={program}
                 goals={programGoals}
                 onSetGoalDeadline={handleSetGoalDeadline}
+            />
+
+            <GoalDetailModal
+                isOpen={showGoalModal}
+                onClose={() => setShowGoalModal(false)}
+                goal={selectedGoal}
+                onUpdate={handleGoalUpdate}
+                onToggleCompletion={handleGoalCompletion}
+                rootId={rootId}
+                programs={[program]} // Pass current program as array for association context
+                activityDefinitions={activities}
+                displayMode="modal"
             />
         </div>
     );
