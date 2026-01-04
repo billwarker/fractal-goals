@@ -27,11 +27,21 @@ DONE for 0.1.0
 1. add immediate goals to practice sessions
 2. have immediate goals show up in fractal view under practice sessions
 3. fix duration and end time for goals not behaving correctly
+<<<<<<< HEAD
 4. have a backend service for updating data daily
 5. fix add session functionality in fractal view
+=======
+5. fix add session functionality in fractal view
+
+>>>>>>> dev
 
 TO-DO for v 0.1.0
 
 4. remove plotly from analytics page and replace with better component
+<<<<<<< HEAD
 5. note taking interface
 6. manage session templates as its own modal
+=======
+4. have a backend service for updating data daily
+5. note taking interface
+>>>>>>> dev

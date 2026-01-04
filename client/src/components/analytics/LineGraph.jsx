@@ -1,9 +1,11 @@
 import React from 'react';
-import PlotlyChart from './PlotlyChart';
+import { Line } from 'react-chartjs-2';
+import { chartDefaults, createChartOptions } from './ChartJSWrapper';
 
 /**
  * Line Graph component for visualizing metric progression over time
  * Shows a single metric on Y-axis and time on X-axis
+ * Uses Chart.js via react-chartjs-2
  * Supports split filtering for split-enabled activities
  */
 function LineGraph({ selectedActivity, activityInstances, activities, selectedMetric, setSelectedMetric, setsHandling = 'top', selectedSplit = 'all' }) {
@@ -313,57 +315,82 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
         }
     }
 
-    const plotData = [{
-        x: dataPoints.map(p => p.timestamp),
-        y: dataPoints.map(p => p.value),
-        mode: 'lines+markers',
-        type: 'scatter',
-        line: {
-            color: isProductMetric ? '#e91e63' : '#2196f3',
-            width: 2
-        },
-        marker: {
-            size: 8,
-            color: isProductMetric ? '#e91e63' : '#2196f3',
-            line: {
-                color: isProductMetric ? '#c2185b' : '#1976d2',
-                width: 1
-            }
-        },
-        text: dataPoints.map(p =>
-            `${p.session_name}<br>${p.aggregation || (p.set_number ? `Set ${p.set_number}` : '')}<br>${p.timestamp.toLocaleDateString()}`
-        ),
-        hovertemplate: '%{text}<br>' +
-            `${metricLabel}: %{y}${isProductMetric ? ` (${metricUnitText})` : ` ${metricUnitText}`}<br>` +
-            '<extra></extra>'
-    }];
+    const lineColor = isProductMetric ? chartDefaults.secondaryColor : chartDefaults.primaryColor;
+    const borderLineColor = isProductMetric ? '#c2185b' : chartDefaults.borderColor;
 
-    const layout = {
-        title: {
-            text: `${selectedActivity.name}${titleSuffix} - ${metricLabel} Over Time`,
-            font: { color: '#ccc', size: 16 }
-        },
-        paper_bgcolor: '#1e1e1e',
-        plot_bgcolor: '#252525',
-        font: { color: '#ccc' },
-        margin: { l: 70, r: 40, t: 60, b: 80 }, // Increased left margin for longer labels
-        autosize: true,
-        xaxis: {
-            title: {
-                text: 'Date',
-                font: { color: '#ccc', size: 12 }
+    // Prepare chart data using {x, y} format for proper time scale rendering
+    const chartDataPoints = dataPoints.map(p => ({
+        x: p.timestamp,
+        y: p.value,
+        session_name: p.session_name,
+        aggregation: p.aggregation,
+        set_number: p.set_number
+    }));
+
+    const chartData = {
+        datasets: [{
+            label: metricLabel,
+            data: chartDataPoints,
+            borderColor: lineColor,
+            backgroundColor: `${lineColor}33`,
+            borderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 10,
+            pointBackgroundColor: lineColor,
+            pointBorderColor: borderLineColor,
+            pointBorderWidth: 1,
+            pointHoverBackgroundColor: lineColor,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
+            fill: true,
+            tension: 0.1
+        }]
+    };
+
+    const options = {
+        ...createChartOptions({
+            title: `${selectedActivity.name}${titleSuffix} - ${metricLabel} Over Time`,
+            xAxisLabel: 'Date',
+            yAxisLabel: `${metricLabel} (${metricUnitText})`,
+            isTimeScale: true
+        }),
+        plugins: {
+            ...createChartOptions({}).plugins,
+            legend: {
+                display: false
             },
-            gridcolor: '#333',
-            zerolinecolor: '#444',
-            type: 'date'
-        },
-        yaxis: {
             title: {
-                text: `${metricLabel} (${metricUnitText})`,
-                font: { color: '#ccc', size: 12 }
+                display: true,
+                text: `${selectedActivity.name}${titleSuffix} - ${metricLabel} Over Time`,
+                color: chartDefaults.textColor,
+                font: {
+                    size: 16
+                }
             },
-            gridcolor: '#333',
-            zerolinecolor: '#444'
+            tooltip: {
+                ...createChartOptions({}).plugins.tooltip,
+                callbacks: {
+                    title: function (context) {
+                        const point = context[0].raw;
+                        return point.session_name;
+                    },
+                    label: function (context) {
+                        const point = context.raw;
+                        const lines = [];
+
+                        if (point.aggregation) {
+                            lines.push(point.aggregation);
+                        } else if (point.set_number) {
+                            lines.push(`Set ${point.set_number}`);
+                        }
+
+                        lines.push(point.x.toLocaleDateString());
+                        lines.push(`${metricLabel}: ${point.y}${isProductMetric ? ` (${metricUnitText})` : ` ${metricUnitText}`}`);
+
+                        return lines;
+                    }
+                }
+            }
         }
     };
 
@@ -412,8 +439,8 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1 }}>
-                <PlotlyChart data={plotData} layout={layout} />
+            <div style={{ flex: 1, minHeight: 0 }}>
+                <Line data={chartData} options={options} />
             </div>
         </div>
     );

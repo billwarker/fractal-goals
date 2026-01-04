@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
-import { getChildType, calculateGoalAge } from '../utils/goalHelpers';
+import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
 import TargetCard from './TargetCard';
 
 /**
@@ -29,7 +29,11 @@ function GoalDetailModal({
     rootId,
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
-    programs = []  // For showing associated programs on completion
+    programs = [],  // For showing associated programs on completion
+    // Create mode props
+    mode = 'view',  // 'view', 'edit', or 'create'
+    onCreate,  // Function to call when creating a new goal
+    parentGoal  // Parent goal for context when creating
 }) {
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
@@ -61,7 +65,17 @@ function GoalDetailModal({
     const depGoalCompletedAt = goal?.attributes?.completed_at;
 
     useEffect(() => {
-        if (goal) {
+        if (mode === 'create') {
+            // Initialize empty form for create mode
+            setName('');
+            setDescription('');
+            setDeadline('');
+            setLocalCompleted(false);
+            setLocalCompletedAt(null);
+            setTargets([]);
+            setIsEditing(true);  // Start in edit mode for creation
+            setViewState('goal');
+        } else if (goal) {
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
             setDeadline(goal.attributes?.deadline || goal.deadline || '');
@@ -81,26 +95,49 @@ function GoalDetailModal({
                 }
             }
             setTargets(parsedTargets);
-            setIsEditing(false);
+            setIsEditing(mode === 'edit');
             setViewState('goal');
         }
-    }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt]);
+    }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
 
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
-    if (!goal) return null;
+    // Allow rendering without goal in create mode
+    if (!goal && mode !== 'create') return null;
 
     const handleSave = () => {
-        onUpdate(goal.id, {
-            name,
-            description,
-            deadline: deadline || null,
-            targets: targets
-        });
-        setIsEditing(false);
+        if (mode === 'create') {
+            // Create mode: call onCreate with new goal data
+            const parentType = parentGoal?.attributes?.type || parentGoal?.type;
+            const childType = getChildType(parentType);
+            const parentId = parentGoal?.attributes?.id || parentGoal?.id;
+
+            onCreate({
+                name,
+                description,
+                deadline: deadline || null,
+                type: childType,
+                parent_id: parentId,
+                targets: targets
+            });
+        } else {
+            // Edit mode: update existing goal
+            onUpdate(goal.id, {
+                name,
+                description,
+                deadline: deadline || null,
+                targets: targets
+            });
+            setIsEditing(false);
+        }
     };
 
     const handleCancel = () => {
+        if (mode === 'create') {
+            // In create mode, cancel means close the modal
+            if (onClose) onClose();
+            return;
+        }
         if (goal) {
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
@@ -200,18 +237,21 @@ function GoalDetailModal({
         setEditingTarget(null);
     };
 
-    const goalType = goal.attributes?.type || goal.type;
+    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
+    const goalType = mode === 'create'
+        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
+        : (goal.attributes?.type || goal.type);
     const goalColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
     const isCompleted = localCompleted;  // Use local state for optimistic UI
-    const goalId = goal.attributes?.id || goal.id;
+    const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
     const childType = getChildType(goalType);
 
     // Session relationships
     const isShortTermGoal = goalType === 'ShortTermGoal';
     const isImmediateGoal = goalType === 'ImmediateGoal';
 
-    const childSessions = isShortTermGoal
+    const childSessions = (isShortTermGoal && mode !== 'create')
         ? practiceSessions.filter(session => {
             const parentIds = session.attributes?.parent_ids || [];
             return parentIds.includes(goalId);
@@ -219,7 +259,7 @@ function GoalDetailModal({
         : [];
 
     let parentSession = null;
-    if (isImmediateGoal && practiceSessions.length > 0) {
+    if (isImmediateGoal && practiceSessions.length > 0 && mode !== 'create') {
         const parentId = goal.attributes?.parent_id || goal.parent_id;
         parentSession = practiceSessions.find(s => s.id === parentId);
     }
@@ -843,6 +883,11 @@ function GoalDetailModal({
                 borderBottom: `2px solid ${goalColor}`
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {mode === 'create' && (
+                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                            + Create
+                        </span>
+                    )}
                     <div style={{
                         padding: '5px 12px',
                         background: goalColor,
@@ -851,9 +896,14 @@ function GoalDetailModal({
                         fontSize: '12px',
                         fontWeight: 'bold'
                     }}>
-                        {goalType}
+                        {getTypeDisplayName(goalType)}
                     </div>
-                    {isCompleted && (
+                    {mode === 'create' && parentGoal && (
+                        <span style={{ color: '#888', fontSize: '12px' }}>
+                            under "{parentGoal.name}"
+                        </span>
+                    )}
+                    {mode !== 'create' && isCompleted && (
                         <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
                             ✓ Completed
                         </span>
@@ -1015,7 +1065,7 @@ function GoalDetailModal({
                                 fontWeight: 600
                             }}
                         >
-                            Save
+                            {mode === 'create' ? 'Create' : 'Save'}
                         </button>
                     </div>
                 </div>
