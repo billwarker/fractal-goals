@@ -381,6 +381,8 @@ def remove_goal_target(goal_id, target_id):
 @goals_bp.route('/<root_id>/goals/<goal_id>/complete', methods=['PATCH'])
 def update_goal_completion_endpoint(goal_id: str, root_id=None):
     """Update goal or practice session completion status."""
+    from datetime import datetime
+    
     data = request.get_json(silent=True) or {}
     
     engine = models.get_engine()
@@ -393,6 +395,12 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                 goal.completed = data['completed']
             else:
                 goal.completed = not goal.completed
+            
+            # Set or clear completed_at based on completion status
+            if goal.completed:
+                goal.completed_at = datetime.now()
+            else:
+                goal.completed_at = None
                 
             session.commit()
             session.refresh(goal)
@@ -406,6 +414,12 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                 ps.completed = data['completed']
             else:
                 ps.completed = not ps.completed
+            
+            # Set or clear completed_at based on completion status
+            if ps.completed:
+                ps.completed_at = datetime.now()
+            else:
+                ps.completed_at = None
                 
             session.commit()
             session.refresh(ps)

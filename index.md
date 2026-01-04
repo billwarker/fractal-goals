@@ -440,7 +440,14 @@ Fractal selection/home page.
 
 #### Core Components
 
-- **`Sidebar.jsx`** - Sidebar for goal details and editing
+- **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
+- **`GoalDetailModal.jsx`** - Unified goal viewing/editing component with dual display modes (modal/panel):
+  - View/Edit goal name, description, deadline
+  - Inline target builder (add/edit/delete targets)
+  - Completion confirmation flow with program/target summary
+  - Display completed_at date for finished goals
+  - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
+  - Action buttons: Mark Complete, Edit, Add Child, Delete
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
 - **`ActivitiesManager.jsx`** - Activity selection and management interface

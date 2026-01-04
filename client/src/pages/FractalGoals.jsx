@@ -231,11 +231,7 @@ function FractalGoals() {
                     onDelete={(node) => setFractalToDelete(node)}
                     onAddChild={handleAddChildClick}
                     onAddSession={() => setShowPracticeSessionModal(true)}
-                    onToggleCompletion={(node) => {
-                        const goalId = node.attributes?.id || node.id;
-                        const currentStatus = node.attributes?.completed || false;
-                        handleToggleCompletion(goalId, currentStatus);
-                    }}
+                    onToggleCompletion={handleToggleCompletion}
                     treeData={fractalData}
                     practiceSessions={practiceSessions}
                     activityDefinitions={activities}

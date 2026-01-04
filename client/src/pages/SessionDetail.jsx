@@ -1373,6 +1373,8 @@ function SessionDetail() {
                 onClose={() => setSelectedGoal(null)}
                 goal={selectedGoal}
                 onUpdate={handleUpdateGoal}
+                activityDefinitions={activities}
+                rootId={rootId}
             />
 
             {/* Auto-save status indicator - Fixed position above environment badge */}
