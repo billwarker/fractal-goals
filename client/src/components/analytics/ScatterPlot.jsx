@@ -1,15 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { chartDefaults, createChartOptions } from './ChartJSWrapper';
 
 /**
  * Scatter Plot component for visualizing activity metrics
  * Uses Chart.js via react-chartjs-2
- * Note: Chart.js does not support 3D scatter plots, so we display 2D with the first two metrics
+ * Allows user to select X and Y axis metrics via dropdowns
+ * Requires at least 2 metrics to be meaningful
  * Supports split filtering for split-enabled activities
  */
 function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all' }) {
-    console.log('ScatterPlot called', { selectedActivity, activityInstances, selectedSplit });
+    const [xMetric, setXMetric] = useState(null);
+    const [yMetric, setYMetric] = useState(null);
+
+    const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
+    const metrics = activityDef?.metric_definitions || [];
+
+    // Reset metric selections when activity changes
+    useEffect(() => {
+        if (metrics.length >= 2) {
+            setXMetric(metrics[0]);
+            setYMetric(metrics[1]);
+        } else {
+            setXMetric(null);
+            setYMetric(null);
+        }
+    }, [selectedActivity?.id]);
 
     if (!selectedActivity) {
         return (
@@ -27,10 +43,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     }
 
     const instances = activityInstances[selectedActivity.id] || [];
-    const activityDef = activities.find(a => a.id === selectedActivity.id);
-
-    console.log('Activity instances:', instances);
-    console.log('Activity definition:', activityDef);
+    const hasSplits = activityDef?.has_splits && activityDef?.split_definitions?.length > 0;
 
     if (!activityDef || instances.length === 0) {
         return (
@@ -47,25 +60,42 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         );
     }
 
-    const metrics = activityDef.metric_definitions || [];
-    const hasSplits = activityDef.has_splits && activityDef.split_definitions?.length > 0;
-
-    console.log('Metrics:', metrics, 'Has splits:', hasSplits);
-
-    if (metrics.length === 0) {
+    // Scatter plot requires at least 2 metrics
+    if (metrics.length < 2) {
         return (
             <div style={{
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
+                gap: '16px',
                 color: '#666',
-                fontSize: '14px'
+                textAlign: 'center',
+                padding: '20px'
             }}>
-                This activity has no metrics to display
+                <div style={{ fontSize: '48px' }}>📊</div>
+                <div style={{ fontSize: '16px', fontWeight: 500, color: '#888' }}>
+                    Scatter Plot Unavailable
+                </div>
+                <div style={{ fontSize: '14px', maxWidth: '400px' }}>
+                    Scatter plots require at least 2 metrics to compare.
+                    This activity only has {metrics.length === 0 ? 'no metrics' : '1 metric'}.
+                </div>
+                <div style={{
+                    fontSize: '13px',
+                    color: '#2196f3',
+                    marginTop: '8px'
+                }}>
+                    Try the Line Graph view instead to see metric progression over time.
+                </div>
             </div>
         );
     }
+
+    // Use selected metrics or defaults
+    const xMetricToPlot = xMetric || metrics[0];
+    const yMetricToPlot = yMetric || metrics[1];
 
     // Collect data points from instances
     const dataPoints = [];
@@ -77,7 +107,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
         // For activities with sets
         if (instance.has_sets && instance.sets) {
-            // Collect metrics from all sets
             const allSets = [];
             instance.sets.forEach((set, setIdx) => {
                 const setPoint = { ...basePoint, set_number: setIdx + 1 };
@@ -86,50 +115,48 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         // Filter by split if applicable
                         if (hasSplits) {
                             if (selectedSplit !== 'all' && m.split_id !== selectedSplit) {
-                                return; // Skip metrics that don't match selected split
+                                return;
                             }
                             if (selectedSplit === 'all' && !m.split_id) {
-                                return; // Skip non-split metrics when viewing all splits
+                                return;
                             }
                         } else {
-                            // For non-split activities, skip metrics with split_id
                             if (m.split_id) return;
                         }
 
                         const metricDef = metrics.find(md => md.id === m.metric_id);
                         if (metricDef && m.value) {
-                            setPoint[metricDef.name] = parseFloat(m.value);
+                            setPoint[metricDef.id] = parseFloat(m.value);
                         }
                     });
                 }
-                if (Object.keys(setPoint).length > 3) { // Has at least one metric
+                // Only include if we have both selected metrics
+                if (setPoint[xMetricToPlot.id] != null && setPoint[yMetricToPlot.id] != null) {
                     allSets.push(setPoint);
                 }
             });
 
             if (allSets.length > 0) {
                 if (setsHandling === 'top') {
-                    // Find set with highest value of first metric
-                    const firstMetric = metrics[0].name;
+                    // Find set with highest value of X metric
                     const topSet = allSets.reduce((max, current) =>
-                        (current[firstMetric] || 0) > (max[firstMetric] || 0) ? current : max
+                        (current[xMetricToPlot.id] || 0) > (max[xMetricToPlot.id] || 0) ? current : max
                     );
                     topSet.aggregation = 'Top Set';
                     dataPoints.push(topSet);
                 } else if (setsHandling === 'average') {
-                    // Calculate average for each metric
                     const avgPoint = { ...basePoint, aggregation: `Avg of ${allSets.length} sets` };
-                    metrics.forEach(metricDef => {
+                    [xMetricToPlot, yMetricToPlot].forEach(metricDef => {
                         const values = allSets
-                            .map(s => s[metricDef.name])
+                            .map(s => s[metricDef.id])
                             .filter(v => v != null);
                         if (values.length > 0) {
-                            avgPoint[metricDef.name] = Math.round(
+                            avgPoint[metricDef.id] = Math.round(
                                 (values.reduce((sum, v) => sum + v, 0) / values.length) * 100
                             ) / 100;
                         }
                     });
-                    if (Object.keys(avgPoint).length > 3) {
+                    if (avgPoint[xMetricToPlot.id] != null && avgPoint[yMetricToPlot.id] != null) {
                         dataPoints.push(avgPoint);
                     }
                 }
@@ -139,78 +166,107 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         else if (instance.metrics) {
             const point = { ...basePoint };
             instance.metrics.forEach(m => {
-                // Filter by split if applicable
                 if (hasSplits) {
                     if (selectedSplit !== 'all' && m.split_id !== selectedSplit) {
-                        return; // Skip metrics that don't match selected split
+                        return;
                     }
                     if (selectedSplit === 'all' && !m.split_id) {
-                        return; // Skip non-split metrics when viewing all splits
+                        return;
                     }
                 } else {
-                    // For non-split activities, skip metrics with split_id
                     if (m.split_id) return;
                 }
 
                 const metricDef = metrics.find(md => md.id === m.metric_id);
                 if (metricDef && m.value) {
-                    point[metricDef.name] = parseFloat(m.value);
+                    point[metricDef.id] = parseFloat(m.value);
                 }
             });
-            if (Object.keys(point).length > 2) { // Has at least one metric
+            if (point[xMetricToPlot.id] != null && point[yMetricToPlot.id] != null) {
                 dataPoints.push(point);
             }
         }
     });
 
-    console.log('Data points:', dataPoints);
-
     if (dataPoints.length === 0) {
         return (
             <div style={{
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                color: '#666',
-                fontSize: '14px'
+                gap: '20px'
             }}>
-                No metric data available for this activity
+                <div style={{ color: '#666', fontSize: '14px' }}>
+                    No metric data available for the selected metrics
+                </div>
+                {/* Metric Selectors */}
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: '#888' }}>X-Axis:</span>
+                        <select
+                            value={xMetricToPlot.id}
+                            onChange={(e) => {
+                                const metric = metrics.find(m => m.id === e.target.value);
+                                setXMetric(metric);
+                            }}
+                            style={{
+                                padding: '6px 12px',
+                                background: '#333',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                color: 'white',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {metrics.map(metric => (
+                                <option key={metric.id} value={metric.id}>
+                                    {metric.name} ({metric.unit})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis:</span>
+                        <select
+                            value={yMetricToPlot.id}
+                            onChange={(e) => {
+                                const metric = metrics.find(m => m.id === e.target.value);
+                                setYMetric(metric);
+                            }}
+                            style={{
+                                padding: '6px 12px',
+                                background: '#333',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                color: 'white',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {metrics.map(metric => (
+                                <option key={metric.id} value={metric.id}>
+                                    {metric.name} ({metric.unit})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
             </div>
         );
     }
-
-    // Determine which metrics to plot (Chart.js only supports 2D)
-    const metricsToPlot = metrics.slice(0, 2);
-    const hasSecondMetric = metricsToPlot.length >= 2;
-
-    console.log('Metrics to plot:', metricsToPlot);
 
     // Prepare chart data
-    const chartDataPoints = dataPoints
-        .filter(p => p[metricsToPlot[0].name] != null && (!hasSecondMetric || p[metricsToPlot[1]?.name] != null))
-        .map(p => ({
-            x: p[metricsToPlot[0].name],
-            y: hasSecondMetric ? p[metricsToPlot[1].name] : p[metricsToPlot[0].name],
-            label: `${p.session_name}\n${p.aggregation || (p.set_number ? `Set ${p.set_number}` : '')}\n${new Date(p.session_date).toLocaleDateString()}`
-        }));
-
-    console.log('Chart data points:', chartDataPoints);
-
-    if (chartDataPoints.length === 0) {
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#666',
-                fontSize: '14px'
-            }}>
-                No valid metric values found
-            </div>
-        );
-    }
+    const chartDataPoints = dataPoints.map(p => ({
+        x: p[xMetricToPlot.id],
+        y: p[yMetricToPlot.id],
+        session_name: p.session_name,
+        session_date: p.session_date,
+        aggregation: p.aggregation,
+        set_number: p.set_number
+    }));
 
     // Get split name for title if applicable
     let titleSuffix = '';
@@ -236,10 +292,8 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         }]
     };
 
-    const xAxisLabel = `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`;
-    const yAxisLabel = hasSecondMetric
-        ? `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`
-        : `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`;
+    const xAxisLabel = `${xMetricToPlot.name} (${xMetricToPlot.unit})`;
+    const yAxisLabel = `${yMetricToPlot.name} (${yMetricToPlot.unit})`;
 
     const options = {
         ...createChartOptions({
@@ -253,15 +307,24 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
             tooltip: {
                 ...createChartOptions({}).plugins.tooltip,
                 callbacks: {
+                    title: function (context) {
+                        const point = context[0].raw;
+                        return point.session_name;
+                    },
                     label: function (context) {
                         const point = context.raw;
-                        const lines = [
-                            point.label,
-                            `${metricsToPlot[0].name}: ${point.x} ${metricsToPlot[0].unit}`
-                        ];
-                        if (hasSecondMetric) {
-                            lines.push(`${metricsToPlot[1].name}: ${point.y} ${metricsToPlot[1].unit}`);
+                        const lines = [];
+
+                        if (point.aggregation) {
+                            lines.push(point.aggregation);
+                        } else if (point.set_number) {
+                            lines.push(`Set ${point.set_number}`);
                         }
+
+                        lines.push(new Date(point.session_date).toLocaleDateString());
+                        lines.push(`${xMetricToPlot.name}: ${point.x} ${xMetricToPlot.unit}`);
+                        lines.push(`${yMetricToPlot.name}: ${point.y} ${yMetricToPlot.unit}`);
+
                         return lines;
                     }
                 }
@@ -269,26 +332,69 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         }
     };
 
-    console.log('Rendering Chart.js scatter plot with data:', chartData);
-
-    // Show notice if 3D was intended but we're using 2D
-    const show3DNotice = metrics.length >= 3;
-
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {show3DNotice && (
-                <div style={{
-                    padding: '8px 16px',
-                    background: 'rgba(255, 152, 0, 0.15)',
-                    border: '1px solid rgba(255, 152, 0, 0.3)',
-                    borderRadius: '4px',
-                    marginBottom: '12px',
-                    fontSize: '12px',
-                    color: '#ff9800'
-                }}>
-                    📊 This activity has {metrics.length} metrics. Showing first 2 metrics in 2D view.
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Metric Selectors */}
+            <div style={{
+                display: 'flex',
+                gap: '16px',
+                alignItems: 'center',
+                padding: '0 20px',
+                flexWrap: 'wrap'
+            }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#888' }}>X-Axis:</span>
+                    <select
+                        value={xMetricToPlot.id}
+                        onChange={(e) => {
+                            const metric = metrics.find(m => m.id === e.target.value);
+                            setXMetric(metric);
+                        }}
+                        style={{
+                            padding: '6px 12px',
+                            background: '#333',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {metrics.map(metric => (
+                            <option key={metric.id} value={metric.id}>
+                                {metric.name} ({metric.unit})
+                            </option>
+                        ))}
+                    </select>
                 </div>
-            )}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis:</span>
+                    <select
+                        value={yMetricToPlot.id}
+                        onChange={(e) => {
+                            const metric = metrics.find(m => m.id === e.target.value);
+                            setYMetric(metric);
+                        }}
+                        style={{
+                            padding: '6px 12px',
+                            background: '#333',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {metrics.map(metric => (
+                            <option key={metric.id} value={metric.id}>
+                                {metric.name} ({metric.unit})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Chart */}
             <div style={{ flex: 1, minHeight: 0 }}>
                 <Scatter data={chartData} options={options} />
             </div>

@@ -80,11 +80,14 @@ export function createChartOptions({
                 type: isTimeScale ? 'time' : 'linear',
                 ...(isTimeScale && {
                     time: {
+                        unit: 'day',
                         displayFormats: {
-                            day: 'MMM d',
-                            week: 'MMM d',
+                            hour: 'MMM d, h a',
+                            day: 'MMM d, yyyy',
+                            week: 'MMM d, yyyy',
                             month: 'MMM yyyy'
-                        }
+                        },
+                        tooltipFormat: 'MMM d, yyyy'
                     }
                 }),
                 title: {

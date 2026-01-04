@@ -318,11 +318,19 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
     const lineColor = isProductMetric ? chartDefaults.secondaryColor : chartDefaults.primaryColor;
     const borderLineColor = isProductMetric ? '#c2185b' : chartDefaults.borderColor;
 
+    // Prepare chart data using {x, y} format for proper time scale rendering
+    const chartDataPoints = dataPoints.map(p => ({
+        x: p.timestamp,
+        y: p.value,
+        session_name: p.session_name,
+        aggregation: p.aggregation,
+        set_number: p.set_number
+    }));
+
     const chartData = {
-        labels: dataPoints.map(p => p.timestamp),
         datasets: [{
             label: metricLabel,
-            data: dataPoints.map(p => p.value),
+            data: chartDataPoints,
             borderColor: lineColor,
             backgroundColor: `${lineColor}33`,
             borderWidth: 2,
@@ -338,14 +346,6 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
             tension: 0.1
         }]
     };
-
-    // Store session info for tooltips
-    const sessionInfo = dataPoints.map(p => ({
-        session_name: p.session_name,
-        aggregation: p.aggregation,
-        set_number: p.set_number,
-        timestamp: p.timestamp
-    }));
 
     const options = {
         ...createChartOptions({
@@ -371,23 +371,21 @@ function LineGraph({ selectedActivity, activityInstances, activities, selectedMe
                 ...createChartOptions({}).plugins.tooltip,
                 callbacks: {
                     title: function (context) {
-                        const index = context[0].dataIndex;
-                        const info = sessionInfo[index];
-                        return info.session_name;
+                        const point = context[0].raw;
+                        return point.session_name;
                     },
                     label: function (context) {
-                        const index = context.dataIndex;
-                        const info = sessionInfo[index];
+                        const point = context.raw;
                         const lines = [];
 
-                        if (info.aggregation) {
-                            lines.push(info.aggregation);
-                        } else if (info.set_number) {
-                            lines.push(`Set ${info.set_number}`);
+                        if (point.aggregation) {
+                            lines.push(point.aggregation);
+                        } else if (point.set_number) {
+                            lines.push(`Set ${point.set_number}`);
                         }
 
-                        lines.push(`${info.timestamp.toLocaleDateString()}`);
-                        lines.push(`${metricLabel}: ${context.parsed.y}${isProductMetric ? ` (${metricUnitText})` : ` ${metricUnitText}`}`);
+                        lines.push(point.x.toLocaleDateString());
+                        lines.push(`${metricLabel}: ${point.y}${isProductMetric ? ` (${metricUnitText})` : ` ${metricUnitText}`}`);
 
                         return lines;
                     }
