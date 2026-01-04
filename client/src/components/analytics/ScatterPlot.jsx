@@ -1,9 +1,11 @@
 import React from 'react';
-import PlotlyChart from './PlotlyChart';
+import { Scatter } from 'react-chartjs-2';
+import { chartDefaults, createChartOptions } from './ChartJSWrapper';
 
 /**
  * Scatter Plot component for visualizing activity metrics
- * Supports both 2D and 3D scatter plots based on number of metrics
+ * Uses Chart.js via react-chartjs-2
+ * Note: Chart.js does not support 3D scatter plots, so we display 2D with the first two metrics
  * Supports split filtering for split-enabled activities
  */
 function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all' }) {
@@ -178,20 +180,24 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         );
     }
 
-    // Determine which metrics to plot (up to 3)
-    const metricsToPlot = metrics.slice(0, 3);
-    const is3D = metricsToPlot.length === 3;
+    // Determine which metrics to plot (Chart.js only supports 2D)
+    const metricsToPlot = metrics.slice(0, 2);
+    const hasSecondMetric = metricsToPlot.length >= 2;
 
-    console.log('Metrics to plot:', metricsToPlot, 'is3D:', is3D);
+    console.log('Metrics to plot:', metricsToPlot);
 
-    // Prepare plot data
-    const xData = dataPoints.map(p => p[metricsToPlot[0].name]).filter(v => v != null);
-    const yData = metricsToPlot[1] ? dataPoints.map(p => p[metricsToPlot[1].name]).filter(v => v != null) : [];
-    const zData = is3D ? dataPoints.map(p => p[metricsToPlot[2].name]).filter(v => v != null) : [];
+    // Prepare chart data
+    const chartDataPoints = dataPoints
+        .filter(p => p[metricsToPlot[0].name] != null && (!hasSecondMetric || p[metricsToPlot[1]?.name] != null))
+        .map(p => ({
+            x: p[metricsToPlot[0].name],
+            y: hasSecondMetric ? p[metricsToPlot[1].name] : p[metricsToPlot[0].name],
+            label: `${p.session_name}\n${p.aggregation || (p.set_number ? `Set ${p.set_number}` : '')}\n${new Date(p.session_date).toLocaleDateString()}`
+        }));
 
-    console.log('Plot data:', { xData, yData, zData });
+    console.log('Chart data points:', chartDataPoints);
 
-    if (xData.length === 0) {
+    if (chartDataPoints.length === 0) {
         return (
             <div style={{
                 display: 'flex',
@@ -206,31 +212,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         );
     }
 
-    const plotData = [{
-        x: xData,
-        y: yData.length > 0 ? yData : undefined,
-        z: zData.length > 0 ? zData : undefined,
-        mode: 'markers',
-        type: is3D ? 'scatter3d' : 'scatter',
-        marker: {
-            size: 8,
-            color: '#2196f3',
-            opacity: 0.7,
-            line: {
-                color: '#1976d2',
-                width: 1
-            }
-        },
-        text: dataPoints.map(p =>
-            `${p.session_name}<br>${p.aggregation || (p.set_number ? `Set ${p.set_number}` : '')}<br>${new Date(p.session_date).toLocaleDateString()}`
-        ),
-        hovertemplate: '%{text}<br>' +
-            `${metricsToPlot[0].name}: %{x} ${metricsToPlot[0].unit}<br>` +
-            (metricsToPlot[1] ? `${metricsToPlot[1].name}: %{y} ${metricsToPlot[1].unit}<br>` : '') +
-            (is3D ? `${metricsToPlot[2].name}: %{z} ${metricsToPlot[2].unit}<br>` : '') +
-            '<extra></extra>'
-    }];
-
     // Get split name for title if applicable
     let titleSuffix = '';
     if (hasSplits && selectedSplit !== 'all') {
@@ -240,70 +221,79 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         }
     }
 
-    const layout = {
-        title: {
-            text: `${selectedActivity.name}${titleSuffix} - Metrics Analysis`,
-            font: { color: '#ccc', size: 16 }
-        },
-        paper_bgcolor: '#1e1e1e',
-        plot_bgcolor: '#252525',
-        font: { color: '#ccc' },
-        margin: { l: 60, r: 40, t: 60, b: 80 }, // Increased bottom margin for axis labels
-        autosize: true
+    const chartData = {
+        datasets: [{
+            label: selectedActivity.name,
+            data: chartDataPoints,
+            backgroundColor: 'rgba(33, 150, 243, 0.7)',
+            borderColor: chartDefaults.borderColor,
+            borderWidth: 1,
+            pointRadius: 8,
+            pointHoverRadius: 12,
+            pointHoverBackgroundColor: chartDefaults.primaryColor,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2
+        }]
     };
 
-    // Add appropriate axes based on plot type
-    if (is3D) {
-        layout.scene = {
-            xaxis: {
-                title: {
-                    text: `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`,
-                    font: { color: '#ccc', size: 12 }
-                },
-                gridcolor: '#333',
-                backgroundcolor: '#252525'
-            },
-            yaxis: {
-                title: {
-                    text: `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`,
-                    font: { color: '#ccc', size: 12 }
-                },
-                gridcolor: '#333',
-                backgroundcolor: '#252525'
-            },
-            zaxis: {
-                title: {
-                    text: `${metricsToPlot[2].name} (${metricsToPlot[2].unit})`,
-                    font: { color: '#ccc', size: 12 }
-                },
-                gridcolor: '#333',
-                backgroundcolor: '#252525'
+    const xAxisLabel = `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`;
+    const yAxisLabel = hasSecondMetric
+        ? `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`
+        : `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`;
+
+    const options = {
+        ...createChartOptions({
+            title: `${selectedActivity.name}${titleSuffix} - Metrics Analysis`,
+            xAxisLabel,
+            yAxisLabel,
+            isTimeScale: false
+        }),
+        plugins: {
+            ...createChartOptions({}).plugins,
+            tooltip: {
+                ...createChartOptions({}).plugins.tooltip,
+                callbacks: {
+                    label: function (context) {
+                        const point = context.raw;
+                        const lines = [
+                            point.label,
+                            `${metricsToPlot[0].name}: ${point.x} ${metricsToPlot[0].unit}`
+                        ];
+                        if (hasSecondMetric) {
+                            lines.push(`${metricsToPlot[1].name}: ${point.y} ${metricsToPlot[1].unit}`);
+                        }
+                        return lines;
+                    }
+                }
             }
-        };
-    } else {
-        layout.xaxis = {
-            title: {
-                text: `${metricsToPlot[0].name} (${metricsToPlot[0].unit})`,
-                font: { color: '#ccc', size: 12 }
-            },
-            gridcolor: '#333',
-            zerolinecolor: '#444'
-        };
-        if (metricsToPlot[1]) {
-            layout.yaxis = {
-                title: {
-                    text: `${metricsToPlot[1].name} (${metricsToPlot[1].unit})`,
-                    font: { color: '#ccc', size: 12 }
-                },
-                gridcolor: '#333',
-                zerolinecolor: '#444'
-            };
         }
-    }
+    };
 
-    console.log('Rendering plot with data:', plotData, 'layout:', layout);
+    console.log('Rendering Chart.js scatter plot with data:', chartData);
 
-    return <PlotlyChart data={plotData} layout={layout} />;
+    // Show notice if 3D was intended but we're using 2D
+    const show3DNotice = metrics.length >= 3;
+
+    return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {show3DNotice && (
+                <div style={{
+                    padding: '8px 16px',
+                    background: 'rgba(255, 152, 0, 0.15)',
+                    border: '1px solid rgba(255, 152, 0, 0.3)',
+                    borderRadius: '4px',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                    color: '#ff9800'
+                }}>
+                    📊 This activity has {metrics.length} metrics. Showing first 2 metrics in 2D view.
+                </div>
+            )}
+            <div style={{ flex: 1, minHeight: 0 }}>
+                <Scatter data={chartData} options={options} />
+            </div>
+        </div>
+    );
 }
 
 export default ScatterPlot;
