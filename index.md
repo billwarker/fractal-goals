@@ -490,6 +490,7 @@ Fractal selection/home page.
 - **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
 - **`GoalDetailModal.jsx`** - Unified goal viewing/editing component with dual display modes (modal/panel):
   - View/Edit goal name, description, deadline
+  - **Associated/Targeting Programs display**
   - Inline target builder (add/edit/delete targets)
   - Completion confirmation flow with program/target summary
   - Display completed_at date for finished goals

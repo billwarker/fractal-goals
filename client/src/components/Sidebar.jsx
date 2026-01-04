@@ -23,7 +23,8 @@ const Sidebar = ({
     // Data props needed for enhanced features
     treeData,
     practiceSessions = [],
-    activityDefinitions = []
+    activityDefinitions = [],
+    programs = []
 }) => {
     const navigate = useNavigate();
 
@@ -102,6 +103,7 @@ const Sidebar = ({
                         rootId={selectedRootId}
                         treeData={treeData}
                         displayMode="panel"
+                        programs={programs}
                     />
                 </div>
             </div>

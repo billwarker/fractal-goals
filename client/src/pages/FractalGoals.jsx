@@ -45,6 +45,24 @@ function FractalGoals() {
         fetchActivities
     } = useActivities();
 
+    // Programs State
+    const [programs, setPrograms] = useState([]);
+    const [programsLoading, setProgramsLoading] = useState(false);
+
+    const fetchPrograms = async (id) => {
+        try {
+            setProgramsLoading(true);
+            const { fractalApi } = await import('../utils/api'); // Dynamic import to avoid circular dep issues if any
+            const res = await fractalApi.getPrograms(id);
+            setPrograms(res.data || []);
+        } catch (err) {
+            console.error("Failed to fetch programs:", err);
+            // Non-critical, just log
+        } finally {
+            setProgramsLoading(false);
+        }
+    };
+
     const loading = goalsLoading || sessionsLoading;
 
     // Sidebar state
@@ -70,6 +88,7 @@ function FractalGoals() {
         fetchFractalTree(rootId);
         fetchSessions(rootId);
         fetchActivities(rootId);
+        fetchPrograms(rootId);
     }, [rootId, navigate]);
 
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
@@ -263,6 +282,7 @@ function FractalGoals() {
                     treeData={fractalData}
                     practiceSessions={practiceSessions}
                     activityDefinitions={activities}
+                    programs={programs}
                 />
             )}
 

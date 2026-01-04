@@ -1055,6 +1055,51 @@ function GoalDetailModal({
                         </div>
                     </div>
 
+                    {/* Associated Programs */}
+                    {programs && (() => {
+                        const associatedPrograms = programs.filter(p => {
+                            // Check directly on program
+                            const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
+                            // Check on blocks
+                            const blockLevel = p.blocks && p.blocks.some(b => b.goal_ids && b.goal_ids.includes(goalId));
+                            return programLevel || blockLevel;
+                        });
+
+                        if (associatedPrograms.length === 0) return null;
+
+                        return (
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                                    Associated Programs:
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {associatedPrograms.map(prog => (
+                                        <div
+                                            key={prog.id}
+                                            onClick={() => {
+                                                if (displayMode === 'modal' && onClose) onClose();
+                                                navigate(`/${rootId}/programs/${prog.id}`);
+                                            }}
+                                            style={{
+                                                padding: '8px 10px',
+                                                background: '#153d5a',
+                                                border: '1px solid #1e5a85',
+                                                borderRadius: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '14px' }}>📁</span>
+                                            <span style={{ fontSize: '13px', color: 'white' }}>{prog.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* Targets Section - View Mode */}
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
