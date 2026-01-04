@@ -21,6 +21,7 @@ const ProgramDetail = () => {
     const [loading, setLoading] = useState(true);
     const [goals, setGoals] = useState([]);
     const [activities, setActivities] = useState([]);
+    const [sessions, setSessions] = useState([]);
     const [showEditBuilder, setShowEditBuilder] = useState(false);
 
     // View Mode
@@ -53,8 +54,10 @@ const ProgramDetail = () => {
     useEffect(() => {
         if (rootId && programId) {
             fetchProgramData();
+            fetchProgramData();
             fetchGoals();
             fetchActivities();
+            fetchSessions();
         }
     }, [rootId, programId]);
 
@@ -85,6 +88,15 @@ const ProgramDetail = () => {
             setActivities(res.data);
         } catch (err) {
             console.error('Failed to fetch activities:', err);
+        }
+    };
+
+    const fetchSessions = async () => {
+        try {
+            const res = await fractalApi.getSessions(rootId);
+            setSessions(res.data);
+        } catch (err) {
+            console.error('Failed to fetch sessions:', err);
         }
     };
 
@@ -295,23 +307,68 @@ const ProgramDetail = () => {
         }
     };
 
-    // Handler for adding a block day from DayViewModal
-    const handleAddBlockDayFromModal = async (blockId, date) => {
+    // Handler for scheduling a day (creates a Planned Session linked to the Template Day)
+    const handleScheduleDay = async (blockId, date, templateDay) => {
         try {
-            // Create a new day with the selected date and a default name
-            const dayData = {
-                name: `Day ${date}`,
-                date: date,
-                notes: '',
-                templates: []
-            };
-            await fractalApi.addBlockDay(rootId, program.id, blockId, dayData);
+            await fractalApi.createSession(rootId, {
+                name: templateDay ? templateDay.name : 'Ad-hoc Session',
+                session_start: date, // YYYY-MM-DD (Backend handles ISO)
+                attributes: {
+                    program_context: {
+                        day_id: templateDay ? templateDay.id : null,
+                        block_id: blockId,
+                        program_id: program.id
+                    }
+                }
+            });
+            await fetchSessions(); // Refresh sessions to update calendar
+            // no need to fetchProgramData if we rely on sessions for calendar, 
+            // but might be good to sync if side effects exist
+
+            setShowDayViewModal(false);
+            setSelectedDate(null);
+        } catch (err) {
+            console.error('Failed to schedule day:', err);
+            alert('Failed to schedule day: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    // Handler for scheduling an existing block day (assigning a date)
+    const handleScheduleBlockDay = async (blockId, dayId, date) => {
+        try {
+            // Update the day's date
+            // We need to fetch the existing day first to preserve other fields, 
+            // but the API might handle partial updates? 
+            // Looking at the API, updateBlockDay usually expects full object or merges.
+            // Let's assume we can just send the date update or we might need the day object.
+            // The safest is to find the day in our local state, clone it, update date, and send.
+
+            let dayToUpdate = null;
+            program.blocks.some(b => {
+                if (b.id === blockId && b.days) {
+                    const found = b.days.find(d => d.id === dayId);
+                    if (found) {
+                        dayToUpdate = found;
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            if (!dayToUpdate) {
+                throw new Error("Day not found in local state");
+            }
+
+            const updatedDay = { ...dayToUpdate, date: date };
+            // Remove block_id/id from payload if API doesn't want them in body (usually safe to include or exclude)
+
+            await fractalApi.updateBlockDay(rootId, program.id, blockId, dayId, updatedDay);
             fetchProgramData();
             setShowDayViewModal(false);
             setSelectedDate(null);
         } catch (err) {
-            console.error('Failed to add block day:', err);
-            alert('Failed to add block day: ' + (err.response?.data?.error || err.message));
+            console.error('Failed to schedule block day:', err);
+            alert('Failed to schedule block day: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -416,6 +473,57 @@ const ProgramDetail = () => {
     };
 
     const calendarEvents = [];
+
+    // Helper Map for Template Lookups
+    const programDaysMap = new Map();
+    program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockColor: b.color })));
+
+    // Render Sessions as Calendar Events (The "Scheduled" Reality)
+    sessions.forEach(session => {
+        let pDayId = session.program_day_id;
+        // Fallback: check session.attributes used by createSession
+        if (!pDayId && session.attributes) {
+            try {
+                const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
+                pDayId = attr?.program_context?.day_id;
+            } catch (e) { }
+        }
+
+        if (pDayId && programDaysMap.has(pDayId)) {
+            const pDay = programDaysMap.get(pDayId);
+            const isCompleted = session.session_end && moment(session.session_end).isValid();
+
+            // Base Event (Text Label)
+            calendarEvents.push({
+                id: `session-event-${session.id}`,
+                title: (isCompleted ? "✓ " : "") + pDay.name,
+                start: session.session_start ? session.session_start.split('T')[0] : null,
+                allDay: true,
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                textColor: isCompleted ? '#4caf50' : 'rgba(255,255,255,0.9)',
+                classNames: ['day-label-event']
+            });
+
+            // Render Templates (The "Plan") from the Abstract Day
+            // Only if not completed? Or filter logic?
+            // Usually we show templates as gray bars.
+            if (pDay.templates) {
+                pDay.templates.forEach(t => {
+                    calendarEvents.push({
+                        id: `session-tmpl-${session.id}-${t.id}`,
+                        title: t.name,
+                        start: session.session_start ? session.session_start.split('T')[0] : null,
+                        allDay: true,
+                        backgroundColor: isCompleted ? '#2e7d32' : '#37474F', // Green if done, Gray if planned
+                        borderColor: 'transparent',
+                        textColor: isCompleted ? 'white' : '#CFD8DC',
+                        extendedProps: { type: 'session_template', ...t }
+                    });
+                });
+            }
+        }
+    });
     sortedBlocks.forEach(block => {
         if (!block.start_date || !block.end_date) return;
 
@@ -674,6 +782,7 @@ const ProgramDetail = () => {
                                 initialDate={program.start_date ? new Date(program.start_date) : new Date()}
                                 events={calendarEvents}
                                 height="100%"
+                                dayMaxEvents={5}
                                 selectable={true}
                                 select={handleDateSelect}
                                 eventClick={handleEventClick}
@@ -757,7 +866,7 @@ const ProgramDetail = () => {
                                         <div style={{
                                             display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px'
                                         }}>
-                                            {block.days?.map(day => (
+                                            {block.days?.filter(d => !d.date).map(day => (
                                                 <div key={day.id}
                                                     onClick={() => handleEditDay(block.id, day)}
                                                     style={{
@@ -850,7 +959,8 @@ const ProgramDetail = () => {
                 goals={programGoals}
                 onSetGoalDeadline={handleSetGoalDeadline}
                 blocks={sortedBlocks}
-                onAddBlockDay={handleAddBlockDayFromModal}
+                onScheduleDay={handleScheduleDay}
+                sessions={sessions}
             />
 
             <GoalDetailModal

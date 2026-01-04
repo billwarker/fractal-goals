@@ -319,11 +319,26 @@ def add_block_day(root_id, program_id, block_id):
         
         for target in target_blocks:
             dates_to_add = []
-            if day_of_week and target.start_date and target.end_date:
+            
+            # 1. Explicit Date (Manual Scheduling)
+            if data.get('date'):
+                try:
+                    # Parse YYYY-MM-DD
+                    dt_str = data.get('date')
+                    if 'T' in dt_str: dt_str = dt_str.split('T')[0]
+                    d_obj = datetime.strptime(dt_str, '%Y-%m-%d').date()
+                    dates_to_add.append(d_obj)
+                except ValueError:
+                    return jsonify({"error": "Invalid date format, use YYYY-MM-DD"}), 400
+            
+            # 2. Pattern Matching (Day of Week)
+            elif day_of_week and target.start_date and target.end_date:
                 curr = target.start_date
                 while curr <= target.end_date:
                     if curr.strftime('%A') == day_of_week: dates_to_add.append(curr)
                     curr += timedelta(days=1)
+            
+            # 3. Abstract Day (No Date)
             else:
                 dates_to_add.append(None)
             
