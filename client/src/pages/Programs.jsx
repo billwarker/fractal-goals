@@ -295,32 +295,12 @@ function Programs() {
                                 >
                                     {/* Delete Button - Top Right */}
                                     <button
+                                        className="delete-btn"
                                         onClick={(e) => handleDeleteProgram(e, program)}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '12px',
-                                            right: '12px',
-                                            background: '#d32f2f',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            padding: '6px 10px',
-                                            cursor: 'pointer',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            zIndex: 10,
-                                            transition: 'background 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.stopPropagation();
-                                            e.target.style.background = '#c62828';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.stopPropagation();
-                                            e.target.style.background = '#d32f2f';
-                                        }}
+                                        title="Delete Program"
+                                        style={{ position: 'absolute', top: '8px', right: '8px' }}
                                     >
-                                        Delete
+                                        ×
                                     </button>
 
                                     {/* Program Header */}
