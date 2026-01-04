@@ -82,6 +82,7 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - `description` (String)
 - `deadline` (DateTime, nullable)
 - `completed` (Boolean)
+- `completed_at` (DateTime, nullable) - When goal was marked complete
 - `created_at` (DateTime)
 - `updated_at` (DateTime)
 - `parent_id` (String, FK to goals.id)

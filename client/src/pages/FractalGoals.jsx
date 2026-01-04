@@ -72,6 +72,34 @@ function FractalGoals() {
         fetchActivities(rootId);
     }, [rootId, navigate]);
 
+    // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
+    useEffect(() => {
+        if (!fractalData || !viewingGoal) return;
+
+        // Recursive helper to find goal in tree
+        const findGoal = (node, targetId) => {
+            const nodeId = node.attributes?.id || node.id;
+            if (nodeId === targetId) return node;
+
+            if (node.children) {
+                for (const child of node.children) {
+                    const found = findGoal(child, targetId);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const viewingId = viewingGoal.attributes?.id || viewingGoal.id;
+        const updatedGoal = findGoal(fractalData, viewingId);
+
+        // Only update if we found it and it's different (shallow check of attributes helps avoid loops if implemented carefully, 
+        // but since we're setting a new object reference, we rely on React's equality check or the fact that fractalData reference changes only on update)
+        if (updatedGoal && updatedGoal !== viewingGoal) {
+            setViewingGoal(updatedGoal);
+        }
+    }, [fractalData, viewingGoal]);
+
     // Derived Data
     const shortTermGoals = fractalData ? collectShortTermGoals(fractalData) : [];
 
