@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import GoalModal from '../components/modals/GoalModal';
+import { GOAL_COLORS } from '../utils/goalColors';
 import '../App.css';
 
 /**
@@ -27,6 +28,7 @@ function Log() {
     const [activityDefinitions, setActivityDefinitions] = useState([]); // NEW: for target creation
     const [showGoalModal, setShowGoalModal] = useState(false); // NEW: control goal creation modal
     const [showSelectGoalModal, setShowSelectGoalModal] = useState(false); // NEW: control goal selection modal
+    const [tempSelectedGoals, setTempSelectedGoals] = useState([]); // NEW: track selections in modal
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -280,6 +282,9 @@ function Log() {
                 })
             };
 
+            console.log('Creating session with rootId:', rootId);
+            console.log('Session Payload:', sessionData);
+
             const response = await fractalApi.createSession(rootId, sessionData);
 
             // Get the created session ID from the response
@@ -311,7 +316,7 @@ function Log() {
                 if (existingGoals.length > 0) {
                     await Promise.all(
                         existingGoals.map(goal =>
-                            fractalApi.updateGoal(goal.id, {
+                            fractalApi.updateGoal(rootId, goal.id, {
                                 parent_id: createdSessionId
                             })
                         )
@@ -896,8 +901,8 @@ function Log() {
                                             key={goal.id}
                                             onClick={() => handleToggleGoal(goal.id)}
                                             style={{
-                                                background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                                background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : '#2a2a2a', // 10% opacity
+                                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#444'}`,
                                                 borderRadius: '6px',
                                                 padding: '12px 16px',
                                                 cursor: 'pointer',
@@ -911,12 +916,12 @@ function Log() {
                                                 width: '20px',
                                                 height: '20px',
                                                 borderRadius: '4px',
-                                                border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
-                                                background: isSelected ? '#4caf50' : 'transparent',
+                                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#666'}`,
+                                                background: isSelected ? GOAL_COLORS.ShortTermGoal : 'transparent',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                color: 'white',
+                                                color: '#1a1a1a',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 flexShrink: 0
@@ -986,7 +991,7 @@ function Log() {
                                         }}
                                     >
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#F8F9FA' }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: GOAL_COLORS.ImmediateGoal }}>
                                                 {goal.name}
                                             </div>
                                             {goal.description && (
@@ -1022,7 +1027,10 @@ function Log() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <button
-                                onClick={() => setShowSelectGoalModal(true)}
+                                onClick={() => {
+                                    setTempSelectedGoals([]);
+                                    setShowSelectGoalModal(true);
+                                }}
                                 disabled={existingImmediateGoals.length === 0}
                                 style={{
                                     padding: '12px 24px',
@@ -1054,7 +1062,7 @@ function Log() {
                                 onClick={() => setShowGoalModal(true)}
                                 style={{
                                     padding: '12px 24px',
-                                    background: '#F8F9FA',
+                                    background: GOAL_COLORS.ImmediateGoal,
                                     border: 'none',
                                     borderRadius: '6px',
                                     color: '#1a1a1a',
@@ -1067,7 +1075,7 @@ function Log() {
                                     e.currentTarget.style.background = '#e0e0e0';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#F8F9FA';
+                                    e.currentTarget.style.background = GOAL_COLORS.ImmediateGoal;
                                 }}
                             >
                                 + Create New Goal
@@ -1128,13 +1136,13 @@ function Log() {
                                 )}
                                 <br />
                                 Associated with{' '}
-                                <strong style={{ color: '#4ECDC4' }}>
+                                <strong style={{ color: GOAL_COLORS.ShortTermGoal }}>
                                     {selectedGoalIds.length} short term goal{selectedGoalIds.length !== 1 ? 's' : ''}
                                 </strong>
                                 {immediateGoals.length > 0 && (
                                     <span>
                                         {' '}and{' '}
-                                        <strong style={{ color: '#F8F9FA' }}>
+                                        <strong style={{ color: GOAL_COLORS.ImmediateGoal }}>
                                             {immediateGoals.length} immediate goal{immediateGoals.length !== 1 ? 's' : ''}
                                         </strong>
                                     </span>
@@ -1159,71 +1167,133 @@ function Log() {
             />
 
             {/* Goal Selection Modal */}
+            {/* Goal Selection Modal */}
             {showSelectGoalModal && (
                 <div className="modal-overlay" onClick={() => setShowSelectGoalModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-                        <h2>Select Existing Immediate Goal</h2>
+                        <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
+                            Select Existing Immediate Goal(s)
+                        </h2>
 
                         {existingImmediateGoals.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
                                 <p>No existing immediate goals found.</p>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
                                 {existingImmediateGoals.map(goal => {
                                     const isAlreadyAdded = immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id);
+                                    const isSelected = tempSelectedGoals.includes(goal.id);
 
                                     return (
                                         <div
                                             key={goal.id}
                                             onClick={() => {
                                                 if (!isAlreadyAdded) {
-                                                    handleSelectExistingGoal(goal);
-                                                    setShowSelectGoalModal(false);
+                                                    setTempSelectedGoals(prev =>
+                                                        prev.includes(goal.id)
+                                                            ? prev.filter(id => id !== goal.id)
+                                                            : [...prev, goal.id]
+                                                    );
                                                 }
                                             }}
                                             style={{
-                                                background: isAlreadyAdded ? '#2a2a2a' : '#1e1e1e',
-                                                border: `2px solid ${isAlreadyAdded ? '#666' : '#9c27b0'}`,
+                                                background: isSelected ? '#2a4a2a' : '#1e1e1e',
+                                                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : (isAlreadyAdded ? '#333' : '#444')}`,
                                                 borderRadius: '6px',
                                                 padding: '12px 16px',
                                                 cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
                                                 opacity: isAlreadyAdded ? 0.5 : 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
                                                 transition: 'all 0.2s'
                                             }}
                                             onMouseEnter={(e) => {
-                                                if (!isAlreadyAdded) {
-                                                    e.currentTarget.style.borderColor = '#7b1fa2';
+                                                if (!isAlreadyAdded && !isSelected) {
+                                                    e.currentTarget.style.borderColor = GOAL_COLORS.ImmediateGoal;
                                                 }
                                             }}
                                             onMouseLeave={(e) => {
-                                                if (!isAlreadyAdded) {
-                                                    e.currentTarget.style.borderColor = '#9c27b0';
+                                                if (!isAlreadyAdded && !isSelected) {
+                                                    e.currentTarget.style.borderColor = '#444';
                                                 }
                                             }}
                                         >
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#9c27b0' }}>
-                                                {goal.name}
-                                                {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
+                                            <div style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                borderRadius: '4px',
+                                                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : '#666'}`,
+                                                background: isSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#1a1a1a',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                flexShrink: 0
+                                            }}>
+                                                {(isSelected || isAlreadyAdded) && '✓'}
                                             </div>
-                                            {goal.description && (
-                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                                                    {goal.description}
+
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected || isAlreadyAdded ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
+                                                    {goal.name}
+                                                    {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
                                                 </div>
-                                            )}
-                                            {goal.deadline && (
-                                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                                    📅 {new Date(goal.deadline).toLocaleDateString()}
-                                                </div>
-                                            )}
+                                                {goal.description && (
+                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                        {goal.description}
+                                                    </div>
+                                                )}
+                                                {goal.deadline && (
+                                                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                                        📅 {new Date(goal.deadline).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         )}
 
-                        <div className="actions" style={{ marginTop: '20px' }}>
-                            <button type="button" onClick={() => setShowSelectGoalModal(false)}>Close</button>
+                        <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowSelectGoalModal(false)}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: 'transparent',
+                                    border: '1px solid #666',
+                                    color: '#ccc',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const goalsToAdd = existingImmediateGoals.filter(g => tempSelectedGoals.includes(g.id));
+                                    goalsToAdd.forEach(goal => handleSelectExistingGoal(goal));
+                                    setShowSelectGoalModal(false);
+                                }}
+                                disabled={tempSelectedGoals.length === 0}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: tempSelectedGoals.length === 0 ? '#444' : GOAL_COLORS.ImmediateGoal,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    color: tempSelectedGoals.length === 0 ? '#888' : '#1a1a1a',
+                                    fontWeight: 'bold',
+                                    cursor: tempSelectedGoals.length === 0 ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                Add Selected ({tempSelectedGoals.length})
+                            </button>
                         </div>
                     </div>
                 </div>

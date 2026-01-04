@@ -27,6 +27,8 @@ DONE for 0.1.0
 1. add immediate goals to practice sessions
 2. have immediate goals show up in fractal view under practice sessions
 3. fix duration and end time for goals not behaving correctly
+4. have a backend service for updating data daily
+5. note taking interface
 
 TO-DO for v 0.1.0
 

@@ -474,6 +474,7 @@ Session creation page.
 - Program context tracking (links sessions to program/block/day)
 - Associate sessions with multiple short-term goals
 - Smart UI that adapts based on available options (all steps visible simultaneously)
+- **New Feature:** Add/Attach Immediate Goals to new sessions (both new and existing immediate goals)
 
 #### `Selection.jsx`
 Fractal selection/home page.
@@ -632,7 +633,7 @@ From `/my-implementation-plans/features.txt`:
 **To-Do:**
 - ⏳ Allow adjustments to estimated time in sessions
 - ⏳ Toggle hiding practice sessions from fractal view
-- ⏳ Add immediate goals to practice sessions
+- ✅ Add immediate goals to practice sessions
 - ⏳ SMART mode for goals
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
 - ⏳ Additional programming features (backend integration)
@@ -647,7 +648,7 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Allow adjustments to estimated time in sessions
 - ⏳ Practice sessions show session start date instead of age
 - ⏳ Toggle hiding practice sessions from fractal view
-- ⏳ Add immediate goals to practice sessions
+- ✅ Add immediate goals to practice sessions
 - ⏳ SMART mode for goals
 - ⏳ Programming section enhancements
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
@@ -655,6 +656,10 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Search functionality for activities
 
 - ⏳ Make duration updates more sensible
+
+### Recent Fixes
+- **CreateSession Page:** Fixed styling consistency (colors), added multi-selection for existing immediate goals, corrected API call for updating goals (fixed 404 error).
+- **Backend API:** Updated `update_fractal_goal` to allow reparenting via `parent_id` (enabling attachment of existing goals to sessions).
 
 ---
 

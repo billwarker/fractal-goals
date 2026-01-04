@@ -686,6 +686,10 @@ def update_fractal_goal(root_id, goal_id):
         if 'targets' in data:
             # Store targets as JSON string
             goal.targets = json.dumps(data['targets']) if data['targets'] else None
+            
+        if 'parent_id' in data:
+            # Allow reparenting (e.g. moving ImmediateGoal to a Session)
+            goal.parent_id = data['parent_id']
         
         session.commit()
         
