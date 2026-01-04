@@ -152,9 +152,10 @@ function FractalGoals() {
             return;
         }
 
-        // If adding a Practice Session to a ShortTermGoal, use Practice Session Modal
+        // If adding a Practice Session to a ShortTermGoal, redirect to CREATE SESSION page
         if (parentType === 'ShortTermGoal' && childType === 'PracticeSession') {
-            setShowPracticeSessionModal(true);
+            const goalId = nodeDatum.id || nodeDatum.attributes?.id;
+            navigate(`/${rootId}/create-session?goalId=${goalId}`);
             return;
         }
 
@@ -277,7 +278,10 @@ function FractalGoals() {
                     onUpdate={handleUpdateNode}
                     onDelete={(node) => setFractalToDelete(node)}
                     onAddChild={handleAddChildClick}
-                    onAddSession={() => setShowPracticeSessionModal(true)}
+                    onAddSession={() => {
+                        const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                        navigate(`/${rootId}/create-session?goalId=${goalId}`);
+                    }}
                     onToggleCompletion={handleToggleCompletion}
                     treeData={fractalData}
                     practiceSessions={practiceSessions}

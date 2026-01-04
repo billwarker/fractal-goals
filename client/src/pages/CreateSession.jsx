@@ -392,8 +392,8 @@ function Log() {
                                         key={programName}
                                         onClick={() => handleSelectProgram(programName)}
                                         style={{
-                                            background: isSelected ? '#2a3f5f' : '#2a2a2a',
-                                            border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                            background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                            border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
                                             borderRadius: '6px',
                                             padding: '16px 20px',
                                             cursor: 'pointer',
@@ -404,7 +404,7 @@ function Log() {
                                         }}
                                         onMouseEnter={(e) => {
                                             if (!isSelected) {
-                                                e.currentTarget.style.borderColor = '#2196f3';
+                                                e.currentTarget.style.borderColor = '#4caf50';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
@@ -426,7 +426,7 @@ function Log() {
                                         </div>
                                         {isSelected && (
                                             <div style={{
-                                                color: '#2196f3',
+                                                color: '#4caf50',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold'
                                             }}>
@@ -456,7 +456,7 @@ function Log() {
                                     }}
                                     onMouseEnter={(e) => {
                                         if (sessionSource !== 'template') {
-                                            e.currentTarget.style.background = 'rgba(33, 150, 243, 0.1)';
+                                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.1)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
@@ -501,8 +501,8 @@ function Log() {
                             <div
                                 onClick={() => handleSelectSource('program')}
                                 style={{
-                                    background: sessionSource === 'program' ? '#2a3f5f' : '#2a2a2a',
-                                    border: `2px solid ${sessionSource === 'program' ? '#2196f3' : '#444'}`,
+                                    background: sessionSource === 'program' ? '#2a4a2a' : '#2a2a2a',
+                                    border: `2px solid ${sessionSource === 'program' ? '#4caf50' : '#444'}`,
                                     borderRadius: '8px',
                                     padding: '24px',
                                     cursor: 'pointer',
@@ -511,7 +511,7 @@ function Log() {
                                 }}
                                 onMouseEnter={(e) => {
                                     if (sessionSource !== 'program') {
-                                        e.currentTarget.style.borderColor = '#2196f3';
+                                        e.currentTarget.style.borderColor = '#4caf50';
                                     }
                                 }}
                                 onMouseLeave={(e) => {
@@ -530,7 +530,7 @@ function Log() {
                                 {sessionSource === 'program' && (
                                     <div style={{
                                         marginTop: '12px',
-                                        color: '#2196f3',
+                                        color: '#4caf50',
                                         fontSize: '12px',
                                         fontWeight: 'bold'
                                     }}>
@@ -542,8 +542,8 @@ function Log() {
                             <div
                                 onClick={() => handleSelectSource('template')}
                                 style={{
-                                    background: sessionSource === 'template' ? '#2a3f5f' : '#2a2a2a',
-                                    border: `2px solid ${sessionSource === 'template' ? '#2196f3' : '#444'}`,
+                                    background: sessionSource === 'template' ? '#2a4a2a' : '#2a2a2a',
+                                    border: `2px solid ${sessionSource === 'template' ? '#4caf50' : '#444'}`,
                                     borderRadius: '8px',
                                     padding: '24px',
                                     cursor: 'pointer',
@@ -552,7 +552,7 @@ function Log() {
                                 }}
                                 onMouseEnter={(e) => {
                                     if (sessionSource !== 'template') {
-                                        e.currentTarget.style.borderColor = '#2196f3';
+                                        e.currentTarget.style.borderColor = '#4caf50';
                                     }
                                 }}
                                 onMouseLeave={(e) => {
@@ -571,7 +571,7 @@ function Log() {
                                 {sessionSource === 'template' && (
                                     <div style={{
                                         marginTop: '12px',
-                                        color: '#2196f3',
+                                        color: '#4caf50',
                                         fontSize: '12px',
                                         fontWeight: 'bold'
                                     }}>
@@ -639,8 +639,8 @@ function Log() {
                                             <div
                                                 onClick={() => handleSelectProgramDay(programDay)}
                                                 style={{
-                                                    background: isSelected ? '#2a3f5f' : '#2a2a2a',
-                                                    border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                                    background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                                    border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
                                                     borderRadius: '6px',
                                                     padding: '16px',
                                                     cursor: 'pointer',
@@ -689,7 +689,7 @@ function Log() {
                                                 {isSelected && !hasMultipleSessions && (
                                                     <div style={{
                                                         marginTop: '8px',
-                                                        color: '#2196f3',
+                                                        color: '#4caf50',
                                                         fontSize: '12px',
                                                         fontWeight: 'bold',
                                                         textAlign: 'right'
@@ -723,8 +723,8 @@ function Log() {
                                                                     }}
                                                                     style={{
                                                                         padding: '12px',
-                                                                        background: isSessionSelected ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.05)',
-                                                                        border: `2px solid ${isSessionSelected ? '#2196f3' : 'transparent'}`,
+                                                                        background: isSessionSelected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(33, 150, 243, 0.05)',
+                                                                        border: `2px solid ${isSessionSelected ? '#4caf50' : 'transparent'}`,
                                                                         borderRadius: '4px',
                                                                         cursor: 'pointer',
                                                                         transition: 'all 0.2s'
@@ -741,7 +741,7 @@ function Log() {
                                                                     {isSessionSelected && (
                                                                         <div style={{
                                                                             marginTop: '6px',
-                                                                            color: '#2196f3',
+                                                                            color: '#4caf50',
                                                                             fontSize: '12px',
                                                                             fontWeight: 'bold'
                                                                         }}>
@@ -820,8 +820,8 @@ function Log() {
                                                 setSelectedProgramSession(null);
                                             }}
                                             style={{
-                                                background: isSelected ? '#2a3f5f' : '#2a2a2a',
-                                                border: `2px solid ${isSelected ? '#2196f3' : '#444'}`,
+                                                background: isSelected ? '#2a4a2a' : '#2a2a2a',
+                                                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
                                                 borderRadius: '6px',
                                                 padding: '16px',
                                                 cursor: 'pointer',
@@ -842,7 +842,7 @@ function Log() {
                                             {isSelected && (
                                                 <div style={{
                                                     marginTop: '8px',
-                                                    color: '#2196f3',
+                                                    color: '#4caf50',
                                                     fontSize: '12px',
                                                     fontWeight: 'bold'
                                                 }}>
@@ -858,7 +858,7 @@ function Log() {
                 )}
 
                 {/* Step 2: Associate with Short-Term Goal */}
-                {(selectedTemplate || selectedProgramDay) && (
+                <>
                     <div style={{
                         background: '#1e1e1e',
                         border: '1px solid #333',
@@ -939,10 +939,10 @@ function Log() {
                             </div>
                         )}
                     </div>
-                )}
+                </>
 
                 {/* Step 3: Attach Immediate Goals (Optional) */}
-                {(selectedTemplate || selectedProgramDay) && selectedGoalIds.length > 0 && (
+                <>
                     <div style={{
                         background: '#1e1e1e',
                         border: '1px solid #333',
@@ -977,7 +977,7 @@ function Log() {
                                         key={goal.tempId}
                                         style={{
                                             background: '#2a2a2a',
-                                            border: '2px solid #9c27b0',
+                                            border: '2px solid #F8F9FA',
                                             borderRadius: '6px',
                                             padding: '12px 16px',
                                             display: 'flex',
@@ -986,7 +986,7 @@ function Log() {
                                         }}
                                     >
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#9c27b0' }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#F8F9FA' }}>
                                                 {goal.name}
                                             </div>
                                             {goal.description && (
@@ -1054,30 +1054,30 @@ function Log() {
                                 onClick={() => setShowGoalModal(true)}
                                 style={{
                                     padding: '12px 24px',
-                                    background: '#9c27b0',
+                                    background: '#F8F9FA',
                                     border: 'none',
                                     borderRadius: '6px',
-                                    color: 'white',
+                                    color: '#1a1a1a',
                                     fontSize: '16px',
                                     fontWeight: 'bold',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s'
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#7b1fa2';
+                                    e.currentTarget.style.background = '#e0e0e0';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#9c27b0';
+                                    e.currentTarget.style.background = '#F8F9FA';
                                 }}
                             >
                                 + Create New Goal
                             </button>
                         </div>
                     </div>
-                )}
+                </>
 
                 {/* Step 4: Create Session Button */}
-                {(selectedTemplate || selectedProgramDay) && (
+                <>
                     <div style={{
                         background: '#1e1e1e',
                         border: '1px solid #333',
@@ -1126,13 +1126,23 @@ function Log() {
                                 {selectedProgramDay && (
                                     <span> from <strong style={{ color: '#2196f3' }}>{selectedProgramDay.program_name}</strong></span>
                                 )}
-                                {' '}associated with{' '}
-                                <strong style={{ color: 'white' }}>{selectedGoalIds.length}</strong>
-                                {' '}goal{selectedGoalIds.length !== 1 ? 's' : ''}
+                                <br />
+                                Associated with{' '}
+                                <strong style={{ color: '#4ECDC4' }}>
+                                    {selectedGoalIds.length} short term goal{selectedGoalIds.length !== 1 ? 's' : ''}
+                                </strong>
+                                {immediateGoals.length > 0 && (
+                                    <span>
+                                        {' '}and{' '}
+                                        <strong style={{ color: '#F8F9FA' }}>
+                                            {immediateGoals.length} immediate goal{immediateGoals.length !== 1 ? 's' : ''}
+                                        </strong>
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
+                </>
             </div>
 
             {/* Goal Creation Modal */}

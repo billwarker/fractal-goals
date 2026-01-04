@@ -371,6 +371,7 @@ Main fractal view page with goal tree visualization and sidebar.
 - Goal completion toggling
 - Sidebar with goal details
 - Target management
+- Direct navigation to session creation from ShortTermGoal nodes
 
 #### `Sessions.jsx`
 Practice sessions list and management.
@@ -472,7 +473,7 @@ Session creation page.
 - Auto-detection of available sources (program days vs templates)
 - Program context tracking (links sessions to program/block/day)
 - Associate sessions with multiple short-term goals
-- Smart UI that adapts based on available options
+- Smart UI that adapts based on available options (all steps visible simultaneously)
 
 #### `Selection.jsx`
 Fractal selection/home page.
@@ -622,6 +623,7 @@ From `/my-implementation-plans/features.txt`:
 - ✅ Activity groups (families)
 - ✅ Practice sessions show session start date instead of age
 - ✅ Programming section (composable session templates)
+- ✅ Improve "add practice session" functionality in fractal UI (redirects to Create Session page)
 
 **In Progress:**
 - 🔄 Programs feature integration with backend
@@ -635,7 +637,7 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
 - ⏳ Additional programming features (backend integration)
 - ⏳ Search functionality for activities
-- ⏳ Improve "add practice session" functionality in fractal UI
+
 - ⏳ Make duration updates more sensible
 - ⏳ Fix nav bar alignment (selected section slightly lower)
 - ⏳ Add session button text always white (not just on hover)
@@ -651,7 +653,7 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
 - ⏳ Additional programming features
 - ⏳ Search functionality for activities
-- ⏳ Improve "add practice session" functionality in fractal UI
+
 - ⏳ Make duration updates more sensible
 
 ---
