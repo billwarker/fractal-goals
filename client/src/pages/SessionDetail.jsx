@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
@@ -7,6 +7,8 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../utils/dateUtils';
 import ActivityBuilder from '../components/ActivityBuilder';
+import GoalDetailModal from '../components/GoalDetailModal';
+import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import '../App.css';
 
 /**
@@ -26,32 +28,30 @@ function calculateSectionDuration(section, activityInstances) {
 }
 
 /**
- * Calculate total completed duration across all sections
- * Falls back to session_end - session_start if no activity durations exist
+ * Calculate total completed duration
+ * - If session_end is set: use session_end - session_start
+ * - If session_end is NULL: sum all section durations
  */
 function calculateTotalCompletedDuration(sessionData, activityInstances) {
-    if (!sessionData || !sessionData.sections) return 0;
+    if (!sessionData) return 0;
 
-    // Try to calculate from activity durations first
-    let totalSeconds = 0;
-    for (const section of sessionData.sections) {
-        totalSeconds += calculateSectionDuration(section, activityInstances);
-    }
-
-    // If we have activity durations, return them
-    if (totalSeconds > 0) {
-        return totalSeconds;
-    }
-
-    // Fallback: Calculate from session_start and session_end
-    if (sessionData.session_start && sessionData.session_end) {
+    // Priority 1: If session_end is set, use session_end - session_start
+    if (sessionData.session_end && sessionData.session_start) {
         const start = new Date(sessionData.session_start);
         const end = new Date(sessionData.session_end);
         const diffSeconds = Math.floor((end - start) / 1000);
         return diffSeconds > 0 ? diffSeconds : 0;
     }
 
-    return 0;
+    // Priority 2: Sum all section durations from activity instances
+    if (!sessionData.sections) return 0;
+
+    let totalSeconds = 0;
+    for (const section of sessionData.sections) {
+        totalSeconds += calculateSectionDuration(section, activityInstances);
+    }
+
+    return totalSeconds;
 }
 
 /**
@@ -107,6 +107,7 @@ function SessionDetail() {
     const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
+    const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
 
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
@@ -261,7 +262,7 @@ function SessionDetail() {
         }
     };
 
-    // Initialize session_start and session_end if they don't exist
+    // Initialize session_start if it doesn't exist
     useEffect(() => {
         if (!sessionData || !session || loading) return;
 
@@ -274,14 +275,7 @@ function SessionDetail() {
             needsUpdate = true;
         }
 
-        // Initialize session_end as session_start + total duration if not set
-        if (!updatedData.session_end && updatedData.session_start) {
-            const totalSeconds = calculateTotalCompletedDuration(sessionData);
-            const startDate = new Date(updatedData.session_start);
-            const endDate = new Date(startDate.getTime() + totalSeconds * 1000);
-            updatedData.session_end = endDate.toISOString();
-            needsUpdate = true;
-        }
+        // DO NOT auto-initialize session_end - leave it NULL until user sets it
 
         if (needsUpdate) {
             setSessionData(updatedData);
@@ -720,6 +714,30 @@ function SessionDetail() {
         setSessionData(updatedData);
     };
 
+    const handleUpdateGoal = async (goalId, updates) => {
+        try {
+            await fractalApi.updateGoal(goalId, updates);
+
+            // Update local state
+            if (selectedGoal && selectedGoal.id === goalId) {
+                setSelectedGoal({ ...selectedGoal, ...updates, attributes: { ...selectedGoal.attributes, ...updates } });
+            }
+
+            // Update parent goals if it's one of them
+            setParentGoals(prev => prev.map(g =>
+                g.id === goalId ? { ...g, ...updates, attributes: { ...g.attributes, ...updates } } : g
+            ));
+
+            // Refresh session to get updated immediate goals
+            fetchSession();
+
+            setSelectedGoal(null);
+        } catch (err) {
+            console.error('Error updating goal:', err);
+            alert(`Failed to update goal: ${err.response?.data?.error || err.message}`);
+        }
+    };
+
     if (loading) {
         return (
             <div className="page-container">
@@ -752,186 +770,275 @@ function SessionDetail() {
                 borderBottom: '1px solid #444',
                 marginBottom: '20px'
             }}>
-                <h1 style={{ fontWeight: 300, marginBottom: '10px' }}>
+                <h1 style={{ fontWeight: 300, marginBottom: '16px' }}>
                     {session.name}
                 </h1>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '20px' }}>
-                    {/* Left side: Metadata grid - 4 columns x 2 rows */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto auto auto auto',
-                        gap: '12px 24px',
-                        fontSize: '14px',
-                        color: '#aaa'
-                    }}>
-                        {/* Row 1 */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Template:</span>
-                            <span style={{ color: '#ccc' }}>{sessionData.template_name}</span>
-                        </div>
 
-                        {/* Session Start DateTime - Editable */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ color: '#666', fontSize: '14px' }}>Session Start:</label>
-                            <input
-                                type="text"
-                                placeholder="YYYY-MM-DD HH:MM:SS"
-                                value={localSessionStart}
-                                onChange={(e) => setLocalSessionStart(e.target.value)}
-                                onBlur={(e) => {
-                                    if (e.target.value) {
-                                        try {
-                                            const isoValue = localToISO(e.target.value, timezone);
-                                            handleSessionStartChange(isoValue);
-                                        } catch (err) {
-                                            console.error('Invalid date format:', err);
-                                            // Reset to previous value
-                                            setLocalSessionStart(sessionData.session_start ? formatForInput(sessionData.session_start, timezone) : '');
-                                        }
-                                    } else {
-                                        handleSessionStartChange(null);
-                                    }
-                                }}
-                                style={{
-                                    padding: '4px 8px',
-                                    background: '#333',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: '#ccc',
-                                    fontSize: '13px',
-                                    width: '180px',
-                                    fontFamily: 'monospace'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Total Duration (Planned):</span>
-                            <span style={{ color: '#ccc' }}>{sessionData.total_duration_minutes} min</span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Date Created:</span>
-                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.created_at)}</span>
-                        </div>
-
-                        {/* Row 2 */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Sections:</span>
-                            <span style={{ color: '#ccc' }}>{sessionData.sections?.length || 0}</span>
-                        </div>
-
-                        {/* Session End DateTime - Editable */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ color: '#666', fontSize: '14px' }}>Session End:</label>
-                            <input
-                                type="text"
-                                placeholder="YYYY-MM-DD HH:MM:SS"
-                                value={localSessionEnd}
-                                onChange={(e) => setLocalSessionEnd(e.target.value)}
-                                onBlur={(e) => {
-                                    if (e.target.value) {
-                                        try {
-                                            const isoValue = localToISO(e.target.value, timezone);
-                                            handleSessionEndChange(isoValue);
-                                        } catch (err) {
-                                            console.error('Invalid date format:', err);
-                                            // Reset to previous value
-                                            setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
-                                        }
-                                    } else {
-                                        handleSessionEndChange(null);
-                                    }
-                                }}
-                                style={{
-                                    padding: '4px 8px',
-                                    background: '#333',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: '#ccc',
-                                    fontSize: '13px',
-                                    width: '180px',
-                                    fontFamily: 'monospace'
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Total Duration (Completed):</span>
-                            <span style={{
-                                color: '#4caf50',
-                                fontWeight: 'bold',
-                                fontFamily: 'monospace'
-                            }}>
-                                {formatDuration(calculateTotalCompletedDuration(sessionData))}
-                            </span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '14px' }}>Last Modified:</span>
-                            <span style={{ color: '#ccc' }}>{formatDateTime(session.attributes?.updated_at)}</span>
-                        </div>
+                {/* 2x5 Grid Layout */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'auto auto auto auto 1fr',
+                    gap: '16px 32px',
+                    fontSize: '14px',
+                    color: '#aaa',
+                    alignItems: 'start'
+                }}>
+                    {/* Row 1, Column 1: Program/Template */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {session.program_info ? (
+                            <>
+                                <span style={{ color: '#666', fontSize: '12px' }}>Program:</span>
+                                <Link
+                                    to={`/${rootId}/programs/${session.program_info.program_id}`}
+                                    style={{ color: '#2196f3', textDecoration: 'none', fontWeight: '500', fontSize: '14px' }}
+                                >
+                                    {session.program_info.program_name}
+                                </Link>
+                                <div style={{ fontSize: '11px', color: '#888' }}>
+                                    {session.program_info.block_name} • {session.program_info.day_name}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <span style={{ color: '#666', fontSize: '12px' }}>Program:</span>
+                                <span style={{ color: '#ccc', fontSize: '14px' }}>—</span>
+                            </>
+                        )}
                     </div>
 
-                    {/* Auto-save status indicator */}
-                    {autoSaveStatus && (
+                    {/* Row 1, Column 2: Session Start */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ color: '#666', fontSize: '12px' }}>Session Start:</label>
+                        <input
+                            type="text"
+                            placeholder="YYYY-MM-DD HH:MM:SS"
+                            value={localSessionStart}
+                            onChange={(e) => setLocalSessionStart(e.target.value)}
+                            onBlur={(e) => {
+                                if (e.target.value) {
+                                    try {
+                                        const isoValue = localToISO(e.target.value, timezone);
+                                        handleSessionStartChange(isoValue);
+                                    } catch (err) {
+                                        console.error('Invalid date format:', err);
+                                        setLocalSessionStart(sessionData.session_start ? formatForInput(sessionData.session_start, timezone) : '');
+                                    }
+                                } else {
+                                    handleSessionStartChange(null);
+                                }
+                            }}
+                            style={{
+                                padding: '4px 8px',
+                                background: '#333',
+                                border: '1px solid #555',
+                                borderRadius: '4px',
+                                color: '#ccc',
+                                fontSize: '12px',
+                                width: '160px',
+                                fontFamily: 'monospace'
+                            }}
+                        />
+                    </div>
+
+                    {/* Row 1, Column 3: Date Created */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Date Created:</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.created_at)}</span>
+                    </div>
+
+                    {/* Row 1, Column 4: Total Duration (Planned) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Total Duration (Planned):</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{sessionData.total_duration_minutes} min</span>
+                    </div>
+
+                    {/* Row 1, Column 5: Short-Term Goals */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Short-Term Goals:</span>
+                        {parentGoals.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {parentGoals.map(goal => {
+                                    const goalColor = getGoalColor(goal.attributes?.type || goal.type);
+                                    const textColor = getGoalTextColor(goal.attributes?.type || goal.type);
+                                    return (
+                                        <div
+                                            key={goal.id}
+                                            onClick={() => setSelectedGoal(goal)}
+                                            style={{
+                                                padding: '4px 10px',
+                                                background: '#2a2a2a',
+                                                border: `1px solid ${goalColor}`,
+                                                borderRadius: '4px',
+                                                color: goalColor,
+                                                fontSize: '12px',
+                                                fontWeight: '500',
+                                                whiteSpace: 'nowrap',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = goalColor;
+                                                e.currentTarget.style.color = textColor;
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#2a2a2a';
+                                                e.currentTarget.style.color = goalColor;
+                                            }}
+                                        >
+                                            {goal.name}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <span style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>None</span>
+                        )}
+                    </div>
+
+                    {/* Row 2, Column 1: Template */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Template:</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{sessionData.template_name || '—'}</span>
+                    </div>
+
+                    {/* Row 2, Column 2: Session End */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ color: '#666', fontSize: '12px' }}>Session End:</label>
+                        <input
+                            type="text"
+                            placeholder="YYYY-MM-DD HH:MM:SS"
+                            value={localSessionEnd}
+                            onChange={(e) => setLocalSessionEnd(e.target.value)}
+                            onBlur={(e) => {
+                                if (e.target.value) {
+                                    try {
+                                        const isoValue = localToISO(e.target.value, timezone);
+                                        handleSessionEndChange(isoValue);
+                                    } catch (err) {
+                                        console.error('Invalid date format:', err);
+                                        setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
+                                    }
+                                } else {
+                                    handleSessionEndChange(null);
+                                }
+                            }}
+                            style={{
+                                padding: '4px 8px',
+                                background: '#333',
+                                border: '1px solid #555',
+                                borderRadius: '4px',
+                                color: '#ccc',
+                                fontSize: '12px',
+                                width: '160px',
+                                fontFamily: 'monospace'
+                            }}
+                        />
+                    </div>
+
+                    {/* Row 2, Column 3: Last Modified */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Last Modified:</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.updated_at)}</span>
+                    </div>
+
+                    {/* Row 2, Column 4: Total Duration (Completed) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Total Duration (Completed):</span>
                         <span style={{
-                            fontSize: '13px',
-                            color: autoSaveStatus === 'saved' ? '#4caf50' :
-                                autoSaveStatus === 'error' ? '#f44336' : '#888',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            whiteSpace: 'nowrap'
+                            color: '#4caf50',
+                            fontWeight: 'bold',
+                            fontFamily: 'monospace',
+                            fontSize: '14px'
                         }}>
-                            {autoSaveStatus === 'saving' && '💾 Saving...'}
-                            {autoSaveStatus === 'saved' && '✓ All changes saved'}
-                            {autoSaveStatus === 'error' && '⚠ Error saving'}
+                            {formatDuration(calculateTotalCompletedDuration(sessionData, activityInstances))}
                         </span>
-                    )}
+                    </div>
+
+                    {/* Row 2, Column 5: Immediate Goals */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ color: '#666', fontSize: '12px' }}>Immediate Goals:</span>
+                        {session.children && session.children.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {session.children.map(child => {
+                                    const goalColor = getGoalColor(child.attributes?.type || child.type);
+                                    const textColor = getGoalTextColor(child.attributes?.type || child.type);
+                                    return (
+                                        <div
+                                            key={child.id}
+                                            onClick={() => setSelectedGoal(child)}
+                                            style={{
+                                                padding: '4px 10px',
+                                                background: '#2a2a2a',
+                                                border: `1px solid ${goalColor}`,
+                                                borderRadius: '4px',
+                                                color: goalColor,
+                                                fontSize: '12px',
+                                                fontWeight: '500',
+                                                whiteSpace: 'nowrap',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = goalColor;
+                                                e.currentTarget.style.color = textColor;
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#2a2a2a';
+                                                e.currentTarget.style.color = goalColor;
+                                            }}
+                                        >
+                                            {child.name}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <span style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>None</span>
+                        )}
+                    </div>
                 </div>
-
-                {/* Achieved Targets Indicator */}
-                {(() => {
-                    const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
-                    if (achievedTargets.length === 0) return null;
-
-                    return (
-                        <div style={{
-                            marginTop: '16px',
-                            padding: '12px',
-                            background: '#1a2e1a',
-                            borderRadius: '6px',
-                            borderLeft: '3px solid #4caf50'
-                        }}>
-                            <div style={{ fontSize: '12px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
-                                🎯 Targets Achieved ({achievedTargets.length}):
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                {achievedTargets.map((achieved, idx) => (
-                                    <div
-                                        key={idx}
-                                        style={{
-                                            padding: '6px 12px',
-                                            background: '#2e7d32',
-                                            borderRadius: '4px',
-                                            fontSize: '12px',
-                                            color: 'white',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px'
-                                        }}
-                                    >
-                                        <span>✓</span>
-                                        <span>{achieved.target.name || 'Target'}</span>
-                                        <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })()}
             </div>
+
+            {/* Achieved Targets Indicator */}
+            {(() => {
+                const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
+                if (achievedTargets.length === 0) return null;
+
+                return (
+                    <div style={{
+                        marginTop: '16px',
+                        padding: '12px',
+                        background: '#1a2e1a',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #4caf50'
+                    }}>
+                        <div style={{ fontSize: '12px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                            🎯 Targets Achieved ({achievedTargets.length}):
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {achievedTargets.map((achieved, idx) => (
+                                <div
+                                    key={idx}
+                                    style={{
+                                        padding: '6px 12px',
+                                        background: '#2e7d32',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        color: 'white',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <span>✓</span>
+                                    <span>{achieved.target.name || 'Target'}</span>
+                                    <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Sections */}
             <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -969,7 +1076,7 @@ function SessionDetail() {
                                     fontWeight: 'bold',
                                     fontFamily: 'monospace'
                                 }}>
-                                    {formatDuration(calculateSectionDuration(section))}
+                                    {formatDuration(calculateSectionDuration(section, activityInstances))}
                                 </span>
                                 <span style={{ color: '#666', fontSize: '14px' }}>
                                     (planned: {section.duration_minutes} min)
@@ -1259,6 +1366,42 @@ function SessionDetail() {
                 rootId={rootId}
                 onSave={handleActivityCreated}
             />
+
+            {/* Goal Detail Modal */}
+            <GoalDetailModal
+                isOpen={!!selectedGoal}
+                onClose={() => setSelectedGoal(null)}
+                goal={selectedGoal}
+                onUpdate={handleUpdateGoal}
+                activityDefinitions={activities}
+                rootId={rootId}
+            />
+
+            {/* Auto-save status indicator - Fixed position above environment badge */}
+            {
+                autoSaveStatus && (
+                    <div style={{
+                        position: 'fixed',
+                        bottom: '50px',
+                        right: '20px',
+                        zIndex: 999,
+                        padding: '8px 12px',
+                        background: '#1e1e1e',
+                        border: `1px solid ${autoSaveStatus === 'saved' ? '#4caf50' : autoSaveStatus === 'error' ? '#f44336' : '#888'}`,
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: autoSaveStatus === 'saved' ? '#4caf50' :
+                            autoSaveStatus === 'error' ? '#f44336' : '#888',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}>
+                        {autoSaveStatus === 'saving' && '💾 Saving...'}
+                        {autoSaveStatus === 'saved' && '✓ Saved'}
+                        {autoSaveStatus === 'error' && '⚠ Error'}
+                    </div>
+                )
+            }
         </div >
     );
 }

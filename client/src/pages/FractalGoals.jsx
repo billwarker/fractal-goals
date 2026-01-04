@@ -45,6 +45,24 @@ function FractalGoals() {
         fetchActivities
     } = useActivities();
 
+    // Programs State
+    const [programs, setPrograms] = useState([]);
+    const [programsLoading, setProgramsLoading] = useState(false);
+
+    const fetchPrograms = async (id) => {
+        try {
+            setProgramsLoading(true);
+            const { fractalApi } = await import('../utils/api'); // Dynamic import to avoid circular dep issues if any
+            const res = await fractalApi.getPrograms(id);
+            setPrograms(res.data || []);
+        } catch (err) {
+            console.error("Failed to fetch programs:", err);
+            // Non-critical, just log
+        } finally {
+            setProgramsLoading(false);
+        }
+    };
+
     const loading = goalsLoading || sessionsLoading;
 
     // Sidebar state
@@ -70,7 +88,36 @@ function FractalGoals() {
         fetchFractalTree(rootId);
         fetchSessions(rootId);
         fetchActivities(rootId);
+        fetchPrograms(rootId);
     }, [rootId, navigate]);
+
+    // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
+    useEffect(() => {
+        if (!fractalData || !viewingGoal) return;
+
+        // Recursive helper to find goal in tree
+        const findGoal = (node, targetId) => {
+            const nodeId = node.attributes?.id || node.id;
+            if (nodeId === targetId) return node;
+
+            if (node.children) {
+                for (const child of node.children) {
+                    const found = findGoal(child, targetId);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const viewingId = viewingGoal.attributes?.id || viewingGoal.id;
+        const updatedGoal = findGoal(fractalData, viewingId);
+
+        // Only update if we found it and it's different (shallow check of attributes helps avoid loops if implemented carefully, 
+        // but since we're setting a new object reference, we rely on React's equality check or the fact that fractalData reference changes only on update)
+        if (updatedGoal && updatedGoal !== viewingGoal) {
+            setViewingGoal(updatedGoal);
+        }
+    }, [fractalData, viewingGoal]);
 
     // Derived Data
     const shortTermGoals = fractalData ? collectShortTermGoals(fractalData) : [];
@@ -105,9 +152,10 @@ function FractalGoals() {
             return;
         }
 
-        // If adding a Practice Session to a ShortTermGoal, use Practice Session Modal
+        // If adding a Practice Session to a ShortTermGoal, redirect to CREATE SESSION page
         if (parentType === 'ShortTermGoal' && childType === 'PracticeSession') {
-            setShowPracticeSessionModal(true);
+            const goalId = nodeDatum.id || nodeDatum.attributes?.id;
+            navigate(`/${rootId}/create-session?goalId=${goalId}`);
             return;
         }
 
@@ -230,15 +278,15 @@ function FractalGoals() {
                     onUpdate={handleUpdateNode}
                     onDelete={(node) => setFractalToDelete(node)}
                     onAddChild={handleAddChildClick}
-                    onAddSession={() => setShowPracticeSessionModal(true)}
-                    onToggleCompletion={(node) => {
-                        const goalId = node.attributes?.id || node.id;
-                        const currentStatus = node.attributes?.completed || false;
-                        handleToggleCompletion(goalId, currentStatus);
+                    onAddSession={() => {
+                        const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                        navigate(`/${rootId}/create-session?goalId=${goalId}`);
                     }}
+                    onToggleCompletion={handleToggleCompletion}
                     treeData={fractalData}
                     practiceSessions={practiceSessions}
                     activityDefinitions={activities}
+                    programs={programs}
                 />
             )}
 

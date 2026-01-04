@@ -12,7 +12,7 @@ import Programs from './pages/Programs';
 import ProgramDetail from './pages/ProgramDetail';
 import Sessions from './pages/Sessions';
 import SessionDetail from './pages/SessionDetail';
-import Log from './pages/Log';
+import CreateSession from './pages/CreateSession';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
 import ManageActivities from './pages/ManageActivities';
 import Analytics from './pages/Analytics';
@@ -126,7 +126,7 @@ function App() {
                     <div className="nav-separator">|</div>
                     <button
                         className="nav-text-link add-session-btn"
-                        onClick={() => navigate(`/${rootId}/create-practice-session`)}
+                        onClick={() => navigate(`/${rootId}/create-session`)}
                         style={{
                             background: '#4caf50',
                             padding: '6px 12px',
@@ -185,7 +185,7 @@ function App() {
                             <Route path="/:rootId/sessions" element={<Sessions />} />
                             <Route path="/:rootId/analytics" element={<Analytics />} />
                             <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
-                            <Route path="/:rootId/create-practice-session" element={<Log />} />
+                            <Route path="/:rootId/create-session" element={<CreateSession />} />
                             <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
                             <Route path="/:rootId/manage-activities" element={<ManageActivities />} />
                             <Route path="*" element={<Navigate to="/" replace />} />

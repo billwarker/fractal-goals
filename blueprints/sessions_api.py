@@ -301,6 +301,18 @@ def create_fractal_session(root_id):
         
         # Keep session_data for backward compatibility
         new_session.session_data = new_session.attributes
+        
+        # Extract program_day_id from program_context if present
+        program_day_id = None
+        if new_session.attributes:
+            try:
+                session_data_dict = json.loads(new_session.attributes) if isinstance(new_session.attributes, str) else new_session.attributes
+                program_context = session_data_dict.get('program_context')
+                if program_context and 'day_id' in program_context:
+                    program_day_id = program_context['day_id']
+                    new_session.program_day_id = program_day_id
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         db_session.add(new_session)
         db_session.flush()  # Get the ID before committing
@@ -320,6 +332,13 @@ def create_fractal_session(root_id):
                  g = db_session.query(Goal).filter_by(id=pid).first()
                  if g and g.type == 'ShortTermGoal':
                       new_session.parent_goals.append(g)
+        
+        # Update program day completion status if linked to a program day
+        if program_day_id:
+            from models import ProgramDay
+            program_day = db_session.query(ProgramDay).filter_by(id=program_day_id).first()
+            if program_day:
+                program_day.is_completed = program_day.check_completion()
         
         db_session.commit()
         

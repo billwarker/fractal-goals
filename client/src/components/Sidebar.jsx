@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTypeDisplayName, getChildType, calculateGoalAge } from '../utils/goalHelpers';
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
-import TargetCard from './TargetCard';
-import AddTargetModal from './AddTargetModal';
+import GoalDetailModal from './GoalDetailModal';
 import './Sidebar.css';
 
+/**
+ * Sidebar Component
+ * 
+ * Displays details for the selected node in the fractal tree.
+ * - For Goals: Uses GoalDetailModal in panel mode (standardized component)
+ * - For Practice Sessions: Shows inline view/edit (session-specific UI)
+ */
 const Sidebar = ({
     selectedNode,
     selectedRootId,
@@ -19,80 +23,38 @@ const Sidebar = ({
     // Data props needed for enhanced features
     treeData,
     practiceSessions = [],
-    activityDefinitions = []
+    activityDefinitions = [],
+    programs = []
 }) => {
     const navigate = useNavigate();
-    const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({ name: '', description: '', deadline: '' });
 
-    // Target Management State
-    const [editedTargets, setEditedTargets] = useState([]);
-    const [showTargetModal, setShowTargetModal] = useState(false);
-    const [editingTarget, setEditingTarget] = useState(null);
+    // State for Practice Session editing (inline)
+    const [isEditingSession, setIsEditingSession] = useState(false);
+    const [sessionForm, setSessionForm] = useState({ name: '', description: '' });
 
-    // Reset editing state when selection changes
+    // Reset editing state when selection changes 
     useEffect(() => {
-        setIsEditing(false);
-        setEditedTargets([]);
-        setEditingTarget(null);
+        setIsEditingSession(false);
     }, [selectedNode]);
 
-    // Initialize form when entering edit mode
+    // Initialize session form when entering edit mode
     useEffect(() => {
-        if (isEditing && selectedNode) {
-            setEditForm({
+        if (isEditingSession && selectedNode) {
+            setSessionForm({
                 name: selectedNode.name || '',
-                description: selectedNode.attributes?.description || selectedNode.description || '',
-                deadline: selectedNode.attributes?.deadline || selectedNode.deadline || ''
+                description: selectedNode.attributes?.description || selectedNode.description || ''
             });
-            // Initialize targets
-            setEditedTargets(selectedNode.attributes?.targets || []);
         }
-    }, [isEditing, selectedNode]);
+    }, [isEditingSession, selectedNode]);
 
-    const handleSave = () => {
-        // Prepare payload
-        const payload = {
-            ...editForm,
-            deadline: editForm.deadline === '' ? null : editForm.deadline,
-        };
-
-        const isPracticeSession = selectedNode?.attributes?.type === 'PracticeSession' ||
-            selectedNode?.type === 'PracticeSession' ||
-            selectedNode?.__isPracticeSession;
-
-        // Include targets if it's a Goal
-        if (!isPracticeSession) {
-            payload.targets = editedTargets;
-        }
-
-        onUpdate(payload);
-        setIsEditing(false);
+    const handleSessionSave = () => {
+        onUpdate(sessionForm);
+        setIsEditingSession(false);
     };
 
-    // Target Handlers (Local State)
-    const handleAddTarget = () => {
-        setEditingTarget(null);
-        setShowTargetModal(true);
-    };
-
-    const handleEditTarget = (target) => {
-        setEditingTarget(target);
-        setShowTargetModal(true);
-    };
-
-    const handleDeleteTarget = (targetId) => {
-        setEditedTargets(prev => prev.filter(t => t.id !== targetId));
-    };
-
-    const handleSaveTarget = (target) => {
-        if (editingTarget) {
-            // Update existing
-            setEditedTargets(prev => prev.map(t => t.id === target.id ? target : t));
-        } else {
-            // Add new
-            setEditedTargets(prev => [...prev, target]);
-        }
+    // Handler for GoalDetailModal - bridges to the Sidebar's onUpdate prop
+    const handleGoalUpdate = (goalId, updates) => {
+        onUpdate(updates);
     };
 
     const isPracticeSession = selectedNode?.attributes?.type === 'PracticeSession' ||
@@ -123,117 +85,73 @@ const Sidebar = ({
         );
     }
 
-    // Details View
+    // ============ GOAL VIEW - Use GoalDetailModal in Panel Mode ============
+    if (!isPracticeSession) {
+        return (
+            <div className="details-window">
+                <div className="window-content" style={{ padding: 0 }}>
+                    <GoalDetailModal
+                        isOpen={true}
+                        onClose={onClose}
+                        goal={selectedNode}
+                        onUpdate={handleGoalUpdate}
+                        activityDefinitions={activityDefinitions}
+                        onToggleCompletion={onToggleCompletion}
+                        onAddChild={onAddChild}
+                        onDelete={onDelete}
+                        practiceSessions={practiceSessions}
+                        rootId={selectedRootId}
+                        treeData={treeData}
+                        displayMode="panel"
+                        programs={programs}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // ============ PRACTICE SESSION VIEW - Inline ============
     return (
         <div className="details-window">
             <div className="window-content">
-                <div className={isPracticeSession ? "session-details-pane" : "goal-details-pane"}>
-
-                    {/* Header / Close Button */}
-                    <button
-                        className="close-sidebar-btn"
-                        onClick={onClose}
-                    >
+                <div className="session-details-pane">
+                    {/* Close Button */}
+                    <button className="close-sidebar-btn" onClick={onClose}>
                         &times;
                     </button>
 
-                    {isEditing ? (
+                    {isEditingSession ? (
+                        /* Session Edit Mode */
                         <div className="edit-form-sidebar">
                             <input
                                 type="text"
-                                value={editForm.name}
-                                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                value={sessionForm.name}
+                                onChange={e => setSessionForm({ ...sessionForm, name: e.target.value })}
                                 className="edit-input-title"
-                                placeholder={isPracticeSession ? "Session Name" : "Goal Name"}
+                                placeholder="Session Name"
                             />
                             <div className="form-group">
                                 <label>Description:</label>
                                 <textarea
-                                    value={editForm.description}
-                                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                                    value={sessionForm.description}
+                                    onChange={e => setSessionForm({ ...sessionForm, description: e.target.value })}
                                     rows={5}
                                 />
                             </div>
-                            {!isPracticeSession && (
-                                <div className="form-group">
-                                    <label>Deadline:</label>
-                                    <input
-                                        type="date"
-                                        value={editForm.deadline}
-                                        onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
-                                        className="edit-input-deadline"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Targets Editor (Goals Only) */}
-                            {!isPracticeSession && (
-                                <div className="form-group">
-                                    <label className="mb-8 block-display">Targets:</label>
-                                    <div className="targets-editor-container">
-                                        {editedTargets.length === 0 ? (
-                                            <p className="no-targets-text">
-                                                No targets set. Click "+ Add Target" below.
-                                            </p>
-                                        ) : (
-                                            <div className="targets-list">
-                                                {editedTargets.map(target => (
-                                                    <TargetCard
-                                                        key={target.id}
-                                                        target={target}
-                                                        activityDefinitions={activityDefinitions}
-                                                        onEdit={() => handleEditTarget(target)}
-                                                        onDelete={() => handleDeleteTarget(target.id)}
-                                                        isCompleted={false}
-                                                        isEditMode={true}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={handleAddTarget}
-                                            className="add-target-btn"
-                                        >
-                                            + Add Target
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
 
                             <div className="sidebar-actions">
-                                <button className="action-btn secondary" onClick={() => setIsEditing(false)}>Cancel</button>
-                                <button className="action-btn primary" onClick={handleSave}>Save</button>
+                                <button className="action-btn secondary" onClick={() => setIsEditingSession(false)}>Cancel</button>
+                                <button className="action-btn primary" onClick={handleSessionSave}>Save</button>
                             </div>
                         </div>
                     ) : (
+                        /* Session View Mode */
                         <>
-                            {/* View Mode */}
-                            {!isPracticeSession && (
-                                <div className="header-meta">
-                                    <span
-                                        className="type-badge"
-                                        style={{
-                                            background: getGoalColor(selectedNode.attributes?.type || selectedNode.type),
-                                            color: getGoalTextColor(selectedNode.attributes?.type || selectedNode.type)
-                                        }}
-                                    >
-                                        {selectedNode.attributes?.type || selectedNode.type}
-                                    </span>
-                                </div>
-                            )}
                             <h2>{selectedNode.name}</h2>
 
                             {selectedNode.attributes?.created_at && (
                                 <p className="meta-info">
                                     Created: {new Date(selectedNode.attributes.created_at).toLocaleDateString()}
-                                    {!isPracticeSession && ` (${calculateGoalAge(selectedNode.attributes.created_at)})`}
-                                </p>
-                            )}
-
-                            {!isPracticeSession && (selectedNode.attributes?.deadline || selectedNode.deadline) && (
-                                <p className="meta-info">
-                                    <strong>Deadline:</strong> {selectedNode.attributes?.deadline || selectedNode.deadline}
                                 </p>
                             )}
 
@@ -242,76 +160,9 @@ const Sidebar = ({
                                 <p>{selectedNode.attributes?.description || selectedNode.description || 'No description provided.'}</p>
                             </div>
 
-                            {/* Practice Sessions Check (ShortTermGoal) */}
-                            {!isPracticeSession && (selectedNode.attributes?.type === 'ShortTermGoal' || selectedNode.type === 'ShortTermGoal') && (
-                                <div className="description-section">
-                                    <h4>Practice Sessions</h4>
-                                    {(() => {
-                                        const goalId = selectedNode.attributes?.id || selectedNode.id;
-                                        const associatedSessions = practiceSessions.filter(session => {
-                                            const parentIds = session.attributes?.parent_ids || [];
-                                            return parentIds.includes(goalId);
-                                        });
-
-                                        if (associatedSessions.length === 0) {
-                                            return <p style={{ color: '#888', fontSize: '14px' }}>No practice sessions yet</p>;
-                                        }
-
-                                        return (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                                                {associatedSessions.map(session => (
-                                                    <div
-                                                        key={session.id}
-                                                        onClick={() => navigate(`/${selectedRootId}/session/${session.id}`)}
-                                                        className="session-item"
-                                                    >
-                                                        <div className="session-item-title">
-                                                            {session.name}
-                                                        </div>
-                                                        {session.attributes?.created_at && (
-                                                            <div className="session-item-date">
-                                                                {new Date(session.attributes.created_at).toLocaleDateString()}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
-
-                            {/* Targets Section (Goal View) */}
-                            {!isPracticeSession && (
-                                <div className="description-section">
-                                    <h4>Targets</h4>
-                                    {(() => {
-                                        const targets = selectedNode.attributes?.targets || [];
-                                        if (targets.length === 0) {
-                                            return <p style={{ color: '#888', fontSize: '14px' }}>No targets set.</p>;
-                                        }
-                                        return (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                {targets.map(target => (
-                                                    <TargetCard
-                                                        key={target.id}
-                                                        target={target}
-                                                        activityDefinitions={activityDefinitions}
-                                                        // No actions in view mode
-                                                        isCompleted={selectedNode.attributes?.completed || false}
-                                                        isEditMode={false}
-                                                    />
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
-
-                            {/* Achieved Targets (Practice Session View) */}
-                            {isPracticeSession && treeData && (() => {
+                            {/* Achieved Targets */}
+                            {treeData && (() => {
                                 const parentIds = selectedNode.attributes?.parent_ids || [];
-                                // Helper to find goals in tree
                                 const findGoal = (node, targetId) => {
                                     if (!node) return null;
                                     if (node.id === targetId || node.attributes?.id === targetId) return node;
@@ -347,50 +198,25 @@ const Sidebar = ({
                             })()}
 
                             <div className="sidebar-actions mt-20">
-                                {!isPracticeSession && (
-                                    <button
-                                        className={`action-btn ${selectedNode.attributes?.completed ? 'completion-btn-active' : 'completion-btn-inactive'}`}
-                                        onClick={() => onToggleCompletion(selectedNode.attributes?.id || selectedNode.id, selectedNode.attributes?.completed)}
-                                    >
-                                        {selectedNode.attributes?.completed ? '✓ Completed' : 'Mark Complete'}
-                                    </button>
-                                )}
-
-                                <button className="action-btn primary" onClick={() => setIsEditing(true)}>
-                                    Edit {isPracticeSession ? "Session" : "Goal"}
+                                <button
+                                    className="action-btn primary"
+                                    onClick={() => navigate(`/${selectedRootId}/session/${selectedNode.id}`)}
+                                >
+                                    Open Session
                                 </button>
 
-                                {!isPracticeSession && (() => {
-                                    const type = selectedNode.attributes?.type || selectedNode.type;
-                                    const childType = getChildType(type);
-                                    if (childType) {
-                                        return (
-                                            <button className="action-btn secondary" onClick={() => onAddChild(selectedNode)}>
-                                                + Add {childType}
-                                            </button>
-                                        );
-                                    }
-                                })()}
+                                <button className="action-btn secondary" onClick={() => setIsEditingSession(true)}>
+                                    Edit Session
+                                </button>
 
                                 <button className="action-btn danger" onClick={() => onDelete(selectedNode)}>
-                                    Delete {isPracticeSession ? "Session" : "Goal"}
+                                    Delete Session
                                 </button>
                             </div>
                         </>
                     )}
                 </div>
             </div>
-
-            <AddTargetModal
-                isOpen={showTargetModal}
-                onClose={() => {
-                    setShowTargetModal(false);
-                    setEditingTarget(null);
-                }}
-                onSave={handleSaveTarget}
-                activityDefinitions={activityDefinitions}
-                existingTarget={editingTarget}
-            />
         </div>
     );
 };

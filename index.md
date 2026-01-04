@@ -82,6 +82,7 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - `description` (String)
 - `deadline` (DateTime, nullable)
 - `completed` (Boolean)
+- `completed_at` (DateTime, nullable) - When goal was marked complete
 - `created_at` (DateTime)
 - `updated_at` (DateTime)
 - `parent_id` (String, FK to goals.id)
@@ -211,6 +212,52 @@ Reusable session templates.
 - `created_at` (DateTime)
 - `template_data` (String/JSON)
 
+#### `programs`
+Manages training programs (macro-cycles).
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `root_id` (String, FK to goals.id)
+- `name` (String)
+- `description` (String)
+- `start_date` (DateTime)
+- `end_date` (DateTime)
+- `is_active` (Boolean)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+
+#### `program_blocks`
+Training blocks within a program (meso-cycles).
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `program_id` (String, FK to programs.id)
+- `name` (String)
+- `start_date` (Date)
+- `end_date` (Date)
+- `color` (String)
+- `goal_ids` (Text/JSON) - Goals targeted by this block
+
+#### `program_days`
+Days within a block (micro-cycles).
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `block_id` (String, FK to program_blocks.id)
+- `day_number` (Integer) - Order within block
+- `date` (Date)
+- `name` (String)
+- `notes` (Text)
+- `is_completed` (Boolean)
+
+#### `program_day_templates` (Junction Table)
+Links ProgramDays to multiple SessionTemplates (many-to-many).
+
+**Fields:**
+- `program_day_id` (String, FK to program_days.id, PK)
+- `session_template_id` (String, FK to session_templates.id, PK)
+- `order` (Integer)
+
 ---
 
 ## Backend API Structure
@@ -282,6 +329,22 @@ Manages session templates.
 - `PUT /api/<root_id>/session-templates/<template_id>` - Update template
 - `DELETE /api/<root_id>/session-templates/<template_id>` - Delete template
 
+#### `programs_api.py`
+Manages training programs, blocks, and scheduled sessions.
+
+**Key Endpoints:**
+- `GET /api/<root_id>/programs` - Get all programs
+- `GET /api/<root_id>/programs/<program_id>` - Get specific program
+- `POST /api/<root_id>/programs` - Create program
+- `PUT /api/<root_id>/programs/<program_id>` - Update program
+- `DELETE /api/<root_id>/programs/<program_id>` - Delete program
+- `GET /api/<root_id>/programs/active-days` - Get active program days for current date
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days` - Add day to block
+- `PUT /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Update program day
+- `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
+- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
+
 #### `pages.py`
 Serves static pages (minimal usage, mostly SPA).
 
@@ -308,6 +371,7 @@ Main fractal view page with goal tree visualization and sidebar.
 - Goal completion toggling
 - Sidebar with goal details
 - Target management
+- Direct navigation to session creation from ShortTermGoal nodes
 
 #### `Sessions.jsx`
 Practice sessions list and management.
@@ -373,25 +437,44 @@ Programs list and management page.
 - List all saved programs/templates
 - Create new programs
 - Edit existing programs
-- Delete programs
+- Delete programs with custom modal and session impact warning
 - Navigate to program detail view
+- Visual improvements:
+  - Block date ranges and active status indicators
+  - Correct grouping of attached goals
 
 #### `ProgramDetail.jsx`
 Detailed view of a single program/template.
 
 **Features:**
-- View program components
-- Edit program structure
-- Component reordering
-- Duration management
+- Calendar and blocks view modes
+- **Calendar View updates:**
+  - Toggle between "Select Dates to Add Block" mode and Day View mode
+  - Comprehensive Day View Modal showing schedule, templates, and goals due
+  - Set goal deadlines directly from Day View
+  - Dynamic calendar events (hiding planned templates if session matches, showing all goal deadlines)
+- **Block Interaction:**
+  - Create and edit training blocks with custom colors and date ranges
+  - User-controlled day creation (days not auto-populated)
+  - Edit existing blocks (name, dates, color)
+  - Delete blocks with confirmation dialog and cascade warning
+  - Active block indicators
+- Add and edit program days with efficient copy functionality
+- Attach goals to blocks with deadline management
+- View completed sessions linked to program days
 
-#### `Log.jsx`
-Activity log and practice session creation.
+#### `CreateSession.jsx`
+Session creation page.
 
 **Features:**
-- Create new practice sessions
-- Quick session logging
-- Activity history
+- Enhanced session creation flow with dual-source support
+- Option to create sessions from active program days
+- Option to create sessions from templates directly
+- Auto-detection of available sources (program days vs templates)
+- Program context tracking (links sessions to program/block/day)
+- Associate sessions with multiple short-term goals
+- Smart UI that adapts based on available options (all steps visible simultaneously)
+- **New Feature:** Add/Attach Immediate Goals to new sessions (both new and existing immediate goals)
 
 #### `Selection.jsx`
 Fractal selection/home page.
@@ -406,7 +489,15 @@ Fractal selection/home page.
 
 #### Core Components
 
-- **`Sidebar.jsx`** - Sidebar for goal details and editing
+- **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
+- **`GoalDetailModal.jsx`** - Unified goal viewing/editing component with dual display modes (modal/panel):
+  - View/Edit goal name, description, deadline
+  - **Associated/Targeting Programs display**
+  - Inline target builder (add/edit/delete targets)
+  - Completion confirmation flow with program/target summary
+  - Display completed_at date for finished goals
+  - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
+  - Action buttons: Mark Complete, Edit, Add Child, Delete
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
 - **`ActivitiesManager.jsx`** - Activity selection and management interface
@@ -425,6 +516,14 @@ Fractal selection/home page.
 - **`TemplateSelectionModal.jsx`** - Modal for selecting templates
 - **`AlertModal.jsx`** - Reusable alert/notification modal
 - **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal
+- **`ProgramBuilder.jsx`** - Modal for creating/editing programs
+- **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
+- **`ProgramDayModal.jsx`** - Modal for creating/editing program days
+- **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
+- **`DeleteProgramModal.jsx`** - Modal for confirming program deletion with session count warning
+- **`DayViewModal.jsx`** - Detailed view of a calendar day (schedule + goal deadlines)
+- **`PracticeSessionModal.jsx`** - Modal for creating/editing practice sessions
+- **`GroupBuilderModal.jsx`** - Modal for creating/editing activity groups
 
 #### Analytics Components (in `/client/src/components/analytics/`)
 
@@ -446,6 +545,7 @@ Fractal selection/home page.
 - **`goalHelpers.js`** - Goal hierarchy and validation helpers
 - **`metricsHelpers.js`** - Metric calculation utilities
 - **`targetUtils.js`** - Target validation and progress calculation
+- **`programUtils.jsx`** - Shared utilities for program block status (Active badges)
 
 ---
 
@@ -510,226 +610,9 @@ Fractal selection/home page.
 
 ---
 
-## Recent Major Changes & Known Issues
+---
 
-### Recent Fixes (as of Dec 2025)
-
-1. **Activity Timer Errors** - Fixed "Activity instance not found" errors by:
-   - Adding `POST /<root_id>/activity-instances` endpoint to create instances without starting timer
-   - Updating `SessionDetail.jsx` to create instances immediately when activities are added
-   - Adding useEffect to create missing instances on session load
-
-2. **Session Template Management** - Fixed template editing:
-   - Modified `handleLoadTemplate` to store template ID
-   - Updated `handleSaveTemplate` to conditionally update vs. create
-   - Replaced browser modals with custom UI modals
-
-3. **Environment Data Loading** - Fixed production environment:
-   - Corrected frontend API configuration to use `VITE_API_URL`
-   - Ensured no hardcoded API URLs override environment variables
-
-4. **Timer Datetime Inputs** - Improved usability:
-   - Changed datetime inputs from `datetime-local` to `text` type
-   - Added placeholders for format guidance
-
-5. **Goal Age Display** - Implemented age calculation:
-   - Added `created_at` to Goal model
-   - Created age calculation helper in frontend
-   - Display age in fractal UI and sidebar
-
-6. **Timer Stop Validation** - Fixed timer stop behavior (Dec 31, 2025):
-   - Modified `stop_activity_timer` endpoint to return error when timer was never started
-   - Prevents setting both `time_start` and `time_stop` to the same value
-   - Added clear error messages guiding users to click "Start" first or use manual time entry
-   - Ensures data integrity for session duration tracking
-
-7. **Activity Instance Deletion Bug** - Fixed critical auto-save issue (Dec 31, 2025):
-   - **Root Cause**: `sync_session_activities` was deleting instances with timer data during auto-save
-   - **Fix**: Modified orphan cleanup to preserve instances with `time_start` or `time_stop` set
-   - **Location**: `/blueprints/sessions_api.py` lines 104-112
-   - **Architectural Note**: See `ARCHITECTURE_NOTES.md` for discussion of dual source of truth issue
-   - This was a recurring problem due to storing activity data in both JSON and relational tables
-
-8. **Activity Instance Architecture Migration** (Jan 01, 2026):
-   - Fully migrated from dual source of truth (JSON + DB) to **Database-Only Architecture** (Option A).
-   - `ActivityInstance` data is now SOLELY managed in the relational database.
-   - `session_data` JSON now only stores UI metadata (section names, ordering via `activity_ids`).
-   - Refactored `SessionDetail.jsx` to fetch instances separately and use specific API endpoints for all modifications.
-   - Removed fragile synchronization logic (`sync_session_activities`) from session auto-save.
-   - Implemented **Read-Time Hydration** in `PracticeSession.to_dict()`: `session_data.sections[].exercises` are now reconstructed on-the-fly from `ActivityInstances` to ensure listing pages (like `/sessions`) work correctly without duplication.
-
-9. **Database Schema Update for Activity Persistence** (Jan 01, 2026):
-   - Added `completed` (BOOLEAN), `notes` (TEXT), and `data` (TEXT/JSON) columns to `activity_instances` table.
-   - This prevents data loss for "sets" and other activity-specific data that isn't native to the relational model but was supported in the old JSON architecture.
-   - Updated `models.py` and `timers_api.py` to handle these fields.
-
-10. **Legacy Data Migration & Recovery** (Jan 01, 2026):
-     - **Backfill Strategy**: Created `migrate_activities_v2.py` to move legacy JSON activity data into `ActivityInstance` records.
-     - **Time Restoration**: Created `backfill_session_times.py` to restore missing session start/end times from JSON history to database columns.
-     - **Display Fixes**: Updated hydration logic to correctly map activity names and set `has_sets` flags, ensuring metrics and "Previous Exercises" are visible.
-     - **Result**: All historical sessions are now fully compatible with the new Database-Only architecture.
-
-11. **Session Timing & Activity Duration Persistence Fix** (Jan 01, 2026):
-     - **Problems Identified**:
-       1. Session start/end times not saved to database columns (only in JSON)
-       2. Activity instance durations not displaying on `/sessions/` page
-       3. Auto-save causing 500 errors preventing all data persistence
-       4. Unnecessary instance creation attempts causing console errors
-     - **Root Causes**:
-       1. Frontend sending `session_start`/`session_end` inside `session_data` JSON instead of as top-level fields
-       2. Frontend sending `undefined` values for timing fields → backend 500 error
-       3. Backend receiving ISO datetime strings but SQLAlchemy expecting Python datetime objects
-       4. Hydrated exercises missing `instance_id` field that frontend checks for
-       5. `createMissingInstances` attempting to recreate all instances on session load
-     - **Fixes Applied**:
-       1. **Frontend** (`SessionDetail.jsx`):
-          - Modified auto-save to send timing fields as top-level parameters (not just in JSON)
-          - Added conditional checks to only send timing fields when they have values
-          - Normalized datetime formats to standard ISO before sending
-          - Calculate and save `total_duration_seconds` when marking session complete
-          - Check if instances exist before attempting to create them
-       2. **Backend** (`sessions_api.py`):
-          - Parse ISO datetime strings to Python datetime objects using `datetime.fromisoformat()`
-          - Handle 'Z' timezone indicator by replacing with '+00:00'
-       3. **Models** (`models.py`):
-          - Added `instance_id` field to hydrated exercise objects for frontend compatibility
-     - **Impact**: 
-       - Session timing data now properly saved to database columns for analytics
-       - Activity durations now display correctly on `/sessions/` page
-       - No more 500 errors blocking data persistence
-       - Clean console with no unnecessary API calls
-     - **Locations**: 
-       - `/client/src/pages/SessionDetail.jsx` lines 136-154, 300-337, 580-594
-       - `/blueprints/sessions_api.py` lines 349-363
-       - `/models.py` line 190
-
-
-12. **API Hardening & Test Coverage** (Jan 01, 2026):
-     - **Integration Tests**: Achieved 100% pass rate for Goals, Sessions, and Timers API tests.
-     - **Database Constraints**: Resolved NOT NULL constraint failures for `MetricDefinition` and `MetricValue` by enforcing `root_id` propagation.
-     - **Timers API**: Fixed timezone mismatch (Local vs UTC) and added auto-generation of Activity Instance IDs.
-     - **Sessions API**: Added missing endpoints (`GET session`, `PUT activity`, `POST reorder`) and improved validation for session creation (parsing ISO dates).
-     - **Models**: Updated `to_dict` methods to ensure top-level field consistency across all API responses.
-     - **Test Coverage Expansion**: Created integration tests for `programs_api`, `activities_api`, and `templates_api` (previously 0-17% covered). Overall project coverage increased from 55% to 73%.
-
-
-### Database Improvements (Jan 01, 2026)
-
-**Status:** ✅ **FULLY COMPLETED** - Development & Production (2026-01-01 16:00)  
-**Documents:** See `DATABASE_IMPROVEMENTS.md` for details, `MIGRATION_COMPLETION_REPORT.md` and `MIGRATION_HOTFIX.md` for results
-
-**Overview:**
-Comprehensive database schema improvements to make the backend production-ready and prepare for multi-user support. Successfully deployed to both development and production databases.
-
-**Completed Phases:**
-
-1. **✅ Root ID Denormalization** (Phase 1):
-   - Added `root_id` column to ALL tables (`activity_instances`, `metric_values`, `metric_definitions`, `split_definitions`)
-   - Backfilled `goals.root_id` for all goals (20 in dev, all in prod)
-   - Enables fast fractal-scoped queries without multi-level joins
-   - **Critical for multi-user:** When users are added, only `goals` table needs `user_id`; all other tables automatically scoped via `root_id`
-
-2. **ℹ️ Data Integrity & Constraints** (Phase 2):
-   - Documented constraints (SQLite limitations prevent ALTER TABLE constraints)
-   - Enforced in application layer via models.py
-   - Unique constraints: prevent duplicate names within same scope
-   - Check constraints: validate data consistency (e.g., `time_stop >= time_start`)
-
-3. **✅ Performance Optimization** (Phase 3):
-   - Created 18 foreign key indexes (SQLite doesn't auto-index FKs!)
-   - Created 5 composite indexes for common query patterns
-   - Created 3 partial indexes for filtered queries
-   - **Total: 28-31 indexes** - Expected 10-100x speedup on analytics queries
-
-4. **✅ Soft Deletes & Audit Trail** (Phase 4):
-   - Added `deleted_at` to 6 major tables (enable data recovery)
-   - Added `updated_at` to 7 tables (complete audit trail)
-   - Added `created_at` to metric_values
-   - Added `sort_order` columns to 3 tables for UI display control
-   - Never lose data, enable "undo" functionality
-
-5. **✅ Multi-User Preparation** (Phase 5):
-   - Schema ready for multi-user support
-   - Migration path: only `goals` table needs `user_id`
-   - All other tables automatically scoped via `root_id` → minimal migration effort
-   - 90% reduction in future migration work
-
-**Results:**
-- ✅ **28-31 indexes created** for massive performance boost (100x faster queries)
-- ✅ **Zero NULL root_ids** - all data properly scoped
-- ✅ **No data loss** - all historical data preserved
-- ✅ **Multi-user ready** with minimal future migration
-- ✅ **Data safety** with soft deletes and audit trail
-- ✅ **Production-ready** schema with proper indexes
-- ✅ **Both databases migrated** - development and production in sync
-
-**Migration Timeline:**
-
-**Development (goals_dev.db):**
-- **Date:** 2026-01-01 15:30
-- **Backup:** goals_dev.db.backup_20260101_152821
-- **Duration:** 4 minutes
-- **Issues:** SQLite DEFAULT CURRENT_TIMESTAMP limitation (resolved)
-
-**Production (goals.db):**
-- **Date:** 2026-01-01 15:54
-- **Backup:** goals.db.backup_20260101_155103 (176KB)
-- **Duration:** 3 minutes
-- **Issues:** Missing columns (has_splits, group_id, split_definition_id) - all resolved
-
-**Code Updates (✅ COMPLETE):**
-1. ✅ **models.py updated** - All 8 models include new columns
-2. ✅ **API endpoints updated** - 11 INSERT statements include root_id
-3. ✅ **Hotfix applied** - completed, notes, data columns added to activity_instances
-4. ✅ **Schema fixes** - split_definition_id added to metric_values
-
-**Files Modified:**
-- ✅ `models.py` - 8 model classes updated
-- ✅ `blueprints/sessions_api.py` - 4 locations updated
-- ✅ `blueprints/timers_api.py` - 3 locations updated
-- ✅ `blueprints/activities_api.py` - 4 locations updated
-
-**Migration Documents Created:**
-- `DATABASE_MIGRATION_READINESS.md` - Pre-migration assessment
-- `MIGRATION_QUICK_START.md` - Quick reference guide
-- `MIGRATION_PREFLIGHT_REPORT.md` - Pre-flight analysis
-- `MIGRATION_COMPLETION_REPORT.md` - Development migration results
-- `MIGRATION_HOTFIX.md` - Hotfix documentation
-- `MIGRATION_CODE_UPDATES.md` - Code changes summary
-- `PRODUCTION_MIGRATION_GUIDE.md` - Production migration instructions
-- `PRODUCTION_MIGRATION_CHECKLIST.md` - Printable checklist
-- `PRODUCTION_VS_DEV_MIGRATION.md` - Comparison guide
-
-**Performance Improvements:**
-- Fractal-scoped queries: **100x faster** (500ms → 5ms)
-- Analytics aggregations: **50-100x faster**
-- Session reports: **20-50x faster**
-- Metric lookups: **10x faster**
-
-**Schema Changes Summary:**
-
-**New Columns Added:**
-- `root_id` → 5 tables (activity_instances, metric_values, metric_definitions, split_definitions, + existing)
-- `deleted_at` → 6 tables (soft delete support)
-- `updated_at` → 7 tables (audit trail)
-- `created_at` → 1 table (metric_values)
-- `sort_order` → 3 tables (UI ordering)
-- `completed`, `notes`, `data` → activity_instances (session persistence)
-- `split_definition_id` → metric_values (splits support)
-- `has_splits`, `group_id` → activity_definitions (features)
-
-**Next Steps (Future Enhancements):**
-1. ⏳ Implement soft delete logic in DELETE operations (use deleted_at instead of hard delete)
-2. ⏳ Add query filters for `WHERE deleted_at IS NULL`
-3. ⏳ Implement UI for sort_order reordering
-4. ⏳ Add audit trail display in UI (created_at, updated_at)
-5. ⏳ Performance benchmarking and optimization
-6. ⏳ Multi-user support (when needed - 90% easier now!)
-
-**Status:** ✅ **MIGRATION COMPLETE - PRODUCTION READY** 🚀
-
-
-### Known Issues & To-Do Items
+## Known Issues & Roadmap
 
 From `/my-implementation-plans/features.txt`:
 
@@ -741,6 +624,7 @@ From `/my-implementation-plans/features.txt`:
 - ✅ Activity groups (families)
 - ✅ Practice sessions show session start date instead of age
 - ✅ Programming section (composable session templates)
+- ✅ Improve "add practice session" functionality in fractal UI (redirects to Create Session page)
 
 **In Progress:**
 - 🔄 Programs feature integration with backend
@@ -749,12 +633,12 @@ From `/my-implementation-plans/features.txt`:
 **To-Do:**
 - ⏳ Allow adjustments to estimated time in sessions
 - ⏳ Toggle hiding practice sessions from fractal view
-- ⏳ Add immediate goals to practice sessions
+- ✅ Add immediate goals to practice sessions
 - ⏳ SMART mode for goals
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
 - ⏳ Additional programming features (backend integration)
 - ⏳ Search functionality for activities
-- ⏳ Improve "add practice session" functionality in fractal UI
+
 - ⏳ Make duration updates more sensible
 - ⏳ Fix nav bar alignment (selected section slightly lower)
 - ⏳ Add session button text always white (not just on hover)
@@ -764,14 +648,18 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Allow adjustments to estimated time in sessions
 - ⏳ Practice sessions show session start date instead of age
 - ⏳ Toggle hiding practice sessions from fractal view
-- ⏳ Add immediate goals to practice sessions
+- ✅ Add immediate goals to practice sessions
 - ⏳ SMART mode for goals
 - ⏳ Programming section enhancements
 - ⏳ Detailed notes interface (multiple notes per set, new DB table)
 - ⏳ Additional programming features
 - ⏳ Search functionality for activities
-- ⏳ Improve "add practice session" functionality in fractal UI
+
 - ⏳ Make duration updates more sensible
+
+### Recent Fixes
+- **CreateSession Page:** Fixed styling consistency (colors), added multi-selection for existing immediate goals, corrected API call for updating goals (fixed 404 error).
+- **Backend API:** Updated `update_fractal_goal` to allow reparenting via `parent_id` (enabling attachment of existing goals to sessions).
 
 ---
 
@@ -1121,119 +1009,6 @@ python python-scripts/migrate_<name>.py
 
 ---
 
-**Last Updated:** 2026-01-01  
+**Last Updated:** 2026-01-03  
 **Version:** 1.2.0  
 **Maintained By:** Project AI Agents
-
-**Recent Changes:**
-- Reorganized all documentation into `/docs/` directory structure
-- Added comprehensive Documentation Protocol for AI Agents
-- Organized python-scripts into categorized subdirectories
-- Created README files for `/docs/` and `/python-scripts/`
-
----
-
-## Recent Development Notes
-
-### Documentation Reorganization (Jan 01, 2026)
-- **Created `/docs/` directory** with organized subdirectories:
-  - `/docs/architecture/` - System design & architecture decisions
-  - `/docs/migrations/` - Database migration docs & reports
-  - `/docs/features/` - Feature implementation documentation
-  - `/docs/planning/` - Roadmaps, backlogs, planning docs
-  - `/docs/guides/` - How-to guides & tutorials
-- **Moved all documentation** from project root to appropriate subdirectories
-- **Organized `/python-scripts/`** into categorized subdirectories:
-  - `/python-scripts/migrations/` - Database migration scripts
-  - `/python-scripts/debug/` - Debugging & inspection tools
-  - `/python-scripts/demo-data/` - Demo data creation scripts
-  - `/python-scripts/utilities/` - General utility scripts
-- **Created comprehensive README files** for both `/docs/` and `/python-scripts/`
-- **Added Documentation Protocol** to `index.md` with clear guidelines for AI agents
-- **Root directory cleanup** - Removed obsolete `migrations/` and `implementation-docs/` folders
-
-### Metric Persistence & Display Fix (Jan 01, 2026)
-- **Problem:** Metrics for activities without sets were not visible in the frontend sessions table, causing user concern about data loss.
-- **Root Cause:** Mismatch between backend API response (`metric_definition_id`) and frontend expectation (`metric_id`). Frontend components `Sessions.jsx` and `SessionActivityItem.jsx` relied on `metric_id`.
-- **Fix:** Updated `MetricValue.to_dict()` in `models.py` to include `metric_id` as an alias for `metric_definition_id`, ensuring backward compatibility and fixing the display issue.
-- **Verification:** verified via `repro_metrics.py` script that both sets validation and single-metric validation function correctly.
-
-### Programming/Programs Feature (Dec 31, 2025)
-- Added `Programming.jsx` page with composable session template builder
-- Added `Programs.jsx` and `ProgramDetail.jsx` for program management
-- Implemented component-based template system (warmup, drill, practice, cooldown)
-- Added visual template builder with reordering and duration tracking
-- JSON export functionality for templates
-- Custom modal components (`AlertModal`, `DeleteConfirmModal`) for better UX
-- Navigation updated to include "PROGRAMS" tab
-- **Note:** Currently frontend-only, backend integration pending
-
-### Testing Framework Implementation (Jan 01, 2026)
-- **Created comprehensive testing infrastructure** to prevent regressions and ensure code quality
-- **100+ tests created** covering all major features:
-  - Unit tests for models, business logic, and utilities
-  - Integration tests for all API endpoints (goals, sessions, activities, timers)
-  - Critical functionality tests (timer workflows, session persistence, data integrity)
-- **Test infrastructure:**
-  - `/tests/` directory with unit, integration, and e2e subdirectories
-  - `conftest.py` with comprehensive fixtures (sample data, database setup)
-  - `pytest.ini` with coverage configuration (80%+ target)
-  - `run-tests.sh` script with multiple test modes
-  - Pre-commit hook for automated testing
-- **Coverage goals:** 80%+ overall, 90%+ models, 85%+ API endpoints
-- **Documentation:** Complete testing guide in `/tests/README.md`
-- **Impact:** Raises production quality from 6.5/10 to 8.0/10
-- **See:** `/docs/planning/TESTING_STRATEGY.md` and `/docs/planning/TESTING_FRAMEWORK_IMPLEMENTATION.md`
-
-### Navigation Improvements
-- Added `HeaderContext` for dynamic page-specific actions
-- Fractal name displayed in navigation header
-- Environment indicator shows current environment (development/testing/production)
-- "+ ADD SESSION" button with improved styling
-- Programs tab added to main navigation
-
-13. **Session Page Manual Time Edit & Completion Fixes** (Jan 01, 2026):
-      - **Problem 1**: Manual editing of activity instance start/stop times caused 500 error
-        - **Root Cause**: Timezone-aware/naive datetime mismatch - frontend sent ISO strings with milliseconds (e.g., `2026-01-02T06:04:04.000Z`), backend mixed timezone-aware and timezone-naive datetimes
-        - **Error**: `TypeError: can't subtract offset-naive and offset-aware datetimes`
-      - **Problem 2**: Marking session complete caused page to go blank
-        - **Root Cause**: Frontend expected `res.data.goal` but backend returned practice session tree directly in `res.data`
-        - **Error**: `TypeError: Cannot read properties of undefined (reading 'attributes')`
-      - **Fixes Applied**:
-        1. Created `parse_iso_datetime()` helper in `timers_api.py` that:
-           - Strips milliseconds from ISO strings (`.000` removed)
-           - Converts timezone-aware datetimes to timezone-naive UTC (matching database format)
-           - Handles both `Z` and `+00:00` timezone formats
-        2. Updated `ActivityInstance.to_dict()` to serialize datetimes without milliseconds using `timespec='seconds'`
-        3. Fixed `handleToggleSessionComplete` to use `res.data` instead of `res.data.goal`
-        4. Added comprehensive error logging for datetime parsing issues
-      - **Impact**:
-        - Manual time editing now works correctly without timezone errors
-        - Session completion updates UI properly without breaking the page
-        - Consistent datetime format throughout application (no milliseconds)
-      - **Locations**:
-        - `/blueprints/timers_api.py` - Added `parse_iso_datetime()` helper, enhanced error logging
-        - `/models.py` line 361-363 - Updated datetime serialization
-        - `/client/src/pages/SessionDetail.jsx` line 614 - Fixed response handling
-
-
-14. **Duplicate Root Goals Cleanup** (Jan 01, 2026):
-      - **Problem**: Database had 253 root goals, with 235 being duplicates of "Master Software Engineering"
-        - All duplicates created at 2026-01-01 22:06:09 with millisecond differences
-        - Indicates a rapid-fire creation bug (likely frontend button not debounced)
-      - **Root Cause**: Frontend likely triggered multiple simultaneous API calls when creating fractals
-      - **Solution**: Created `cleanup_duplicate_roots.py` utility script
-        - Identifies duplicate root goals by name
-        - Keeps the root with most children (or earliest created if tied)
-        - Recursively deletes orphaned duplicates and their descendants
-        - Creates automatic backup before cleanup
-      - **Results**:
-        - Removed 243 duplicate root goals
-        - Deleted 763 total goals (including descendants)
-        - Reduced from 253 to 10 unique root goals
-        - Cleaned duplicates: "Master Software Engineering" (235→1), "LinkedIn Job Hunting" (4→1), others
-      - **Backup**: `backups/goals.db.backup_cleanup_20260101_224953`
-      - **Location**: `/python-scripts/utilities/cleanup_duplicate_roots.py`
-      - **Impact**: Database now clean, UI should show correct fractal list
-      - **TODO**: Investigate and fix frontend rapid-fire creation bug to prevent recurrence
-

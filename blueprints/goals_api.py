@@ -86,6 +86,10 @@ def create_goal():
             parent_id=parent_id  # Can be goal ID or practice session ID
         )
         
+        # Handle targets if provided
+        if 'targets' in data and data['targets']:
+            new_goal.targets = json.dumps(data['targets'])
+        
         session.add(new_goal)
         session.commit()
         session.refresh(new_goal)
@@ -377,6 +381,8 @@ def remove_goal_target(goal_id, target_id):
 @goals_bp.route('/<root_id>/goals/<goal_id>/complete', methods=['PATCH'])
 def update_goal_completion_endpoint(goal_id: str, root_id=None):
     """Update goal or practice session completion status."""
+    from datetime import datetime
+    
     data = request.get_json(silent=True) or {}
     
     engine = models.get_engine()
@@ -389,6 +395,12 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                 goal.completed = data['completed']
             else:
                 goal.completed = not goal.completed
+            
+            # Set or clear completed_at based on completion status
+            if goal.completed:
+                goal.completed_at = datetime.now()
+            else:
+                goal.completed_at = None
                 
             session.commit()
             session.refresh(goal)
@@ -402,6 +414,12 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                 ps.completed = data['completed']
             else:
                 ps.completed = not ps.completed
+            
+            # Set or clear completed_at based on completion status
+            if ps.completed:
+                ps.completed_at = datetime.now()
+            else:
+                ps.completed_at = None
                 
             session.commit()
             session.refresh(ps)
@@ -567,6 +585,10 @@ def create_fractal_goal(root_id):
             completed=False
         )
         
+        # Handle targets if provided
+        if 'targets' in data and data['targets']:
+            new_goal.targets = json.dumps(data['targets'])
+        
         session.add(new_goal)
         session.commit()
         
@@ -664,6 +686,10 @@ def update_fractal_goal(root_id, goal_id):
         if 'targets' in data:
             # Store targets as JSON string
             goal.targets = json.dumps(data['targets']) if data['targets'] else None
+            
+        if 'parent_id' in data:
+            # Allow reparenting (e.g. moving ImmediateGoal to a Session)
+            goal.parent_id = data['parent_id']
         
         session.commit()
         

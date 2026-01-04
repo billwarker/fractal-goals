@@ -307,7 +307,7 @@ function Sessions() {
                                         background: '#2a2a2a',
                                         borderBottom: '1px solid #333',
                                         display: 'grid',
-                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
+                                        gridTemplateColumns: '1.5fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr',
                                         gap: '16px',
                                         alignItems: 'center'
                                     }}>
@@ -329,6 +329,26 @@ function Sessions() {
                                                 <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
                                                     {session.attributes.description}
                                                 </div>
+                                            )}
+                                        </div>
+
+                                        {/* Program */}
+                                        <div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Program</div>
+                                            {session.program_info ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <Link
+                                                        to={`/${rootId}/programs/${session.program_info.program_id}`}
+                                                        style={{ color: '#2196f3', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
+                                                    >
+                                                        {session.program_info.program_name}
+                                                    </Link>
+                                                    <span style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
+                                                        {session.program_info.block_name} • {session.program_info.day_name}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span style={{ color: '#666', fontSize: '12px' }}>-</span>
                                             )}
                                         </div>
 
