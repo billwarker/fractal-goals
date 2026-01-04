@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useHeader } from '../context/HeaderContext';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
+import { GOAL_COLORS, getGoalTextColor } from '../utils/goalColors';
 import '../App.css';
 
 /**
@@ -417,33 +418,73 @@ function Sessions() {
                                         </div>
                                     </div>
 
-                                    {/* Parent Goals Section */}
-                                    {sessionParentGoals.length > 0 && (
+                                    {/* Parent Goals & Immediate Goals Section */}
+                                    {(sessionParentGoals.length > 0 || (session.children && session.children.length > 0)) && (
                                         <div style={{
                                             padding: '12px 16px',
                                             background: '#252525',
-                                            borderBottom: '1px solid #333'
+                                            borderBottom: '1px solid #333',
+                                            display: 'flex',
+                                            gap: '32px'
                                         }}>
-                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
-                                                Short-Term Goals:
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                {sessionParentGoals.map(goal => (
-                                                    <div
-                                                        key={goal.id}
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            background: '#1e1e1e',
-                                                            border: '1px solid #4caf50',
-                                                            borderRadius: '4px',
-                                                            fontSize: '13px',
-                                                            color: '#4caf50'
-                                                        }}
-                                                    >
-                                                        {goal.name}
+                                            {/* Short-Term Goals (left side) */}
+                                            {sessionParentGoals.length > 0 && (
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                                                        Short-Term Goals:
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        {sessionParentGoals.map(goal => (
+                                                            <div
+                                                                key={goal.id}
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    background: '#1e1e1e',
+                                                                    border: `1px solid ${GOAL_COLORS.ShortTermGoal}`,
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '13px',
+                                                                    color: GOAL_COLORS.ShortTermGoal
+                                                                }}
+                                                            >
+                                                                {goal.name}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Immediate Goals (right side) */}
+                                            {session.children && session.children.filter(c => c.attributes?.type === 'ImmediateGoal').length > 0 && (
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                                                        Immediate Goals:
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        {session.children
+                                                            .filter(child => child.attributes?.type === 'ImmediateGoal')
+                                                            .map(goal => (
+                                                                <div
+                                                                    key={goal.id}
+                                                                    style={{
+                                                                        padding: '6px 12px',
+                                                                        background: '#1e1e1e',
+                                                                        border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '13px',
+                                                                        color: GOAL_COLORS.ImmediateGoal,
+                                                                        textDecoration: goal.attributes?.completed ? 'line-through' : 'none',
+                                                                        opacity: goal.attributes?.completed ? 0.7 : 1
+                                                                    }}
+                                                                >
+                                                                    {goal.name}
+                                                                    {goal.attributes?.completed && (
+                                                                        <span style={{ marginLeft: '6px', color: '#4caf50' }}>✓</span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
