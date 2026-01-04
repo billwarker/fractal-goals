@@ -295,6 +295,26 @@ const ProgramDetail = () => {
         }
     };
 
+    // Handler for adding a block day from DayViewModal
+    const handleAddBlockDayFromModal = async (blockId, date) => {
+        try {
+            // Create a new day with the selected date and a default name
+            const dayData = {
+                name: `Day ${date}`,
+                date: date,
+                notes: '',
+                templates: []
+            };
+            await fractalApi.addBlockDay(rootId, program.id, blockId, dayData);
+            fetchProgramData();
+            setShowDayViewModal(false);
+            setSelectedDate(null);
+        } catch (err) {
+            console.error('Failed to add block day:', err);
+            alert('Failed to add block day: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
     // Attach Goal Handlers
     const handleAttachGoalClick = (blockId) => {
         setAttachBlockId(blockId);
@@ -602,8 +622,17 @@ const ProgramDetail = () => {
                 {/* Right Panel */}
                 <div style={{ flex: 1, padding: '24px', background: '#121212', overflowY: 'auto' }}>
                     {viewMode === 'calendar' ? (
-                        <div style={{ height: '100%', minHeight: '600px', background: '#1e1e1e', padding: '20px', borderRadius: '12px', position: 'relative' }}>
-                            <div style={{ position: 'absolute', zIndex: 10, top: '20px', right: '250px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ height: 'calc(100vh - 200px)', minHeight: '500px', background: '#1e1e1e', padding: '20px', borderRadius: '12px', position: 'relative' }}>
+                            {/* Block creation controls - positioned at top right of calendar area */}
+                            <div style={{
+                                position: 'absolute',
+                                top: '20px',
+                                right: '20px',
+                                zIndex: 10,
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'center'
+                            }}>
                                 <button
                                     onClick={() => setBlockCreationMode(!blockCreationMode)}
                                     style={{
@@ -613,20 +642,35 @@ const ProgramDetail = () => {
                                         color: blockCreationMode ? 'white' : '#888',
                                         padding: '6px 12px',
                                         cursor: 'pointer',
-                                        fontSize: '13px',
+                                        fontSize: '12px',
                                         fontWeight: 500,
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.2s',
+                                        whiteSpace: 'nowrap'
                                     }}
                                 >
                                     {blockCreationMode ? '✓ Block Creation Mode' : 'Select Dates to Add Block'}
                                 </button>
-                                <div style={{ color: '#444' }}>|</div>
-                                <button onClick={handleAddBlockClick} style={{ background: '#3A86FF', border: 'none', borderRadius: '4px', color: 'white', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>+ Add Block</button>
+                                <button
+                                    onClick={handleAddBlockClick}
+                                    style={{
+                                        background: '#3A86FF',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        padding: '6px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    + Add Block
+                                </button>
                             </div>
                             <FullCalendar
                                 plugins={[dayGridPlugin, interactionPlugin]}
                                 initialView="dayGridMonth"
-                                headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' }}
+                                headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
                                 initialDate={program.start_date ? new Date(program.start_date) : new Date()}
                                 events={calendarEvents}
                                 height="100%"
@@ -805,6 +849,8 @@ const ProgramDetail = () => {
                 program={program}
                 goals={programGoals}
                 onSetGoalDeadline={handleSetGoalDeadline}
+                blocks={sortedBlocks}
+                onAddBlockDay={handleAddBlockDayFromModal}
             />
 
             <GoalDetailModal

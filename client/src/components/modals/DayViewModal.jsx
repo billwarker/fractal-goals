@@ -5,10 +5,11 @@ import { getGoalColor, getGoalTextColor } from '../../utils/goalColors';
  * DayViewModal - Modal for viewing and managing program days on a specific date
  * Shows all program days scheduled for the selected date and allows adding new ones
  */
-const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline }) => {
+const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onAddBlockDay, blocks }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
-
+    const [showAddDaySection, setShowAddDaySection] = useState(false);
+    const [selectedBlockId, setSelectedBlockId] = useState('');
     if (!isOpen || !date || !program) return null;
 
     // Find all program days that match this date
@@ -288,6 +289,85 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             </div>
                         )}
                     </div>
+
+                    {/* Add Block Day Section */}
+                    {blocks && blocks.length > 0 && onAddBlockDay && (
+                        <div style={{ marginTop: '16px' }}>
+                            <button
+                                onClick={() => setShowAddDaySection(!showAddDaySection)}
+                                style={{
+                                    background: 'transparent',
+                                    border: '1px solid #444',
+                                    borderRadius: '6px',
+                                    color: 'white',
+                                    padding: '10px 16px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    width: '100%',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <span>📅 Add Block Day for This Date</span>
+                                <span>{showAddDaySection ? '−' : '+'}</span>
+                            </button>
+
+                            {showAddDaySection && (
+                                <div style={{ marginTop: '12px', padding: '16px', background: '#252525', borderRadius: '6px' }}>
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                            Select Block
+                                        </label>
+                                        <select
+                                            value={selectedBlockId}
+                                            onChange={(e) => setSelectedBlockId(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px',
+                                                background: '#1e1e1e',
+                                                border: '1px solid #444',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                fontSize: '14px'
+                                            }}
+                                        >
+                                            <option value="">Choose a block...</option>
+                                            {blocks.map(block => (
+                                                <option key={block.id} value={block.id}>
+                                                    {block.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (selectedBlockId && onAddBlockDay) {
+                                                onAddBlockDay(selectedBlockId, date);
+                                                setSelectedBlockId('');
+                                                setShowAddDaySection(false);
+                                            }
+                                        }}
+                                        disabled={!selectedBlockId}
+                                        style={{
+                                            padding: '10px 16px',
+                                            background: selectedBlockId ? '#3A86FF' : '#333',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            color: selectedBlockId ? 'white' : '#666',
+                                            cursor: selectedBlockId ? 'pointer' : 'not-allowed',
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            width: '100%'
+                                        }}
+                                    >
+                                        Add Day to Block
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
