@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
-import GoalModal from '../components/modals/GoalModal';
+import GoalDetailModal from '../components/GoalDetailModal';
 import PracticeSessionModal from '../components/modals/PracticeSessionModal';
 import AlertModal from '../components/modals/AlertModal';
 import { useGoals } from '../contexts/GoalsContext';
@@ -291,11 +291,14 @@ function FractalGoals() {
             )}
 
             {/* Modals */}
-            <GoalModal
+            <GoalDetailModal
                 isOpen={showGoalModal}
                 onClose={() => setShowGoalModal(false)}
-                onSubmit={handleCreateGoal}
-                parent={selectedParent}
+                mode="create"
+                onCreate={handleCreateGoal}
+                parentGoal={selectedParent}
+                activityDefinitions={activities}
+                rootId={rootId}
             />
 
             <PracticeSessionModal
