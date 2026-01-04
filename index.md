@@ -658,6 +658,15 @@ From `/my-implementation-plans/features.txt`:
 - ⏳ Make duration updates more sensible
 
 ### Recent Fixes
+- **Production Migration (2026-01-04):** Applied database updates to production:
+  - Applied `migrate_program_day_templates.py` migration:
+    - Created `program_day_templates` junction table for many-to-many relationship
+    - Added `program_day_id` column to `goals` table (links sessions to program days)
+    - Added `is_completed` column to `program_days` table
+    - Dropped legacy `scheduled_sessions` table
+    - Backup: `goals_db_backup_program_migration_20260104_114659.db`
+  - Added missing `completed_at` column to `goals` table (tracks when goals were marked complete)
+  - Production schema now matches development schema
 - **CreateSession Page:** Fixed styling consistency (colors), added multi-selection for existing immediate goals, corrected API call for updating goals (fixed 404 error).
 - **Backend API:** Updated `update_fractal_goal` to allow reparenting via `parent_id` (enabling attachment of existing goals to sessions).
 

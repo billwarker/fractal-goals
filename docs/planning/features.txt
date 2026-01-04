@@ -34,3 +34,4 @@ TO-DO for v 0.1.0
 
 4. remove plotly from analytics page and replace with better component
 5. note taking interface
+6. manage session templates as its own modal
