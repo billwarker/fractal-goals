@@ -8,6 +8,15 @@ import json
 def utc_now():
     return datetime.now(timezone.utc)
 
+def format_utc(dt):
+    """Format a datetime object to UTC ISO string with 'Z' suffix."""
+    if not dt: return None
+    # If naive, assume UTC and append Z
+    if dt.tzinfo is None:
+        return dt.isoformat(timespec='seconds') + 'Z'
+    # If aware, ensure UTC and use Z suffix
+    return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+
 Base = declarative_base()
 
 # Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
@@ -104,9 +113,9 @@ class Goal(Base):
                 "description": self.description,
                 "deadline": self.deadline.isoformat() if self.deadline else None,
                 "completed": self.completed,
-                "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-                "created_at": self.created_at.isoformat() if self.created_at else None,
-                "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+                "completed_at": format_utc(self.completed_at),
+                "created_at": format_utc(self.created_at),
+                "updated_at": format_utc(self.updated_at),
                 "targets": json.loads(self.targets) if self.targets else [],
             },
             "children": []
@@ -238,13 +247,7 @@ class Session(Base):
     def to_dict(self):
         """Convert session to dictionary format compatible with frontend."""
         
-        def format_utc(dt):
-            if not dt: return None
-            # If naive, assume UTC and append Z
-            if dt.tzinfo is None:
-                return dt.isoformat(timespec='seconds') + 'Z'
-            # If aware, ensure UTC and use Z suffix
-            return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+
 
         result = {
             "id": self.id,
@@ -270,8 +273,9 @@ class Session(Base):
                 "total_duration_seconds": self.total_duration_seconds,
                 "template_id": self.template_id,
                 "completed": self.completed,
-                "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-                "created_at": self.created_at.isoformat() if self.created_at else None,
+                "completed_at": format_utc(self.completed_at),
+                "created_at": format_utc(self.created_at),
+                "updated_at": format_utc(self.updated_at),
             }
         }
         
@@ -477,9 +481,9 @@ class ActivityInstance(Base):
             "practice_session_id": self.practice_session_id,  # Legacy support
             "activity_definition_id": self.activity_definition_id,
             "definition_name": self.definition.name if self.definition else "Unknown",
-            "created_at": self.created_at.isoformat(timespec='seconds') + 'Z' if self.created_at else None,
-            "time_start": self.time_start.isoformat(timespec='seconds') + 'Z' if self.time_start else None,
-            "time_stop": self.time_stop.isoformat(timespec='seconds') + 'Z' if self.time_stop else None,
+            "created_at": format_utc(self.created_at),
+            "time_start": format_utc(self.time_start),
+            "time_stop": format_utc(self.time_stop),
             "duration_seconds": self.duration_seconds,
             "completed": self.completed,
             "notes": self.notes,
@@ -567,10 +571,10 @@ class Program(Base):
             "root_id": self.root_id,
             "name": self.name,
             "description": self.description,
-            "start_date": self.start_date.isoformat() if self.start_date else None,
-            "end_date": self.end_date.isoformat() if self.end_date else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "start_date": format_utc(self.start_date),
+            "end_date": format_utc(self.end_date),
+            "created_at": format_utc(self.created_at),
+            "updated_at": format_utc(self.updated_at),
             "is_active": self.is_active,
             "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
             "weekly_schedule": schedule_from_db,
@@ -648,7 +652,7 @@ class ProgramDay(Base):
             # Include templates
             "templates": [{"id": t.id, "name": t.name, "description": t.description} for t in self.templates if not t.deleted_at],
             # Include completed sessions summary
-            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": s.created_at.isoformat() if s.created_at else None} for s in self.completed_sessions if not s.deleted_at]
+            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": format_utc(s.created_at)} for s in self.completed_sessions if not s.deleted_at]
         }
 
 
