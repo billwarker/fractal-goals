@@ -21,18 +21,19 @@
 ## Core Features
 
 ### 1. Hierarchical Goal Management
-- 8-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → PracticeSession → ImmediateGoal → MicroGoal → NanoGoal
+- 7-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
 - Visual tree representation using ReactFlow
 - Goal completion tracking with targets
 - Goal age calculation and display
-- Multi-parent support for practice sessions
+- **Note:** Sessions are now managed separately from the goal hierarchy
 
-### 2. Practice Session Management
-- Sessions are nodes in the goal tree (children of ShortTermGoals)
+### 2. Session Management
+- **Sessions are now stored in a separate `sessions` table** (not part of the goal tree)
 - Session start/end times with duration tracking
 - Activity instances with timers
 - Session templates for recurring practices
-- Many-to-many relationship with ShortTermGoals via junction table
+- Many-to-many relationship with Goals via `session_goals` junction table
+- Sessions can be linked to ShortTermGoals and ImmediateGoals
 
 ### 3. Activity System
 - Reusable activity definitions organized by groups
@@ -103,22 +104,46 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - LongTermGoal
 - MidTermGoal
 - ShortTermGoal
-- PracticeSession
 - ImmediateGoal
 - MicroGoal
 - NanoGoal
 
+**Note:** PracticeSession is NO LONGER a goal type. Sessions are now stored in the separate `sessions` table.
+
 **Relationships:**
 - Self-referential parent-child via `parent_id`
-- PracticeSession has many ActivityInstances
-- PracticeSession has many-to-many with ShortTermGoals via `practice_session_goals`
 
-#### `practice_session_goals` (Junction Table)
-Links PracticeSessions to multiple ShortTermGoals (many-to-many).
+#### `sessions` (Separate Table)
+Stores practice session data independently from the goal hierarchy.
 
 **Fields:**
-- `practice_session_id` (String, FK to goals.id, PK)
-- `short_term_goal_id` (String, FK to goals.id, PK)
+- `id` (String, UUID, PK)
+- `name` (String)
+- `description` (String)
+- `root_id` (String, FK to goals.id) - Reference to fractal root
+- `completed` (Boolean)
+- `completed_at` (DateTime, nullable)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+- `deleted_at` (DateTime, nullable) - Soft delete
+- `duration_minutes` (Integer)
+- `session_start` (DateTime)
+- `session_end` (DateTime)
+- `total_duration_seconds` (Integer)
+- `template_id` (String)
+- `program_day_id` (String, FK to program_days.id)
+- `attributes` (Text/JSON) - Flexible session data storage
+
+**Relationships:**
+- Has many ActivityInstances
+- Has many-to-many with Goals via `session_goals`
+
+#### `session_goals` (Junction Table)
+Links Sessions to multiple Goals (many-to-many).
+
+**Fields:**
+- `session_id` (String, FK to sessions.id, PK)
+- `goal_id` (String, FK to goals.id, PK)
 
 #### `activity_groups`
 Organizes activities into families/categories.
@@ -175,19 +200,23 @@ Defines splits for activities (e.g., left/right).
 - `created_at` (DateTime)
 
 #### `activity_instances`
-Actual activity occurrences within practice sessions.
+Actual activity occurrences within sessions.
 
 **Fields:**
 - `id` (String, UUID, PK)
-- `practice_session_id` (String, FK to goals.id)
+- `session_id` (String, FK to sessions.id)
 - `activity_definition_id` (String, FK to activity_definitions.id)
+- `root_id` (String, FK to goals.id) - For performance
 - `created_at` (DateTime)
 - `time_start` (DateTime, nullable)
 - `time_stop` (DateTime, nullable)
 - `duration_seconds` (Integer, nullable)
+- `completed` (Boolean)
+- `notes` (Text)
+- `data` (Text/JSON) - Flexible data storage (sets, etc.)
 
 **Relationships:**
-- Belongs to PracticeSession
+- Belongs to Session
 - Belongs to ActivityDefinition
 - Has many MetricValues
 

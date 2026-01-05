@@ -384,20 +384,20 @@ function SessionDetail() {
                 if (value === 'start') {
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.startActivityTimer(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'stop') {
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.stopActivityTimer(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'reset') {
                     // Reset: update instance in database to clear times
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.updateActivityInstance(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id,
                         time_start: null,
                         time_stop: null,
@@ -466,7 +466,7 @@ function SessionDetail() {
             // Persist to backend
             try {
                 await fractalApi.updateActivityInstance(rootId, instanceId, {
-                    practice_session_id: sessionId,
+                    session_id: sessionId,
                     activity_definition_id: instance.activity_definition_id,
                     time_start: updatedInstance.time_start,
                     time_stop: updatedInstance.time_stop,
@@ -508,7 +508,7 @@ function SessionDetail() {
         // Persist to backend (for fields like notes, completed)
         try {
             await fractalApi.updateActivityInstance(rootId, instanceId, {
-                practice_session_id: sessionId,
+                session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
                 [field]: value
             });
@@ -535,7 +535,7 @@ function SessionDetail() {
         // Persist to backend
         try {
             await fractalApi.updateActivityInstance(rootId, instanceId, {
-                practice_session_id: sessionId,
+                session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
                 completed: newCompleted
             });
@@ -580,7 +580,7 @@ function SessionDetail() {
                     if (instance.time_start && !instance.time_stop) {
                         try {
                             const response = await fractalApi.stopActivityTimer(rootId, instance.id, {
-                                practice_session_id: sessionId,
+                                session_id: sessionId,
                                 activity_definition_id: instance.activity_definition_id
                             });
 

@@ -25,8 +25,7 @@ const getChildType = (parentType) => {
         'UltimateGoal': 'LongTermGoal',
         'LongTermGoal': 'MidTermGoal',
         'MidTermGoal': 'ShortTermGoal',
-        'ShortTermGoal': 'PracticeSession',
-        'PracticeSession': 'ImmediateGoal',
+        'ShortTermGoal': 'ImmediateGoal',  // Sessions are now separate
         'ImmediateGoal': 'MicroGoal',
         'MicroGoal': 'NanoGoal',
         'NanoGoal': null
@@ -40,10 +39,10 @@ const getTypeDisplayName = (type) => {
         'LongTermGoal': 'Long Term Goal',
         'MidTermGoal': 'Mid Term Goal',
         'ShortTermGoal': 'Short Term Goal',
-        'PracticeSession': 'Practice Session',
         'ImmediateGoal': 'Immediate Goal',
         'MicroGoal': 'Micro Goal',
-        'NanoGoal': 'Nano Goal'
+        'NanoGoal': 'Nano Goal',
+        'Session': 'Session'  // For display purposes
     };
     return names[type] || type;
 };

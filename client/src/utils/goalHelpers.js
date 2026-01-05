@@ -1,10 +1,16 @@
+/**
+ * Goal Helpers - Utilities for goal hierarchy management
+ * 
+ * IMPORTANT: Sessions are NO LONGER part of the goal hierarchy.
+ * Hierarchy is now: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
+ */
+
 export const getChildType = (parentType) => {
     const map = {
         'UltimateGoal': 'LongTermGoal',
         'LongTermGoal': 'MidTermGoal',
         'MidTermGoal': 'ShortTermGoal',
-        'ShortTermGoal': 'PracticeSession',
-        'PracticeSession': 'ImmediateGoal',
+        'ShortTermGoal': 'ImmediateGoal',  // Changed: was PracticeSession
         'ImmediateGoal': 'MicroGoal',
         'MicroGoal': 'NanoGoal',
         'NanoGoal': null
@@ -18,10 +24,10 @@ export const getTypeDisplayName = (type) => {
         'LongTermGoal': 'Long Term Goal',
         'MidTermGoal': 'Mid Term Goal',
         'ShortTermGoal': 'Short Term Goal',
-        'PracticeSession': 'Practice Session',
         'ImmediateGoal': 'Immediate Goal',
         'MicroGoal': 'Micro Goal',
-        'NanoGoal': 'Nano Goal'
+        'NanoGoal': 'Nano Goal',
+        'Session': 'Session'  // For display purposes only
     };
     return names[type] || type;
 };
@@ -69,6 +75,22 @@ export const collectShortTermGoals = (node, collected = []) => {
     }
     if (node.children && node.children.length > 0) {
         node.children.forEach(child => collectShortTermGoals(child, collected));
+    }
+    return collected;
+};
+
+export const collectImmediateGoals = (node, collected = []) => {
+    if (!node) return collected;
+    const type = node.attributes?.type || node.type;
+    if (type === 'ImmediateGoal') {
+        collected.push({
+            id: node.attributes?.id || node.id,
+            name: node.name,
+            parentId: node.attributes?.parent_id || node.parent_id
+        });
+    }
+    if (node.children && node.children.length > 0) {
+        node.children.forEach(child => collectImmediateGoals(child, collected));
     }
     return collected;
 };

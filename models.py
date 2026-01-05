@@ -7,11 +7,13 @@ import json
 
 Base = declarative_base()
 
-# Junction table for linking PracticeSessions to multiple ShortTermGoals
-practice_session_goals = Table(
-    'practice_session_goals', Base.metadata,
-    Column('practice_session_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('short_term_goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True)
+# Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
+session_goals = Table(
+    'session_goals', Base.metadata,
+    Column('session_id', String, ForeignKey('sessions.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_type', String, nullable=False),  # 'short_term' or 'immediate'
+    Column('created_at', DateTime, default=datetime.now)
 )
 
 # Junction table for linking ProgramDays to multiple SessionTemplates (many-to-many)
@@ -24,7 +26,10 @@ program_day_templates = Table(
 
 class Goal(Base):
     """
-    Represents all nodes in the fractal goal tree, including Practice Sessions.
+    Represents all nodes in the fractal goal tree.
+    
+    Sessions are NO LONGER part of the goal hierarchy.
+    Hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
     
     Single Table Inheritance is used to distinguish types.
     """
@@ -43,20 +48,8 @@ class Goal(Base):
     parent_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=True)
     sort_order = Column(Integer, default=0)  # Sibling order for UI display
     
-    # Practice Session specific fields (nullable for other goals)
-    root_id = Column(String, nullable=True) # Useful for all goals? Or just PS?
-    duration_minutes = Column(Integer, nullable=True)
-    
-    # Session analytics fields (promoted from JSON for query performance)
-    session_start = Column(DateTime, nullable=True)  # When session actually started
-    session_end = Column(DateTime, nullable=True)    # When session actually ended
-    total_duration_seconds = Column(Integer, nullable=True)  # Calculated or from session_end - session_start
-    template_id = Column(String, nullable=True)      # Reference to session template
-    program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True)  # Link to program day if created from program
-    
-    # Flexible data storage (renamed from session_data for semantic clarity)
-    attributes = Column(Text, nullable=True)  # JSON - stores sections, exercises, notes, etc.
-    session_data = Column(Text, nullable=True)  # DEPRECATED - kept for backward compatibility, use attributes
+    # Root goal reference (for performance queries)
+    root_id = Column(String, nullable=True)
     
     # JSON Plans/Targets
     targets = Column(Text, nullable=True)
@@ -65,7 +58,7 @@ class Goal(Base):
         CheckConstraint(
             type.in_([
                 'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-                'PracticeSession', 'ImmediateGoal', 'MicroGoal', 'NanoGoal'
+                'ImmediateGoal', 'MicroGoal', 'NanoGoal'
             ]),
             name='valid_goal_type'
         ),
@@ -84,6 +77,13 @@ class Goal(Base):
         cascade="all, delete-orphan"
     )
 
+    # Sessions associated with this goal (via junction table)
+    sessions = relationship(
+        "Session",
+        secondary=session_goals,
+        back_populates="goals",
+        viewonly=True
+    )
 
     def to_dict(self, include_children=True):
         """Convert goal to dictionary format compatible with frontend."""
@@ -92,7 +92,6 @@ class Goal(Base):
             "id": self.id,
             "description": self.description,
             "deadline": self.deadline.isoformat() if self.deadline else None,
-            "program_day_id": self.program_day_id,  # Include for calendar rendering
             "attributes": {
                 "id": self.id,
                 "type": self.type,
@@ -139,39 +138,80 @@ class NanoGoal(Goal):
     __mapper_args__ = {'polymorphic_identity': 'NanoGoal'}
 
 
-
-class PracticeSession(Goal):
+class Session(Base):
     """
-    PracticeSession is now a node in the Goal tree.
-    """
-    __mapper_args__ = {
-        'polymorphic_identity': 'PracticeSession',
-    }
+    Represents a practice/work session.
     
-    # Relationship to Activity Instances (One-to-Many)
+    Sessions are now SEPARATE from the goal hierarchy.
+    They can be associated with ShortTermGoals and ImmediateGoals via the session_goals junction table.
+    """
+    __tablename__ = 'sessions'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    
+    # Session timing
+    session_start = Column(DateTime, nullable=True)
+    session_end = Column(DateTime, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    total_duration_seconds = Column(Integer, nullable=True)
+    
+    # Template/Program references
+    template_id = Column(String, ForeignKey('session_templates.id'), nullable=True)
+    program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True)
+    
+    # Flexible data storage (sections, exercises, notes, etc.)
+    attributes = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # Completion
+    completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Relationships
     activity_instances = relationship(
         "ActivityInstance",
-        backref="practice_session",
+        backref="session",
         cascade="all, delete-orphan",
-        foreign_keys="ActivityInstance.practice_session_id"
-    )
-
-    # Many-to-Many with ShortTermGoal (linked via junction)
-    # This allows a session to satisfy targets for multiple goals
-    parent_goals = relationship(
-        "Goal",
-        secondary=practice_session_goals,
-        primaryjoin="PracticeSession.id==practice_session_goals.c.practice_session_id",
-        secondaryjoin="Goal.id==practice_session_goals.c.short_term_goal_id",
-        backref="linked_practice_sessions",
-        viewonly=False # explicit
+        foreign_keys="ActivityInstance.session_id"
     )
     
-    # Relationship to ProgramDay (if session was created from a program)
-    program_day = relationship("ProgramDay", back_populates="completed_sessions", foreign_keys=[Goal.program_day_id])
+    goals = relationship(
+        "Goal",
+        secondary=session_goals,
+        back_populates="sessions",
+        viewonly=True
+    )
+    
+    program_day = relationship("ProgramDay", back_populates="completed_sessions")
+    template = relationship("SessionTemplate")
+    
+    def get_short_term_goals(self, db_session):
+        """Get all ShortTermGoals associated with this session."""
+        from sqlalchemy import select
+        stmt = select(Goal).join(session_goals).where(
+            session_goals.c.session_id == self.id,
+            session_goals.c.goal_type == 'short_term'
+        )
+        return db_session.execute(stmt).scalars().all()
+    
+    def get_immediate_goals(self, db_session):
+        """Get all ImmediateGoals associated with this session."""
+        from sqlalchemy import select
+        stmt = select(Goal).join(session_goals).where(
+            session_goals.c.session_id == self.id,
+            session_goals.c.goal_type == 'immediate'
+        )
+        return db_session.execute(stmt).scalars().all()
     
     def get_program_info(self):
-        """Get full program context for this session"""
+        """Get full program context for this session."""
         if not self.program_day:
             return None
         
@@ -191,69 +231,69 @@ class PracticeSession(Goal):
             "day_date": day.date.isoformat() if day.date else None
         }
     
-    def to_dict(self, include_children=True):
-        # Result uses basic Goal structure but adds PS fields
-        result = super().to_dict(include_children)
-        result["session_start"] = self.session_start.isoformat() if self.session_start else None
-        result["session_end"] = self.session_end.isoformat() if self.session_end else None
-        result["template_id"] = self.template_id
-        result["total_duration_seconds"] = self.total_duration_seconds
-        result["attributes"]["duration_minutes"] = self.duration_minutes
+    def to_dict(self):
+        """Convert session to dictionary format compatible with frontend."""
+        result = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "root_id": self.root_id,
+            "session_start": self.session_start.isoformat() if self.session_start else None,
+            "session_end": self.session_end.isoformat() if self.session_end else None,
+            "duration_minutes": self.duration_minutes,
+            "total_duration_seconds": self.total_duration_seconds,
+            "template_id": self.template_id,
+            "program_day_id": self.program_day_id,
+            "completed": self.completed,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "attributes": {
+                "id": self.id,
+                "type": "Session",  # For frontend compatibility
+                "session_start": self.session_start.isoformat() if self.session_start else None,
+                "session_end": self.session_end.isoformat() if self.session_end else None,
+                "duration_minutes": self.duration_minutes,
+                "total_duration_seconds": self.total_duration_seconds,
+                "template_id": self.template_id,
+                "completed": self.completed,
+                "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+            }
+        }
         
-        # Add session analytics fields
-        result["attributes"]["session_start"] = self.session_start.isoformat() if self.session_start else None
-        result["attributes"]["session_end"] = self.session_end.isoformat() if self.session_end else None
-        result["attributes"]["total_duration_seconds"] = self.total_duration_seconds
-        result["attributes"]["template_id"] = self.template_id
+        # Parse session data from attributes
+        if self.attributes:
+            try:
+                data_obj = json.loads(self.attributes)
+                result["attributes"]["session_data"] = data_obj
+                
+                # Hydrate "exercises" from database ActivityInstances
+                if "sections" in data_obj:
+                    instance_map = {inst.id: inst for inst in self.activity_instances}
+                    
+                    for section in data_obj["sections"]:
+                        if "activity_ids" in section:
+                            activity_ids = section["activity_ids"]
+                            exercises = []
+                            for inst_id in activity_ids:
+                                if inst_id in instance_map:
+                                    inst = instance_map[inst_id]
+                                    ex = inst.to_dict()
+                                    ex['type'] = 'activity'
+                                    ex['instance_id'] = inst.id
+                                    ex['name'] = ex.get('definition_name', 'Unknown Activity')
+                                    ex['activity_id'] = inst.activity_definition_id
+                                    ex['has_sets'] = len(ex.get('sets', [])) > 0
+                                    ex['metrics'] = ex['metric_values']
+                                    exercises.append(ex)
+                            section["exercises"] = exercises
+            except:
+                pass
         
-        # Parse session data from attributes (new) or session_data (legacy)
-        session_data_json = self.attributes or self.session_data
-        if session_data_json:
-             try:
-                 data_obj = json.loads(session_data_json)
-                 result["attributes"]["session_data"] = data_obj
-                 
-                 # Hydrate "exercises" from database ActivityInstances (Database-Only Architecture)
-                 if "sections" in data_obj:
-                     # Pre-fetch instances to a map
-                     # Note: This might trigger lazy loads. For performance, ensure joinedload usage in queries.
-                     instance_map = {inst.id: inst for inst in self.activity_instances}
-                     print(f"DEBUG: Hydration instance_map keys: {list(instance_map.keys())}")
-                     
-                     for section in data_obj["sections"]:
-                         # Only hydrate if this is a migrated session (has activity_ids)
-                         # Otherwise preserve legacy 'exercises' data for display
-                         if "activity_ids" in section:
-                             activity_ids = section["activity_ids"]
-                             exercises = []
-                             for inst_id in activity_ids:
-                                 if inst_id in instance_map:
-                                     inst = instance_map[inst_id]
-                                     # Convert to dict and add compatibility fields for frontend
-                                     ex = inst.to_dict()
-                                     ex['type'] = 'activity'
-                                     ex['instance_id'] = inst.id  # Frontend looks for instance_id
-                                     ex['name'] = ex.get('definition_name', 'Unknown Activity')
-                                     ex['activity_id'] = inst.activity_definition_id
-                                 
-                                     # Set has_sets flag so frontend knows how to render
-                                     ex['has_sets'] = len(ex.get('sets', [])) > 0
-                                 
-                                     # Map metric_values to metrics for frontend list compatibility
-                                     ex['metrics'] = ex['metric_values']
-                                     exercises.append(ex)
-                             section["exercises"] = exercises
-             except:
-                 pass
-        
-        # Parent IDs (Combine primary parent_id and any secondary parents)
-        # Note: In new creation logic, parent_id should be in parent_goals list too.
-        # So we just can use parent_goals if populated.
-        p_ids = [g.id for g in self.parent_goals]
-        if self.parent_id and self.parent_id not in p_ids:
-             p_ids.append(self.parent_id)
-        
-        result["attributes"]["parent_ids"] = p_ids
+        # Get associated goal IDs
+        goal_ids = [g.id for g in self.goals]
+        result["attributes"]["goal_ids"] = goal_ids
         
         # Add program info if linked to program day
         program_info = self.get_program_info()
@@ -261,7 +301,6 @@ class PracticeSession(Goal):
             result["program_info"] = program_info
         
         return result
-
 
 
 class ActivityGroup(Base):
@@ -372,8 +411,10 @@ class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    # practice_session_id points to goals.id because PracticeSession is a Goal
-    practice_session_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
+    # New session_id column pointing to sessions table
+    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True)
+    # Legacy column - kept for migration compatibility, will be deprecated
+    practice_session_id = Column(String, nullable=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     created_at = Column(DateTime, default=datetime.now)
@@ -396,7 +437,8 @@ class ActivityInstance(Base):
         data_dict = json.loads(self.data) if self.data else {}
         return {
             "id": self.id,
-            "practice_session_id": self.practice_session_id,
+            "session_id": self.session_id,
+            "practice_session_id": self.practice_session_id,  # Legacy support
             "activity_definition_id": self.activity_definition_id,
             "definition_name": self.definition.name if self.definition else "Unknown",
             "created_at": self.created_at.isoformat(timespec='seconds') + 'Z' if self.created_at else None,
@@ -535,7 +577,7 @@ class ProgramDay(Base):
     # Relationships
     block = relationship("ProgramBlock", back_populates="days")
     templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
-    completed_sessions = relationship("PracticeSession", back_populates="program_day", foreign_keys="[Goal.program_day_id]")
+    completed_sessions = relationship("Session", back_populates="program_day")
 
     def check_completion(self):
         """Check if all templates have been completed"""
@@ -578,58 +620,62 @@ def init_db(engine):
     Base.metadata.create_all(engine)
 
 def get_session(engine):
-    Session = sessionmaker(bind=engine)
-    return Session()
+    DBSession = sessionmaker(bind=engine)
+    return DBSession()
 
-def get_all_root_goals(session):
-    return session.query(Goal).filter(
-        Goal.parent_id == None,
-        Goal.type != 'PracticeSession'
+def get_all_root_goals(db_session):
+    return db_session.query(Goal).filter(
+        Goal.parent_id == None
     ).all()
 
-def get_goal_by_id(session, goal_id):
-    return session.query(Goal).filter(Goal.id == goal_id).first()
+def get_goal_by_id(db_session, goal_id):
+    return db_session.query(Goal).filter(Goal.id == goal_id).first()
 
-def get_practice_session_by_id(session, session_id):
-    # This now queries the goals table where type='PracticeSession'
-    return session.query(PracticeSession).filter(PracticeSession.id == session_id).first()
+def get_session_by_id(db_session, session_id):
+    """Get a session by its ID."""
+    return db_session.query(Session).filter(Session.id == session_id).first()
 
-def get_all_practice_sessions(session):
-    return session.query(PracticeSession).all()
+def get_all_sessions(db_session):
+    """Get all sessions."""
+    return db_session.query(Session).all()
 
-def get_immediate_goals_for_session(session, practice_session_id):
-    # Immediate goals are now just children of the session (which is a Goal)
-    # But since ImmediateGoal is a Goal, simple query works.
-    return session.query(Goal).filter(
-        Goal.type == 'ImmediateGoal',
-        Goal.parent_id == practice_session_id
-    ).all()
+def get_sessions_for_root(db_session, root_id):
+    """Get all sessions for a specific fractal (root goal)."""
+    return db_session.query(Session).filter(Session.root_id == root_id).all()
 
-def delete_goal_recursive(session, goal_id):
-    goal = get_goal_by_id(session, goal_id)
+def get_immediate_goals_for_session(db_session, session_id):
+    """Get ImmediateGoals associated with a session via the junction table."""
+    from sqlalchemy import select
+    stmt = select(Goal).join(session_goals).where(
+        session_goals.c.session_id == session_id,
+        session_goals.c.goal_type == 'immediate'
+    )
+    return db_session.execute(stmt).scalars().all()
+
+def delete_goal_recursive(db_session, goal_id):
+    goal = get_goal_by_id(db_session, goal_id)
     if goal:
-        session.delete(goal)
-        session.commit()
+        db_session.delete(goal)
+        db_session.commit()
         return True
     return False
 
-def delete_practice_session(session, session_id):
-    return delete_goal_recursive(session, session_id)
+def delete_session(db_session, session_id):
+    """Delete a session."""
+    session = get_session_by_id(db_session, session_id)
+    if session:
+        db_session.delete(session)
+        db_session.commit()
+        return True
+    return False
 
-def build_goal_tree(session, goal):
+def build_goal_tree(db_session, goal):
     # Goal.to_dict(include_children=True) uses the relationship, which is efficient/lazy loaded.
-    # But recursively, valid.
-    # IMPORTANT: The old logic manually queried children. SQLAlchemy 'children' relationship does that for us.
-    # However, to be safe and consistent with recursive formatting:
     return goal.to_dict(include_children=True)
 
-def build_practice_session_tree(session, practice_session):
-    # Same as goal tree now!
-    return build_goal_tree(session, practice_session)
-
 # Common 'root_id' finder
-def get_root_id_for_goal(session, goal_id):
-    goal = get_goal_by_id(session, goal_id)
+def get_root_id_for_goal(db_session, goal_id):
+    goal = get_goal_by_id(db_session, goal_id)
     if not goal: return None
     curr = goal
     count = 0
@@ -638,11 +684,35 @@ def get_root_id_for_goal(session, goal_id):
         count += 1
     return curr.id
 
-def validate_root_goal(session, root_id):
+def validate_root_goal(db_session, root_id):
     """
     Validate that a root_id exists and is actually a root goal (has no parent).
     """
-    goal = get_goal_by_id(session, root_id)
+    goal = get_goal_by_id(db_session, root_id)
     if goal and goal.parent_id is None:
         return goal
     return None
+
+
+# =============================================================================
+# LEGACY ALIASES (for backwards compatibility during migration)
+# =============================================================================
+
+# Alias for old PracticeSession references - use Session instead
+PracticeSession = Session
+
+def get_practice_session_by_id(db_session, session_id):
+    """DEPRECATED: Use get_session_by_id instead."""
+    return get_session_by_id(db_session, session_id)
+
+def get_all_practice_sessions(db_session):
+    """DEPRECATED: Use get_all_sessions instead."""
+    return get_all_sessions(db_session)
+
+def delete_practice_session(db_session, session_id):
+    """DEPRECATED: Use delete_session instead."""
+    return delete_session(db_session, session_id)
+
+def build_practice_session_tree(db_session, session):
+    """DEPRECATED: Use session.to_dict() instead."""
+    return session.to_dict()

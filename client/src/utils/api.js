@@ -265,7 +265,7 @@ export const fractalApi = {
     /**
      * Create an activity instance (without starting timer)
      * @param {string} rootId - ID of the fractal
-     * @param {Object} data - {instance_id, practice_session_id, activity_definition_id}
+     * @param {Object} data - {instance_id, session_id, activity_definition_id}
      */
     createActivityInstance: (rootId, data) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances`, data),
@@ -274,7 +274,7 @@ export const fractalApi = {
      * Start timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
+     * @param {Object} data - Optional {session_id, activity_definition_id}
      */
     startActivityTimer: (rootId, instanceId, data = {}) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`, data),
@@ -283,7 +283,7 @@ export const fractalApi = {
      * Stop timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
+     * @param {Object} data - Optional {session_id, activity_definition_id}
      */
     stopActivityTimer: (rootId, instanceId, data = {}) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`, data),
@@ -292,7 +292,7 @@ export const fractalApi = {
      * Update activity instance manually (e.g. set times)
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - {time_start, time_stop, practice_session_id, activity_definition_id}
+     * @param {Object} data - {time_start, time_stop, session_id, activity_definition_id}
      */
     updateActivityInstance: (rootId, instanceId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}`, data),
