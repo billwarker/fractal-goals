@@ -529,6 +529,19 @@ const ProgramDetail = () => {
     const programDaysMap = new Map();
     program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockColor: b.color })));
 
+    // Helper to get local date string from a datetime
+    const getLocalDateString = (dateTimeStr) => {
+        if (!dateTimeStr) return null;
+        // If it's already just a date (YYYY-MM-DD), return it
+        if (dateTimeStr.length === 10) return dateTimeStr;
+        // Otherwise parse and convert to local date
+        const d = new Date(dateTimeStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Render Sessions as Calendar Events (The "Scheduled" Reality)
     sessions.forEach(session => {
         let pDayId = session.program_day_id;
@@ -545,10 +558,13 @@ const ProgramDetail = () => {
             const isCompleted = session.session_end && moment(session.session_end).isValid();
 
             // Main Event - Show the scheduled day as a visible event
+            // Use local date to prevent timezone shift issues
+            const eventDate = getLocalDateString(session.session_start);
+
             calendarEvents.push({
                 id: `session-event-${session.id}`,
                 title: (isCompleted ? "✓ " : "📋 ") + pDay.name,
-                start: session.session_start ? session.session_start.split('T')[0] : null,
+                start: eventDate,
                 allDay: true,
                 backgroundColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
                 borderColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
@@ -622,7 +638,7 @@ const ProgramDetail = () => {
                             calendarEvents.push({
                                 id: `session-${s.id}`,
                                 title: `✓ ${s.name}`,
-                                start: s.created_at ? s.created_at.split('T')[0] : day.date,
+                                start: s.created_at ? getLocalDateString(s.created_at) : day.date,
                                 allDay: true,
                                 backgroundColor: '#2e7d32',
                                 borderColor: '#4caf50',

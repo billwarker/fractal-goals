@@ -67,14 +67,30 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
     // 2. Sessions (Planned & Completed handling)
     const completedSessions = [];
+
+    // Helper to get local date string from a datetime
+    const getLocalDateString = (dateTimeStr) => {
+        if (!dateTimeStr) return null;
+        // If it's already just a date (YYYY-MM-DD), return it
+        if (dateTimeStr.length === 10) return dateTimeStr;
+        // Otherwise parse and convert to local date
+        const d = new Date(dateTimeStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     if (sessions) {
         sessions.forEach(session => {
             const start = session.session_start || session.start_time;
-            // Check Date Match (first 10 chars = YYYY-MM-DD)
-            if (start && start.startsWith(date)) {
-                // Check Completion (session_end or time_stop or total_duration > 0?)
-                // Usually session_end is key.
-                if (session.session_end) {
+            // Convert to local date string for comparison
+            const sessionLocalDate = getLocalDateString(start);
+
+            if (sessionLocalDate === date) {
+                // Check Completion - use explicit completed flag, not just session_end
+                const isCompleted = session.completed || session.attributes?.completed;
+                if (isCompleted) {
                     completedSessions.push(session);
                 } else {
                     // It's a Planned Session (Scheduled Day)
@@ -99,7 +115,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     }) : [];
 
     const formatDate = (dateString) => {
-        const d = new Date(dateString);
+        // Parse as local date by appending noon time to avoid timezone shifts
+        // YYYY-MM-DD strings are interpreted as UTC, which can shift the date
+        const [year, month, day] = dateString.split('-').map(Number);
+        const d = new Date(year, month - 1, day); // month is 0-indexed
         return d.toLocaleDateString('en-US', {
             weekday: 'long',
             month: 'long',
@@ -255,10 +274,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         border: '1px solid #333'
                                     }}>
                                         <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
-                                            {moment(session.start_time).format('h:mm A')} - {session.name || 'Untitled Session'}
+                                            {moment.utc(session.session_end || session.session_start).local().format('h:mm A')} - {session.name || 'Untitled Session'}
                                         </div>
                                         <div style={{ color: '#888', fontSize: '12px', marginTop: '4px' }}>
-                                            Duration: {moment.duration(session.total_duration_seconds, 'seconds').humanize()}
+                                            Duration: {session.total_duration_seconds ? moment.duration(session.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
                                         </div>
                                     </div>
                                 ))}
