@@ -36,7 +36,7 @@ function Selection() { // No props needed anymore
     };
 
     const handleSelectRoot = (rootId) => {
-        navigate(`/${rootId}/fractal-goals`);
+        navigate(`/${rootId}/goals`);
     };
 
     const handleCreateSubmit = async (data) => {

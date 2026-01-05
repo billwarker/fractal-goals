@@ -889,7 +889,7 @@ function Log() {
 
                         {goals.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                                <p>No short-term goals found. Create goals in the Fractal View first.</p>
+                                <p>No short-term goals found. Create goals in the Goals page first.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
