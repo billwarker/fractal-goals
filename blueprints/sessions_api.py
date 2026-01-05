@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import uuid
 import models
+from sqlalchemy import text
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
@@ -259,16 +260,38 @@ def create_fractal_session(root_id):
         # Get request data
         data = request.get_json()
         
-        # Parse dates
-        s_start = data.get('session_start')
-        if s_start and isinstance(s_start, str):
-             try: s_start = datetime.fromisoformat(s_start.replace('Z', '+00:00'))
-             except: s_start = None
+        # Parse dates - handle multiple formats
+        # DEBUG LOGGING TO FILE
+        with open('/tmp/fractal_debug.log', 'a') as f:
+            f.write(f"\n--- SESSION CREATION DEBUG ---\n")
+            f.write(f"Raw session_start: {data.get('session_start')}\n")
+            f.write(f"Type: {type(data.get('session_start'))}\n")
 
-        s_end = data.get('session_end')
-        if s_end and isinstance(s_end, str):
-             try: s_end = datetime.fromisoformat(s_end.replace('Z', '+00:00'))
-             except: s_end = None
+        def parse_datetime(dt_str):
+            if not dt_str or not isinstance(dt_str, str):
+                return None
+            try:
+                # Try ISO format with timezone
+                val = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+                return val
+            except:
+                pass
+            try:
+                # Try datetime-local format (YYYY-MM-DDTHH:MM:SS without timezone)
+                if 'T' in dt_str:
+                    return datetime.strptime(dt_str.split('.')[0], '%Y-%m-%dT%H:%M:%S')
+            except:
+                pass
+            try:
+                # Try date-only format (YYYY-MM-DD) - treat as midnight local time
+                if len(dt_str) == 10:
+                    return datetime.strptime(dt_str, '%Y-%m-%d')
+            except:
+                pass
+            return None
+        
+        s_start = parse_datetime(data.get('session_start'))
+        s_end = parse_datetime(data.get('session_end'))
 
         # Parse session_data
         session_data = data.get('session_data', {})
@@ -309,7 +332,7 @@ def create_fractal_session(root_id):
                     new_session.program_day_id = program_day_id
             except (json.JSONDecodeError, TypeError):
                 pass
-
+        
         db_session.add(new_session)
         db_session.flush()  # Get the ID before committing
         
@@ -352,6 +375,23 @@ def create_fractal_session(root_id):
                 program_day.is_completed = program_day.check_completion()
         
         db_session.commit()
+        
+        # FORCE UPDATE session_start/end because sometimes time is stripped
+        if s_start or s_end:
+            from sqlalchemy import text
+            params = {'id': new_session.id}
+            update_clauses = []
+            if s_start:
+                update_clauses.append("session_start = :start")
+                params['start'] = s_start
+            if s_end:
+                update_clauses.append("session_end = :end")
+                params['end'] = s_end
+            
+            if update_clauses:
+                sql = f"UPDATE sessions SET {', '.join(update_clauses)} WHERE id = :id"
+                db_session.execute(text(sql), params)
+                db_session.commit()
         
         # Refresh to load the goals relationship
         db_session.refresh(new_session)

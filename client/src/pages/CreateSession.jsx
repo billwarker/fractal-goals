@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { GOAL_COLORS } from '../utils/goalColors';
-import { getTodayLocalDate } from '../utils/dateUtils';
+import { getLocalISOString } from '../utils/dateUtils';
 import '../App.css';
 
 /**
@@ -285,8 +285,8 @@ function Log() {
             });
 
             // Create the practice session
-            // Use getTodayLocalDate() for consistent timezone handling
-            const today = getTodayLocalDate();
+            // Use getLocalISOString() for current datetime with timezone handling
+            const sessionStart = getLocalISOString();
 
             const sessionData = {
                 name: selectedTemplate.name,
@@ -294,7 +294,7 @@ function Log() {
                 parent_ids: selectedGoalIds,
                 immediate_goal_ids: selectedImmediateGoalIds, // Include selected existing IGs
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
-                session_start: today, // Add session_start for calendar visibility
+                session_start: sessionStart, // Add session_start for calendar visibility
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,

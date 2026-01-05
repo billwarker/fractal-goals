@@ -286,12 +286,10 @@ function SessionDetail() {
         let needsUpdate = false;
         const updatedData = { ...sessionData };
 
-        // Initialize session_start with created_at if not set (as local date only)
+        // Initialize session_start with created_at if not set (preserve full datetime)
         if (!updatedData.session_start && session.attributes?.created_at) {
-            // Extract local date from created_at to avoid timezone issues
-            const createdDate = new Date(session.attributes.created_at);
-            const localDate = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}-${String(createdDate.getDate()).padStart(2, '0')}`;
-            updatedData.session_start = localDate;
+            // Use the full datetime from created_at to preserve the time component
+            updatedData.session_start = session.attributes.created_at;
             needsUpdate = true;
         }
 
@@ -624,12 +622,12 @@ function SessionDetail() {
                 }
             }
 
-            const res = await fractalApi.toggleGoalCompletion(rootId, sessionId, newCompleted);
-            // The endpoint returns the practice session tree directly, not wrapped in {goal: ...}
+            const res = await fractalApi.updateSession(rootId, sessionId, { completed: newCompleted });
+            // Update the full session object from the response
             setSession(res.data);
         } catch (err) {
             console.error('Error toggling completion:', err);
-            alert('Error updating completion status');
+            alert('Error updating completion status: ' + (err.response?.data?.error || err.message));
         }
     };
 
