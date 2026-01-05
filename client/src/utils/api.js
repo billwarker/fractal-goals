@@ -43,6 +43,13 @@ export const fractalApi = {
     getGoals: (rootId) => axios.get(`${API_BASE}/${rootId}/goals`),
 
     /**
+     * Get active ShortTermGoals and ImmediateGoals for selection
+     * Optimized endpoint that avoids fetching the full tree
+     * @param {string} rootId - ID of the fractal
+     */
+    getGoalsForSelection: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/selection`),
+
+    /**
      * Get a specific goal by ID
      * @param {string} rootId - ID of the fractal
      * @param {string} goalId - ID of the goal to fetch

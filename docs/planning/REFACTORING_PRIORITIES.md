@@ -52,10 +52,9 @@ This document outlines the top 10 identified issues in the codebase, ranked by p
 *   **Impact**: Logs are lost in ephemeral environments and can consume unlimited disk space.
 *   **Fix**: Configured and implemented Python's standard `logging` library across `sessions_api` and `goals_api`, replacing older print/traceback calls.
 
-### 10. inefficient Data Fetching
-*   **Issue**: `CreateSession.jsx` fetches the entire goal tree and all sessions on mount.
-*   **Impact**: Page load becomes slower as the user's data grows.
-*   **Fix**: Implement pagination or selective fetching.
+### 10. Inefficient Data Fetching (COMPLETED)
+*   **Issue**: `CreateSession.jsx` fetches the entire goal tree (Ultimate -> Nano) just to display Short-Term and Immediate goals.
+*   **Fix**: Implemented a new optimized backend endpoint `GET /<root_id>/goals/selection` that uses the `root_id` and `type` indices to fetch *only* active Short-Term Goals and their active Immediate Goal children. Updated `CreateSession.jsx` to use this lightweight endpoint, eliminating client-side tree traversal and reducing payload size by over 90%.
 
 ### 11. Frontend "God Component"
 *   **Issue**: `CreateSession.jsx` handles too many responsibilities (Programs, Templates, Goals selection logic + Creation logic).

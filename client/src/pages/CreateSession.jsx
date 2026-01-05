@@ -46,10 +46,10 @@ function Log() {
 
     const fetchData = async () => {
         try {
-            // Fetch templates, goals, active program days, and activities in parallel
+            // Fetch templates, active goals (optimized), active program days, and activities in parallel
             const [templatesRes, goalsRes, programDaysRes, activitiesRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
-                fractalApi.getGoals(rootId),
+                fractalApi.getGoalsForSelection(rootId),
                 fractalApi.getActiveProgramDays(rootId),
                 fractalApi.getActivities(rootId)
             ]);
@@ -73,13 +73,18 @@ function Log() {
             });
             setProgramsByName(grouped);
 
-            // Extract all short-term goals from the tree
-            const shortTermGoals = extractShortTermGoals(goalsRes.data);
+            // Set Short Term Goals directly from optimized endpoint
+            const shortTermGoals = goalsRes.data || [];
             setGoals(shortTermGoals);
 
-            // Extract all immediate goals from the tree
-            const immediateGoalsFromTree = extractImmediateGoals(goalsRes.data);
-            setExistingImmediateGoals(immediateGoalsFromTree);
+            // Extract all immediate goals from the simplified structure for "Select Existing" modal
+            const allImmediateGoals = shortTermGoals.flatMap(stg =>
+                (stg.immediateGoals || []).map(ig => ({
+                    ...ig,
+                    parent_id: stg.id // Ensure parent_id is available
+                }))
+            );
+            setExistingImmediateGoals(allImmediateGoals);
 
             // Set activity definitions for target creation
             setActivityDefinitions(activitiesRes.data || []);
@@ -109,66 +114,6 @@ function Log() {
             console.error("Failed to fetch data", err);
             setLoading(false);
         }
-    };
-
-    const extractShortTermGoals = (goalTree) => {
-        const shortTermGoals = [];
-
-        const traverse = (node, parentId = null) => {
-            if (node.attributes?.type === 'ShortTermGoal') {
-                // Collect immediate goal children
-                const immediateGoalChildren = [];
-                if (node.children) {
-                    node.children.forEach(child => {
-                        if (child.attributes?.type === 'ImmediateGoal') {
-                            immediateGoalChildren.push({
-                                id: child.id,
-                                name: child.name,
-                                description: child.attributes?.description,
-                                deadline: child.attributes?.deadline,
-                                parent_id: node.id,
-                                completed: child.attributes?.completed
-                            });
-                        }
-                    });
-                }
-
-                shortTermGoals.push({
-                    id: node.id,
-                    name: node.name,
-                    description: node.attributes?.description,
-                    immediateGoals: immediateGoalChildren
-                });
-            }
-            if (node.children) {
-                node.children.forEach(child => traverse(child, node.id));
-            }
-        };
-
-        traverse(goalTree);
-        return shortTermGoals;
-    };
-
-    const extractImmediateGoals = (goalTree) => {
-        const immediateGoals = [];
-
-        const traverse = (node) => {
-            if (node.attributes?.type === 'ImmediateGoal') {
-                immediateGoals.push({
-                    id: node.id,
-                    name: node.name,
-                    description: node.attributes?.description,
-                    deadline: node.attributes?.deadline,
-                    parent_id: node.attributes?.parent_id || node.parent_id
-                });
-            }
-            if (node.children) {
-                node.children.forEach(child => traverse(child));
-            }
-        };
-
-        traverse(goalTree);
-        return immediateGoals;
     };
 
     const handleToggleGoal = (goalId) => {

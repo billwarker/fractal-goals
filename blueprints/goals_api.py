@@ -411,6 +411,56 @@ def get_fractal_goals(root_id):
         db_session.close()
 
 
+@goals_bp.route('/<root_id>/goals/selection', methods=['GET'])
+def get_active_goals_for_selection(root_id):
+    """
+    Get active ShortTermGoals and their active ImmediateGoals for session creation.
+    Excludes completed goals.
+    """
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Query ShortTermGoals directly using root_id index
+        # Filter for active (not completed) goals only
+        st_goals = db_session.query(Goal).filter(
+            Goal.root_id == root_id,
+            Goal.type == 'ShortTermGoal',
+            Goal.completed == False,
+            Goal.deleted_at == None
+        ).all()
+        
+        result = []
+        for stg in st_goals:
+            # Manually find active children to avoid loading entire tree or deleted items
+            active_children = [
+                child.to_dict(include_children=False) 
+                for child in stg.children 
+                if child.type == 'ImmediateGoal' and not child.completed and not child.deleted_at
+            ]
+            
+            stg_dict = {
+                "id": stg.id,
+                "name": stg.name,
+                "description": stg.description,
+                "deadline": stg.deadline.isoformat() if stg.deadline else None,
+                "completed": stg.completed,
+                "immediateGoals": active_children
+            }
+            result.append(stg_dict)
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.exception("Error fetching selection goals")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
 @goals_bp.route('/<root_id>/goals', methods=['POST'])
 def create_fractal_goal(root_id):
     """Create a new goal within a fractal."""
