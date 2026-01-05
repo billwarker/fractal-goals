@@ -11,6 +11,7 @@ import ProgramBlockModal from '../components/modals/ProgramBlockModal';
 import ProgramDayModal from '../components/modals/ProgramDayModal';
 import AttachGoalModal from '../components/modals/AttachGoalModal';
 import DayViewModal from '../components/modals/DayViewModal';
+import ConfirmationModal from '../components/ConfirmationModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 
@@ -46,6 +47,8 @@ const ProgramDetail = () => {
     // Day View Modal State (for viewing/adding days to a specific date)
     const [showDayViewModal, setShowDayViewModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
+    const [unscheduleConfirmOpen, setUnscheduleConfirmOpen] = useState(false);
+    const [itemToUnschedule, setItemToUnschedule] = useState(null);
 
     // Goal Detail Modal State (for calendar clicks)
     const [showGoalModal, setShowGoalModal] = useState(false);
@@ -307,13 +310,59 @@ const ProgramDetail = () => {
         }
     };
 
+    // Handler to open confirmation modal
+    const handleUnscheduleDay = (item) => {
+        setItemToUnschedule(item);
+        setUnscheduleConfirmOpen(true);
+    };
+
+    // Executor for unscheduling (called by modal)
+    const executeUnscheduleDay = async () => {
+        if (!itemToUnschedule) return;
+
+        const item = itemToUnschedule;
+        try {
+            if (item.type === 'session') {
+                await fractalApi.deleteSession(rootId, item.id);
+                fetchSessions();
+            } else {
+                // Legacy Program Day (Instance)
+                if (!item.blockId) {
+                    console.error("Cannot delete day without blockId");
+                    return;
+                }
+                await fractalApi.deleteBlockDay(rootId, program.id, item.blockId, item.id);
+                fetchProgramData();
+            }
+        } catch (err) {
+            console.error('Failed to unschedule day:', err);
+            alert('Failed to unschedule day: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setUnscheduleConfirmOpen(false);
+            setItemToUnschedule(null);
+        }
+    };
+
     // Handler for scheduling a day (creates a Planned Session linked to the Template Day)
     const handleScheduleDay = async (blockId, date, templateDay) => {
         try {
+            // Determine Parent Goals (Block Goals > Program Goals > Root Fallback)
+            const block = program.blocks.find(b => b.id === blockId);
+            const parentIds = new Set([
+                ...(block?.goal_ids || []),
+                ...(program.goal_ids || [])
+            ]);
+
+            // Fallback to rootId if no specific goals targeted, to satisfy backend requirement
+            if (parentIds.size === 0) {
+                parentIds.add(rootId);
+            }
+
             await fractalApi.createSession(rootId, {
                 name: templateDay ? templateDay.name : 'Ad-hoc Session',
                 session_start: date, // YYYY-MM-DD (Backend handles ISO)
-                attributes: {
+                parent_ids: Array.from(parentIds),
+                session_data: {
                     program_context: {
                         day_id: templateDay ? templateDay.id : null,
                         block_id: blockId,
@@ -322,6 +371,8 @@ const ProgramDetail = () => {
                 }
             });
             await fetchSessions(); // Refresh sessions to update calendar
+            // Sync program data to be safe (though templates shouldn't change, side effects might occur)
+            await fetchProgramData();
             // no need to fetchProgramData if we rely on sessions for calendar, 
             // but might be good to sync if side effects exist
 
@@ -478,6 +529,19 @@ const ProgramDetail = () => {
     const programDaysMap = new Map();
     program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockColor: b.color })));
 
+    // Helper to get local date string from a datetime
+    const getLocalDateString = (dateTimeStr) => {
+        if (!dateTimeStr) return null;
+        // If it's already just a date (YYYY-MM-DD), return it
+        if (dateTimeStr.length === 10) return dateTimeStr;
+        // Otherwise parse and convert to local date
+        const d = new Date(dateTimeStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Render Sessions as Calendar Events (The "Scheduled" Reality)
     sessions.forEach(session => {
         let pDayId = session.program_day_id;
@@ -493,35 +557,26 @@ const ProgramDetail = () => {
             const pDay = programDaysMap.get(pDayId);
             const isCompleted = session.session_end && moment(session.session_end).isValid();
 
-            // Base Event (Text Label)
+            // Main Event - Show the scheduled day as a visible event
+            // Use local date to prevent timezone shift issues
+            const eventDate = getLocalDateString(session.session_start);
+
             calendarEvents.push({
                 id: `session-event-${session.id}`,
-                title: (isCompleted ? "✓ " : "") + pDay.name,
-                start: session.session_start ? session.session_start.split('T')[0] : null,
+                title: (isCompleted ? "✓ " : "📋 ") + pDay.name,
+                start: eventDate,
                 allDay: true,
-                backgroundColor: 'transparent',
-                borderColor: 'transparent',
-                textColor: isCompleted ? '#4caf50' : 'rgba(255,255,255,0.9)',
-                classNames: ['day-label-event']
+                backgroundColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
+                borderColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
+                textColor: 'white',
+                classNames: ['scheduled-day-event'],
+                extendedProps: {
+                    type: 'scheduled_day',
+                    sessionId: session.id,
+                    programDayId: pDayId,
+                    dayName: pDay.name
+                }
             });
-
-            // Render Templates (The "Plan") from the Abstract Day
-            // Only if not completed? Or filter logic?
-            // Usually we show templates as gray bars.
-            if (pDay.templates) {
-                pDay.templates.forEach(t => {
-                    calendarEvents.push({
-                        id: `session-tmpl-${session.id}-${t.id}`,
-                        title: t.name,
-                        start: session.session_start ? session.session_start.split('T')[0] : null,
-                        allDay: true,
-                        backgroundColor: isCompleted ? '#2e7d32' : '#37474F', // Green if done, Gray if planned
-                        borderColor: 'transparent',
-                        textColor: isCompleted ? 'white' : '#CFD8DC',
-                        extendedProps: { type: 'session_template', ...t }
-                    });
-                });
-            }
         }
     });
     sortedBlocks.forEach(block => {
@@ -583,7 +638,7 @@ const ProgramDetail = () => {
                             calendarEvents.push({
                                 id: `session-${s.id}`,
                                 title: `✓ ${s.name}`,
-                                start: s.created_at ? s.created_at.split('T')[0] : day.date,
+                                start: s.created_at ? getLocalDateString(s.created_at) : day.date,
                                 allDay: true,
                                 backgroundColor: '#2e7d32',
                                 borderColor: '#4caf50',
@@ -597,9 +652,16 @@ const ProgramDetail = () => {
         }
     });
 
-    // Add Goal Events (for all program goals with deadlines)
+    // Add Goal Events (only for goals attached to this program or its blocks)
+    // Collect all goal IDs that are attached to this program
+    const attachedGoalIds = new Set([
+        ...(program.goal_ids || []),
+        ...sortedBlocks.flatMap(b => b.goal_ids || [])
+    ]);
+
     goals.forEach(goal => {
-        if (goal.deadline) {
+        // Only show goals that are attached to this program AND have a deadline
+        if (goal.deadline && attachedGoalIds.has(goal.id)) {
             const goalType = goal.attributes?.type || goal.type;
             calendarEvents.push({
                 id: `goal-${goal.id}`,
@@ -719,7 +781,7 @@ const ProgramDetail = () => {
                                             {goalType?.replace(/([A-Z])/g, ' $1').trim()}
                                         </div>
                                         <div style={{ color: 'white', fontSize: '13px', fontWeight: 400 }}>{goal.name}</div>
-                                        {goal.deadline && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Target: {formatDate(goal.deadline)}</div>}
+                                        {goal.deadline && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Deadline: {formatDate(goal.deadline)}</div>}
                                     </div>
                                 );
                             })}
@@ -960,7 +1022,17 @@ const ProgramDetail = () => {
                 onSetGoalDeadline={handleSetGoalDeadline}
                 blocks={sortedBlocks}
                 onScheduleDay={handleScheduleDay}
+                onUnscheduleDay={handleUnscheduleDay}
                 sessions={sessions}
+            />
+
+            <ConfirmationModal
+                isOpen={unscheduleConfirmOpen}
+                onClose={() => setUnscheduleConfirmOpen(false)}
+                onConfirm={executeUnscheduleDay}
+                title="Unschedule Day"
+                message={`Are you sure you want to unschedule ${itemToUnschedule?.name || 'this day'}?`}
+                confirmText="Unschedule"
             />
 
             <GoalDetailModal

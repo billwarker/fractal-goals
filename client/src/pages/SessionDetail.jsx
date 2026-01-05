@@ -140,10 +140,18 @@ function SessionDetail() {
                     session_data: JSON.stringify(metadataOnly)
                 };
 
-                // Normalize datetime formats to standard ISO (backend expects consistent format)
+                // Normalize datetime formats - but preserve date-only strings!
+                // If session_start is just a date (YYYY-MM-DD), keep it as-is to avoid timezone issues
                 if (sessionData.session_start) {
-                    const startDate = new Date(sessionData.session_start);
-                    updatePayload.session_start = startDate.toISOString();
+                    const startVal = sessionData.session_start;
+                    // If it's a 10-char date string (YYYY-MM-DD), keep as-is
+                    if (typeof startVal === 'string' && startVal.length === 10) {
+                        updatePayload.session_start = startVal;
+                    } else {
+                        // It's a full datetime, convert to ISO
+                        const startDate = new Date(startVal);
+                        updatePayload.session_start = startDate.toISOString();
+                    }
                 }
                 if (sessionData.session_end) {
                     const endDate = new Date(sessionData.session_end);
@@ -269,9 +277,12 @@ function SessionDetail() {
         let needsUpdate = false;
         const updatedData = { ...sessionData };
 
-        // Initialize session_start with created_at if not set
+        // Initialize session_start with created_at if not set (as local date only)
         if (!updatedData.session_start && session.attributes?.created_at) {
-            updatedData.session_start = session.attributes.created_at;
+            // Extract local date from created_at to avoid timezone issues
+            const createdDate = new Date(session.attributes.created_at);
+            const localDate = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}-${String(createdDate.getDate()).padStart(2, '0')}`;
+            updatedData.session_start = localDate;
             needsUpdate = true;
         }
 

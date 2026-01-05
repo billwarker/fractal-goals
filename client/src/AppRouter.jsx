@@ -113,7 +113,7 @@ function App() {
         if (!rootId || rootId === '') return null;
 
         const navItems = [
-            { path: `/${rootId}/fractal-goals`, label: 'FRACTAL VIEW' },
+            { path: `/${rootId}/goals`, label: 'GOALS' },
             { path: `/${rootId}/programs`, label: 'PROGRAMS' },
             { path: `/${rootId}/sessions`, label: 'SESSIONS' },
             { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
@@ -177,7 +177,7 @@ function App() {
                     ) : (
                         <Routes>
                             <Route
-                                path="/:rootId/fractal-goals"
+                                path="/:rootId/goals"
                                 element={<FractalGoals />}
                             />
                             <Route path="/:rootId/programs" element={<Programs />} />

@@ -282,6 +282,35 @@ def create_fractal_session(root_id):
              try: s_end = datetime.fromisoformat(s_end.replace('Z', '+00:00'))
              except: s_end = None
 
+        # Check for program_day_id to enforce single-day-per-date constraint
+        session_data = data.get('session_data', {})
+        if isinstance(session_data, str):
+            try:
+                session_data = json.loads(session_data)
+            except:
+                session_data = {}
+        
+        program_context = session_data.get('program_context', {})
+        incoming_day_id = program_context.get('day_id')
+        
+        # If scheduling a program day, check if date already has a scheduled session
+        if incoming_day_id and s_start:
+            # Normalize date for comparison (strip time component)
+            check_date = s_start.date() if hasattr(s_start, 'date') else s_start
+            
+            # Query for existing sessions on this date with a program_day_id
+            from sqlalchemy import func, cast, Date
+            existing = db_session.query(PracticeSession).filter(
+                PracticeSession.root_id == root_id,
+                PracticeSession.program_day_id.isnot(None),
+                func.date(PracticeSession.session_start) == check_date
+            ).first()
+            
+            if existing:
+                return jsonify({
+                    "error": f"A program day is already scheduled for this date. Please unschedule '{existing.name}' first."
+                }), 400
+
         # Create the practice session
         new_session = PracticeSession(
             name=data.get('name', 'Untitled Session'),

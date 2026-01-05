@@ -261,11 +261,17 @@ function Log() {
             });
 
             // Create the practice session
+            // Set session_start to today (LOCAL date, not UTC!)
+            // Note: toISOString() gives UTC date which can be tomorrow in late evening EST
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
             const sessionData = {
                 name: selectedTemplate.name,
                 description: selectedTemplate.description || '',
                 parent_ids: selectedGoalIds,
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
+                session_start: today, // Add session_start for calendar visibility
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
@@ -889,7 +895,7 @@ function Log() {
 
                         {goals.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                                <p>No short-term goals found. Create goals in the Fractal View first.</p>
+                                <p>No short-term goals found. Create goals in the Goals page first.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

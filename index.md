@@ -459,7 +459,10 @@ Detailed view of a single program/template.
   - Edit existing blocks (name, dates, color)
   - Delete blocks with confirmation dialog and cascade warning
   - Active block indicators
-- Add and edit program days with efficient copy functionality
+- **Scheduling (New Architecture):**
+  - "Assigning" a Program Day to a calendar date creates a **Practice Session** (linked to the template) rather than duplicating the Program Day definition.
+  - Calendar displays these "Planned Sessions" unified with "Completed Sessions".
+- **Legacy Support:** view completed sessions linked to program days
 - Attach goals to blocks with deadline management
 - View completed sessions linked to program days
 
@@ -671,6 +674,9 @@ From `/my-implementation-plans/features.txt`:
   - Production schema now matches development schema
 - **CreateSession Page:** Fixed styling consistency (colors), added multi-selection for existing immediate goals, corrected API call for updating goals (fixed 404 error).
 - **Backend API:** Updated `update_fractal_goal` to allow reparenting via `parent_id` (enabling attachment of existing goals to sessions).
+- **Program Scheduling Refactor:** Shifted from "Copying Program Days" to "Creating Practice Sessions linked to Templates". This prevents clutter in the Blocks view and streamlines the data model.
+- **DayViewModal:** Unified display of Scheduled Program Days (Sessions) and Legacy Days, added "Unassign" capability, and restricted single-day scheduling.
+- **Calendar Rendering Fix:** Added `program_day_id` to `Goal.to_dict()` serialization so scheduled sessions properly link to their template program days for calendar display.
 
 ---
 

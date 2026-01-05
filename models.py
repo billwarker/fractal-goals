@@ -92,6 +92,7 @@ class Goal(Base):
             "id": self.id,
             "description": self.description,
             "deadline": self.deadline.isoformat() if self.deadline else None,
+            "program_day_id": self.program_day_id,  # Include for calendar rendering
             "attributes": {
                 "id": self.id,
                 "type": self.type,
