@@ -1,8 +1,11 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import uuid
+import logging
 import models
+
+logger = logging.getLogger(__name__)
 from models import (
     get_session,
     Goal, Session,
@@ -45,7 +48,7 @@ def create_goal():
         parent_id = data.get('parent_id')
         
         if parent_id:
-            print(f"DEBUG: Looking for parent with ID: {parent_id}")
+            logger.debug(f"Looking for parent with ID: {parent_id}")
             parent = get_goal_by_id(db_session, parent_id)
             if not parent:
                 return jsonify({"error": f"Parent not found: {parent_id}"}), 404
@@ -93,7 +96,7 @@ def create_goal():
         db_session.commit()
         db_session.refresh(new_goal)
         
-        print(f"DEBUG: Created goal {new_goal.id}")
+        logger.debug(f"Created goal {new_goal.id}")
         
         # Return the goal with its tree
         result = build_goal_tree(db_session, new_goal)
@@ -110,7 +113,7 @@ def create_goal():
 @goals_bp.route('/goals/<goal_id>', methods=['DELETE'])
 def delete_goal_endpoint(goal_id: str):
     """Delete a goal and all its children."""
-    print(f"DEBUG: Attempting to delete goal with ID: {goal_id}")
+    logger.debug(f"Attempting to delete goal with ID: {goal_id}")
     
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -120,11 +123,11 @@ def delete_goal_endpoint(goal_id: str):
             is_root = goal.parent_id is None
             db_session.delete(goal)
             db_session.commit()
-            print(f"DEBUG: Deleted {'root ' if is_root else ''}goal {goal_id}")
+            logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")
             return jsonify({"status": "success", "message": f"{'Root g' if is_root else 'G'}oal deleted"})
         
         # Not found
-        print(f"DEBUG: Goal {goal_id} not found")
+        logger.warning(f"Goal {goal_id} not found")
         return jsonify({"error": "Goal not found"}), 404
         
     except Exception as e:
@@ -177,11 +180,11 @@ def update_goal_endpoint(goal_id: str):
             if 'deadline' in data:
                 goal.deadline = deadline
             if 'targets' in data:
-                print(f"DEBUG: Received targets data: {data['targets']}")
+                logger.debug(f"Received targets data: {data['targets']}")
                 goal.targets = json.dumps(data['targets']) if data['targets'] else None
-                print(f"DEBUG: Stored targets in goal: {goal.targets}")
+                logger.debug(f"Stored targets in goal: {goal.targets}")
             db_session.commit()
-            print(f"DEBUG: Committed changes. Goal targets after commit: {goal.targets}")
+            logger.debug(f"Committed changes. Goal targets after commit: {goal.targets}")
             return jsonify(goal.to_dict(include_children=False))
         
         return jsonify({"error": "Goal not found"}), 404
@@ -267,7 +270,7 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
             
             # Set or clear completed_at based on completion status
             if goal.completed:
-                goal.completed_at = datetime.now()
+                goal.completed_at = datetime.now(timezone.utc)
             else:
                 goal.completed_at = None
                 

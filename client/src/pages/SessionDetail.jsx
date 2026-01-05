@@ -5,7 +5,7 @@ import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatForInput, localToISO } from '../utils/dateUtils';
+import { formatForInput, localToISO, formatDateInTimezone } from '../utils/dateUtils';
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
@@ -70,20 +70,7 @@ function formatDuration(seconds) {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-/**
- * Format datetime to readable format
- */
-function formatDateTime(isoString) {
-    if (!isoString) return 'N/A';
-    const date = new Date(isoString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
+// function formatDateTime(isoString) removed - using formatDateInTimezone instead
 
 /**
  * Session Detail Page
@@ -861,7 +848,7 @@ function SessionDetail() {
                     {/* Row 1, Column 3: Date Created */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Date Created:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.created_at)}</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.created_at, timezone)}</span>
                     </div>
 
                     {/* Row 1, Column 4: Total Duration (Planned) */}
@@ -956,7 +943,7 @@ function SessionDetail() {
                     {/* Row 2, Column 3: Last Modified */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Last Modified:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.updated_at)}</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.updated_at, timezone)}</span>
                     </div>
 
                     {/* Row 2, Column 4: Total Duration (Completed) */}

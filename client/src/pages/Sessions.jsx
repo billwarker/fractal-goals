@@ -4,6 +4,8 @@ import { fractalApi } from '../utils/api';
 import { useHeader } from '../context/HeaderContext';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import { GOAL_COLORS, getGoalTextColor } from '../utils/goalColors';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../utils/dateUtils';
 import '../App.css';
 
 /**
@@ -13,6 +15,7 @@ import '../App.css';
 function Sessions() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const timezone = useTimezone();
     // Local page header is now rendered directly
 
 
@@ -84,10 +87,10 @@ function Sessions() {
     });
 
     // Helper to format date - handles timezone correctly
-    const formatDate = (dateString) => {
+    const formatDate = (dateString, options = {}) => {
         if (!dateString) return '';
         // If it's just a date (YYYY-MM-DD), parse as local date
-        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-')) {
+        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-') && !dateString.includes('T')) {
             const [year, month, day] = dateString.split('-').map(Number);
             const date = new Date(year, month - 1, day);
             return date.toLocaleDateString('en-US', {
@@ -96,11 +99,11 @@ function Sessions() {
                 year: 'numeric'
             });
         }
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+        return formatDateInTimezone(dateString, timezone, {
             month: 'short',
             day: 'numeric',
-            year: 'numeric'
+            year: 'numeric',
+            ...options
         });
     };
 
@@ -108,14 +111,20 @@ function Sessions() {
     const formatTime = (dateString) => {
         if (!dateString) return '';
         // If it's just a date (no time component), don't show time
-        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-')) {
+        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-') && !dateString.includes('T')) {
             return '';
         }
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('en-US', {
+        // Extract time part using formatDateInTimezone
+        const formatted = formatDateInTimezone(dateString, timezone, {
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: true
         });
+
+        // If formatDateInTimezone returns a full date string for some reason, try to parse just time, 
+        // but typically with these options it returns just the time part if dealing with known locale.
+        // Actually, Intl.DateTimeFormat with only time options returns only time.
+        return formatted;
     };
 
     // Helper to get formatted duration from activity instances

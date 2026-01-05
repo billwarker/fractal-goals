@@ -320,9 +320,11 @@ function Log() {
             const createdSessionId = response.data.id;
 
             // Create NEW immediate goals (ones created inline during session creation)
+
             const newImmediateGoals = immediateGoals.filter(g => g.isNew);
             if (newImmediateGoals.length > 0) {
-                for (const goal of newImmediateGoals) {
+                // Use Promise.all to create goals in parallel
+                await Promise.all(newImmediateGoals.map(async (goal) => {
                     // Create the immediate goal with its STG parent
                     const createdGoal = await fractalApi.createGoal(rootId, {
                         name: goal.name,
@@ -337,7 +339,7 @@ function Log() {
                     if (createdGoal.data?.id) {
                         await fractalApi.addSessionGoal(rootId, createdSessionId, createdGoal.data.id, 'immediate');
                     }
-                }
+                }));
             }
 
             // Navigate to the session detail page to fill in details

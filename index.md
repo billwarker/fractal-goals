@@ -709,6 +709,10 @@ From `/my-implementation-plans/features.txt`:
 - **Program Scheduling Refactor:** Shifted from "Copying Program Days" to "Creating Practice Sessions linked to Templates". This prevents clutter in the Blocks view and streamlines the data model.
 - **DayViewModal:** Unified display of Scheduled Program Days (Sessions) and Legacy Days, added "Unassign" capability, and restricted single-day scheduling.
 - **Calendar Rendering Fix:** Added `program_day_id` to `Goal.to_dict()` serialization so scheduled sessions properly link to their template program days for calendar display.
+- **Datetime Standardization:** Refactored backend `Session.to_dict` to explicitly return UTC-formatted ISO strings (`Z` suffix). Updated Frontend (`SessionDetail`, `Sessions`) to use `formatDateInTimezone` for consistent Local Time display.
+- **Backend Performance:** Optimized `get_session_activities` with eager loading to eliminate N+1 queries. Removed dead code `sync_session_activities`.
+- **Frontend Performance:** Refactored `CreateSession.jsx` to parallelize immediate goal creation requests using `Promise.all`.
+- **Logging Standardization:** Replaced ad-hoc `print` and `traceback.print_exc` calls with Python's standard `logging` library in `sessions_api.py` and `goals_api.py` for better observability.
 
 ---
 

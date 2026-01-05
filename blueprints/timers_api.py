@@ -61,12 +61,13 @@ def activity_instances(root_id):
         
         else:  # GET
             # Get all sessions for this fractal
-            sessions = db_session.query(Session).filter_by(root_id=root_id).all()
+            sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).all()
             session_ids = [s.id for s in sessions]
             
             # Get all activity instances for these sessions
             instances = db_session.query(ActivityInstance).filter(
-                ActivityInstance.session_id.in_(session_ids)
+                ActivityInstance.session_id.in_(session_ids),
+                ActivityInstance.deleted_at == None
             ).all()
             
             return jsonify([inst.to_dict() for inst in instances])
@@ -158,7 +159,8 @@ def stop_activity_timer(root_id, instance_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        # Get the activity instance
+        instance = db_session.query(ActivityInstance).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
         if not instance:
             # Instance doesn't exist - this is an error condition
             # The instance should have been created when the activity was added to the session

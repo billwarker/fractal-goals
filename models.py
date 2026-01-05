@@ -1,9 +1,12 @@
 
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Table, CheckConstraint, Float, Text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import json
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 Base = declarative_base()
 
@@ -13,7 +16,8 @@ session_goals = Table(
     Column('session_id', String, ForeignKey('sessions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_type', String, nullable=False),  # 'short_term' or 'immediate'
-    Column('created_at', DateTime, default=datetime.now)
+    Column('created_at', DateTime, default=utc_now)
+
 )
 
 # Junction table for linking ProgramDays to multiple SessionTemplates (many-to-many)
@@ -42,8 +46,8 @@ class Goal(Base):
     deadline = Column(DateTime, nullable=True)
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)  # When goal was marked complete
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
     parent_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=True)
     sort_order = Column(Integer, default=0)  # Sibling order for UI display
@@ -166,8 +170,8 @@ class Session(Base):
     attributes = Column(Text, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
     
     # Completion
@@ -233,26 +237,35 @@ class Session(Base):
     
     def to_dict(self):
         """Convert session to dictionary format compatible with frontend."""
+        
+        def format_utc(dt):
+            if not dt: return None
+            # If naive, assume UTC and append Z
+            if dt.tzinfo is None:
+                return dt.isoformat(timespec='seconds') + 'Z'
+            # If aware, ensure UTC and use Z suffix
+            return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+
         result = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
             "root_id": self.root_id,
-            "session_start": self.session_start.isoformat() if self.session_start else None,
-            "session_end": self.session_end.isoformat() if self.session_end else None,
+            "session_start": format_utc(self.session_start),
+            "session_end": format_utc(self.session_end),
             "duration_minutes": self.duration_minutes,
             "total_duration_seconds": self.total_duration_seconds,
             "template_id": self.template_id,
             "program_day_id": self.program_day_id,
             "completed": self.completed,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "completed_at": format_utc(self.completed_at),
+            "created_at": format_utc(self.created_at),
+            "updated_at": format_utc(self.updated_at),
             "attributes": {
                 "id": self.id,
                 "type": "Session",  # For frontend compatibility
-                "session_start": self.session_start.isoformat() if self.session_start else None,
-                "session_end": self.session_end.isoformat() if self.session_end else None,
+                "session_start": format_utc(self.session_start),
+                "session_end": format_utc(self.session_end),
                 "duration_minutes": self.duration_minutes,
                 "total_duration_seconds": self.total_duration_seconds,
                 "template_id": self.template_id,
@@ -333,9 +346,9 @@ class ActivityGroup(Base):
     root_id = Column(String, ForeignKey('goals.id'), nullable=False)
     name = Column(String, nullable=False)
     description = Column(String, default='')
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     sort_order = Column(Integer, default=0)
 
     def to_dict(self):
@@ -356,9 +369,9 @@ class ActivityDefinition(Base):
     root_id = Column(String, ForeignKey('goals.id'), nullable=False)
     name = Column(String, nullable=False)
     description = Column(String, default='')
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     has_sets = Column(Boolean, default=False)
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
@@ -393,9 +406,9 @@ class MetricDefinition(Base):
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)
     unit = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     is_active = Column(Boolean, default=True)
     is_top_set_metric = Column(Boolean, default=False)  # Determines which metric defines "top set"
     is_multiplicative = Column(Boolean, default=True)   # Include in product calculations
@@ -419,9 +432,9 @@ class SplitDefinition(Base):
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)  # e.g., "Left", "Right", "Split #1"
     order = Column(Integer, nullable=False)  # Display order
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
 
     def to_dict(self):
         return {
@@ -440,12 +453,12 @@ class ActivityInstance(Base):
     practice_session_id = Column(String, nullable=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     time_start = Column(DateTime, nullable=True)
     time_stop = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     sort_order = Column(Integer, default=0)  # UI display order within session
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
@@ -484,8 +497,8 @@ class MetricValue(Base):
     split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)  # Nullable for non-split activities
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     value = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)  # Audit trail
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    created_at = Column(DateTime, default=utc_now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
 
     definition = relationship("MetricDefinition")
     split = relationship("SplitDefinition")
@@ -509,9 +522,9 @@ class SessionTemplate(Base):
     name = Column(String, nullable=False)
     description = Column(String, default='')
     root_id = Column(String, ForeignKey('goals.id'), nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # Audit trail
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     template_data = Column(String, nullable=False)
     
     def to_dict(self):
@@ -527,8 +540,8 @@ class Program(Base):
     description = Column(String, default='')
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     is_active = Column(Boolean, default=True)
     
     # JSON fields (Legacy/Deprecated in favor of relational structure)
@@ -539,6 +552,16 @@ class Program(Base):
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
     
     def to_dict(self):
+        # Build weekly_schedule from relational blocks (Source of Truth)
+        # Transform snake_case keys (DB) to camelCase (Frontend legacy compatibility)
+        schedule_from_db = []
+        if self.blocks:
+            for b in self.blocks:
+                bd = b.to_dict()
+                bd['startDate'] = bd.pop('start_date', None)
+                bd['endDate'] = bd.pop('end_date', None)
+                schedule_from_db.append(bd)
+
         return {
             "id": self.id,
             "root_id": self.root_id,
@@ -550,8 +573,7 @@ class Program(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "is_active": self.is_active,
             "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
-            "weekly_schedule": json.loads(self.weekly_schedule) if self.weekly_schedule else {},
-            # Include blocks summary if needed, but usually fetched via separate endpoint or expansive query
+            "weekly_schedule": schedule_from_db,
             "blocks": [b.to_dict() for b in self.blocks]
         }
 
@@ -608,8 +630,8 @@ class ProgramDay(Base):
             return False
         
         # Get template IDs from completed sessions
-        completed_template_ids = {s.template_id for s in self.completed_sessions if s.template_id}
-        required_template_ids = {t.id for t in self.templates}
+        completed_template_ids = {s.template_id for s in self.completed_sessions if s.template_id and not s.deleted_at}
+        required_template_ids = {t.id for t in self.templates if not t.deleted_at}
         
         # Day is complete if all required templates have been done
         return required_template_ids.issubset(completed_template_ids)
@@ -624,9 +646,9 @@ class ProgramDay(Base):
             "notes": self.notes,
             "is_completed": self.is_completed,
             # Include templates
-            "templates": [{"id": t.id, "name": t.name, "description": t.description} for t in self.templates],
+            "templates": [{"id": t.id, "name": t.name, "description": t.description} for t in self.templates if not t.deleted_at],
             # Include completed sessions summary
-            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": s.created_at.isoformat() if s.created_at else None} for s in self.completed_sessions]
+            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": s.created_at.isoformat() if s.created_at else None} for s in self.completed_sessions if not s.deleted_at]
         }
 
 
@@ -656,15 +678,15 @@ def get_goal_by_id(db_session, goal_id):
 
 def get_session_by_id(db_session, session_id):
     """Get a session by its ID."""
-    return db_session.query(Session).filter(Session.id == session_id).first()
+    return db_session.query(Session).filter(Session.id == session_id, Session.deleted_at == None).first()
 
 def get_all_sessions(db_session):
     """Get all sessions."""
-    return db_session.query(Session).all()
+    return db_session.query(Session).filter(Session.deleted_at == None).all()
 
 def get_sessions_for_root(db_session, root_id):
     """Get all sessions for a specific fractal (root goal)."""
-    return db_session.query(Session).filter(Session.root_id == root_id).all()
+    return db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).all()
 
 def get_immediate_goals_for_session(db_session, session_id):
     """Get ImmediateGoals associated with a session via the junction table."""
@@ -687,7 +709,7 @@ def delete_session(db_session, session_id):
     """Delete a session."""
     session = get_session_by_id(db_session, session_id)
     if session:
-        db_session.delete(session)
+        session.deleted_at = utc_now()
         db_session.commit()
         return True
     return False

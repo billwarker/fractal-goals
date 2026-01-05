@@ -1,9 +1,14 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import uuid
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
 import models
 from sqlalchemy import text
+from sqlalchemy.orm import joinedload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
@@ -19,195 +24,10 @@ sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
 # HELPER FUNCTIONS
 # ============================================================================
 
-def sync_session_activities(db_session, session, session_data_dict):
-    """
-    Parses session_data JSON to find activity instances and syncs them to the relational DB.
-    This allows for analytics querying later.
-    """
-    if not session_data_dict:
-        return
-
-    # Extract all activity items from the session structure
-    # Structure: { sections: [ { items/exercises: [ { type: 'activity', ... } ] } ] }
-    
-    found_instances = []
-    
-    sections = session_data_dict.get('sections', [])
-    for section in sections:
-        items = section.get('exercises', [])
-        
-        for item in items:
-            # Check if this is a trackable activity
-            activity_def_id = item.get('activity_id')
-            if activity_def_id:
-                # Check for Sets
-                sets = item.get('sets', [])
-                instances_to_process = []
-
-                if sets:
-                    # Treat each set as an instance
-                    for s in sets:
-                         if s.get('instance_id'):
-                             instances_to_process.append(s)
-                else:
-                    # Treat the item itself as the instance (legacy or single instance)
-                    if item.get('instance_id'):
-                        instances_to_process.append(item)
-
-                for inst_data in instances_to_process:
-                    instance_id = inst_data.get('instance_id')
-                    
-                    # Update or Create Instance
-                    instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
-                    if not instance:
-                        instance = ActivityInstance(
-                            id=instance_id,
-                            session_id=session.id,
-                            activity_definition_id=activity_def_id,
-                            root_id=session.root_id,  # Add root_id for performance
-                            created_at=session.created_at  # Approximate timestamp
-                        )
-                        db_session.add(instance)
-                        db_session.flush()  # Ensure instance exists in DB before creating metric values
-                    
-                    found_instances.append(instance_id)
-
-                    # Update Metrics
-                    # metrics = [ { 'metric_id': '...', 'value': 100 }, ... ]
-                    for m_data in inst_data.get('metrics', []):
-                        m_def_id = m_data.get('metric_id')
-                        m_val = m_data.get('value')
-                        
-                        # Only save if we have a value.
-                        if m_def_id and m_val is not None and str(m_val).strip() != '':
-                                # Check if value is float convertible
-                                try:
-                                    float_val = float(m_val)
-                                    # Find existing value record
-                                    metric_val_rec = db_session.query(MetricValue).filter_by(
-                                        activity_instance_id=instance_id,
-                                        metric_definition_id=m_def_id
-                                    ).first()
-                                    
-                                    if metric_val_rec:
-                                        metric_val_rec.value = float_val
-                                    else:
-                                        new_mv = MetricValue(
-                                            activity_instance_id=instance_id,
-                                            metric_definition_id=m_def_id,
-                                            root_id=session.root_id,  # Add root_id for performance
-                                            value=float_val
-                                        )
-                                        db_session.add(new_mv)
-                                except ValueError:
-                                    pass # Ignore non-numeric values
-    
-    # Clean up orphans for this session
-    # BUT: Don't delete instances that have timer data (time_start/time_stop)
-    # These are managed by the timer API, not the session_data JSON
-    existing_for_session = db_session.query(ActivityInstance).filter_by(session_id=session.id).all()
-    for ex_inst in existing_for_session:
-        if ex_inst.id not in found_instances:
-            # Only delete if this instance has no timer data
-            if ex_inst.time_start is None and ex_inst.time_stop is None:
-                db_session.delete(ex_inst)
+# Helper functions removed: sync_session_activities (Dead Code / N+1 Query Issue)
 
 
-def check_and_complete_goals(db_session, session):
-    """
-    Check if any activity instances in the session meet goal targets.
-    Auto-complete goals when ALL targets are met (AND logic).
-    """
-    # Get all goals for this fractal that have targets
-    root_id = session.root_id
-    if not root_id:
-        return
-    
-    # Get all goals in this fractal
-    all_goals = db_session.query(Goal).filter(
-        (Goal.id == root_id) | (Goal.parent_id != None)
-    ).all()
-    
-    # Filter to goals with targets
-    goals_with_targets = [g for g in all_goals if g.targets]
-    
-    for goal in goals_with_targets:
-        if goal.completed:
-            continue  # Skip already completed goals
-        
-        try:
-            targets = json.loads(goal.targets)
-        except:
-            continue
-        
-        if not targets:
-            continue
-        
-        # Check if ALL targets are met (AND logic)
-        all_targets_met = True
-        
-        for target in targets:
-            target_met = check_target_met(db_session, session, target)
-            if not target_met:
-                all_targets_met = False
-                break
-        
-        # If all targets met, mark goal as complete
-        if all_targets_met:
-            goal.completed = True
-            print(f"✅ Goal '{goal.name}' auto-completed (all targets met)")
-
-
-def check_target_met(db_session, session, target):
-    """
-    Check if a specific target has been met by any activity instance in the session.
-    Returns True if at least one instance meets or exceeds the target.
-    """
-    activity_id = target.get('activity_id')
-    target_metrics = target.get('metrics', [])
-    
-    if not activity_id or not target_metrics:
-        return False
-    
-    # Get all activity instances for this activity in this session
-    instances = db_session.query(ActivityInstance).filter_by(
-        session_id=session.id,
-        activity_definition_id=activity_id
-    ).all()
-    
-    # Check if any instance meets the target
-    for instance in instances:
-        if instance_meets_target(instance, target_metrics):
-            return True
-    
-    return False
-
-
-def instance_meets_target(instance, target_metrics):
-    """
-    Check if a single activity instance meets or exceeds all target metric values.
-    Returns True only if ALL metrics meet or exceed their targets.
-    """
-    # Get all metric values for this instance
-    instance_metrics = {mv.metric_definition_id: mv.value for mv in instance.metric_values}
-    
-    # Check each target metric
-    for target_metric in target_metrics:
-        metric_id = target_metric.get('metric_id')
-        target_value = target_metric.get('value')
-        
-        if not metric_id or target_value is None:
-            continue
-        
-        # Get instance's value for this metric
-        instance_value = instance_metrics.get(metric_id)
-        
-        # If metric not found or value is less than target, fail
-        if instance_value is None or instance_value < target_value:
-            return False
-    
-    # All metrics meet or exceed targets
-    return True
+# Helper functions removed: check_and_complete_goals (Dead Code)
 
 
 # ============================================================================
@@ -238,7 +58,7 @@ def get_fractal_sessions(root_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get sessions filtered by root_id, sorted by date (newest first)
-        sessions = db_session.query(Session).filter_by(root_id=root_id).order_by(Session.created_at.desc()).all()
+        sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
         result = [s.to_dict() for s in sessions]
         return jsonify(result)
         
@@ -260,35 +80,19 @@ def create_fractal_session(root_id):
         # Get request data
         data = request.get_json()
         
-        # Parse dates - handle multiple formats
-        # DEBUG LOGGING TO FILE
-        with open('/tmp/fractal_debug.log', 'a') as f:
-            f.write(f"\n--- SESSION CREATION DEBUG ---\n")
-            f.write(f"Raw session_start: {data.get('session_start')}\n")
-            f.write(f"Type: {type(data.get('session_start'))}\n")
-
+        # Parse dates - Strict ISO-8601
         def parse_datetime(dt_str):
             if not dt_str or not isinstance(dt_str, str):
                 return None
+            
             try:
-                # Try ISO format with timezone
-                val = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-                return val
-            except:
-                pass
-            try:
-                # Try datetime-local format (YYYY-MM-DDTHH:MM:SS without timezone)
-                if 'T' in dt_str:
-                    return datetime.strptime(dt_str.split('.')[0], '%Y-%m-%dT%H:%M:%S')
-            except:
-                pass
-            try:
-                # Try date-only format (YYYY-MM-DD) - treat as midnight local time
-                if len(dt_str) == 10:
-                    return datetime.strptime(dt_str, '%Y-%m-%d')
-            except:
-                pass
-            return None
+                # Strict ISO format (handle Z for UTC)
+                dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+                # Ensure UTC
+                return dt.astimezone(timezone.utc)
+            except ValueError:
+                print(f"WARNING: Invalid date format received: {dt_str}")
+                return None
         
         s_start = parse_datetime(data.get('session_start'))
         s_end = parse_datetime(data.get('session_end'))
@@ -402,8 +206,7 @@ def create_fractal_session(root_id):
         
     except Exception as e:
         db_session.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -421,9 +224,10 @@ def update_session(root_id, session_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the session
-        session = db_session.query(Session).filter_by(
-            id=session_id,
-            root_id=root_id
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
         ).first()
         
         if not session:
@@ -445,18 +249,20 @@ def update_session(root_id, session_id):
         if 'completed' in data:
             session.completed = data['completed']
             if data['completed']:
-                session.completed_at = datetime.now()
+                session.completed_at = datetime.now(timezone.utc)
         
         # Update session analytics fields
         if 'session_start' in data:
             if isinstance(data['session_start'], str):
-                session.session_start = datetime.fromisoformat(data['session_start'].replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(data['session_start'].replace('Z', '+00:00'))
+                session.session_start = dt.astimezone(timezone.utc)
             else:
                 session.session_start = data['session_start']
         
         if 'session_end' in data:
             if isinstance(data['session_end'], str):
-                session.session_end = datetime.fromisoformat(data['session_end'].replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(data['session_end'].replace('Z', '+00:00'))
+                session.session_end = dt.astimezone(timezone.utc)
             else:
                 session.session_end = data['session_end']
         
@@ -480,6 +286,7 @@ def update_session(root_id, session_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -511,26 +318,24 @@ def delete_session_endpoint(root_id, session_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the session
-        session = db_session.query(Session).filter_by(
-            id=session_id,
-            root_id=root_id
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
         ).first()
         
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
-        # Delete junction table entries
-        db_session.execute(
-            session_goals.delete().where(session_goals.c.session_id == session_id)
-        )
-            
-        db_session.delete(session)
+        # Soft Delete
+        session.deleted_at = datetime.now(timezone.utc)
         db_session.commit()
         
         return jsonify({"message": "Session deleted successfully"})
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -552,22 +357,30 @@ def get_session_activities(root_id, session_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Validate session exists
-        session = db_session.query(Session).filter_by(
-            id=session_id,
-            root_id=root_id
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
         ).first()
         
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
         # Get all activity instances for this session, ordered by created_at
-        instances = db_session.query(ActivityInstance).filter_by(
-            session_id=session_id
+        # Use eager loading to prevent N+1 queries
+        instances = db_session.query(ActivityInstance).options(
+            joinedload(ActivityInstance.definition),
+            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
+            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split)
+        ).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.deleted_at == None
         ).order_by(ActivityInstance.created_at).all()
         
         return jsonify([inst.to_dict() for inst in instances])
         
     except Exception as e:
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -585,9 +398,10 @@ def add_activity_to_session(root_id, session_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Validate session exists
-        session = db_session.query(Session).filter_by(
-            id=session_id,
-            root_id=root_id
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
         ).first()
         
         if not session:
@@ -615,6 +429,7 @@ def add_activity_to_session(root_id, session_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -643,6 +458,7 @@ def reorder_activities(root_id, session_id):
         return jsonify({"status": "success"}), 200
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -668,6 +484,7 @@ def update_activity_instance_in_session(root_id, session_id, instance_id):
         return jsonify(instance.to_dict())
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -700,6 +517,7 @@ def remove_activity_from_session(root_id, session_id, instance_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -773,6 +591,7 @@ def update_activity_metrics(root_id, session_id, instance_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -847,6 +666,7 @@ def add_goal_to_session(root_id, session_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -869,6 +689,7 @@ def remove_goal_from_session(root_id, session_id, goal_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("An error occurred in remove_goal_from_session")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
