@@ -6,7 +6,7 @@ import moment from 'moment';
  * DayViewModal - Modal for viewing and managing program days on a specific date
  * Shows all program days scheduled for the selected date and allows adding new ones
  */
-const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, blocks, sessions }) => {
+const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, onUnscheduleDay, blocks, sessions }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);
@@ -43,18 +43,21 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
     if (!isOpen || !date || !program) return null;
 
-    // Find all program days that match this date
-    const programDaysForDate = [];
+    // Unified Scheduled Items (Legacy Days + Planned Sessions)
+    const scheduledItems = [];
+
+    // 1. Legacy Days (Instance Copies)
     if (program.blocks) {
         program.blocks.forEach(block => {
             if (block.days) {
                 block.days.forEach(day => {
                     if (day.date === date) {
-                        programDaysForDate.push({
+                        scheduledItems.push({
                             ...day,
                             blockName: block.name,
                             blockId: block.id,
-                            blockColor: block.color
+                            blockColor: block.color,
+                            type: 'program_day'
                         });
                     }
                 });
@@ -62,11 +65,32 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         });
     }
 
-    // Find sessions completed on this date
-    const completedSessions = sessions ? sessions.filter(session => {
-        if (!session.start_time) return false;
-        return session.start_time.startsWith(date);
-    }) : [];
+    // 2. Sessions (Planned & Completed handling)
+    const completedSessions = [];
+    if (sessions) {
+        sessions.forEach(session => {
+            const start = session.session_start || session.start_time;
+            // Check Date Match (first 10 chars = YYYY-MM-DD)
+            if (start && start.startsWith(date)) {
+                // Check Completion (session_end or time_stop or total_duration > 0?)
+                // Usually session_end is key.
+                if (session.session_end) {
+                    completedSessions.push(session);
+                } else {
+                    // It's a Planned Session (Scheduled Day)
+                    scheduledItems.push({
+                        id: session.id,
+                        name: session.name,
+                        blockName: session.program_info?.block_name || 'Scheduled',
+                        blockColor: session.program_info?.block_color || '#3A86FF',
+                        notes: session.attributes?.notes || '',
+                        type: 'session',
+                        program_info: session.program_info
+                    });
+                }
+            }
+        });
+    }
 
     // Find goals due on this date
     const goalsDueOnDate = goals ? goals.filter(g => {
@@ -128,7 +152,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             {formatDate(date)}
                         </h2>
                         <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
-                            {programDaysForDate.length} program days scheduled • {goalsDueOnDate.length} goals due
+                            {scheduledItems.length} program days scheduled • {goalsDueOnDate.length} goals due
                         </div>
                         {blocksContainingDate.length > 0 && (
                             <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
@@ -159,9 +183,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                 <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
 
                     {/* Scheduled Program Days */}
-                    {programDaysForDate.length > 0 ? (
+                    {scheduledItems.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                            {programDaysForDate.map((day, idx) => (
+                            {scheduledItems.map((day, idx) => (
                                 <div key={idx} style={{
                                     background: '#252525',
                                     borderRadius: '8px',
@@ -175,6 +199,22 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                             </div>
                                             <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{day.name}</div>
                                         </div>
+                                        {/* Unschedule Button */}
+                                        <button
+                                            onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#666',
+                                                cursor: 'pointer',
+                                                fontSize: '16px',
+                                                padding: '4px',
+                                                lineHeight: 1
+                                            }}
+                                            title="Unschedule Day"
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
                                     {day.notes && (
                                         <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px', whiteSpace: 'pre-wrap' }}>
@@ -333,8 +373,8 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             )}
                         </div>
 
-                        {/* Add Block Day Section */}
-                        {blocks && blocks.length > 0 && onScheduleDay && (
+                        {/* Add Block Day Section (Disabled if day already scheduled) */}
+                        {scheduledItems.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
                             <div style={{ marginTop: '0' }}>
                                 <button
                                     onClick={() => setShowAddDaySection(!showAddDaySection)}
