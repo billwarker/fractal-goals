@@ -112,6 +112,17 @@ export const fractalApi = {
     deleteSession: (rootId, sessionId) =>
         axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
 
+    /**
+     * Add a goal association to a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} goalId - ID of the goal to associate
+     * @param {string} goalType - 'short_term' or 'immediate'
+     */
+    addSessionGoal: (rootId, sessionId, goalId, goalType = 'immediate') =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/goals`, { goal_id: goalId, goal_type: goalType }),
+
+
     // ========== Session Activity Instances (Database-Only Architecture) ==========
 
     /**

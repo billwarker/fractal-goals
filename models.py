@@ -291,9 +291,32 @@ class Session(Base):
             except:
                 pass
         
-        # Get associated goal IDs
-        goal_ids = [g.id for g in self.goals]
-        result["attributes"]["goal_ids"] = goal_ids
+        # Get associated goals with type information
+        short_term_goals = []
+        immediate_goals = []
+        
+        for goal in self.goals:
+            goal_data = {
+                "id": goal.id,
+                "name": goal.name,
+                "type": goal.type,
+                "parent_id": goal.parent_id,
+                "description": goal.description,
+                "completed": goal.completed
+            }
+            
+            if goal.type == 'ShortTermGoal':
+                short_term_goals.append(goal_data)
+            elif goal.type == 'ImmediateGoal':
+                immediate_goals.append(goal_data)
+        
+        # Legacy: maintain goal_ids for backward compatibility
+        result["attributes"]["goal_ids"] = [g.id for g in self.goals]
+        result["attributes"]["parent_ids"] = [g.id for g in self.goals if g.type == 'ShortTermGoal']
+        
+        # New: separate goal data by type for enhanced display
+        result["short_term_goals"] = short_term_goals
+        result["immediate_goals"] = immediate_goals
         
         # Add program info if linked to program day
         program_info = self.get_program_info()

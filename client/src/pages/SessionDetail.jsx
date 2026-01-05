@@ -250,18 +250,27 @@ function SessionDetail() {
                 setSessionData(parsedData);
             }
 
-            // Fetch parent goals for target achievement checking
-            const parentIds = foundSession.attributes?.parent_ids || [];
-            const goals = [];
-            for (const goalId of parentIds) {
-                try {
-                    const goalRes = await fractalApi.getGoal(rootId, goalId);
-                    goals.push(goalRes.data);
-                } catch (err) {
-                    console.error(`Failed to fetch goal ${goalId}`, err);
+            // Use the goal data directly from the session response
+            // New structure: short_term_goals and immediate_goals arrays
+            const shortTermGoals = foundSession.short_term_goals || [];
+            const immediateGoals = foundSession.immediate_goals || [];
+
+            // For backward compatibility, also check attributes.parent_ids if new data is empty
+            if (shortTermGoals.length === 0 && foundSession.attributes?.parent_ids?.length > 0) {
+                const parentIds = foundSession.attributes.parent_ids;
+                for (const goalId of parentIds) {
+                    try {
+                        const goalRes = await fractalApi.getGoal(rootId, goalId);
+                        shortTermGoals.push(goalRes.data);
+                    } catch (err) {
+                        console.error(`Failed to fetch goal ${goalId}`, err);
+                    }
                 }
             }
-            setParentGoals(goals);
+
+            // Store both goal types
+            setParentGoals(shortTermGoals);
+            // Store immediate goals in session object (already available via foundSession.immediate_goals)
 
             setLoading(false);
         } catch (err) {
@@ -869,8 +878,8 @@ function SessionDetail() {
                         {parentGoals.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                 {parentGoals.map(goal => {
-                                    const goalColor = getGoalColor(goal.attributes?.type || goal.type);
-                                    const textColor = getGoalTextColor(goal.attributes?.type || goal.type);
+                                    const goalColor = getGoalColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
+                                    const textColor = getGoalTextColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
                                     return (
                                         <div
                                             key={goal.id}
@@ -968,15 +977,15 @@ function SessionDetail() {
                     {/* Row 2, Column 5: Immediate Goals */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Immediate Goals:</span>
-                        {session.children && session.children.length > 0 ? (
+                        {session.immediate_goals && session.immediate_goals.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {session.children.map(child => {
-                                    const goalColor = getGoalColor(child.attributes?.type || child.type);
-                                    const textColor = getGoalTextColor(child.attributes?.type || child.type);
+                                {session.immediate_goals.map(goal => {
+                                    const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
+                                    const textColor = getGoalTextColor(goal.type || 'ImmediateGoal');
                                     return (
                                         <div
-                                            key={child.id}
-                                            onClick={() => setSelectedGoal(child)}
+                                            key={goal.id}
+                                            onClick={() => setSelectedGoal(goal)}
                                             style={{
                                                 padding: '4px 10px',
                                                 background: '#2a2a2a',
@@ -998,7 +1007,7 @@ function SessionDetail() {
                                                 e.currentTarget.style.color = goalColor;
                                             }}
                                         >
-                                            {child.name}
+                                            {goal.name}
                                         </div>
                                     );
                                 })}
