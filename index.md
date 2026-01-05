@@ -139,11 +139,13 @@ Stores practice session data independently from the goal hierarchy.
 - Has many-to-many with Goals via `session_goals`
 
 #### `session_goals` (Junction Table)
-Links Sessions to multiple Goals (many-to-many).
+Links Sessions to multiple Goals (many-to-many). Supports both ShortTermGoals and ImmediateGoals.
 
 **Fields:**
 - `session_id` (String, FK to sessions.id, PK)
 - `goal_id` (String, FK to goals.id, PK)
+- `goal_type` (String) - 'short_term' or 'immediate'
+- `created_at` (DateTime)
 
 #### `activity_groups`
 Organizes activities into families/categories.
