@@ -668,21 +668,6 @@ function TemplateBuilderModal({
 
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button
-                                onClick={editingSectionIndex !== null ? handleUpdateSection : handleAddSection}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#4caf50',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                {editingSectionIndex !== null ? 'Update Section' : 'Add Section'}
-                            </button>
-                            <button
                                 onClick={() => {
                                     setShowSectionModal(false);
                                     setEditingSectionIndex(null);
@@ -700,6 +685,21 @@ function TemplateBuilderModal({
                                 }}
                             >
                                 Cancel
+                            </button>
+                            <button
+                                onClick={editingSectionIndex !== null ? handleUpdateSection : handleAddSection}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    background: '#4caf50',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {editingSectionIndex !== null ? 'Update Section' : 'Add Section'}
                             </button>
                         </div>
                     </div>
@@ -810,23 +810,6 @@ function TemplateBuilderModal({
 
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button
-                                onClick={handleAddActivities}
-                                disabled={selectedActivities.length === 0}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: selectedActivities.length === 0 ? '#666' : '#4caf50',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: selectedActivities.length === 0 ? 'not-allowed' : 'pointer',
-                                    opacity: selectedActivities.length === 0 ? 0.5 : 1
-                                }}
-                            >
-                                Add {selectedActivities.length > 0 ? `(${selectedActivities.length})` : ''}
-                            </button>
-                            <button
                                 onClick={() => {
                                     setShowActivityModal(false);
                                     setSelectedSectionIndex(null);
@@ -844,6 +827,23 @@ function TemplateBuilderModal({
                                 }}
                             >
                                 Cancel
+                            </button>
+                            <button
+                                onClick={handleAddActivities}
+                                disabled={selectedActivities.length === 0}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    background: selectedActivities.length === 0 ? '#666' : '#4caf50',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    cursor: selectedActivities.length === 0 ? 'not-allowed' : 'pointer',
+                                    opacity: selectedActivities.length === 0 ? 0.5 : 1
+                                }}
+                            >
+                                Add {selectedActivities.length > 0 ? `(${selectedActivities.length})` : ''}
                             </button>
                         </div>
                     </div>
