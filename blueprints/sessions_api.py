@@ -279,25 +279,6 @@ def create_fractal_session(root_id):
                 session_data = {}
         
         program_context = session_data.get('program_context', {})
-        incoming_day_id = program_context.get('day_id')
-        
-        # If scheduling a program day, check if date already has a scheduled session
-        if incoming_day_id and s_start:
-            # Normalize date for comparison (strip time component)
-            check_date = s_start.date() if hasattr(s_start, 'date') else s_start
-            
-            # Query for existing sessions on this date with a program_day_id
-            from sqlalchemy import func
-            existing = db_session.query(Session).filter(
-                Session.root_id == root_id,
-                Session.program_day_id.isnot(None),
-                func.date(Session.session_start) == check_date
-            ).first()
-            
-            if existing:
-                return jsonify({
-                    "error": f"A program day is already scheduled for this date. Please unschedule '{existing.name}' first."
-                }), 400
 
         # Create the session
         new_session = Session(
@@ -371,6 +352,9 @@ def create_fractal_session(root_id):
                 program_day.is_completed = program_day.check_completion()
         
         db_session.commit()
+        
+        # Refresh to load the goals relationship
+        db_session.refresh(new_session)
 
         # Return the created session
         result = new_session.to_dict()

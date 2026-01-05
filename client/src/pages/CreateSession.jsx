@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import GoalModal from '../components/modals/GoalModal';
+import GoalDetailModal from '../components/GoalDetailModal';
 import { GOAL_COLORS } from '../utils/goalColors';
 import '../App.css';
 
@@ -345,7 +345,9 @@ function Log() {
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {
             console.error('Error creating session:', err);
-            alert('Error creating session: ' + err.message);
+            // Get the actual error message from the backend response
+            const errorMessage = err.response?.data?.error || err.message;
+            alert('Error creating session: ' + errorMessage);
             setCreating(false);
         }
     };
@@ -1204,17 +1206,23 @@ function Log() {
                 </>
             </div>
 
-            {/* Goal Creation Modal */}
-            <GoalModal
+            {/* Goal Creation Modal - Uses GoalDetailModal for consistent UI */}
+            <GoalDetailModal
                 isOpen={showGoalModal}
-                onClose={() => setShowGoalModal(false)}
-                onSubmit={handleCreateImmediateGoal}
-                parent={{
-                    name: selectedTemplate?.name || 'Practice Session',
-                    type: 'PracticeSession',
-                    attributes: { type: 'PracticeSession' }
+                onClose={() => {
+                    setShowGoalModal(false);
+                    setCreatingGoalForSTG(null);
                 }}
+                mode="create"
+                onCreate={handleCreateImmediateGoal}
+                parentGoal={creatingGoalForSTG ? {
+                    id: creatingGoalForSTG.id,
+                    name: creatingGoalForSTG.name,
+                    type: 'ShortTermGoal',
+                    attributes: { type: 'ShortTermGoal' }
+                } : null}
                 activityDefinitions={activityDefinitions}
+                rootId={rootId}
             />
 
             {/* Goal Selection Modal */}

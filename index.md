@@ -28,12 +28,17 @@
 - **Note:** Sessions are now managed separately from the goal hierarchy
 
 ### 2. Session Management
-- **Sessions are now stored in a separate `sessions` table** (not part of the goal tree)
+- **Sessions are stored in a separate `sessions` table** (not part of the goal tree)
 - Session start/end times with duration tracking
 - Activity instances with timers
 - Session templates for recurring practices
-- Many-to-many relationship with Goals via `session_goals` junction table
-- Sessions can be linked to ShortTermGoals and ImmediateGoals
+- **Session-Goal Associations:**
+  - Many-to-many relationship with Goals via `session_goals` junction table
+  - Sessions can be linked to ShortTermGoals (`goal_type='short_term'`)
+  - Sessions can be linked to ImmediateGoals (`goal_type='immediate'`)
+  - CreateSession page allows selecting STGs and their child IGs in a unified flow
+  - SessionDetail header displays associated STGs and IGs with clickable links
+  - GoalDetailModal shows associated sessions for both STGs and IGs
 
 ### 3. Activity System
 - Reusable activity definitions organized by groups

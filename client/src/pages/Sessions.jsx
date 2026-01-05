@@ -83,9 +83,19 @@ function Sessions() {
         return true;
     });
 
-    // Helper to format date
+    // Helper to format date - handles timezone correctly
     const formatDate = (dateString) => {
         if (!dateString) return '';
+        // If it's just a date (YYYY-MM-DD), parse as local date
+        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-')) {
+            const [year, month, day] = dateString.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
             month: 'short',
@@ -97,6 +107,10 @@ function Sessions() {
     // Helper to format time
     const formatTime = (dateString) => {
         if (!dateString) return '';
+        // If it's just a date (no time component), don't show time
+        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-')) {
+            return '';
+        }
         const date = new Date(dateString);
         return date.toLocaleTimeString('en-US', {
             hour: '2-digit',
@@ -419,7 +433,7 @@ function Sessions() {
                                     </div>
 
                                     {/* Parent Goals & Immediate Goals Section */}
-                                    {(sessionParentGoals.length > 0 || (session.children && session.children.length > 0)) && (
+                                    {(sessionParentGoals.length > 0 || (session.immediate_goals && session.immediate_goals.length > 0)) && (
                                         <div style={{
                                             padding: '12px 16px',
                                             background: '#252525',
@@ -453,35 +467,33 @@ function Sessions() {
                                                 </div>
                                             )}
 
-                                            {/* Immediate Goals (right side) */}
-                                            {session.children && session.children.filter(c => c.attributes?.type === 'ImmediateGoal').length > 0 && (
+                                            {/* Immediate Goals (right side) - using new junction table data */}
+                                            {session.immediate_goals && session.immediate_goals.length > 0 && (
                                                 <div style={{ flex: 1 }}>
                                                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
                                                         Immediate Goals:
                                                     </div>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                        {session.children
-                                                            .filter(child => child.attributes?.type === 'ImmediateGoal')
-                                                            .map(goal => (
-                                                                <div
-                                                                    key={goal.id}
-                                                                    style={{
-                                                                        padding: '6px 12px',
-                                                                        background: '#1e1e1e',
-                                                                        border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '13px',
-                                                                        color: GOAL_COLORS.ImmediateGoal,
-                                                                        textDecoration: goal.attributes?.completed ? 'line-through' : 'none',
-                                                                        opacity: goal.attributes?.completed ? 0.7 : 1
-                                                                    }}
-                                                                >
-                                                                    {goal.name}
-                                                                    {goal.attributes?.completed && (
-                                                                        <span style={{ marginLeft: '6px', color: '#4caf50' }}>✓</span>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+                                                        {session.immediate_goals.map(goal => (
+                                                            <div
+                                                                key={goal.id}
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    background: '#1e1e1e',
+                                                                    border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '13px',
+                                                                    color: GOAL_COLORS.ImmediateGoal,
+                                                                    textDecoration: goal.completed ? 'line-through' : 'none',
+                                                                    opacity: goal.completed ? 0.7 : 1
+                                                                }}
+                                                            >
+                                                                {goal.name}
+                                                                {goal.completed && (
+                                                                    <span style={{ marginLeft: '6px', color: '#4caf50' }}>✓</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             )}
