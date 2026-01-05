@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { GOAL_COLORS } from '../utils/goalColors';
+import { getTodayLocalDate } from '../utils/dateUtils';
 import '../App.css';
 
 /**
@@ -284,10 +285,8 @@ function Log() {
             });
 
             // Create the practice session
-            // Set session_start to today (LOCAL date, not UTC!)
-            // Note: toISOString() gives UTC date which can be tomorrow in late evening EST
-            const now = new Date();
-            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            // Use getTodayLocalDate() for consistent timezone handling
+            const today = getTodayLocalDate();
 
             const sessionData = {
                 name: selectedTemplate.name,

@@ -1,6 +1,70 @@
 /**
  * Date/Time formatting utilities with timezone support
+ * 
+ * USAGE GUIDELINES:
+ * - Use getLocalISOString() when creating timestamps (session_start, session_end, etc.)
+ * - Use getTodayLocalDate() when you only need a date (no time component)
+ * - Use parseAnyDate() to safely parse any incoming date string
+ * - Use formatForInput() to display dates in input fields
+ * - Use formatDateInTimezone() for general display formatting
  */
+
+/**
+ * Get current local time as an ISO string that preserves local time when sent to backend
+ * This should be used whenever creating new timestamps (e.g., session_start)
+ * @returns {string} ISO string in format "YYYY-MM-DDTHH:MM:SS" (no Z suffix)
+ */
+export const getLocalISOString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+};
+
+/**
+ * Get today's date as a local date string (YYYY-MM-DD)
+ * Use this when you only need the date without time
+ * @returns {string} Date string in format "YYYY-MM-DD"
+ */
+export const getTodayLocalDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * Safely parse any date string, handling both date-only and datetime formats
+ * @param {string} dateString - Any date string
+ * @returns {Date} Parsed Date object
+ */
+export const parseAnyDate = (dateString) => {
+    if (!dateString) return null;
+
+    // If it's just a date (YYYY-MM-DD), parse as local date at midnight
+    if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-') && !dateString.includes('T')) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    // If it's a datetime without timezone (YYYY-MM-DD HH:MM:SS), parse as local
+    if (typeof dateString === 'string' && dateString.includes(' ') && !dateString.includes('Z') && !dateString.includes('+')) {
+        const [datePart, timePart] = dateString.split(' ');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
+        return new Date(year, month - 1, day, hours || 0, minutes || 0, seconds || 0);
+    }
+
+    // Otherwise use standard parsing (handles ISO strings with Z suffix)
+    return new Date(dateString);
+};
 
 /**
  * Format a date/datetime string to a localized string in the specified timezone
@@ -50,7 +114,16 @@ export const formatDateOnly = (dateValue, timezone) => {
 export const formatForInput = (dateValue, timezone) => {
     if (!dateValue) return '';
 
-    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    let date;
+
+    // Handle date-only strings (YYYY-MM-DD) - treat as local date at midnight
+    if (typeof dateValue === 'string' && dateValue.length === 10 && dateValue.includes('-') && !dateValue.includes('T')) {
+        const [year, month, day] = dateValue.split('-').map(Number);
+        // Create a local date, then format it without timezone conversion
+        return `${dateValue} 00:00:00`;
+    }
+
+    date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
 
     // Get parts in the specified timezone
     const formatter = new Intl.DateTimeFormat('en-US', {

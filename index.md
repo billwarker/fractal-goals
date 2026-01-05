@@ -581,7 +581,12 @@ Fractal selection/home page.
 ### Utilities (in `/client/src/utils/`)
 
 - **`api.js`** - Axios-based API client with all endpoint functions
-- **`dateUtils.js`** - Date formatting and timezone utilities
+- **`dateUtils.js`** - Date formatting and timezone utilities:
+  - `getLocalISOString()` - Create timestamps in local time (use for session_start, etc.)
+  - `getTodayLocalDate()` - Get today's date as YYYY-MM-DD (local)
+  - `parseAnyDate()` - Safely parse any date string (handles date-only and datetime)
+  - `formatForInput()` - Format dates for input fields
+  - `formatDateInTimezone()` - Format dates for display
 - **`goalColors.js`** - Color schemes for goal types
 - **`goalHelpers.js`** - Goal hierarchy and validation helpers
 - **`metricsHelpers.js`** - Metric calculation utilities
