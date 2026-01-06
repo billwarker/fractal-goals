@@ -5,15 +5,13 @@ import uuid
 import models
 from models import (
     get_session,
-    ActivityInstance, PracticeSession,
+    ActivityInstance, Session,
     validate_root_goal
 )
 
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
 
-# Global engine removed
-# engine = get_engine()
 
 # ============================================================================
 # ACTIVITY INSTANCE TIME TRACKING ENDPOINTS
@@ -34,14 +32,15 @@ def activity_instances(root_id):
             # Create new activity instance
             data = request.get_json() or {}
             instance_id = data.get('instance_id')
-            practice_session_id = data.get('practice_session_id')
+            # Support both new session_id and legacy practice_session_id
+            session_id = data.get('session_id') or data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
             
             if not instance_id:
                 instance_id = str(uuid.uuid4())
             
-            if not practice_session_id or not activity_definition_id:
-                return jsonify({"error": "practice_session_id and activity_definition_id required"}), 400
+            if not session_id or not activity_definition_id:
+                return jsonify({"error": "session_id and activity_definition_id required"}), 400
             
             # Check if instance already exists
             existing = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
@@ -51,7 +50,7 @@ def activity_instances(root_id):
             # Create new instance
             instance = ActivityInstance(
                 id=instance_id,
-                practice_session_id=practice_session_id,
+                session_id=session_id,
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
@@ -61,13 +60,14 @@ def activity_instances(root_id):
             return jsonify(instance.to_dict()), 201
         
         else:  # GET
-            # Get all practice sessions for this fractal
-            sessions = db_session.query(PracticeSession).filter_by(root_id=root_id).all()
+            # Get all sessions for this fractal
+            sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).all()
             session_ids = [s.id for s in sessions]
             
             # Get all activity instances for these sessions
             instances = db_session.query(ActivityInstance).filter(
-                ActivityInstance.practice_session_id.in_(session_ids)
+                ActivityInstance.session_id.in_(session_ids),
+                ActivityInstance.deleted_at == None
             ).all()
             
             return jsonify([inst.to_dict() for inst in instances])
@@ -77,6 +77,7 @@ def activity_instances(root_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/start', methods=['POST'])
 def start_activity_timer(root_id, instance_id):
@@ -98,17 +99,18 @@ def start_activity_timer(root_id, instance_id):
         if not instance:
             # Instance doesn't exist yet - create it
             data = request.get_json(silent=True) or {}
-            practice_session_id = data.get('practice_session_id')
+            # Support both new session_id and legacy practice_session_id
+            session_id = data.get('session_id') or data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
             
-            print(f"[START TIMER] Creating new instance - session: {practice_session_id}, activity: {activity_definition_id}")
+            print(f"[START TIMER] Creating new instance - session: {session_id}, activity: {activity_definition_id}")
             
-            if not practice_session_id or not activity_definition_id:
-                return jsonify({"error": "practice_session_id and activity_definition_id required"}), 400
+            if not session_id or not activity_definition_id:
+                return jsonify({"error": "session_id and activity_definition_id required"}), 400
             
             instance = ActivityInstance(
                 id=instance_id,
-                practice_session_id=practice_session_id,
+                session_id=session_id,
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
@@ -157,7 +159,8 @@ def stop_activity_timer(root_id, instance_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        # Get the activity instance
+        instance = db_session.query(ActivityInstance).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
         if not instance:
             # Instance doesn't exist - this is an error condition
             # The instance should have been created when the activity was added to the session
@@ -240,17 +243,17 @@ def update_activity_instance(root_id, instance_id):
         
         if not instance:
             # Create if missing, but we strictly need connection IDs
-            practice_session_id = data.get('practice_session_id')
+            # Support both new session_id and legacy practice_session_id
+            session_id = data.get('session_id') or data.get('practice_session_id')
             activity_definition_id = data.get('activity_definition_id')
             
-            if not practice_session_id or not activity_definition_id:
+            if not session_id or not activity_definition_id:
                 # If we lack info to create, and it doesn't exist, that's an issue for manual updates
-                # unless we want to fail
                 return jsonify({"error": "Instance not found and missing creation details"}), 404
             
             instance = ActivityInstance(
                 id=instance_id,
-                practice_session_id=practice_session_id,
+                session_id=session_id,
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )

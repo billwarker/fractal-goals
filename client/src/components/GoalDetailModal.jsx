@@ -251,6 +251,7 @@ function GoalDetailModal({
     const isShortTermGoal = goalType === 'ShortTermGoal';
     const isImmediateGoal = goalType === 'ImmediateGoal';
 
+    // For STGs: Find sessions that have this goal in their parent_ids (short_term goals)
     const childSessions = (isShortTermGoal && mode !== 'create')
         ? practiceSessions.filter(session => {
             const parentIds = session.attributes?.parent_ids || [];
@@ -258,11 +259,13 @@ function GoalDetailModal({
         })
         : [];
 
-    let parentSession = null;
-    if (isImmediateGoal && practiceSessions.length > 0 && mode !== 'create') {
-        const parentId = goal.attributes?.parent_id || goal.parent_id;
-        parentSession = practiceSessions.find(s => s.id === parentId);
-    }
+    // For IGs: Find sessions that have this goal in their goal_ids (all associated goals)
+    const associatedSessions = (isImmediateGoal && mode !== 'create')
+        ? practiceSessions.filter(session => {
+            const goalIds = session.attributes?.goal_ids || [];
+            return goalIds.includes(goalId);
+        })
+        : [];
 
     // Get activities with metrics for target builder
     const activitiesWithMetrics = activityDefinitions.filter(a =>
@@ -1236,36 +1239,47 @@ function GoalDetailModal({
                         </div>
                     )}
 
-                    {/* Parent Session - For ImmediateGoals */}
-                    {isImmediateGoal && parentSession && (
+                    {/* Associated Sessions - For ImmediateGoals */}
+                    {isImmediateGoal && (
                         <div>
                             <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                Parent Session:
+                                Associated Sessions ({associatedSessions.length}):
                             </label>
-                            <div
-                                onClick={() => {
-                                    if (displayMode === 'modal' && onClose) onClose();
-                                    navigate(`/${rootId}/session/${parentSession.id}`);
-                                }}
-                                style={{
-                                    padding: '8px 10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #9c27b0',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                <span style={{ color: 'white' }}>{parentSession.name}</span>
-                                {parentSession.attributes?.created_at && (
-                                    <span style={{ fontSize: '11px', color: '#888' }}>
-                                        {new Date(parentSession.attributes.created_at).toLocaleDateString()}
-                                    </span>
-                                )}
-                            </div>
+                            {associatedSessions.length === 0 ? (
+                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                                    No associated sessions yet
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {associatedSessions.map(session => (
+                                        <div
+                                            key={session.id}
+                                            onClick={() => {
+                                                if (displayMode === 'modal' && onClose) onClose();
+                                                navigate(`/${rootId}/session/${session.id}`);
+                                            }}
+                                            style={{
+                                                padding: '8px 10px',
+                                                background: '#2a2a2a',
+                                                border: '1px solid #9c27b0',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                fontSize: '13px'
+                                            }}
+                                        >
+                                            <span style={{ color: 'white' }}>{session.name}</span>
+                                            {session.attributes?.created_at && (
+                                                <span style={{ fontSize: '11px', color: '#888' }}>
+                                                    {new Date(session.attributes.created_at).toLocaleDateString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

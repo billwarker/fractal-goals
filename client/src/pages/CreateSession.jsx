@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import GoalModal from '../components/modals/GoalModal';
+import GoalDetailModal from '../components/GoalDetailModal';
 import { GOAL_COLORS } from '../utils/goalColors';
+import { getLocalISOString } from '../utils/dateUtils';
 import '../App.css';
 
 /**
@@ -23,12 +24,14 @@ function Log() {
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
-    const [immediateGoals, setImmediateGoals] = useState([]); // NEW: immediate goals to attach
+    const [selectedImmediateGoalIds, setSelectedImmediateGoalIds] = useState([]); // Existing IG checkboxes
+    const [immediateGoals, setImmediateGoals] = useState([]); // NEW: immediate goals to create
     const [existingImmediateGoals, setExistingImmediateGoals] = useState([]); // NEW: existing immediate goals from tree
     const [activityDefinitions, setActivityDefinitions] = useState([]); // NEW: for target creation
     const [showGoalModal, setShowGoalModal] = useState(false); // NEW: control goal creation modal
     const [showSelectGoalModal, setShowSelectGoalModal] = useState(false); // NEW: control goal selection modal
     const [tempSelectedGoals, setTempSelectedGoals] = useState([]); // NEW: track selections in modal
+    const [creatingGoalForSTG, setCreatingGoalForSTG] = useState(null); // Which STG we're creating an IG for
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -43,10 +46,10 @@ function Log() {
 
     const fetchData = async () => {
         try {
-            // Fetch templates, goals, active program days, and activities in parallel
+            // Fetch templates, active goals (optimized), active program days, and activities in parallel
             const [templatesRes, goalsRes, programDaysRes, activitiesRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
-                fractalApi.getGoals(rootId),
+                fractalApi.getGoalsForSelection(rootId),
                 fractalApi.getActiveProgramDays(rootId),
                 fractalApi.getActivities(rootId)
             ]);
@@ -70,13 +73,18 @@ function Log() {
             });
             setProgramsByName(grouped);
 
-            // Extract all short-term goals from the tree
-            const shortTermGoals = extractShortTermGoals(goalsRes.data);
+            // Set Short Term Goals directly from optimized endpoint
+            const shortTermGoals = goalsRes.data || [];
             setGoals(shortTermGoals);
 
-            // Extract all immediate goals from the tree
-            const immediateGoalsFromTree = extractImmediateGoals(goalsRes.data);
-            setExistingImmediateGoals(immediateGoalsFromTree);
+            // Extract all immediate goals from the simplified structure for "Select Existing" modal
+            const allImmediateGoals = shortTermGoals.flatMap(stg =>
+                (stg.immediateGoals || []).map(ig => ({
+                    ...ig,
+                    parent_id: stg.id // Ensure parent_id is available
+                }))
+            );
+            setExistingImmediateGoals(allImmediateGoals);
 
             // Set activity definitions for target creation
             setActivityDefinitions(activitiesRes.data || []);
@@ -106,47 +114,6 @@ function Log() {
             console.error("Failed to fetch data", err);
             setLoading(false);
         }
-    };
-
-    const extractShortTermGoals = (goalTree) => {
-        const shortTermGoals = [];
-
-        const traverse = (node) => {
-            if (node.attributes?.type === 'ShortTermGoal') {
-                shortTermGoals.push({
-                    id: node.id,
-                    name: node.name,
-                    description: node.attributes?.description
-                });
-            }
-            if (node.children) {
-                node.children.forEach(child => traverse(child));
-            }
-        };
-
-        traverse(goalTree);
-        return shortTermGoals;
-    };
-
-    const extractImmediateGoals = (goalTree) => {
-        const immediateGoals = [];
-
-        const traverse = (node) => {
-            if (node.attributes?.type === 'ImmediateGoal') {
-                immediateGoals.push({
-                    id: node.id,
-                    name: node.name,
-                    description: node.attributes?.description,
-                    deadline: node.attributes?.deadline
-                });
-            }
-            if (node.children) {
-                node.children.forEach(child => traverse(child));
-            }
-        };
-
-        traverse(goalTree);
-        return immediateGoals;
     };
 
     const handleToggleGoal = (goalId) => {
@@ -208,10 +175,12 @@ function Log() {
             ...goalData,
             tempId: crypto.randomUUID(),
             type: 'ImmediateGoal',
-            isNew: true // Mark as new so we know to create it
+            isNew: true, // Mark as new so we know to create it
+            parent_id: creatingGoalForSTG?.id || null // Associate with the STG we're creating for
         };
         setImmediateGoals(prev => [...prev, newGoal]);
         setShowGoalModal(false);
+        setCreatingGoalForSTG(null);
     };
 
     const handleSelectExistingGoal = (goal) => {
@@ -261,17 +230,16 @@ function Log() {
             });
 
             // Create the practice session
-            // Set session_start to today (LOCAL date, not UTC!)
-            // Note: toISOString() gives UTC date which can be tomorrow in late evening EST
-            const now = new Date();
-            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            // Use getLocalISOString() for current datetime with timezone handling
+            const sessionStart = getLocalISOString();
 
             const sessionData = {
                 name: selectedTemplate.name,
                 description: selectedTemplate.description || '',
                 parent_ids: selectedGoalIds,
+                immediate_goal_ids: selectedImmediateGoalIds, // Include selected existing IGs
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
-                session_start: today, // Add session_start for calendar visibility
+                session_start: sessionStart, // Add session_start for calendar visibility
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
@@ -296,45 +264,36 @@ function Log() {
             // Get the created session ID from the response
             const createdSessionId = response.data.id;
 
-            // Create immediate goals as children of the practice session
-            if (immediateGoals.length > 0) {
-                // Separate new goals from existing goals
-                const newGoals = immediateGoals.filter(g => g.isNew);
-                const existingGoals = immediateGoals.filter(g => !g.isNew);
+            // Create NEW immediate goals (ones created inline during session creation)
 
-                // Create new immediate goals
-                if (newGoals.length > 0) {
-                    await Promise.all(
-                        newGoals.map(goal =>
-                            fractalApi.createGoal(rootId, {
-                                name: goal.name,
-                                description: goal.description || '',
-                                deadline: goal.deadline || null,
-                                type: 'ImmediateGoal',
-                                parent_id: createdSessionId,
-                                targets: goal.targets || []
-                            })
-                        )
-                    );
-                }
+            const newImmediateGoals = immediateGoals.filter(g => g.isNew);
+            if (newImmediateGoals.length > 0) {
+                // Use Promise.all to create goals in parallel
+                await Promise.all(newImmediateGoals.map(async (goal) => {
+                    // Create the immediate goal with its STG parent
+                    const createdGoal = await fractalApi.createGoal(rootId, {
+                        name: goal.name,
+                        description: goal.description || '',
+                        deadline: goal.deadline || null,
+                        type: 'ImmediateGoal',
+                        parent_id: goal.parent_id, // Parent is the STG
+                        targets: goal.targets || []
+                    });
 
-                // Update existing goals to add this session as a parent
-                if (existingGoals.length > 0) {
-                    await Promise.all(
-                        existingGoals.map(goal =>
-                            fractalApi.updateGoal(rootId, goal.id, {
-                                parent_id: createdSessionId
-                            })
-                        )
-                    );
-                }
+                    // Associate the new goal with the session
+                    if (createdGoal.data?.id) {
+                        await fractalApi.addSessionGoal(rootId, createdSessionId, createdGoal.data.id, 'immediate');
+                    }
+                }));
             }
 
             // Navigate to the session detail page to fill in details
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {
             console.error('Error creating session:', err);
-            alert('Error creating session: ' + err.message);
+            // Get the actual error message from the backend response
+            const errorMessage = err.response?.data?.error || err.message;
+            alert('Error creating session: ' + errorMessage);
             setCreating(false);
         }
     };
@@ -868,7 +827,7 @@ function Log() {
                     </div>
                 )}
 
-                {/* Step 2: Associate with Short-Term Goal */}
+                {/* Step 2: Associate with Goals */}
                 <>
                     <div style={{
                         background: '#1e1e1e',
@@ -877,7 +836,7 @@ function Log() {
                         padding: '24px',
                         marginBottom: '24px'
                     }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ fontSize: '20px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{
                                 background: '#2196f3',
                                 color: 'white',
@@ -890,60 +849,231 @@ function Log() {
                                 fontSize: '14px',
                                 fontWeight: 'bold'
                             }}>2</span>
-                            Associate with Short-Term Goal(s)
+                            Associate with Goals
                         </h2>
+                        <p style={{ color: '#888', fontSize: '13px', marginBottom: '16px', marginLeft: '36px' }}>
+                            Select short-term goals and optionally attach their immediate goals to this session.
+                        </p>
 
                         {goals.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
                                 <p>No short-term goals found. Create goals in the Goals page first.</p>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {goals.map(goal => {
-                                    const isSelected = selectedGoalIds.includes(goal.id);
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {goals.map(stg => {
+                                    const isSelected = selectedGoalIds.includes(stg.id);
+                                    const hasImmediateGoals = stg.immediateGoals && stg.immediateGoals.length > 0;
+                                    const hasNewGoals = immediateGoals.filter(g => g.parent_id === stg.id).length > 0;
 
                                     return (
-                                        <div
-                                            key={goal.id}
-                                            onClick={() => handleToggleGoal(goal.id)}
-                                            style={{
-                                                background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : '#2a2a2a', // 10% opacity
-                                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#444'}`,
-                                                borderRadius: '6px',
-                                                padding: '12px 16px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <div style={{
-                                                width: '20px',
-                                                height: '20px',
-                                                borderRadius: '4px',
-                                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#666'}`,
-                                                background: isSelected ? GOAL_COLORS.ShortTermGoal : 'transparent',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#1a1a1a',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                flexShrink: 0
-                                            }}>
-                                                {isSelected && '✓'}
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
-                                                    {goal.name}
+                                        <div key={stg.id} style={{
+                                            border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#444'}`,
+                                            borderRadius: '8px',
+                                            overflow: 'hidden',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                            {/* Short-Term Goal Header */}
+                                            <div
+                                                onClick={() => handleToggleGoal(stg.id)}
+                                                style={{
+                                                    background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : '#2a2a2a',
+                                                    padding: '14px 16px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '22px',
+                                                    height: '22px',
+                                                    borderRadius: '4px',
+                                                    border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#666'}`,
+                                                    background: isSelected ? GOAL_COLORS.ShortTermGoal : 'transparent',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#1a1a1a',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {isSelected && '✓'}
                                                 </div>
-                                                {goal.description && (
-                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                                                        {goal.description}
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? GOAL_COLORS.ShortTermGoal : 'white' }}>
+                                                        {stg.name}
+                                                    </div>
+                                                    {stg.description && (
+                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                            {stg.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {(hasImmediateGoals || hasNewGoals) && (
+                                                    <div style={{
+                                                        fontSize: '11px',
+                                                        color: '#888',
+                                                        padding: '2px 8px',
+                                                        background: '#333',
+                                                        borderRadius: '10px'
+                                                    }}>
+                                                        {stg.immediateGoals.length + immediateGoals.filter(g => g.parent_id === stg.id).length} immediate goal{(stg.immediateGoals.length + immediateGoals.filter(g => g.parent_id === stg.id).length) !== 1 ? 's' : ''}
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Immediate Goals Section - Show when STG is selected */}
+                                            {isSelected && (
+                                                <div style={{
+                                                    background: '#1a1a1a',
+                                                    padding: '12px 16px',
+                                                    borderTop: '1px solid #333'
+                                                }}>
+                                                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ color: GOAL_COLORS.ImmediateGoal }}>◇</span>
+                                                        Immediate Goals (optional)
+                                                    </div>
+
+                                                    {/* Existing Immediate Goals as Checkboxes */}
+                                                    {hasImmediateGoals && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: hasNewGoals ? '12px' : '0' }}>
+                                                            {stg.immediateGoals.map(ig => {
+                                                                const isIgSelected = selectedImmediateGoalIds.includes(ig.id);
+                                                                return (
+                                                                    <div
+                                                                        key={ig.id}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedImmediateGoalIds(prev =>
+                                                                                prev.includes(ig.id)
+                                                                                    ? prev.filter(id => id !== ig.id)
+                                                                                    : [...prev, ig.id]
+                                                                            );
+                                                                        }}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '10px',
+                                                                            padding: '10px 12px',
+                                                                            background: isIgSelected ? `${GOAL_COLORS.ImmediateGoal}15` : '#252525',
+                                                                            border: `1px solid ${isIgSelected ? GOAL_COLORS.ImmediateGoal : '#333'}`,
+                                                                            borderRadius: '4px',
+                                                                            cursor: 'pointer',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <div style={{
+                                                                            width: '18px',
+                                                                            height: '18px',
+                                                                            borderRadius: '3px',
+                                                                            border: `2px solid ${isIgSelected ? GOAL_COLORS.ImmediateGoal : '#555'}`,
+                                                                            background: isIgSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            color: '#1a1a1a',
+                                                                            fontSize: '12px',
+                                                                            fontWeight: 'bold',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            {isIgSelected && '✓'}
+                                                                        </div>
+                                                                        <div style={{ flex: 1 }}>
+                                                                            <div style={{ fontSize: '13px', color: isIgSelected ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
+                                                                                {ig.name}
+                                                                            </div>
+                                                                            {ig.deadline && (
+                                                                                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                                                                                    📅 {new Date(ig.deadline).toLocaleDateString()}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        {ig.completed && (
+                                                                            <span style={{ fontSize: '11px', color: '#4caf50' }}>✓ Done</span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Newly Created Immediate Goals */}
+                                                    {immediateGoals.filter(g => g.parent_id === stg.id).length > 0 && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                                                            {immediateGoals.filter(g => g.parent_id === stg.id).map(ig => (
+                                                                <div
+                                                                    key={ig.tempId}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '10px',
+                                                                        padding: '10px 12px',
+                                                                        background: `${GOAL_COLORS.ImmediateGoal}15`,
+                                                                        border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
+                                                                        borderRadius: '4px'
+                                                                    }}
+                                                                >
+                                                                    <span style={{ fontSize: '12px', color: '#4caf50' }}>✨ New</span>
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ fontSize: '13px', color: GOAL_COLORS.ImmediateGoal }}>
+                                                                            {ig.name}
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleRemoveImmediateGoal(ig.tempId);
+                                                                        }}
+                                                                        style={{
+                                                                            padding: '4px 8px',
+                                                                            background: '#d32f2f',
+                                                                            border: 'none',
+                                                                            borderRadius: '3px',
+                                                                            color: 'white',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '11px'
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Add Immediate Goal Button */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setCreatingGoalForSTG(stg);
+                                                            setShowGoalModal(true);
+                                                        }}
+                                                        style={{
+                                                            padding: '8px 14px',
+                                                            background: 'transparent',
+                                                            border: `1px dashed ${GOAL_COLORS.ImmediateGoal}50`,
+                                                            borderRadius: '4px',
+                                                            color: GOAL_COLORS.ImmediateGoal,
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px',
+                                                            width: '100%',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = `${GOAL_COLORS.ImmediateGoal}10`;
+                                                            e.currentTarget.style.borderStyle = 'solid';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'transparent';
+                                                            e.currentTarget.style.borderStyle = 'dashed';
+                                                        }}
+                                                    >
+                                                        + Create New Immediate Goal
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -952,145 +1082,7 @@ function Log() {
                     </div>
                 </>
 
-                {/* Step 3: Attach Immediate Goals (Optional) */}
-                <>
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>3</span>
-                            Attach Immediate Goals (Optional)
-                        </h2>
-
-                        <div style={{ marginBottom: '16px', color: '#aaa', fontSize: '14px' }}>
-                            Add immediate goals that you want to accomplish during this practice session.
-                        </div>
-
-                        {immediateGoals.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                                {immediateGoals.map(goal => (
-                                    <div
-                                        key={goal.tempId}
-                                        style={{
-                                            background: '#2a2a2a',
-                                            border: '2px solid #F8F9FA',
-                                            borderRadius: '6px',
-                                            padding: '12px 16px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '12px'
-                                        }}
-                                    >
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '15px', color: GOAL_COLORS.ImmediateGoal }}>
-                                                {goal.name}
-                                            </div>
-                                            {goal.description && (
-                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                                                    {goal.description}
-                                                </div>
-                                            )}
-                                            {goal.deadline && (
-                                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                                    📅 {new Date(goal.deadline).toLocaleDateString()}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={() => handleRemoveImmediateGoal(goal.tempId)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                background: '#d32f2f',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                cursor: 'pointer',
-                                                fontSize: '12px',
-                                                fontWeight: 'bold'
-                                            }}
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <button
-                                onClick={() => {
-                                    setTempSelectedGoals([]);
-                                    setShowSelectGoalModal(true);
-                                }}
-                                disabled={existingImmediateGoals.length === 0}
-                                style={{
-                                    padding: '12px 24px',
-                                    background: existingImmediateGoals.length === 0 ? '#555' : '#2196f3',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    color: 'white',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    cursor: existingImmediateGoals.length === 0 ? 'not-allowed' : 'pointer',
-                                    transition: 'all 0.2s',
-                                    opacity: existingImmediateGoals.length === 0 ? 0.5 : 1
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (existingImmediateGoals.length > 0) {
-                                        e.currentTarget.style.background = '#1976d2';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (existingImmediateGoals.length > 0) {
-                                        e.currentTarget.style.background = '#2196f3';
-                                    }
-                                }}
-                            >
-                                📎 Add Existing Goal
-                            </button>
-
-                            <button
-                                onClick={() => setShowGoalModal(true)}
-                                style={{
-                                    padding: '12px 24px',
-                                    background: GOAL_COLORS.ImmediateGoal,
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    color: '#1a1a1a',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#e0e0e0';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = GOAL_COLORS.ImmediateGoal;
-                                }}
-                            >
-                                + Create New Goal
-                            </button>
-                        </div>
-                    </div>
-                </>
-
-                {/* Step 4: Create Session Button */}
+                {/* Step 3: Create Session Button */}
                 <>
                     <div style={{
                         background: '#1e1e1e',
@@ -1111,9 +1103,10 @@ function Log() {
                                 justifyContent: 'center',
                                 fontSize: '14px',
                                 fontWeight: 'bold'
-                            }}>4</span>
+                            }}>3</span>
                             Create Session
                         </h2>
+
 
                         <button
                             onClick={handleCreateSession}
@@ -1159,17 +1152,23 @@ function Log() {
                 </>
             </div>
 
-            {/* Goal Creation Modal */}
-            <GoalModal
+            {/* Goal Creation Modal - Uses GoalDetailModal for consistent UI */}
+            <GoalDetailModal
                 isOpen={showGoalModal}
-                onClose={() => setShowGoalModal(false)}
-                onSubmit={handleCreateImmediateGoal}
-                parent={{
-                    name: selectedTemplate?.name || 'Practice Session',
-                    type: 'PracticeSession',
-                    attributes: { type: 'PracticeSession' }
+                onClose={() => {
+                    setShowGoalModal(false);
+                    setCreatingGoalForSTG(null);
                 }}
+                mode="create"
+                onCreate={handleCreateImmediateGoal}
+                parentGoal={creatingGoalForSTG ? {
+                    id: creatingGoalForSTG.id,
+                    name: creatingGoalForSTG.name,
+                    type: 'ShortTermGoal',
+                    attributes: { type: 'ShortTermGoal' }
+                } : null}
                 activityDefinitions={activityDefinitions}
+                rootId={rootId}
             />
 
             {/* Goal Selection Modal */}

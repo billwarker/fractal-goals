@@ -4,17 +4,19 @@ import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GoalDetailModal from '../components/GoalDetailModal';
-import PracticeSessionModal from '../components/modals/PracticeSessionModal';
 import AlertModal from '../components/modals/AlertModal';
 import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
-import { getChildType, collectShortTermGoals } from '../utils/goalHelpers';
+import { getChildType } from '../utils/goalHelpers';
 import '../App.css';
 import './FractalGoals.css';
 
 /**
  * FractalGoals Page - FlowTree visualization with sidebar
+ * 
+ * NOTE: Sessions are NO LONGER displayed in the goal tree.
+ * They are managed separately via the /sessions page.
  */
 function FractalGoals() {
     const { rootId } = useParams();
@@ -32,11 +34,8 @@ function FractalGoals() {
     } = useGoals();
 
     const {
-        sessions: practiceSessions,
+        sessions,
         fetchSessions,
-        updateSession,
-        createSession,
-        deleteSession,
         loading: sessionsLoading
     } = useSessions();
 
@@ -52,28 +51,25 @@ function FractalGoals() {
     const fetchPrograms = async (id) => {
         try {
             setProgramsLoading(true);
-            const { fractalApi } = await import('../utils/api'); // Dynamic import to avoid circular dep issues if any
+            const { fractalApi } = await import('../utils/api');
             const res = await fractalApi.getPrograms(id);
             setPrograms(res.data || []);
         } catch (err) {
             console.error("Failed to fetch programs:", err);
-            // Non-critical, just log
         } finally {
             setProgramsLoading(false);
         }
     };
 
-    const loading = goalsLoading || sessionsLoading;
+    const loading = goalsLoading;
 
     // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
-    const [viewingPracticeSession, setViewingPracticeSession] = useState(null);
 
     // Modal state
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedParent, setSelectedParent] = useState(null);
-    const [showPracticeSessionModal, setShowPracticeSessionModal] = useState(false);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     // Alert state
@@ -112,15 +108,10 @@ function FractalGoals() {
         const viewingId = viewingGoal.attributes?.id || viewingGoal.id;
         const updatedGoal = findGoal(fractalData, viewingId);
 
-        // Only update if we found it and it's different (shallow check of attributes helps avoid loops if implemented carefully, 
-        // but since we're setting a new object reference, we rely on React's equality check or the fact that fractalData reference changes only on update)
         if (updatedGoal && updatedGoal !== viewingGoal) {
             setViewingGoal(updatedGoal);
         }
     }, [fractalData, viewingGoal]);
-
-    // Derived Data
-    const shortTermGoals = fractalData ? collectShortTermGoals(fractalData) : [];
 
     // Helper to show alert
     const showAlert = (title, message) => {
@@ -130,17 +121,8 @@ function FractalGoals() {
     // Handlers
 
     const handleGoalNameClick = (nodeDatum) => {
-        const isPracticeSession = nodeDatum.attributes?.type === 'PracticeSession' ||
-            nodeDatum.type === 'PracticeSession' ||
-            nodeDatum.__isPracticeSession;
-
-        if (isPracticeSession) {
-            setViewingPracticeSession(nodeDatum);
-            setSidebarMode('session-details');
-        } else {
-            setViewingGoal(nodeDatum);
-            setSidebarMode('goal-details');
-        }
+        setViewingGoal(nodeDatum);
+        setSidebarMode('goal-details');
     };
 
     const handleAddChildClick = (nodeDatum) => {
@@ -152,14 +134,7 @@ function FractalGoals() {
             return;
         }
 
-        // If adding a Practice Session to a ShortTermGoal, redirect to CREATE SESSION page
-        if (parentType === 'ShortTermGoal' && childType === 'PracticeSession') {
-            const goalId = nodeDatum.id || nodeDatum.attributes?.id;
-            navigate(`/${rootId}/create-session?goalId=${goalId}`);
-            return;
-        }
-
-        // Otherwise, show the Goal creation modal
+        // Show the Goal creation modal
         setSelectedParent(nodeDatum);
         setShowGoalModal(true);
     };
@@ -173,34 +148,11 @@ function FractalGoals() {
         }
     };
 
-    const handleCreateSession = async (sessionData) => {
-        try {
-            const payload = {
-                name: "Auto-Generated",
-                description: `Practice session with ${sessionData.immediateGoals.length} immediate goal(s)`,
-                parent_ids: sessionData.selectedShortTermGoals,
-                immediate_goals: sessionData.immediateGoals
-            };
-
-            await createSession(rootId, payload);
-            setShowPracticeSessionModal(false);
-        } catch (err) {
-            showAlert('Creation Failed', 'Error creating practice session: ' + err.message);
-        }
-    };
-
     const handleUpdateNode = async (payload) => {
         try {
-            const target = sidebarMode === 'session-details' ? viewingPracticeSession : viewingGoal;
-            const nodeId = target.id || target.attributes?.id;
-
-            if (sidebarMode === 'session-details') {
-                const updated = await updateSession(rootId, String(nodeId), payload);
-                setViewingPracticeSession(updated);
-            } else {
-                const updated = await updateGoal(rootId, String(nodeId), payload);
-                setViewingGoal(updated);
-            }
+            const nodeId = viewingGoal.id || viewingGoal.attributes?.id;
+            const updated = await updateGoal(rootId, String(nodeId), payload);
+            setViewingGoal(updated);
         } catch (err) {
             showAlert('Update Failed', 'Failed to update: ' + err.message);
         }
@@ -218,19 +170,11 @@ function FractalGoals() {
         if (!fractalToDelete) return;
 
         try {
-            const isSession = fractalToDelete.attributes?.type === 'PracticeSession' ||
-                fractalToDelete.type === 'PracticeSession';
-
-            if (isSession) {
-                await deleteSession(rootId, fractalToDelete.id);
-            } else {
-                await deleteGoal(rootId, fractalToDelete.id);
-            }
+            await deleteGoal(rootId, fractalToDelete.id);
 
             setFractalToDelete(null);
             setSidebarMode(null);
             setViewingGoal(null);
-            setViewingPracticeSession(null);
         } catch (err) {
             showAlert('Deletion Failed', 'Failed to delete: ' + err.message);
         }
@@ -251,14 +195,8 @@ function FractalGoals() {
             <div className="fractal-view-wrapper">
                 <FractalView
                     treeData={fractalData}
-                    practiceSessions={practiceSessions}
                     onNodeClick={handleGoalNameClick}
-                    selectedNodeId={
-                        viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) :
-                            viewingPracticeSession ? (viewingPracticeSession.attributes?.id || viewingPracticeSession.id) :
-                                null
-                    }
-                    onAddPracticeSession={() => setShowPracticeSessionModal(true)}
+                    selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
                     onAddChild={handleAddChildClick}
                     sidebarOpen={!!sidebarMode}
                     key={rootId} // Force refresh on root switch
@@ -268,12 +206,11 @@ function FractalGoals() {
             {/* Sidebar */}
             {sidebarMode && (
                 <Sidebar
-                    selectedNode={sidebarMode === 'session-details' ? viewingPracticeSession : viewingGoal}
+                    selectedNode={viewingGoal}
                     selectedRootId={rootId}
                     onClose={() => {
                         setSidebarMode(null);
                         setViewingGoal(null);
-                        setViewingPracticeSession(null);
                     }}
                     onUpdate={handleUpdateNode}
                     onDelete={(node) => setFractalToDelete(node)}
@@ -284,7 +221,7 @@ function FractalGoals() {
                     }}
                     onToggleCompletion={handleToggleCompletion}
                     treeData={fractalData}
-                    practiceSessions={practiceSessions}
+                    sessions={sessions}
                     activityDefinitions={activities}
                     programs={programs}
                 />
@@ -301,19 +238,12 @@ function FractalGoals() {
                 rootId={rootId}
             />
 
-            <PracticeSessionModal
-                isOpen={showPracticeSessionModal}
-                onClose={() => setShowPracticeSessionModal(false)}
-                onSubmit={handleCreateSession}
-                shortTermGoals={shortTermGoals}
-            />
-
             <DeleteConfirmModal
                 isOpen={!!fractalToDelete}
                 onClose={() => setFractalToDelete(null)}
                 onConfirm={handleDelete}
-                title={`Delete ${fractalToDelete?.attributes?.type === 'PracticeSession' ? 'Session' : 'Goal'}?`}
-                message={`Are you sure you want to delete "${fractalToDelete?.name}"?`}
+                title="Delete Goal?"
+                message={`Are you sure you want to delete "${fractalToDelete?.name}" and all its children?`}
             />
 
             <AlertModal

@@ -5,7 +5,7 @@ import SessionActivityItem from '../components/SessionActivityItem';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatForInput, localToISO } from '../utils/dateUtils';
+import { formatForInput, localToISO, formatDateInTimezone } from '../utils/dateUtils';
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
@@ -70,20 +70,7 @@ function formatDuration(seconds) {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-/**
- * Format datetime to readable format
- */
-function formatDateTime(isoString) {
-    if (!isoString) return 'N/A';
-    const date = new Date(isoString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
+// function formatDateTime(isoString) removed - using formatDateInTimezone instead
 
 /**
  * Session Detail Page
@@ -250,18 +237,27 @@ function SessionDetail() {
                 setSessionData(parsedData);
             }
 
-            // Fetch parent goals for target achievement checking
-            const parentIds = foundSession.attributes?.parent_ids || [];
-            const goals = [];
-            for (const goalId of parentIds) {
-                try {
-                    const goalRes = await fractalApi.getGoal(rootId, goalId);
-                    goals.push(goalRes.data);
-                } catch (err) {
-                    console.error(`Failed to fetch goal ${goalId}`, err);
+            // Use the goal data directly from the session response
+            // New structure: short_term_goals and immediate_goals arrays
+            const shortTermGoals = foundSession.short_term_goals || [];
+            const immediateGoals = foundSession.immediate_goals || [];
+
+            // For backward compatibility, also check attributes.parent_ids if new data is empty
+            if (shortTermGoals.length === 0 && foundSession.attributes?.parent_ids?.length > 0) {
+                const parentIds = foundSession.attributes.parent_ids;
+                for (const goalId of parentIds) {
+                    try {
+                        const goalRes = await fractalApi.getGoal(rootId, goalId);
+                        shortTermGoals.push(goalRes.data);
+                    } catch (err) {
+                        console.error(`Failed to fetch goal ${goalId}`, err);
+                    }
                 }
             }
-            setParentGoals(goals);
+
+            // Store both goal types
+            setParentGoals(shortTermGoals);
+            // Store immediate goals in session object (already available via foundSession.immediate_goals)
 
             setLoading(false);
         } catch (err) {
@@ -277,12 +273,10 @@ function SessionDetail() {
         let needsUpdate = false;
         const updatedData = { ...sessionData };
 
-        // Initialize session_start with created_at if not set (as local date only)
+        // Initialize session_start with created_at if not set (preserve full datetime)
         if (!updatedData.session_start && session.attributes?.created_at) {
-            // Extract local date from created_at to avoid timezone issues
-            const createdDate = new Date(session.attributes.created_at);
-            const localDate = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}-${String(createdDate.getDate()).padStart(2, '0')}`;
-            updatedData.session_start = localDate;
+            // Use the full datetime from created_at to preserve the time component
+            updatedData.session_start = session.attributes.created_at;
             needsUpdate = true;
         }
 
@@ -384,20 +378,20 @@ function SessionDetail() {
                 if (value === 'start') {
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.startActivityTimer(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'stop') {
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.stopActivityTimer(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'reset') {
                     // Reset: update instance in database to clear times
                     const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.updateActivityInstance(rootId, instanceId, {
-                        practice_session_id: sessionId,
+                        session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id,
                         time_start: null,
                         time_stop: null,
@@ -466,7 +460,7 @@ function SessionDetail() {
             // Persist to backend
             try {
                 await fractalApi.updateActivityInstance(rootId, instanceId, {
-                    practice_session_id: sessionId,
+                    session_id: sessionId,
                     activity_definition_id: instance.activity_definition_id,
                     time_start: updatedInstance.time_start,
                     time_stop: updatedInstance.time_stop,
@@ -508,7 +502,7 @@ function SessionDetail() {
         // Persist to backend (for fields like notes, completed)
         try {
             await fractalApi.updateActivityInstance(rootId, instanceId, {
-                practice_session_id: sessionId,
+                session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
                 [field]: value
             });
@@ -535,7 +529,7 @@ function SessionDetail() {
         // Persist to backend
         try {
             await fractalApi.updateActivityInstance(rootId, instanceId, {
-                practice_session_id: sessionId,
+                session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
                 completed: newCompleted
             });
@@ -580,7 +574,7 @@ function SessionDetail() {
                     if (instance.time_start && !instance.time_stop) {
                         try {
                             const response = await fractalApi.stopActivityTimer(rootId, instance.id, {
-                                practice_session_id: sessionId,
+                                session_id: sessionId,
                                 activity_definition_id: instance.activity_definition_id
                             });
 
@@ -615,12 +609,12 @@ function SessionDetail() {
                 }
             }
 
-            const res = await fractalApi.toggleGoalCompletion(rootId, sessionId, newCompleted);
-            // The endpoint returns the practice session tree directly, not wrapped in {goal: ...}
+            const res = await fractalApi.updateSession(rootId, sessionId, { completed: newCompleted });
+            // Update the full session object from the response
             setSession(res.data);
         } catch (err) {
             console.error('Error toggling completion:', err);
-            alert('Error updating completion status');
+            alert('Error updating completion status: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -854,7 +848,7 @@ function SessionDetail() {
                     {/* Row 1, Column 3: Date Created */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Date Created:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.created_at)}</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.created_at, timezone)}</span>
                     </div>
 
                     {/* Row 1, Column 4: Total Duration (Planned) */}
@@ -869,8 +863,8 @@ function SessionDetail() {
                         {parentGoals.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                 {parentGoals.map(goal => {
-                                    const goalColor = getGoalColor(goal.attributes?.type || goal.type);
-                                    const textColor = getGoalTextColor(goal.attributes?.type || goal.type);
+                                    const goalColor = getGoalColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
+                                    const textColor = getGoalTextColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
                                     return (
                                         <div
                                             key={goal.id}
@@ -949,7 +943,7 @@ function SessionDetail() {
                     {/* Row 2, Column 3: Last Modified */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Last Modified:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateTime(session.attributes?.updated_at)}</span>
+                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.updated_at, timezone)}</span>
                     </div>
 
                     {/* Row 2, Column 4: Total Duration (Completed) */}
@@ -968,15 +962,15 @@ function SessionDetail() {
                     {/* Row 2, Column 5: Immediate Goals */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span style={{ color: '#666', fontSize: '12px' }}>Immediate Goals:</span>
-                        {session.children && session.children.length > 0 ? (
+                        {session.immediate_goals && session.immediate_goals.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {session.children.map(child => {
-                                    const goalColor = getGoalColor(child.attributes?.type || child.type);
-                                    const textColor = getGoalTextColor(child.attributes?.type || child.type);
+                                {session.immediate_goals.map(goal => {
+                                    const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
+                                    const textColor = getGoalTextColor(goal.type || 'ImmediateGoal');
                                     return (
                                         <div
-                                            key={child.id}
-                                            onClick={() => setSelectedGoal(child)}
+                                            key={goal.id}
+                                            onClick={() => setSelectedGoal(goal)}
                                             style={{
                                                 padding: '4px 10px',
                                                 background: '#2a2a2a',
@@ -998,7 +992,7 @@ function SessionDetail() {
                                                 e.currentTarget.style.color = goalColor;
                                             }}
                                         >
-                                            {child.name}
+                                            {goal.name}
                                         </div>
                                     );
                                 })}

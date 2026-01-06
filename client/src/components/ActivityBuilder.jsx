@@ -140,7 +140,6 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
                 has_sets: hasSets,
                 has_metrics: hasMetrics,
-                has_metrics: hasMetrics,
                 metrics_multiplicative: metricsMultiplicative,
                 has_splits: hasSplits,
                 group_id: groupId || null
@@ -191,7 +190,6 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                         metrics: hasMetrics ? validMetrics : [],
                         splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
                         has_sets: hasSets,
-                        has_metrics: hasMetrics,
                         has_metrics: hasMetrics,
                         metrics_multiplicative: metricsMultiplicative,
                         has_splits: hasSplits,

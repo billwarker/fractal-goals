@@ -244,7 +244,7 @@ def delete_program(root_id, program_id):
         affected_sessions_count = 0
         for block in program.blocks:
             for day in block.days:
-                affected_sessions_count += len(day.completed_sessions)
+                affected_sessions_count += len([s for s in day.completed_sessions if not s.deleted_at])
         
         session.delete(program)
         session.commit()
@@ -274,7 +274,7 @@ def get_program_session_count(root_id, program_id):
         session_count = 0
         for block in program.blocks:
             for day in block.days:
-                session_count += len(day.completed_sessions)
+                session_count += len([s for s in day.completed_sessions if not s.deleted_at])
         
         return jsonify({"session_count": session_count})
         
@@ -564,7 +564,7 @@ def get_active_program_days(root_id):
                                     "day_date": day.date.isoformat() if day.date else None,
                                     "is_completed": day.is_completed,
                                     "sessions": session_details,
-                                    "completed_session_count": len(day.completed_sessions)
+                                    "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
                                 })
         
         return jsonify(result)

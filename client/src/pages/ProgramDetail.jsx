@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { GOAL_COLORS, getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import { getLocalISOString } from '../utils/dateUtils';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -360,7 +361,7 @@ const ProgramDetail = () => {
 
             await fractalApi.createSession(rootId, {
                 name: templateDay ? templateDay.name : 'Ad-hoc Session',
-                session_start: date, // YYYY-MM-DD (Backend handles ISO)
+                session_start: getLocalISOString(), // Full datetime of when session is created
                 parent_ids: Array.from(parentIds),
                 session_data: {
                     program_context: {

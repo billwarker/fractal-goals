@@ -8,7 +8,8 @@ export const GOAL_COLORS = {
     'LongTermGoal': '#7B5CFF',      // Nebula Violet
     'MidTermGoal': '#3A86FF',       // Orbital Blue
     'ShortTermGoal': '#4ECDC4',     // Lunar Teal
-    'PracticeSession': '#FF9F1C',   // Thruster Orange
+    'Session': '#FF9F1C',           // Thruster Orange (new name)
+    'PracticeSession': '#FF9F1C',   // Thruster Orange (legacy alias)
     'ImmediateGoal': '#F8F9FA',     // Starlight White
     'MicroGoal': '#A8DADC',         // Placeholder - adjust as needed
     'NanoGoal': '#E0E0E0'           // Placeholder - adjust as needed
@@ -19,6 +20,7 @@ export const GOAL_COLOR_NAMES = {
     'LongTermGoal': 'Nebula Violet',
     'MidTermGoal': 'Orbital Blue',
     'ShortTermGoal': 'Lunar Teal',
+    'Session': 'Thruster Orange',
     'PracticeSession': 'Thruster Orange',
     'ImmediateGoal': 'Starlight White',
     'MicroGoal': 'Cosmic Cyan',

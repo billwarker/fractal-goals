@@ -21,18 +21,24 @@
 ## Core Features
 
 ### 1. Hierarchical Goal Management
-- 8-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → PracticeSession → ImmediateGoal → MicroGoal → NanoGoal
+- 7-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
 - Visual tree representation using ReactFlow
 - Goal completion tracking with targets
 - Goal age calculation and display
-- Multi-parent support for practice sessions
+- **Note:** Sessions are now managed separately from the goal hierarchy
 
-### 2. Practice Session Management
-- Sessions are nodes in the goal tree (children of ShortTermGoals)
+### 2. Session Management
+- **Sessions are stored in a separate `sessions` table** (not part of the goal tree)
 - Session start/end times with duration tracking
 - Activity instances with timers
 - Session templates for recurring practices
-- Many-to-many relationship with ShortTermGoals via junction table
+- **Session-Goal Associations:**
+  - Many-to-many relationship with Goals via `session_goals` junction table
+  - Sessions can be linked to ShortTermGoals (`goal_type='short_term'`)
+  - Sessions can be linked to ImmediateGoals (`goal_type='immediate'`)
+  - CreateSession page allows selecting STGs and their child IGs in a unified flow
+  - SessionDetail header displays associated STGs and IGs with clickable links
+  - GoalDetailModal shows associated sessions for both STGs and IGs
 
 ### 3. Activity System
 - Reusable activity definitions organized by groups
@@ -103,22 +109,48 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - LongTermGoal
 - MidTermGoal
 - ShortTermGoal
-- PracticeSession
 - ImmediateGoal
 - MicroGoal
 - NanoGoal
 
+**Note:** PracticeSession is NO LONGER a goal type. Sessions are now stored in the separate `sessions` table.
+
 **Relationships:**
 - Self-referential parent-child via `parent_id`
-- PracticeSession has many ActivityInstances
-- PracticeSession has many-to-many with ShortTermGoals via `practice_session_goals`
 
-#### `practice_session_goals` (Junction Table)
-Links PracticeSessions to multiple ShortTermGoals (many-to-many).
+#### `sessions` (Separate Table)
+Stores practice session data independently from the goal hierarchy.
 
 **Fields:**
-- `practice_session_id` (String, FK to goals.id, PK)
-- `short_term_goal_id` (String, FK to goals.id, PK)
+- `id` (String, UUID, PK)
+- `name` (String)
+- `description` (String)
+- `root_id` (String, FK to goals.id) - Reference to fractal root
+- `completed` (Boolean)
+- `completed_at` (DateTime, nullable)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+- `deleted_at` (DateTime, nullable) - Soft delete
+- `duration_minutes` (Integer)
+- `session_start` (DateTime)
+- `session_end` (DateTime)
+- `total_duration_seconds` (Integer)
+- `template_id` (String)
+- `program_day_id` (String, FK to program_days.id)
+- `attributes` (Text/JSON) - Flexible session data storage
+
+**Relationships:**
+- Has many ActivityInstances
+- Has many-to-many with Goals via `session_goals`
+
+#### `session_goals` (Junction Table)
+Links Sessions to multiple Goals (many-to-many). Supports both ShortTermGoals and ImmediateGoals.
+
+**Fields:**
+- `session_id` (String, FK to sessions.id, PK)
+- `goal_id` (String, FK to goals.id, PK)
+- `goal_type` (String) - 'short_term' or 'immediate'
+- `created_at` (DateTime)
 
 #### `activity_groups`
 Organizes activities into families/categories.
@@ -175,19 +207,23 @@ Defines splits for activities (e.g., left/right).
 - `created_at` (DateTime)
 
 #### `activity_instances`
-Actual activity occurrences within practice sessions.
+Actual activity occurrences within sessions.
 
 **Fields:**
 - `id` (String, UUID, PK)
-- `practice_session_id` (String, FK to goals.id)
+- `session_id` (String, FK to sessions.id)
 - `activity_definition_id` (String, FK to activity_definitions.id)
+- `root_id` (String, FK to goals.id) - For performance
 - `created_at` (DateTime)
 - `time_start` (DateTime, nullable)
 - `time_stop` (DateTime, nullable)
 - `duration_seconds` (Integer, nullable)
+- `completed` (Boolean)
+- `notes` (Text)
+- `data` (Text/JSON) - Flexible data storage (sets, etc.)
 
 **Relationships:**
-- Belongs to PracticeSession
+- Belongs to Session
 - Belongs to ActivityDefinition
 - Has many MetricValues
 
@@ -545,7 +581,12 @@ Fractal selection/home page.
 ### Utilities (in `/client/src/utils/`)
 
 - **`api.js`** - Axios-based API client with all endpoint functions
-- **`dateUtils.js`** - Date formatting and timezone utilities
+- **`dateUtils.js`** - Date formatting and timezone utilities:
+  - `getLocalISOString()` - Create timestamps in local time (use for session_start, etc.)
+  - `getTodayLocalDate()` - Get today's date as YYYY-MM-DD (local)
+  - `parseAnyDate()` - Safely parse any date string (handles date-only and datetime)
+  - `formatForInput()` - Format dates for input fields
+  - `formatDateInTimezone()` - Format dates for display
 - **`goalColors.js`** - Color schemes for goal types
 - **`goalHelpers.js`** - Goal hierarchy and validation helpers
 - **`metricsHelpers.js`** - Metric calculation utilities
@@ -677,6 +718,10 @@ From `/my-implementation-plans/features.txt`:
 - **Program Scheduling Refactor:** Shifted from "Copying Program Days" to "Creating Practice Sessions linked to Templates". This prevents clutter in the Blocks view and streamlines the data model.
 - **DayViewModal:** Unified display of Scheduled Program Days (Sessions) and Legacy Days, added "Unassign" capability, and restricted single-day scheduling.
 - **Calendar Rendering Fix:** Added `program_day_id` to `Goal.to_dict()` serialization so scheduled sessions properly link to their template program days for calendar display.
+- **Datetime Standardization:** Implemented global `format_utc` in `models.py` to ensure all `DateTime` fields (Sessions, Goals, Activities, Programs) are serialized as ISO 8601 strings with 'Z' suffix, ensuring correct UTC-to-Local conversion on the frontend.
+- **Backend Performance:** Optimized `get_session_activities` with eager loading to eliminate N+1 queries. Removed dead code `sync_session_activities`.
+- **Frontend Performance:** Refactored `CreateSession.jsx` to parallelize immediate goal creation requests using `Promise.all`.
+- **Data Fetching Optimization:** Addressed inefficient data loading in `CreateSession.jsx` by implementing a dedicated `goals/selection` endpoint that fetches only active Short-Term and Immediate goals, avoiding full-tree traversal.
 
 ---
 

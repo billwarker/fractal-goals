@@ -43,6 +43,13 @@ export const fractalApi = {
     getGoals: (rootId) => axios.get(`${API_BASE}/${rootId}/goals`),
 
     /**
+     * Get active ShortTermGoals and ImmediateGoals for selection
+     * Optimized endpoint that avoids fetching the full tree
+     * @param {string} rootId - ID of the fractal
+     */
+    getGoalsForSelection: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/selection`),
+
+    /**
      * Get a specific goal by ID
      * @param {string} rootId - ID of the fractal
      * @param {string} goalId - ID of the goal to fetch
@@ -111,6 +118,17 @@ export const fractalApi = {
      */
     deleteSession: (rootId, sessionId) =>
         axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
+
+    /**
+     * Add a goal association to a session
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     * @param {string} goalId - ID of the goal to associate
+     * @param {string} goalType - 'short_term' or 'immediate'
+     */
+    addSessionGoal: (rootId, sessionId, goalId, goalType = 'immediate') =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/goals`, { goal_id: goalId, goal_type: goalType }),
+
 
     // ========== Session Activity Instances (Database-Only Architecture) ==========
 
@@ -265,7 +283,7 @@ export const fractalApi = {
     /**
      * Create an activity instance (without starting timer)
      * @param {string} rootId - ID of the fractal
-     * @param {Object} data - {instance_id, practice_session_id, activity_definition_id}
+     * @param {Object} data - {instance_id, session_id, activity_definition_id}
      */
     createActivityInstance: (rootId, data) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances`, data),
@@ -274,7 +292,7 @@ export const fractalApi = {
      * Start timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
+     * @param {Object} data - Optional {session_id, activity_definition_id}
      */
     startActivityTimer: (rootId, instanceId, data = {}) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`, data),
@@ -283,7 +301,7 @@ export const fractalApi = {
      * Stop timer for an activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - Optional {practice_session_id, activity_definition_id}
+     * @param {Object} data - Optional {session_id, activity_definition_id}
      */
     stopActivityTimer: (rootId, instanceId, data = {}) =>
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`, data),
@@ -292,7 +310,7 @@ export const fractalApi = {
      * Update activity instance manually (e.g. set times)
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
-     * @param {Object} data - {time_start, time_stop, practice_session_id, activity_definition_id}
+     * @param {Object} data - {time_start, time_stop, session_id, activity_definition_id}
      */
     updateActivityInstance: (rootId, instanceId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}`, data),
