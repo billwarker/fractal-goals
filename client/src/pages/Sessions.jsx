@@ -380,12 +380,7 @@ function Sessions() {
                                         <div>
                                             <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session Start</div>
                                             {sessionData?.session_start ? (
-                                                <>
-                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_start)}</div>
-                                                    <div style={{ fontSize: '11px', color: '#666' }}>
-                                                        {formatTime(sessionData.session_start)}
-                                                    </div>
-                                                </>
+                                                <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_start)}</div>
                                             ) : (
                                                 <div style={{ fontSize: '12px', color: '#666' }}>-</div>
                                             )}
@@ -395,12 +390,7 @@ function Sessions() {
                                         <div>
                                             <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session End</div>
                                             {sessionData?.session_end ? (
-                                                <>
-                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_end)}</div>
-                                                    <div style={{ fontSize: '11px', color: '#666' }}>
-                                                        {formatTime(sessionData.session_end)}
-                                                    </div>
-                                                </>
+                                                <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_end)}</div>
                                             ) : (
                                                 <div style={{ fontSize: '12px', color: '#666' }}>-</div>
                                             )}
@@ -410,9 +400,6 @@ function Sessions() {
                                         <div>
                                             <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Last Modified</div>
                                             <div style={{ fontSize: '14px' }}>{formatDate(session.attributes?.updated_at)}</div>
-                                            <div style={{ fontSize: '11px', color: '#666' }}>
-                                                {formatTime(session.attributes?.updated_at)}
-                                            </div>
                                         </div>
 
                                         {/* Duration */}
