@@ -41,3 +41,14 @@ To-DO for 0.2.0
 - postgres db
 - deploy on GCP
 - optimize for mobile web
+
+UI Improvements
+- Copying an activity brings up the builder before creating the copy
+- Create a session template from a session
+- Assign session templates to programs
+- Adding targets can allow you to create a new activity to set a target against
+- Be able to mark immediate or short term goals as complete within sessions
+- Have sub groups within activity groups; make activity groups collapsible
+- track sessions that occur within a program on the calendar
+- track immediate goals
+- SMART mode for goals
