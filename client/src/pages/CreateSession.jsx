@@ -2,37 +2,59 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import GoalDetailModal from '../components/GoalDetailModal';
-import { GOAL_COLORS } from '../utils/goalColors';
 import { getLocalISOString } from '../utils/dateUtils';
+import {
+    ProgramSelector,
+    SourceSelector,
+    ProgramDayPicker,
+    TemplatePicker,
+    GoalAssociation,
+    CreateSessionActions,
+    SelectExistingGoalModal
+} from '../components/createSession';
 import '../App.css';
 
 /**
  * Create Session Page
  * Enhanced flow: Select from program day OR select template → Associate with goal → Create session
+ * 
+ * Refactored to use focused sub-components for each step:
+ * - ProgramSelector (Step 0a): Choose program when multiple available
+ * - SourceSelector (Step 0b): Choose between program days vs templates  
+ * - ProgramDayPicker (Step 1): Select program day and session
+ * - TemplatePicker (Step 1): Select template directly
+ * - GoalAssociation (Step 2): Associate with STGs and IGs
+ * - CreateSessionActions (Step 3): Create button and summary
  */
-function Log() {
+function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
+    // Data state
     const [templates, setTemplates] = useState([]);
     const [goals, setGoals] = useState([]);
     const [programDays, setProgramDays] = useState([]);
-    const [programsByName, setProgramsByName] = useState({}); // NEW: group days by program
-    const [selectedProgram, setSelectedProgram] = useState(null); // NEW: selected program name
+    const [programsByName, setProgramsByName] = useState({});
+    const [existingImmediateGoals, setExistingImmediateGoals] = useState([]);
+    const [activityDefinitions, setActivityDefinitions] = useState([]);
+
+    // Selection state
+    const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
-    const [selectedImmediateGoalIds, setSelectedImmediateGoalIds] = useState([]); // Existing IG checkboxes
-    const [immediateGoals, setImmediateGoals] = useState([]); // NEW: immediate goals to create
-    const [existingImmediateGoals, setExistingImmediateGoals] = useState([]); // NEW: existing immediate goals from tree
-    const [activityDefinitions, setActivityDefinitions] = useState([]); // NEW: for target creation
-    const [showGoalModal, setShowGoalModal] = useState(false); // NEW: control goal creation modal
-    const [showSelectGoalModal, setShowSelectGoalModal] = useState(false); // NEW: control goal selection modal
-    const [tempSelectedGoals, setTempSelectedGoals] = useState([]); // NEW: track selections in modal
-    const [creatingGoalForSTG, setCreatingGoalForSTG] = useState(null); // Which STG we're creating an IG for
+    const [selectedImmediateGoalIds, setSelectedImmediateGoalIds] = useState([]);
+    const [immediateGoals, setImmediateGoals] = useState([]); // New IGs to create
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
+
+    // Modal state
+    const [showGoalModal, setShowGoalModal] = useState(false);
+    const [showSelectGoalModal, setShowSelectGoalModal] = useState(false);
+    const [creatingGoalForSTG, setCreatingGoalForSTG] = useState(null);
+
+    // UI state
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
 
@@ -46,7 +68,6 @@ function Log() {
 
     const fetchData = async () => {
         try {
-            // Fetch templates, active goals (optimized), active program days, and activities in parallel
             const [templatesRes, goalsRes, programDaysRes, activitiesRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
                 fractalApi.getGoalsForSelection(rootId),
@@ -73,20 +94,18 @@ function Log() {
             });
             setProgramsByName(grouped);
 
-            // Set Short Term Goals directly from optimized endpoint
+            // Set Short Term Goals from optimized endpoint
             const shortTermGoals = goalsRes.data || [];
             setGoals(shortTermGoals);
 
-            // Extract all immediate goals from the simplified structure for "Select Existing" modal
+            // Extract all immediate goals for "Select Existing" modal
             const allImmediateGoals = shortTermGoals.flatMap(stg =>
                 (stg.immediateGoals || []).map(ig => ({
                     ...ig,
-                    parent_id: stg.id // Ensure parent_id is available
+                    parent_id: stg.id
                 }))
             );
             setExistingImmediateGoals(allImmediateGoals);
-
-            // Set activity definitions for target creation
             setActivityDefinitions(activitiesRes.data || []);
 
             // Pre-select goal from URL if provided
@@ -95,17 +114,14 @@ function Log() {
                 setSelectedGoalIds([goalIdFromUrl]);
             }
 
-            // Auto-select session source and program if only one option is available
+            // Auto-select session source and program if only one option available
             const programNames = Object.keys(grouped);
             if (programNames.length === 1 && templatesRes.data.length === 0) {
-                // Only one program, no templates → auto-select program
                 setSessionSource('program');
                 setSelectedProgram(programNames[0]);
             } else if (programNames.length === 1 && templatesRes.data.length > 0) {
-                // One program and templates → auto-select the program for "From Program" option
                 setSelectedProgram(programNames[0]);
             } else if (programNames.length === 0 && templatesRes.data.length > 0) {
-                // No programs, only templates → auto-select template source
                 setSessionSource('template');
             }
 
@@ -116,6 +132,7 @@ function Log() {
         }
     };
 
+    // Handler functions
     const handleToggleGoal = (goalId) => {
         setSelectedGoalIds(prev =>
             prev.includes(goalId)
@@ -124,13 +141,21 @@ function Log() {
         );
     };
 
+    const handleToggleImmediateGoal = (goalId) => {
+        setSelectedImmediateGoalIds(prev =>
+            prev.includes(goalId)
+                ? prev.filter(id => id !== goalId)
+                : [...prev, goalId]
+        );
+    };
+
     const handleSelectProgramDay = (programDay) => {
         setSelectedProgramDay(programDay);
-        setSelectedProgramSession(null); // Reset session selection
-        setSelectedTemplate(null); // Reset template
+        setSelectedProgramSession(null);
+        setSelectedTemplate(null);
 
-        // If only one session, auto-select it
-        if (programDay.sessions && programDay.sessions.length === 1) {
+        // Auto-select if single session
+        if (programDay.sessions?.length === 1) {
             const session = programDay.sessions[0];
             setSelectedProgramSession(session);
             setSelectedTemplate({
@@ -153,7 +178,6 @@ function Log() {
     };
 
     const handleSelectSource = (source) => {
-        // Reset selections when switching sources
         setSelectedTemplate(null);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
@@ -161,39 +185,39 @@ function Log() {
     };
 
     const handleSelectProgram = (programName) => {
-        // Reset day/session selections when switching programs
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
         setSelectedTemplate(null);
         setSelectedProgram(programName);
-        setSessionSource('program'); // Auto-select program source
+        setSessionSource('program');
+    };
+
+    const handleSelectTemplate = (template) => {
+        setSelectedTemplate(template);
+        setSelectedProgramDay(null);
+        setSelectedProgramSession(null);
     };
 
     const handleCreateImmediateGoal = (goalData) => {
-        // Add the goal to our list with a temporary ID
         const newGoal = {
             ...goalData,
             tempId: crypto.randomUUID(),
             type: 'ImmediateGoal',
-            isNew: true, // Mark as new so we know to create it
-            parent_id: creatingGoalForSTG?.id || null // Associate with the STG we're creating for
+            isNew: true,
+            parent_id: creatingGoalForSTG?.id || null
         };
         setImmediateGoals(prev => [...prev, newGoal]);
         setShowGoalModal(false);
         setCreatingGoalForSTG(null);
     };
 
-    const handleSelectExistingGoal = (goal) => {
-        // Check if already added
-        if (immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id)) {
-            return; // Already added
-        }
-        // Add existing goal to the list
-        setImmediateGoals(prev => [...prev, { ...goal, tempId: goal.id, isNew: false }]);
-    };
-
     const handleRemoveImmediateGoal = (tempId) => {
         setImmediateGoals(prev => prev.filter(g => g.tempId !== tempId));
+    };
+
+    const handleOpenCreateGoalModal = (stg) => {
+        setCreatingGoalForSTG(stg);
+        setShowGoalModal(true);
     };
 
     const handleCreateSession = async () => {
@@ -210,9 +234,8 @@ function Log() {
         setCreating(true);
 
         try {
-            // Convert template sections with activities to session sections with exercises
+            // Convert template sections to session sections
             const sectionsWithExercises = (selectedTemplate.template_data?.sections || []).map(section => {
-                // Convert activities to exercise instances
                 const exercises = (section.activities || []).map(activity => ({
                     type: 'activity',
                     name: activity.name,
@@ -229,17 +252,15 @@ function Log() {
                 };
             });
 
-            // Create the practice session
-            // Use getLocalISOString() for current datetime with timezone handling
             const sessionStart = getLocalISOString();
 
             const sessionData = {
                 name: selectedTemplate.name,
                 description: selectedTemplate.description || '',
                 parent_ids: selectedGoalIds,
-                immediate_goal_ids: selectedImmediateGoalIds, // Include selected existing IGs
+                immediate_goal_ids: selectedImmediateGoalIds,
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
-                session_start: sessionStart, // Add session_start for calendar visibility
+                session_start: sessionStart,
                 session_data: JSON.stringify({
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
@@ -260,44 +281,37 @@ function Log() {
             console.log('Session Payload:', sessionData);
 
             const response = await fractalApi.createSession(rootId, sessionData);
-
-            // Get the created session ID from the response
             const createdSessionId = response.data.id;
 
-            // Create NEW immediate goals (ones created inline during session creation)
-
+            // Create NEW immediate goals in parallel
             const newImmediateGoals = immediateGoals.filter(g => g.isNew);
             if (newImmediateGoals.length > 0) {
-                // Use Promise.all to create goals in parallel
                 await Promise.all(newImmediateGoals.map(async (goal) => {
-                    // Create the immediate goal with its STG parent
                     const createdGoal = await fractalApi.createGoal(rootId, {
                         name: goal.name,
                         description: goal.description || '',
                         deadline: goal.deadline || null,
                         type: 'ImmediateGoal',
-                        parent_id: goal.parent_id, // Parent is the STG
+                        parent_id: goal.parent_id,
                         targets: goal.targets || []
                     });
 
-                    // Associate the new goal with the session
                     if (createdGoal.data?.id) {
                         await fractalApi.addSessionGoal(rootId, createdSessionId, createdGoal.data.id, 'immediate');
                     }
                 }));
             }
 
-            // Navigate to the session detail page to fill in details
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {
             console.error('Error creating session:', err);
-            // Get the actual error message from the backend response
             const errorMessage = err.response?.data?.error || err.message;
             alert('Error creating session: ' + errorMessage);
             setCreating(false);
         }
     };
 
+    // Loading state
     if (loading) {
         return (
             <div className="page-container">
@@ -308,6 +322,7 @@ function Log() {
         );
     }
 
+    // Derived state for conditional rendering
     const hasProgramDays = programDays.length > 0;
     const hasTemplates = templates.length > 0;
     const programNames = Object.keys(programsByName);
@@ -315,8 +330,6 @@ function Log() {
     const hasSingleProgram = programNames.length === 1;
     const showSourceChoice = hasSingleProgram && hasTemplates;
     const showProgramChoice = hasMultiplePrograms;
-
-    // Get the days for the currently selected program
     const currentProgramDays = selectedProgram ? (programsByName[selectedProgram]?.days || []) : [];
 
     return (
@@ -328,831 +341,71 @@ function Log() {
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                 {/* Step 0a: Choose Program (if multiple programs available) */}
                 {showProgramChoice && (
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>0</span>
-                            Choose a Program
-                        </h2>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {programNames.map(programName => {
-                                const program = programsByName[programName];
-                                const isSelected = selectedProgram === programName;
-                                const dayCount = program.days.length;
-
-                                return (
-                                    <div
-                                        key={programName}
-                                        onClick={() => handleSelectProgram(programName)}
-                                        style={{
-                                            background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                            border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
-                                            borderRadius: '6px',
-                                            padding: '16px 20px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (!isSelected) {
-                                                e.currentTarget.style.borderColor = '#4caf50';
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (!isSelected) {
-                                                e.currentTarget.style.borderColor = '#444';
-                                            }
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontSize: '48px', marginRight: '16px', display: 'inline' }}>📅</div>
-                                            <div style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '18px' }}>
-                                                    {programName}
-                                                </div>
-                                                <div style={{ fontSize: '13px', color: '#aaa', marginTop: '4px' }}>
-                                                    {dayCount} active day{dayCount !== 1 ? 's' : ''} available
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {isSelected && (
-                                            <div style={{
-                                                color: '#4caf50',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                ✓ Selected
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {hasTemplates && (
-                            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>or</div>
-                                <button
-                                    onClick={() => handleSelectSource('template')}
-                                    style={{
-                                        padding: '10px 20px',
-                                        background: sessionSource === 'template' ? '#2196f3' : 'transparent',
-                                        border: '1px solid #2196f3',
-                                        borderRadius: '4px',
-                                        color: sessionSource === 'template' ? 'white' : '#2196f3',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold',
-                                        fontSize: '14px',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (sessionSource !== 'template') {
-                                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.1)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (sessionSource !== 'template') {
-                                            e.currentTarget.style.background = 'transparent';
-                                        }
-                                    }}
-                                >
-                                    📋 Select Template Manually Instead
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    <ProgramSelector
+                        programsByName={programsByName}
+                        selectedProgram={selectedProgram}
+                        onSelectProgram={handleSelectProgram}
+                        hasTemplates={hasTemplates}
+                        sessionSource={sessionSource}
+                        onSelectTemplateSource={() => handleSelectSource('template')}
+                    />
                 )}
 
-                {/* Step 0b: Choose Session Source (if single program and templates available) */}
+                {/* Step 0b: Choose Session Source (if single program AND templates available) */}
                 {showSourceChoice && (
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>0</span>
-                            Choose Session Source
-                        </h2>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div
-                                onClick={() => handleSelectSource('program')}
-                                style={{
-                                    background: sessionSource === 'program' ? '#2a4a2a' : '#2a2a2a',
-                                    border: `2px solid ${sessionSource === 'program' ? '#4caf50' : '#444'}`,
-                                    borderRadius: '8px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (sessionSource !== 'program') {
-                                        e.currentTarget.style.borderColor = '#4caf50';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (sessionSource !== 'program') {
-                                        e.currentTarget.style.borderColor = '#444';
-                                    }
-                                }}
-                            >
-                                <div style={{ fontSize: '48px', marginBottom: '12px' }}>📅</div>
-                                <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>
-                                    From Active Program
-                                </div>
-                                <div style={{ fontSize: '13px', color: '#aaa' }}>
-                                    Select a day from your current training program
-                                </div>
-                                {sessionSource === 'program' && (
-                                    <div style={{
-                                        marginTop: '12px',
-                                        color: '#4caf50',
-                                        fontSize: '12px',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-
-                            <div
-                                onClick={() => handleSelectSource('template')}
-                                style={{
-                                    background: sessionSource === 'template' ? '#2a4a2a' : '#2a2a2a',
-                                    border: `2px solid ${sessionSource === 'template' ? '#4caf50' : '#444'}`,
-                                    borderRadius: '8px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (sessionSource !== 'template') {
-                                        e.currentTarget.style.borderColor = '#4caf50';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (sessionSource !== 'template') {
-                                        e.currentTarget.style.borderColor = '#444';
-                                    }
-                                }}
-                            >
-                                <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
-                                <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>
-                                    From Template
-                                </div>
-                                <div style={{ fontSize: '13px', color: '#aaa' }}>
-                                    Choose any template manually
-                                </div>
-                                {sessionSource === 'template' && (
-                                    <div style={{
-                                        marginTop: '12px',
-                                        color: '#4caf50',
-                                        fontSize: '12px',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <SourceSelector
+                        sessionSource={sessionSource}
+                        onSelectSource={handleSelectSource}
+                    />
                 )}
 
-                {/* Step 1: Select Program Day OR Template */}
+                {/* Step 1: Select Program Day */}
                 {(sessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>1</span>
-                            Select a Day from Your Program
-                        </h2>
-
-                        {currentProgramDays.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px' }}>
-                                <p style={{ color: '#666', marginBottom: '16px' }}>No active program days available for today</p>
-                                {hasTemplates && (
-                                    <button
-                                        onClick={() => setSessionSource('template')}
-                                        style={{
-                                            padding: '10px 20px',
-                                            background: '#2196f3',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        Select Template Instead
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {currentProgramDays.map(programDay => {
-                                    const isSelected = selectedProgramDay?.day_id === programDay.day_id;
-                                    const hasMultipleSessions = programDay.sessions.length > 1;
-
-                                    return (
-                                        <div key={programDay.day_id}>
-                                            <div
-                                                onClick={() => handleSelectProgramDay(programDay)}
-                                                style={{
-                                                    background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                                    border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
-                                                    borderRadius: '6px',
-                                                    padding: '16px',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                                    <div style={{
-                                                        width: '4px',
-                                                        height: '40px',
-                                                        background: programDay.block_color || '#2196f3',
-                                                        borderRadius: '2px'
-                                                    }} />
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                                                            {programDay.program_name} - {programDay.block_name}
-                                                        </div>
-                                                        <div style={{ fontSize: '13px', color: '#aaa' }}>
-                                                            {programDay.day_name} (Day {programDay.day_number})
-                                                            {hasMultipleSessions && (
-                                                                <span style={{ marginLeft: '8px', color: '#2196f3' }}>
-                                                                    • {programDay.sessions.length} sessions
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {!hasMultipleSessions && (
-                                                    <div style={{ marginLeft: '16px', fontSize: '14px' }}>
-                                                        <div style={{
-                                                            padding: '8px',
-                                                            background: 'rgba(33, 150, 243, 0.1)',
-                                                            borderRadius: '4px'
-                                                        }}>
-                                                            <div style={{ fontWeight: 'bold' }}>{programDay.sessions[0].template_name}</div>
-                                                            {programDay.sessions[0].template_description && (
-                                                                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                                                                    {programDay.sessions[0].template_description}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {isSelected && !hasMultipleSessions && (
-                                                    <div style={{
-                                                        marginTop: '8px',
-                                                        color: '#4caf50',
-                                                        fontSize: '12px',
-                                                        fontWeight: 'bold',
-                                                        textAlign: 'right'
-                                                    }}>
-                                                        ✓ Selected
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Show session selection for multi-session days */}
-                                            {isSelected && hasMultipleSessions && (
-                                                <div style={{
-                                                    marginTop: '12px',
-                                                    marginLeft: '20px',
-                                                    paddingLeft: '16px',
-                                                    borderLeft: `3px solid ${programDay.block_color || '#2196f3'}`
-                                                }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#aaa' }}>
-                                                        Select a session from this day:
-                                                    </div>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {programDay.sessions.map((session, idx) => {
-                                                            const isSessionSelected = selectedProgramSession?.template_id === session.template_id;
-
-                                                            return (
-                                                                <div
-                                                                    key={session.template_id}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleSelectProgramSession(session);
-                                                                    }}
-                                                                    style={{
-                                                                        padding: '12px',
-                                                                        background: isSessionSelected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(33, 150, 243, 0.05)',
-                                                                        border: `2px solid ${isSessionSelected ? '#4caf50' : 'transparent'}`,
-                                                                        borderRadius: '4px',
-                                                                        cursor: 'pointer',
-                                                                        transition: 'all 0.2s'
-                                                                    }}
-                                                                >
-                                                                    <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
-                                                                        {session.template_name}
-                                                                    </div>
-                                                                    {session.template_description && (
-                                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                                                                            {session.template_description}
-                                                                        </div>
-                                                                    )}
-                                                                    {isSessionSelected && (
-                                                                        <div style={{
-                                                                            marginTop: '6px',
-                                                                            color: '#4caf50',
-                                                                            fontSize: '12px',
-                                                                            fontWeight: 'bold'
-                                                                        }}>
-                                                                            ✓ Selected
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <ProgramDayPicker
+                        programDays={currentProgramDays}
+                        selectedProgramDay={selectedProgramDay}
+                        selectedProgramSession={selectedProgramSession}
+                        hasTemplates={hasTemplates}
+                        onSelectProgramDay={handleSelectProgramDay}
+                        onSelectProgramSession={handleSelectProgramSession}
+                        onSwitchToTemplate={() => setSessionSource('template')}
+                    />
                 )}
 
+                {/* Step 1: Select Template */}
                 {(sessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>1</span>
-                            Select a Template
-                        </h2>
-
-                        {templates.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px' }}>
-                                <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
-                                <button
-                                    onClick={() => navigate(`/${rootId}/manage-session-templates`)}
-                                    style={{
-                                        padding: '10px 20px',
-                                        background: '#2196f3',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    Create a Template
-                                </button>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
-                                {templates.map(template => {
-                                    const isSelected = selectedTemplate?.id === template.id;
-                                    const sectionCount = template.template_data?.sections?.length || 0;
-                                    const duration = template.template_data?.total_duration_minutes || 0;
-
-                                    return (
-                                        <div
-                                            key={template.id}
-                                            onClick={() => {
-                                                setSelectedTemplate(template);
-                                                setSelectedProgramDay(null); // Clear program day selection
-                                                setSelectedProgramSession(null);
-                                            }}
-                                            style={{
-                                                background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
-                                                borderRadius: '6px',
-                                                padding: '16px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
-                                                {template.name}
-                                            </div>
-                                            <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
-                                                {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
-                                            </div>
-                                            {template.description && (
-                                                <div style={{ fontSize: '12px', color: '#888' }}>
-                                                    {template.description}
-                                                </div>
-                                            )}
-                                            {isSelected && (
-                                                <div style={{
-                                                    marginTop: '8px',
-                                                    color: '#4caf50',
-                                                    fontSize: '12px',
-                                                    fontWeight: 'bold'
-                                                }}>
-                                                    ✓ Selected
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <TemplatePicker
+                        templates={templates}
+                        selectedTemplate={selectedTemplate}
+                        rootId={rootId}
+                        onSelectTemplate={handleSelectTemplate}
+                    />
                 )}
 
                 {/* Step 2: Associate with Goals */}
-                <>
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>2</span>
-                            Associate with Goals
-                        </h2>
-                        <p style={{ color: '#888', fontSize: '13px', marginBottom: '16px', marginLeft: '36px' }}>
-                            Select short-term goals and optionally attach their immediate goals to this session.
-                        </p>
+                <GoalAssociation
+                    goals={goals}
+                    selectedGoalIds={selectedGoalIds}
+                    selectedImmediateGoalIds={selectedImmediateGoalIds}
+                    immediateGoals={immediateGoals}
+                    onToggleGoal={handleToggleGoal}
+                    onToggleImmediateGoal={handleToggleImmediateGoal}
+                    onRemoveImmediateGoal={handleRemoveImmediateGoal}
+                    onCreateImmediateGoal={handleOpenCreateGoalModal}
+                />
 
-                        {goals.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                                <p>No short-term goals found. Create goals in the Goals page first.</p>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {goals.map(stg => {
-                                    const isSelected = selectedGoalIds.includes(stg.id);
-                                    const hasImmediateGoals = stg.immediateGoals && stg.immediateGoals.length > 0;
-                                    const hasNewGoals = immediateGoals.filter(g => g.parent_id === stg.id).length > 0;
-
-                                    return (
-                                        <div key={stg.id} style={{
-                                            border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#444'}`,
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                            {/* Short-Term Goal Header */}
-                                            <div
-                                                onClick={() => handleToggleGoal(stg.id)}
-                                                style={{
-                                                    background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : '#2a2a2a',
-                                                    padding: '14px 16px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '12px'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: '22px',
-                                                    height: '22px',
-                                                    borderRadius: '4px',
-                                                    border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#666'}`,
-                                                    background: isSelected ? GOAL_COLORS.ShortTermGoal : 'transparent',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#1a1a1a',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'bold',
-                                                    flexShrink: 0
-                                                }}>
-                                                    {isSelected && '✓'}
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? GOAL_COLORS.ShortTermGoal : 'white' }}>
-                                                        {stg.name}
-                                                    </div>
-                                                    {stg.description && (
-                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                                                            {stg.description}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {(hasImmediateGoals || hasNewGoals) && (
-                                                    <div style={{
-                                                        fontSize: '11px',
-                                                        color: '#888',
-                                                        padding: '2px 8px',
-                                                        background: '#333',
-                                                        borderRadius: '10px'
-                                                    }}>
-                                                        {stg.immediateGoals.length + immediateGoals.filter(g => g.parent_id === stg.id).length} immediate goal{(stg.immediateGoals.length + immediateGoals.filter(g => g.parent_id === stg.id).length) !== 1 ? 's' : ''}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Immediate Goals Section - Show when STG is selected */}
-                                            {isSelected && (
-                                                <div style={{
-                                                    background: '#1a1a1a',
-                                                    padding: '12px 16px',
-                                                    borderTop: '1px solid #333'
-                                                }}>
-                                                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <span style={{ color: GOAL_COLORS.ImmediateGoal }}>◇</span>
-                                                        Immediate Goals (optional)
-                                                    </div>
-
-                                                    {/* Existing Immediate Goals as Checkboxes */}
-                                                    {hasImmediateGoals && (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: hasNewGoals ? '12px' : '0' }}>
-                                                            {stg.immediateGoals.map(ig => {
-                                                                const isIgSelected = selectedImmediateGoalIds.includes(ig.id);
-                                                                return (
-                                                                    <div
-                                                                        key={ig.id}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedImmediateGoalIds(prev =>
-                                                                                prev.includes(ig.id)
-                                                                                    ? prev.filter(id => id !== ig.id)
-                                                                                    : [...prev, ig.id]
-                                                                            );
-                                                                        }}
-                                                                        style={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            gap: '10px',
-                                                                            padding: '10px 12px',
-                                                                            background: isIgSelected ? `${GOAL_COLORS.ImmediateGoal}15` : '#252525',
-                                                                            border: `1px solid ${isIgSelected ? GOAL_COLORS.ImmediateGoal : '#333'}`,
-                                                                            borderRadius: '4px',
-                                                                            cursor: 'pointer',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                    >
-                                                                        <div style={{
-                                                                            width: '18px',
-                                                                            height: '18px',
-                                                                            borderRadius: '3px',
-                                                                            border: `2px solid ${isIgSelected ? GOAL_COLORS.ImmediateGoal : '#555'}`,
-                                                                            background: isIgSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center',
-                                                                            color: '#1a1a1a',
-                                                                            fontSize: '12px',
-                                                                            fontWeight: 'bold',
-                                                                            flexShrink: 0
-                                                                        }}>
-                                                                            {isIgSelected && '✓'}
-                                                                        </div>
-                                                                        <div style={{ flex: 1 }}>
-                                                                            <div style={{ fontSize: '13px', color: isIgSelected ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
-                                                                                {ig.name}
-                                                                            </div>
-                                                                            {ig.deadline && (
-                                                                                <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-                                                                                    📅 {new Date(ig.deadline).toLocaleDateString()}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                        {ig.completed && (
-                                                                            <span style={{ fontSize: '11px', color: '#4caf50' }}>✓ Done</span>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Newly Created Immediate Goals */}
-                                                    {immediateGoals.filter(g => g.parent_id === stg.id).length > 0 && (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-                                                            {immediateGoals.filter(g => g.parent_id === stg.id).map(ig => (
-                                                                <div
-                                                                    key={ig.tempId}
-                                                                    style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '10px',
-                                                                        padding: '10px 12px',
-                                                                        background: `${GOAL_COLORS.ImmediateGoal}15`,
-                                                                        border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
-                                                                        borderRadius: '4px'
-                                                                    }}
-                                                                >
-                                                                    <span style={{ fontSize: '12px', color: '#4caf50' }}>✨ New</span>
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontSize: '13px', color: GOAL_COLORS.ImmediateGoal }}>
-                                                                            {ig.name}
-                                                                        </div>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleRemoveImmediateGoal(ig.tempId);
-                                                                        }}
-                                                                        style={{
-                                                                            padding: '4px 8px',
-                                                                            background: '#d32f2f',
-                                                                            border: 'none',
-                                                                            borderRadius: '3px',
-                                                                            color: 'white',
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '11px'
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Add Immediate Goal Button */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setCreatingGoalForSTG(stg);
-                                                            setShowGoalModal(true);
-                                                        }}
-                                                        style={{
-                                                            padding: '8px 14px',
-                                                            background: 'transparent',
-                                                            border: `1px dashed ${GOAL_COLORS.ImmediateGoal}50`,
-                                                            borderRadius: '4px',
-                                                            color: GOAL_COLORS.ImmediateGoal,
-                                                            cursor: 'pointer',
-                                                            fontSize: '12px',
-                                                            width: '100%',
-                                                            transition: 'all 0.2s'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = `${GOAL_COLORS.ImmediateGoal}10`;
-                                                            e.currentTarget.style.borderStyle = 'solid';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = 'transparent';
-                                                            e.currentTarget.style.borderStyle = 'dashed';
-                                                        }}
-                                                    >
-                                                        + Create New Immediate Goal
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </>
-
-                {/* Step 3: Create Session Button */}
-                <>
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        textAlign: 'center'
-                    }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            <span style={{
-                                background: '#2196f3',
-                                color: 'white',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                            }}>3</span>
-                            Create Session
-                        </h2>
-
-
-                        <button
-                            onClick={handleCreateSession}
-                            disabled={!selectedTemplate || selectedGoalIds.length === 0 || creating}
-                            style={{
-                                padding: '16px 48px',
-                                background: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? '#666' : '#4caf50',
-                                border: 'none',
-                                borderRadius: '6px',
-                                color: 'white',
-                                fontSize: '18px',
-                                fontWeight: 'bold',
-                                cursor: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 'not-allowed' : 'pointer',
-                                opacity: (!selectedTemplate || selectedGoalIds.length === 0 || creating) ? 0.5 : 1,
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            {creating ? 'Creating...' : '✓ Create Session'}
-                        </button>
-
-                        {selectedTemplate && selectedGoalIds.length > 0 && (
-                            <div style={{ marginTop: '16px', fontSize: '14px', color: '#aaa' }}>
-                                Creating: <strong style={{ color: 'white' }}>{selectedTemplate.name}</strong>
-                                {selectedProgramDay && (
-                                    <span> from <strong style={{ color: '#2196f3' }}>{selectedProgramDay.program_name}</strong></span>
-                                )}
-                                <br />
-                                Associated with{' '}
-                                <strong style={{ color: GOAL_COLORS.ShortTermGoal }}>
-                                    {selectedGoalIds.length} short term goal{selectedGoalIds.length !== 1 ? 's' : ''}
-                                </strong>
-                                {immediateGoals.length > 0 && (
-                                    <span>
-                                        {' '}and{' '}
-                                        <strong style={{ color: GOAL_COLORS.ImmediateGoal }}>
-                                            {immediateGoals.length} immediate goal{immediateGoals.length !== 1 ? 's' : ''}
-                                        </strong>
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </>
+                {/* Step 3: Create Session */}
+                <CreateSessionActions
+                    selectedTemplate={selectedTemplate}
+                    selectedProgramDay={selectedProgramDay}
+                    selectedGoalIds={selectedGoalIds}
+                    immediateGoals={immediateGoals}
+                    creating={creating}
+                    onCreateSession={handleCreateSession}
+                />
             </div>
 
-            {/* Goal Creation Modal - Uses GoalDetailModal for consistent UI */}
+            {/* Goal Creation Modal */}
             <GoalDetailModal
                 isOpen={showGoalModal}
                 onClose={() => {
@@ -1171,140 +424,24 @@ function Log() {
                 rootId={rootId}
             />
 
-            {/* Goal Selection Modal */}
-            {/* Goal Selection Modal */}
-            {showSelectGoalModal && (
-                <div className="modal-overlay" onClick={() => setShowSelectGoalModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-                        <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
-                            Select Existing Immediate Goal(s)
-                        </h2>
-
-                        {existingImmediateGoals.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                                <p>No existing immediate goals found.</p>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
-                                {existingImmediateGoals.map(goal => {
-                                    const isAlreadyAdded = immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id);
-                                    const isSelected = tempSelectedGoals.includes(goal.id);
-
-                                    return (
-                                        <div
-                                            key={goal.id}
-                                            onClick={() => {
-                                                if (!isAlreadyAdded) {
-                                                    setTempSelectedGoals(prev =>
-                                                        prev.includes(goal.id)
-                                                            ? prev.filter(id => id !== goal.id)
-                                                            : [...prev, goal.id]
-                                                    );
-                                                }
-                                            }}
-                                            style={{
-                                                background: isSelected ? '#2a4a2a' : '#1e1e1e',
-                                                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : (isAlreadyAdded ? '#333' : '#444')}`,
-                                                borderRadius: '6px',
-                                                padding: '12px 16px',
-                                                cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
-                                                opacity: isAlreadyAdded ? 0.5 : 1,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!isAlreadyAdded && !isSelected) {
-                                                    e.currentTarget.style.borderColor = GOAL_COLORS.ImmediateGoal;
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (!isAlreadyAdded && !isSelected) {
-                                                    e.currentTarget.style.borderColor = '#444';
-                                                }
-                                            }}
-                                        >
-                                            <div style={{
-                                                width: '20px',
-                                                height: '20px',
-                                                borderRadius: '4px',
-                                                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : '#666'}`,
-                                                background: isSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#1a1a1a',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                flexShrink: 0
-                                            }}>
-                                                {(isSelected || isAlreadyAdded) && '✓'}
-                                            </div>
-
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected || isAlreadyAdded ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
-                                                    {goal.name}
-                                                    {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
-                                                </div>
-                                                {goal.description && (
-                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                                                        {goal.description}
-                                                    </div>
-                                                )}
-                                                {goal.deadline && (
-                                                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                                        📅 {new Date(goal.deadline).toLocaleDateString()}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                            <button
-                                type="button"
-                                onClick={() => setShowSelectGoalModal(false)}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: 'transparent',
-                                    border: '1px solid #666',
-                                    color: '#ccc',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const goalsToAdd = existingImmediateGoals.filter(g => tempSelectedGoals.includes(g.id));
-                                    goalsToAdd.forEach(goal => handleSelectExistingGoal(goal));
-                                    setShowSelectGoalModal(false);
-                                }}
-                                disabled={tempSelectedGoals.length === 0}
-                                style={{
-                                    padding: '10px 20px',
-                                    background: tempSelectedGoals.length === 0 ? '#444' : GOAL_COLORS.ImmediateGoal,
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    color: tempSelectedGoals.length === 0 ? '#888' : '#1a1a1a',
-                                    fontWeight: 'bold',
-                                    cursor: tempSelectedGoals.length === 0 ? 'not-allowed' : 'pointer'
-                                }}
-                            >
-                                Add Selected ({tempSelectedGoals.length})
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Select Existing Goal Modal */}
+            <SelectExistingGoalModal
+                isOpen={showSelectGoalModal}
+                existingImmediateGoals={existingImmediateGoals}
+                alreadyAddedGoalIds={immediateGoals.map(g => g.id || g.tempId)}
+                onClose={() => setShowSelectGoalModal(false)}
+                onConfirm={(selectedIds) => {
+                    const goalsToAdd = existingImmediateGoals.filter(g => selectedIds.includes(g.id));
+                    goalsToAdd.forEach(goal => {
+                        if (!immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id)) {
+                            setImmediateGoals(prev => [...prev, { ...goal, tempId: goal.id, isNew: false }]);
+                        }
+                    });
+                    setShowSelectGoalModal(false);
+                }}
+            />
         </div>
     );
 }
 
-export default Log;
+export default CreateSession;

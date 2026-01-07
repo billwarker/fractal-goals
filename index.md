@@ -503,7 +503,7 @@ Detailed view of a single program/template.
 - View completed sessions linked to program days
 
 #### `CreateSession.jsx`
-Session creation page.
+Session creation page (refactored into focused sub-components).
 
 **Features:**
 - Enhanced session creation flow with dual-source support
@@ -513,7 +513,19 @@ Session creation page.
 - Program context tracking (links sessions to program/block/day)
 - Associate sessions with multiple short-term goals
 - Smart UI that adapts based on available options (all steps visible simultaneously)
-- **New Feature:** Add/Attach Immediate Goals to new sessions (both new and existing immediate goals)
+- Add/Attach Immediate Goals to new sessions (both new and existing immediate goals)
+
+**Sub-components (in `/client/src/components/createSession/`):**
+- `StepHeader.jsx` - Reusable step header with numbered badge
+- `ProgramSelector.jsx` - Step 0a: Choose program when multiple available
+- `SourceSelector.jsx` - Step 0b: Choose between program days vs templates
+- `ProgramDayPicker.jsx` - Step 1: Select program day and session
+- `TemplatePicker.jsx` - Step 1: Select template directly
+- `GoalAssociation.jsx` - Step 2: Associate with STGs and IGs
+- `ImmediateGoalSection.jsx` - Sub-component for IG display/management
+- `CreateSessionActions.jsx` - Step 3: Create button and summary
+- `SelectExistingGoalModal.jsx` - Modal for selecting existing IGs
+
 
 #### `Selection.jsx`
 Fractal selection/home page.

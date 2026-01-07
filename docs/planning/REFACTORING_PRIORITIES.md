@@ -56,7 +56,17 @@ This document outlines the top 10 identified issues in the codebase, ranked by p
 *   **Issue**: `CreateSession.jsx` fetches the entire goal tree (Ultimate -> Nano) just to display Short-Term and Immediate goals.
 *   **Fix**: Implemented a new optimized backend endpoint `GET /<root_id>/goals/selection` that uses the `root_id` and `type` indices to fetch *only* active Short-Term Goals and their active Immediate Goal children. Updated `CreateSession.jsx` to use this lightweight endpoint, eliminating client-side tree traversal and reducing payload size by over 90%.
 
-### 11. Frontend "God Component"
+### ~~11. Frontend "God Component"~~ (COMPLETED)
 *   **Issue**: `CreateSession.jsx` handles too many responsibilities (Programs, Templates, Goals selection logic + Creation logic).
 *   **Issue**: Very hard to test or refactor safely.
-*   **Fix**: Refactor into smaller, focused sub-components.
+*   **Fix**: Refactored 1311-line god component into 8 focused sub-components in `/client/src/components/createSession/`:
+    - `StepHeader.jsx` - Reusable step header with numbered badge
+    - `ProgramSelector.jsx` - Step 0a: Choose program when multiple available
+    - `SourceSelector.jsx` - Step 0b: Choose between program days vs templates
+    - `ProgramDayPicker.jsx` - Step 1: Select program day and session
+    - `TemplatePicker.jsx` - Step 1: Select template directly
+    - `GoalAssociation.jsx` - Step 2: Associate with STGs and IGs
+    - `ImmediateGoalSection.jsx` - Sub-component for IG display/management
+    - `CreateSessionActions.jsx` - Step 3: Create button and summary
+    - `SelectExistingGoalModal.jsx` - Modal for selecting existing IGs
+    - Main `CreateSession.jsx` reduced from 1311 to ~350 lines (state + composition only)
