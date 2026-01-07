@@ -52,3 +52,9 @@ UI Improvements
 - track sessions that occur within a program on the calendar
 - track immediate goals
 - SMART mode for goals
+- confirm deletion of root fractal by typing "delete"
+- Once goal is completed, show completed date on fractal view
+- Add session text is more visible
+
+Bugs
+- Can't select dock of the Bae
