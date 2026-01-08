@@ -22,7 +22,8 @@ function Analytics() {
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [activityInstances, setActivityInstances] = useState({});
     const [selectedGraph, setSelectedGraph] = useState('scatter'); // 'scatter', 'line'
-    const [selectedMetric, setSelectedMetric] = useState(null); // For line graph
+    const [selectedMetric, setSelectedMetric] = useState(null); // For line graph (Y1 axis)
+    const [selectedMetricY2, setSelectedMetricY2] = useState(null); // For line graph (Y2 axis)
     const [setsHandling, setSetsHandling] = useState('top'); // 'top' or 'average'
     const [selectedSplit, setSelectedSplit] = useState('all'); // 'all' or specific split ID
 
@@ -352,6 +353,8 @@ function Analytics() {
                                         activities={activities}
                                         selectedMetric={selectedMetric}
                                         setSelectedMetric={setSelectedMetric}
+                                        selectedMetricY2={selectedMetricY2}
+                                        setSelectedMetricY2={setSelectedMetricY2}
                                         setsHandling={setsHandling}
                                         selectedSplit={selectedSplit}
                                     />
