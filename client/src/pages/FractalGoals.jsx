@@ -9,6 +9,8 @@ import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { getChildType } from '../utils/goalHelpers';
+import { useSidePane } from '../components/sidepane/SidePaneContext';
+import { buildPageContext } from '../components/sidepane/useSidePaneContext';
 import '../App.css';
 import './FractalGoals.css';
 
@@ -21,6 +23,7 @@ import './FractalGoals.css';
 function FractalGoals() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const { setPageContext } = useSidePane();
 
     // Contexts
     const {
@@ -86,6 +89,12 @@ function FractalGoals() {
         fetchActivities(rootId);
         fetchPrograms(rootId);
     }, [rootId, navigate]);
+
+    // Set SidePane page context on mount
+    useEffect(() => {
+        if (!rootId) return;
+        setPageContext(buildPageContext('Goals', rootId, ['notes', 'history']));
+    }, [rootId, setPageContext]);
 
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {

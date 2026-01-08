@@ -656,6 +656,67 @@ class ProgramDay(Base):
         }
 
 
+class Note(Base):
+    """
+    Represents a note attached to any entity in the system.
+    
+    Notes can be attached to:
+    - Goals (all types)
+    - Sessions
+    - Activity Instances
+    - Programs
+    - Program Days
+    
+    Denormalized parent references enable efficient hierarchical queries
+    (e.g., fetching all notes for a session including its activity instances).
+    """
+    __tablename__ = 'notes'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Content
+    content = Column(Text, nullable=False)
+    content_type = Column(String(20), default='text')  # 'text', 'markdown' (future)
+    
+    # Polymorphic entity reference
+    entity_type = Column(String(50), nullable=False)  # 'goal', 'session', 'activity_instance', 'program', 'program_day'
+    entity_id = Column(String(36), nullable=False)
+    
+    # Denormalized references for efficient queries
+    root_id = Column(String(36), ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    session_id = Column(String(36), ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True)
+    program_day_id = Column(String(36), ForeignKey('program_days.id', ondelete='SET NULL'), nullable=True)
+    program_id = Column(String(36), ForeignKey('programs.id', ondelete='SET NULL'), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete
+    
+    # Future: Rich content metadata (images, links, etc.)
+    note_metadata = Column(Text, nullable=True)  # JSON - renamed from 'metadata' (reserved by SQLAlchemy)
+    
+    def to_dict(self, include_context=False):
+        """Convert note to dictionary format."""
+        result = {
+            'id': self.id,
+            'content': self.content,
+            'content_type': self.content_type,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'root_id': self.root_id,
+            'session_id': self.session_id,
+            'program_day_id': self.program_day_id,
+            'program_id': self.program_id,
+            'created_at': format_utc(self.created_at),
+            'updated_at': format_utc(self.updated_at) if self.updated_at else None,
+        }
+        return result
+    
+    def __repr__(self):
+        return f"<Note(id={self.id}, entity_type={self.entity_type}, entity_id={self.entity_id})>"
+
+
 # Database Helper Functions
 def get_engine(db_path=None):
     """Get SQLAlchemy engine with environment-based database path."""

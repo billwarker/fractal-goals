@@ -294,6 +294,37 @@ Links ProgramDays to multiple SessionTemplates (many-to-many).
 - `session_template_id` (String, FK to session_templates.id, PK)
 - `order` (Integer)
 
+#### `notes`
+Timestamped notes attached to any entity (goals, sessions, activities, programs, days).
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `content` (Text) - Note content
+- `content_type` (String) - 'text' or 'markdown'
+- `entity_type` (String) - 'goal', 'session', 'activity_instance', 'program', 'program_day'
+- `entity_id` (String, UUID) - ID of the attached entity
+- `root_id` (String, FK to goals.id) - Fractal scope
+- `session_id` (String, FK to sessions.id, nullable) - Denormalized for hierarchical queries
+- `program_day_id` (String, FK to program_days.id, nullable) - Denormalized
+- `program_id` (String, FK to programs.id, nullable) - Denormalized
+- `created_at` (DateTime)
+- `updated_at` (DateTime, nullable)
+- `deleted_at` (DateTime, nullable) - Soft delete
+- `metadata` (Text/JSON) - Future: rich content metadata
+
+**Indexes:**
+- `idx_notes_entity` - (entity_type, entity_id)
+- `idx_notes_root_created` - (root_id, created_at DESC)
+- `idx_notes_session` - (session_id, created_at DESC)
+- `idx_notes_program` - (program_id, created_at DESC)
+- `idx_notes_program_day` - (program_day_id, created_at DESC)
+
+**Hierarchical Aggregation:**
+Notes use denormalized parent references to enable efficient hierarchical queries:
+- Session notes include all activity instance notes
+- Program day notes include session and activity notes
+- Program notes include all descendant notes
+
 ---
 
 ## Backend API Structure
@@ -380,6 +411,24 @@ Manages training programs, blocks, and scheduled sessions.
 - `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
+
+#### `notes_api.py`
+Manages timestamped notes attached to any entity.
+
+**Key Endpoints:**
+- `POST /api/<root_id>/notes` - Create note
+- `GET /api/<root_id>/notes` - Get notes with filtering (entity_type, entity_id, include_children, date range)
+- `GET /api/<root_id>/notes/<note_id>` - Get specific note
+- `PUT /api/<root_id>/notes/<note_id>` - Update note content
+- `DELETE /api/<root_id>/notes/<note_id>` - Soft-delete note
+- `GET /api/<root_id>/notes/feed` - Time-series feed of all notes with entity type filtering
+- `GET /api/<root_id>/notes/for-activity/<activity_def_id>` - Get notes from previous instances of an activity
+- `GET /api/<root_id>/notes/count` - Get note counts for multiple entities
+
+**Features:**
+- Hierarchical note aggregation (session notes include activity notes)
+- Time-series querying with date filtering
+- Activity definition history (notes from previous instances)
 
 #### `pages.py`
 Serves static pages (minimal usage, mostly SPA).
@@ -582,6 +631,37 @@ Fractal selection/home page.
 
 - Analytics-specific visualization components
 
+#### SidePane Components (in `/client/src/components/sidepane/`)
+
+Global contextual side panel with Notes system integration.
+
+- **`GlobalSidePane.jsx`** - Main container component with desktop/mobile variants
+- **`SidePaneContext.jsx`** - React context for sidepane state (open/closed, active mode, position)
+- **`SidePaneHeader.jsx`** - Header with context title, back navigation, close button
+- **`SidePaneModeTabs.jsx`** - Tab navigation for switching modes
+- **`SidePaneTrigger.jsx`** - Collapsed state trigger button
+- **`useSidePaneContext.js`** - Hook and helpers for pages to set context
+
+**Mode Components (in `/client/src/components/sidepane/modes/`):**
+- **`NotesMode.jsx`** - Notes viewing/editing with context and feed views
+- **`DetailsMode.jsx`** - Entity properties display with type-specific renderers
+- **`HistoryMode.jsx`** - Created/updated/completed event timeline
+- **`RelatedMode.jsx`** - Linked entities (goals, sessions) navigation
+- **`AnalyticsMode.jsx`** - Previous activity notes, session stats
+- **`ActionsMode.jsx`** - Quick action buttons for the context
+
+**Context Builders (in `useSidePaneContext.js`):**
+- `buildSessionContext()` - Build context for sessions
+- `buildGoalContext()` - Build context for goals
+- `buildActivityInstanceContext()` - Build context for activity instances
+- `buildProgramContext()` - Build context for programs
+- `buildProgramDayContext()` - Build context for program days
+- `buildPageContext()` - Build page-level context
+
+#### Notes Components (in `/client/src/components/notes/`)
+
+Separate notes components (planned for future extraction from NotesMode).
+
 ### Contexts (in `/client/src/contexts/`)
 
 - **`GoalContext.jsx`** - Global state for goals
@@ -687,6 +767,11 @@ From `/my-implementation-plans/features.txt`:
 **In Progress:**
 - 🔄 Programs feature integration with backend
 - 🔄 Navigation improvements (Programs tab added)
+- 🔄 **Global SidePane** - Context-aware side panel with mode tabs (Notes, Details, History, Related, Analytics, Actions)
+- 🔄 **Notes System** - Timestamped notes for any entity with hierarchical aggregation
+  - ✅ Backend: `notes` table and `notes_api.py` with CRUD, feed, and activity history endpoints
+  - ✅ Frontend: SidePane components and NotesMode for note viewing/editing
+  - ⏳ Integration: Activity-level notes button, Previous Notes panel
 
 **To-Do:**
 - ⏳ Allow adjustments to estimated time in sessions

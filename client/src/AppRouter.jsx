@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import axios from 'axios';
 import { globalApi, fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './context/HeaderContext';
+import { SidePaneProvider } from './components/sidepane/SidePaneContext';
+import GlobalSidePane from './components/sidepane/GlobalSidePane';
 import './App.css';
 
 // Import page components
@@ -163,42 +165,53 @@ function App() {
         );
     };
 
+    // Check if we're on a fractal page (not home)
+    const isOnFractalPage = location.pathname !== '/' && location.pathname.split('/').length > 2;
+
     return (
         <HeaderProvider>
-            <div className="app-container">
-                {location.pathname !== '/' && (
-                    <NavigationHeader />
-                )}
-
-                <div className="content-container">
-                    {location.pathname === '/' ? (
-                        <Selection />
-                    ) : (
-                        <Routes>
-                            <Route
-                                path="/:rootId/goals"
-                                element={<FractalGoals />}
-                            />
-                            <Route path="/:rootId/programs" element={<Programs />} />
-                            <Route path="/:rootId/programs/:programId" element={<ProgramDetail />} />
-                            <Route path="/:rootId/sessions" element={<Sessions />} />
-                            <Route path="/:rootId/analytics" element={<Analytics />} />
-                            <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
-                            <Route path="/:rootId/create-session" element={<CreateSession />} />
-                            <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
-                            <Route path="/:rootId/manage-activities" element={<ManageActivities />} />
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
+            <SidePaneProvider>
+                <div className="app-container">
+                    {location.pathname !== '/' && (
+                        <NavigationHeader />
                     )}
-                </div>
 
-                {/* Environment Indicator */}
-                <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
-                    {import.meta.env.VITE_ENV || 'development'}
+                    <div className="app-body">
+                        <main className="app-main">
+                            {location.pathname === '/' ? (
+                                <Selection />
+                            ) : (
+                                <Routes>
+                                    <Route
+                                        path="/:rootId/goals"
+                                        element={<FractalGoals />}
+                                    />
+                                    <Route path="/:rootId/programs" element={<Programs />} />
+                                    <Route path="/:rootId/programs/:programId" element={<ProgramDetail />} />
+                                    <Route path="/:rootId/sessions" element={<Sessions />} />
+                                    <Route path="/:rootId/analytics" element={<Analytics />} />
+                                    <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
+                                    <Route path="/:rootId/create-session" element={<CreateSession />} />
+                                    <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
+                                    <Route path="/:rootId/manage-activities" element={<ManageActivities />} />
+                                    <Route path="*" element={<Navigate to="/" replace />} />
+                                </Routes>
+                            )}
+                        </main>
+
+                        {/* Global SidePane - Shows on all fractal pages */}
+                        {isOnFractalPage && <GlobalSidePane />}
+                    </div>
+
+                    {/* Environment Indicator */}
+                    <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
+                        {import.meta.env.VITE_ENV || 'development'}
+                    </div>
                 </div>
-            </div>
+            </SidePaneProvider>
         </HeaderProvider>
     );
 }
 
 export default App;
+

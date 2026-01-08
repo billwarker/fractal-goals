@@ -15,6 +15,7 @@ from blueprints.goals_api import goals_bp
 from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
+from blueprints.notes_api import notes_bp
 from blueprints.pages import pages_bp
 
 # Print configuration on startup
@@ -53,6 +54,7 @@ app.register_blueprint(goals_bp)
 app.register_blueprint(templates_bp)
 app.register_blueprint(timers_bp)
 app.register_blueprint(programs_bp)
+app.register_blueprint(notes_bp)
 app.register_blueprint(pages_bp)
 
 

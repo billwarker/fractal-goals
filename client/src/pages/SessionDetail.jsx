@@ -9,6 +9,8 @@ import { formatForInput, localToISO, formatDateInTimezone } from '../utils/dateU
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import { useSidePane } from '../components/sidepane/SidePaneContext';
+import { buildSessionContext, buildActivityInstanceContext } from '../components/sidepane/useSidePaneContext';
 import '../App.css';
 
 /**
@@ -80,6 +82,7 @@ function SessionDetail() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
     const timezone = useTimezone();
+    const { setPageContext, selectItem } = useSidePane();
 
     const [session, setSession] = useState(null);
     const [sessionData, setSessionData] = useState(null); // UI metadata only (section names, notes, ordering)
@@ -99,6 +102,19 @@ function SessionDetail() {
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
     const [localSessionEnd, setLocalSessionEnd] = useState('');
+
+    // Set SidePane page context when session loads
+    useEffect(() => {
+        if (session && rootId && !loading) {
+            setPageContext(buildSessionContext(session, rootId));
+        }
+    }, [session, rootId, loading, setPageContext]);
+
+    // Handler for activity item notes click - opens sidepane with activity context
+    const handleActivityNotesClick = (instance) => {
+        if (!instance || !rootId) return;
+        selectItem(buildActivityInstanceContext(instance, rootId, sessionId));
+    };
 
     // Auto-save sessionData (UI metadata only) to database whenever it changes
     useEffect(() => {

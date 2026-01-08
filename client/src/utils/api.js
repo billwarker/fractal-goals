@@ -400,6 +400,84 @@ export const fractalApi = {
      */
     getActiveProgramDays: (rootId) =>
         axios.get(`${API_BASE}/${rootId}/programs/active-days`),
+
+    // ========== Notes ==========
+
+    /**
+     * Get notes with filtering
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} params - Query parameters {entity_type, entity_id, include_children, start_date, end_date, limit, offset}
+     */
+    getNotes: async (rootId, params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await axios.get(`${API_BASE}/${rootId}/notes?${queryString}`);
+        return response.data;
+    },
+
+    /**
+     * Create a new note
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {content, entity_type, entity_id}
+     */
+    createNote: async (rootId, data) => {
+        const response = await axios.post(`${API_BASE}/${rootId}/notes`, data);
+        return response.data;
+    },
+
+    /**
+     * Update a note
+     * @param {string} rootId - ID of the fractal
+     * @param {string} noteId - ID of the note
+     * @param {Object} data - {content}
+     */
+    updateNote: async (rootId, noteId, data) => {
+        const response = await axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data);
+        return response.data;
+    },
+
+    /**
+     * Delete a note (soft delete)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} noteId - ID of the note
+     */
+    deleteNote: async (rootId, noteId) => {
+        const response = await axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`);
+        return response.data;
+    },
+
+    /**
+     * Get notes for previous instances of an activity definition
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityDefId - ID of the activity definition
+     * @param {Object} params - {limit, exclude_instance}
+     */
+    getNotesForActivity: async (rootId, activityDefId, params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await axios.get(`${API_BASE}/${rootId}/notes/for-activity/${activityDefId}?${queryString}`);
+        return response.data;
+    },
+
+    /**
+     * Get time-series feed of all notes
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} params - {entity_types, start_date, end_date, limit, offset}
+     */
+    getNotesFeed: async (rootId, params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await axios.get(`${API_BASE}/${rootId}/notes/feed?${queryString}`);
+        return response.data;
+    },
+
+    /**
+     * Get note counts for multiple entities
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} params - {entity_type, entity_ids (comma-separated), include_children}
+     */
+    getNoteCounts: async (rootId, params = {}) => {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await axios.get(`${API_BASE}/${rootId}/notes/count?${queryString}`);
+        return response.data;
+    },
 };
 
 /**
