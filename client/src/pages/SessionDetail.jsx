@@ -98,6 +98,11 @@ function SessionDetail() {
     const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
+    const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0);
+
+    const handleNoteCreated = () => {
+        setNotesRefreshTrigger(prev => prev + 1);
+    };
     const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
     const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
 
@@ -785,6 +790,8 @@ function SessionDetail() {
                                 groupedActivities={groupedActivities}
                                 groupMap={groupMap}
                                 activities={activities}
+                                onNoteCreated={handleNoteCreated}
+                                sessionId={sessionId}
                             />
                         ))}
                     </div>
@@ -812,10 +819,9 @@ function SessionDetail() {
                             selectedActivity={selectedActivity}
                             activityInstances={activityInstances}
                             activityDefinitions={activities}
-                            onNoteAdded={() => {
-                                // Could refresh notes or show feedback
-                            }}
+                            onNoteAdded={() => setNotesRefreshTrigger(prev => prev + 1)}
                             onGoalClick={(goal) => setSelectedGoal(goal)}
+                            refreshTrigger={notesRefreshTrigger}
                         />
                     </div>
                 </div>

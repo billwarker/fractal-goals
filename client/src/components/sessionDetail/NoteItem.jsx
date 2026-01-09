@@ -90,6 +90,18 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
         <div className={`note-item ${compact ? 'compact' : ''}`}>
             <div className="note-item-time">
                 {formatDate(note.created_at)}
+                {note.activityName && (
+                    <span style={{
+                        marginLeft: '8px',
+                        fontSize: '11px',
+                        color: '#4caf50',
+                        background: 'rgba(76, 175, 80, 0.1)',
+                        padding: '2px 6px',
+                        borderRadius: '4px'
+                    }}>
+                        {note.activityName}
+                    </span>
+                )}
                 {note.set_index !== null && note.set_index !== undefined && (
                     <span className="note-item-set-badge">Set {note.set_index + 1}</span>
                 )}

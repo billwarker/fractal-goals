@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
+import { fractalApi } from '../../utils/api';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -26,7 +27,11 @@ function SessionActivityItem({
     onReorder,
     canMoveUp,
     canMoveDown,
-    showReorderButtons
+    showReorderButtons,
+    rootId,
+    onNoteCreated, // Optional callback to trigger refresh
+    sessionId, // Explicit session ID
+    onFocus // Added prop
 }) {
     // Get timezone from context
     const timezone = useTimezone();
@@ -34,6 +39,32 @@ function SessionActivityItem({
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');
     const [localStopTime, setLocalStopTime] = useState('');
+
+    // Quick Note State
+    const [localNotes, setLocalNotes] = useState('');
+    const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+
+    const handleAddNote = async () => {
+        if (!localNotes.trim() || !rootId || !exercise.id) return;
+
+        setIsSubmittingNote(true);
+        try {
+            await fractalApi.createNote(rootId, {
+                context_type: 'activity_instance',
+                context_id: exercise.id,
+                session_id: sessionId || exercise.practice_session_id,
+                activity_instance_id: exercise.id,
+                activity_definition_id: activityDefinition?.id,
+                content: localNotes.trim()
+            });
+            setLocalNotes('');
+            if (onNoteCreated) onNoteCreated();
+        } catch (err) {
+            console.error('Failed to create note', err);
+        } finally {
+            setIsSubmittingNote(false);
+        }
+    };
 
     // Sync local state when exercise times change
     useEffect(() => {
@@ -476,15 +507,66 @@ function SessionActivityItem({
                     )
                 )}
 
-                {/* Notes for Activity */}
+                {/* Quick Note Add */}
                 <div style={{ marginTop: '15px' }}>
-                    <input
-                        type="text"
-                        placeholder="Notes..."
-                        value={exercise.notes || ''}
-                        onChange={(e) => onUpdate('notes', e.target.value)}
-                        style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid #444', color: '#ccc', fontSize: '13px', padding: '4px' }}
-                    />
+                    <div style={{ position: 'relative' }}>
+                        <textarea
+                            placeholder="Add a note about this activity..."
+                            value={localNotes}
+                            onChange={(e) => setLocalNotes(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleAddNote();
+                                }
+                            }}
+                            style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                background: '#1a1a1a',
+                                border: '1px solid #333',
+                                borderLeft: '3px solid #666',
+                                borderRadius: '4px',
+                                color: 'white',
+                                fontSize: '13px',
+                                padding: '6px 10px',
+                                minHeight: '36px',
+                                maxHeight: '120px',
+                                resize: 'vertical',
+                                outline: 'none',
+                                transition: 'border-color 0.2s',
+                                fontFamily: 'inherit'
+                            }}
+                            onFocus={(e) => {
+                                e.target.style.borderColor = '#4caf50';
+                                if (onFocus) onFocus();
+                            }}
+                            onBlur={(e) => e.target.style.borderColor = '#333'}
+                        />
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            marginTop: '4px'
+                        }}>
+                            <button
+                                onClick={handleAddNote}
+                                disabled={!localNotes.trim() || isSubmittingNote}
+                                style={{
+                                    background: localNotes.trim() ? '#4caf50' : '#333',
+                                    color: localNotes.trim() ? 'white' : '#666',
+                                    border: 'none',
+                                    padding: '4px 12px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold',
+                                    cursor: localNotes.trim() ? 'pointer' : 'default',
+                                    transition: 'background 0.2s'
+                                }}
+                            >
+                                {isSubmittingNote ? 'Adding...' : 'Add Note'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

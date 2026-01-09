@@ -785,6 +785,11 @@ From `/my-implementation-plans/features.txt`:
 - **DayViewModal:** Unified display of Scheduled Program Days (Sessions) and Legacy Days, added "Unassign" capability, and restricted single-day scheduling.
 - **Calendar Rendering Fix:** Added `program_day_id` to `Goal.to_dict()` serialization so scheduled sessions properly link to their template program days for calendar display.
 - **Datetime Standardization:** Implemented global `format_utc` in `models.py` to ensure all `DateTime` fields (Sessions, Goals, Activities, Programs) are serialized as ISO 8601 strings with 'Z' suffix, ensuring correct UTC-to-Local conversion on the frontend.
+- **Notes System Implementation:**
+  - Implemented comprehensive `SessionSidePane` with collapsible metadata, Notes, and History panels.
+  - Updated `notes` table schema to support polymorphic associations (`context_type`, `context_id`) and specific foreign keys (`activity_instance_id`, `set_index`).
+  - Fixed database migration mismatch in development environment (`migrate_notes_schema_dev.py`).
+  - Integrated notes synchronization across SessionDetail and SidePane.
 - **Backend Performance:** Optimized `get_session_activities` with eager loading to eliminate N+1 queries. Removed dead code `sync_session_activities`.
 - **Frontend Performance:** Refactored `CreateSession.jsx` to parallelize immediate goal creation requests using `Promise.all`.
 - **Data Fetching Optimization:** Addressed inefficient data loading in `CreateSession.jsx` by implementing a dedicated `goals/selection` endpoint that fetches only active Short-Term and Immediate goals, avoiding full-tree traversal.

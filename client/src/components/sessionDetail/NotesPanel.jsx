@@ -13,7 +13,16 @@ import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import PreviousNotesSection from './PreviousNotesSection';
 
-function NotesPanel({ rootId, sessionId, selectedActivity, selectedActivityDef, onNoteAdded }) {
+function NotesPanel({
+    rootId,
+    sessionId,
+    selectedActivity,
+    selectedActivityDef,
+    onNoteAdded,
+    activityInstances,
+    activityDefinitions,
+    refreshTrigger
+}) {
     const activityDefId = selectedActivityDef?.id || null;
 
     const {
@@ -22,8 +31,17 @@ function NotesPanel({ rootId, sessionId, selectedActivity, selectedActivityDef, 
         loading,
         addNote,
         updateNote,
-        deleteNote
+        deleteNote,
+        refreshNotes,
+        error
     } = useSessionNotes(rootId, sessionId, activityDefId);
+
+    // Refresh when external trigger changes
+    React.useEffect(() => {
+        if (refreshTrigger) {
+            refreshNotes();
+        }
+    }, [refreshTrigger, refreshNotes]);
 
     const handleAddNote = async (content, setIndex = null) => {
         try {
@@ -43,10 +61,29 @@ function NotesPanel({ rootId, sessionId, selectedActivity, selectedActivityDef, 
         }
     };
 
-    // Filter notes based on selected activity
-    const displayNotes = selectedActivity
+    // Helper to get activity name for a note
+    const getActivityName = (note) => {
+        if (note.context_type !== 'activity_instance' || !note.activity_instance_id) return null;
+
+        // Try finding instance first
+        const instance = activityInstances?.find(i => i.id === note.activity_instance_id);
+        if (instance) {
+            // Find definition
+            const def = activityDefinitions?.find(d => d.id === instance.activity_definition_id);
+            return def?.name || instance.name || 'Unknown Activity';
+        }
+        return null;
+    };
+
+    // Filter and enhance notes based on selection
+    const rawDisplayNotes = selectedActivity
         ? notes.filter(n => n.activity_instance_id === selectedActivity.id)
-        : notes.filter(n => n.context_type === 'session');
+        : notes; // Show ALL notes if no activity selected
+
+    const displayNotes = rawDisplayNotes.map(note => ({
+        ...note,
+        activityName: getActivityName(note)
+    }));
 
     const allActivityNotes = selectedActivity
         ? notes.filter(n => n.activity_instance_id === selectedActivity.id)
@@ -62,6 +99,12 @@ function NotesPanel({ rootId, sessionId, selectedActivity, selectedActivityDef, 
                     : 'Add a session note...'
                 }
             />
+
+            {error && (
+                <div style={{ padding: '10px', color: '#f44336', fontSize: '12px', textAlign: 'center' }}>
+                    Error: {error}
+                </div>
+            )}
 
             {/* Current Session Notes */}
             <div className="notes-section">

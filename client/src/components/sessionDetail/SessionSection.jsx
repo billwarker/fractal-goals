@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 
 /**
@@ -48,8 +48,15 @@ const SessionSection = ({
     onOpenActivityBuilder,
     groupedActivities,
     groupMap,
-    activities
+    activities,
+    onNoteCreated,
+    sessionId
 }) => {
+    const [viewGroupId, setViewGroupId] = useState(null);
+
+    // Filter ungrouped activities
+    const ungroupedActivities = activities.filter(a => !a.group_id);
+
     return (
         <div
             style={{
@@ -87,14 +94,16 @@ const SessionSection = ({
                             exercise={instance}
                             activityDefinition={definition}
                             onDelete={() => onDeleteActivity(sectionIndex, instanceId)}
-                            onUpdate={(updatedData) => onUpdateActivity(instanceId, updatedData)}
+                            onUpdate={(key, value) => onUpdateActivity(instanceId, { [key]: value })}
                             onFocus={() => onFocusActivity(instance)}
                             isSelected={selectedActivityId === instanceId}
                             rootId={rootId}
-                            /* Add required props for reordering if needed, or default them */
+                            /* Reorder props mocked for now */
                             canMoveUp={false}
                             canMoveDown={false}
                             showReorderButtons={false}
+                            onNoteCreated={onNoteCreated}
+                            sessionId={sessionId}
                         />
                     );
                 })}
@@ -105,100 +114,149 @@ const SessionSection = ({
                         background: '#252525',
                         padding: '16px',
                         borderRadius: '6px',
-                        border: '1px solid #444'
+                        border: '1px solid #444',
+                        animation: 'fadeIn 0.2s ease-in-out'
                     }}>
                         <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 500, color: '#ddd' }}>Add Activity</span>
-                            <button
-                                onClick={() => onToggleActivitySelector(false)}
-                                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px' }}
-                            >
-                                ×
-                            </button>
+                            <span style={{ fontSize: '14px', fontWeight: 500, color: '#ddd' }}>
+                                {viewGroupId === null ? 'Select Activity Group' :
+                                    viewGroupId === 'ungrouped' ? 'Ungrouped Activities' :
+                                        groupMap[viewGroupId]?.name || 'Group Activities'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {viewGroupId !== null && (
+                                    <button
+                                        onClick={() => setViewGroupId(null)}
+                                        style={{ background: 'none', border: '1px solid #555', color: '#ccc', cursor: 'pointer', fontSize: '12px', padding: '2px 8px', borderRadius: '4px' }}
+                                    >
+                                        ← Back
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        onToggleActivitySelector(false);
+                                        setViewGroupId(null); // Reset on close
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px' }}
+                                >
+                                    ×
+                                </button>
+                            </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {/* Grouped Activities */}
-                            {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
-                                const group = groupMap[groupId];
-                                return (
-                                    <div key={groupId} style={{ marginBottom: '8px' }}>
-                                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                            {group?.name || 'Group'}
-                                        </div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                            {groupActivities.map(act => (
-                                                <button
-                                                    key={act.id}
-                                                    onClick={() => onAddActivity(sectionIndex, act.id)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#333',
-                                                        border: '1px solid #555',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px'
-                                                    }}
-                                                >
-                                                    {act.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        {/* Hierarchical View */}
+                        {viewGroupId === null ? (
+                            /* LEVEL 1: GROUPS */
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                                {/* Group Cards */}
+                                {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
+                                    const group = groupMap[groupId];
+                                    if (!groupActivities.length) return null;
+                                    return (
+                                        <button
+                                            key={groupId}
+                                            onClick={() => setViewGroupId(groupId)}
+                                            style={{
+                                                padding: '12px 10px',
+                                                background: '#333',
+                                                border: '1px solid #555',
+                                                borderRadius: '6px',
+                                                color: 'white',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                transition: 'background 0.2s',
+                                                textAlign: 'center'
+                                            }}
+                                            onMouseOver={(e) => e.target.style.background = '#444'}
+                                            onMouseOut={(e) => e.target.style.background = '#333'}
+                                        >
+                                            <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{group?.name || 'Unknown'}</div>
+                                            <div style={{ fontSize: '10px', color: '#888' }}>{groupActivities.length} activities</div>
+                                        </button>
+                                    );
+                                })}
 
-                            {/* Ungrouped */}
-                            {activities.filter(a => !a.group_id).map(act => (
+                                {/* Ungrouped Card */}
+                                {ungroupedActivities.length > 0 && (
+                                    <button
+                                        onClick={() => setViewGroupId('ungrouped')}
+                                        style={{
+                                            padding: '12px 10px',
+                                            background: '#333',
+                                            border: '1px dashed #666',
+                                            borderRadius: '6px',
+                                            color: '#ccc',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            textAlign: 'center'
+                                        }}
+                                    >
+                                        <div style={{ fontSize: '13px', fontStyle: 'italic' }}>Ungrouped</div>
+                                        <div style={{ fontSize: '10px', color: '#888' }}>{ungroupedActivities.length} activities</div>
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            /* LEVEL 2: ACTIVITIES */
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
+                                    <button
+                                        key={act.id}
+                                        onClick={() => onAddActivity(sectionIndex, act.id)}
+                                        style={{
+                                            padding: '8px 14px',
+                                            background: '#333',
+                                            border: '1px solid #4caf50',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            textAlign: 'left',
+                                            transition: 'transform 0.1s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px'
+                                        }}
+                                        onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'}
+                                        onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
+                                    >
+                                        <span>+</span> {act.name}
+                                    </button>
+                                ))}
+                                {(!groupedActivities[viewGroupId] && viewGroupId !== 'ungrouped' && (
+                                    <div style={{ color: '#888', fontStyle: 'italic', padding: '10px' }}>No activities found in this group.</div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Actions Footer (only on root) */}
+                        {viewGroupId === null && (
+                            <>
+                                <div style={{ width: '100%', height: '1px', background: '#333', margin: '12px 0' }}></div>
                                 <button
-                                    key={act.id}
-                                    onClick={() => onAddActivity(sectionIndex, act.id)}
+                                    onClick={() => onOpenActivityBuilder(sectionIndex)}
                                     style={{
-                                        padding: '6px 12px',
-                                        background: '#333',
-                                        border: '1px solid #555',
+                                        width: '100%',
+                                        padding: '8px',
+                                        background: '#1a1a1a',
+                                        border: '1px dashed #666',
                                         borderRadius: '4px',
-                                        color: 'white',
+                                        color: '#aaa',
                                         cursor: 'pointer',
-                                        fontSize: '13px'
+                                        fontSize: '13px',
+                                        fontWeight: 500
                                     }}
                                 >
-                                    {act.name}
+                                    + Create New Activity Definition
                                 </button>
-                            ))}
-
-                            <div style={{ width: '100%', height: '1px', background: '#333', margin: '4px 0' }}></div>
-
-                            <button
-                                onClick={() => onOpenActivityBuilder(sectionIndex)}
-                                style={{
-                                    padding: '6px 12px',
-                                    background: '#1a1a1a',
-                                    border: '1px dashed #666',
-                                    borderRadius: '4px',
-                                    color: '#aaa',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 500
-                                }}
-                            >
-                                + Create New Activity
-                            </button>
-                            <button
-                                onClick={() => onToggleActivitySelector(false)}
-                                style={{
-                                    padding: '6px 12px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#888',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                        </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <button

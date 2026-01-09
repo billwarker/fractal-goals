@@ -71,80 +71,82 @@ function SessionInfoPanel({
 
             {/* Expandable details */}
             {isExpanded && (
-                <div className="session-info-details">
-                    <div className="session-info-row">
-                        <span className="label">Template:</span>
-                        <span className="value">{sessionData?.template_name || '—'}</span>
+                <>
+                    <div className="session-info-details">
+                        <div className="session-info-row">
+                            <span className="label">Template:</span>
+                            <span className="value">{sessionData?.template_name || '—'}</span>
+                        </div>
+                        <div className="session-info-row">
+                            <span className="label">Started:</span>
+                            <span className="value">{formatDate(sessionData?.session_start)}</span>
+                        </div>
+                        <div className="session-info-row">
+                            <span className="label">Ended:</span>
+                            <span className="value">{formatDate(sessionData?.session_end)}</span>
+                        </div>
+                        <div className="session-info-row">
+                            <span className="label">Created:</span>
+                            <span className="value">{formatDate(session.created_at)}</span>
+                        </div>
+                        <div className="session-info-row">
+                            <span className="label">Planned:</span>
+                            <span className="value">{sessionData?.total_duration_minutes || '—'} min</span>
+                        </div>
                     </div>
-                    <div className="session-info-row">
-                        <span className="label">Started:</span>
-                        <span className="value">{formatDate(sessionData?.session_start)}</span>
-                    </div>
-                    <div className="session-info-row">
-                        <span className="label">Ended:</span>
-                        <span className="value">{formatDate(sessionData?.session_end)}</span>
-                    </div>
-                    <div className="session-info-row">
-                        <span className="label">Created:</span>
-                        <span className="value">{formatDate(session.created_at)}</span>
-                    </div>
-                    <div className="session-info-row">
-                        <span className="label">Planned:</span>
-                        <span className="value">{sessionData?.total_duration_minutes || '—'} min</span>
-                    </div>
-                </div>
-            )}
 
-            {/* Goals section */}
-            {(parentGoals?.length > 0 || session.immediate_goals?.length > 0) && (
-                <div className="session-info-goals">
-                    {parentGoals?.length > 0 && (
-                        <div className="goals-group">
-                            <span className="goals-label">Short-Term Goals:</span>
-                            <div className="goals-badges">
-                                {parentGoals.map(goal => {
-                                    const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
-                                    return (
-                                        <div
-                                            key={goal.id}
-                                            className="goal-badge"
-                                            style={{
-                                                borderColor: goalColor,
-                                                color: goalColor
-                                            }}
-                                            onClick={() => onGoalClick?.(goal)}
-                                        >
-                                            {goal.name}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                    {/* Goals section */}
+                    {(parentGoals?.length > 0 || session.immediate_goals?.length > 0) && (
+                        <div className="session-info-goals">
+                            {parentGoals?.length > 0 && (
+                                <div className="goals-group">
+                                    <span className="goals-label">Short-Term Goals:</span>
+                                    <div className="goals-badges">
+                                        {parentGoals.map(goal => {
+                                            const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
+                                            return (
+                                                <div
+                                                    key={goal.id}
+                                                    className="goal-badge"
+                                                    style={{
+                                                        borderColor: goalColor,
+                                                        color: goalColor
+                                                    }}
+                                                    onClick={() => onGoalClick?.(goal)}
+                                                >
+                                                    {goal.name}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                            {session.immediate_goals?.length > 0 && (
+                                <div className="goals-group">
+                                    <span className="goals-label">Immediate Goals:</span>
+                                    <div className="goals-badges">
+                                        {session.immediate_goals.map(goal => {
+                                            const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
+                                            return (
+                                                <div
+                                                    key={goal.id}
+                                                    className="goal-badge"
+                                                    style={{
+                                                        borderColor: goalColor,
+                                                        color: goalColor
+                                                    }}
+                                                    onClick={() => onGoalClick?.(goal)}
+                                                >
+                                                    {goal.name}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-                    {session.immediate_goals?.length > 0 && (
-                        <div className="goals-group">
-                            <span className="goals-label">Immediate Goals:</span>
-                            <div className="goals-badges">
-                                {session.immediate_goals.map(goal => {
-                                    const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
-                                    return (
-                                        <div
-                                            key={goal.id}
-                                            className="goal-badge"
-                                            style={{
-                                                borderColor: goalColor,
-                                                color: goalColor
-                                            }}
-                                            onClick={() => onGoalClick?.(goal)}
-                                        >
-                                            {goal.name}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                </>
             )}
         </div>
     );

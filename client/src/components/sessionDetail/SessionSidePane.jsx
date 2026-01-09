@@ -24,7 +24,8 @@ function SessionSidePane({
     activityInstances,    // All activity instances in session
     activityDefinitions,  // Activity definitions for lookup
     onNoteAdded,          // Callback when note is added
-    onGoalClick           // Callback when goal badge is clicked
+    onGoalClick,          // Callback when goal badge is clicked
+    refreshTrigger        // Counter to trigger notes refresh
 }) {
     const [mode, setMode] = useState('notes'); // 'notes' | 'history'
 
@@ -97,6 +98,9 @@ function SessionSidePane({
                         selectedActivity={selectedActivity}
                         selectedActivityDef={selectedActivityDef}
                         onNoteAdded={onNoteAdded}
+                        activityInstances={activityInstances}
+                        activityDefinitions={activityDefinitions}
+                        refreshTrigger={refreshTrigger}
                     />
                 ) : (
                     <HistoryPanel

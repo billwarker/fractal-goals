@@ -12,6 +12,8 @@
     display: flex;
     flex-direction: column;
     max-height: calc(100vh - 120px);
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 /* Header */
@@ -75,8 +77,8 @@
 
 .session-info-title h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 600;
     color: #fff;
     white-space: nowrap;
     overflow: hidden;
@@ -281,10 +283,14 @@
 
 /* Note Item */
 .note-item {
-    padding: 10px 12px;
-    background: #222;
-    border-radius: 6px;
+    padding: 8px 0;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     position: relative;
+}
+
+.note-item:last-child {
+    border-bottom: none;
 }
 
 .note-item.compact {

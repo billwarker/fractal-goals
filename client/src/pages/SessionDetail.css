@@ -2,7 +2,7 @@
 
 .session-detail-container {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-columns: minmax(0, 1fr) 30%;
     gap: 30px;
     width: 100%;
     position: relative;
@@ -17,7 +17,7 @@
 
 .session-sidebar-sticky {
     position: sticky;
-    top: 60px;
+    top: 20px;
     height: calc(100vh - 80px);
     overflow-y: auto;
 }
