@@ -130,22 +130,26 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
                     <div className="note-item-content">
                         {note.content}
                     </div>
-                    {!compact && (
+                    {(onUpdate || onDelete) && (
                         <div className="note-item-actions">
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="note-action-btn"
-                                title="Edit"
-                            >
-                                ✏️
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="note-action-btn note-delete-btn"
-                                title="Delete"
-                            >
-                                🗑️
-                            </button>
+                            {onUpdate && (
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="note-action-btn"
+                                    title="Edit"
+                                >
+                                    ✏️
+                                </button>
+                            )}
+                            {onDelete && (
+                                <button
+                                    onClick={handleDelete}
+                                    className="note-action-btn note-delete-btn"
+                                    title="Delete"
+                                >
+                                    🗑️
+                                </button>
+                            )}
                         </div>
                     )}
                 </>
