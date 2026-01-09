@@ -1083,6 +1083,14 @@ python python-scripts/migrate_<name>.py
 
 ---
 
-**Last Updated:** 2026-01-03  
+**Last Updated:** 2026-01-09  
 **Version:** 1.2.0  
 **Maintained By:** Project AI Agents
+
+---
+
+## Key Reference Documents
+
+- **[ENGINEERING_ANALYSIS.md](/docs/planning/ENGINEERING_ANALYSIS.md)** — Comprehensive analysis of risks, scalability limits, simplification opportunities, and production blockers
+- **[production_review.md](/docs/planning/production_review.md)** — Top 10 production improvements with implementation steps
+- **[PRODUCTION_QUALITY_ASSESSMENT.md](/docs/planning/PRODUCTION_QUALITY_ASSESSMENT.md)** — Quality assessment and testing framework status
