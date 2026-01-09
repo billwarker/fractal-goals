@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import SessionActivityItem from '../components/SessionActivityItem';
+import SessionSection from '../components/sessionDetail/SessionSection';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatForInput, localToISO, formatDateInTimezone } from '../utils/dateUtils';
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import SessionInfoPanel from '../components/sessionDetail/SessionInfoPanel';
+import SessionControls from '../components/sessionDetail/SessionControls';
+import { SessionSidePane } from '../components/sessionDetail'; // Keep this for now, as it's used in the side pane
+import './SessionDetail.css'; // New CSS import
+import { getGoalColor, getGoalTextColor } from '../utils/goalColors'; // Keep both for now, getGoalColor is used in SessionSidePane
 import '../App.css';
 
 /**
@@ -95,10 +99,27 @@ function SessionDetail() {
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
     const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
+    const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
 
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
     const [localSessionEnd, setLocalSessionEnd] = useState('');
+
+    // Group activities by group_id for the selector
+    const groupedActivities = activities.reduce((acc, activity) => {
+        const groupId = activity.group_id || 'ungrouped';
+        if (!acc[groupId]) {
+            acc[groupId] = [];
+        }
+        acc[groupId].push(activity);
+        return acc;
+    }, {});
+
+    const groupMap = activityGroups.reduce((acc, group) => {
+        acc[group.id] = group;
+        return acc;
+    }, { ungrouped: { id: 'ungrouped', name: 'Ungrouped' } });
+
 
     // Auto-save sessionData (UI metadata only) to database whenever it changes
     useEffect(() => {
@@ -128,7 +149,7 @@ function SessionDetail() {
                 };
 
                 // Normalize datetime formats - but preserve date-only strings!
-                // If session_start is just a date (YYYY-MM-DD), keep it as-is to avoid timezone issues
+                // If session_start is just a date (YYYY-MM-DD), keep as-is to avoid timezone issues
                 if (sessionData.session_start) {
                     const startVal = sessionData.session_start;
                     // If it's a 10-char date string (YYYY-MM-DD), keep as-is
@@ -361,35 +382,27 @@ function SessionDetail() {
         setSessionData(updatedData);
     };
 
-    const handleExerciseChange = async (sectionIndex, exerciseIndex, field, value) => {
-        // Get the instance ID from the section's activity_ids array
-        const section = sessionData.sections[sectionIndex];
-        const instanceId = section.activity_ids?.[exerciseIndex];
-
-        if (!instanceId) {
-            console.error('No instance ID found');
-            return;
-        }
+    const handleUpdateActivity = async (instanceId, updatedFields) => {
+        const instance = activityInstances.find(inst => inst.id === instanceId);
+        if (!instance) return;
 
         // Handle timer actions specially
-        if (field === 'timer_action') {
+        if (updatedFields.timer_action) {
+            const value = updatedFields.timer_action;
             try {
                 let response;
                 if (value === 'start') {
-                    const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.startActivityTimer(rootId, instanceId, {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'stop') {
-                    const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.stopActivityTimer(rootId, instanceId, {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'reset') {
                     // Reset: update instance in database to clear times
-                    const instance = activityInstances.find(inst => inst.id === instanceId);
                     response = await fractalApi.updateActivityInstance(rootId, instanceId, {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id,
@@ -435,95 +448,26 @@ function SessionDetail() {
             return;
         }
 
-        // Handle manual datetime field updates (time_start, time_stop)
-        if (field === 'time_start' || field === 'time_stop') {
-            const instance = activityInstances.find(inst => inst.id === instanceId);
-            if (!instance) return;
+        // Prepare payload for API update
+        const payload = { ...updatedFields };
 
-            // Update locally first
-            const updatedInstance = { ...instance, [field]: value };
+        // Recalculate duration if time_start or time_stop are updated
+        if (payload.time_start !== undefined || payload.time_stop !== undefined) {
+            const newStart = payload.time_start !== undefined ? payload.time_start : instance.time_start;
+            const newStop = payload.time_stop !== undefined ? payload.time_stop : instance.time_stop;
 
-            // Recalculate duration if both times are set
-            if (updatedInstance.time_start && updatedInstance.time_stop) {
-                const start = new Date(updatedInstance.time_start);
-                const stop = new Date(updatedInstance.time_stop);
-                updatedInstance.duration_seconds = Math.floor((stop - start) / 1000);
+            if (newStart && newStop) {
+                const start = new Date(newStart);
+                const stop = new Date(newStop);
+                payload.duration_seconds = Math.floor((stop - start) / 1000);
             } else {
-                updatedInstance.duration_seconds = null;
+                payload.duration_seconds = null;
             }
-
-            // Update local state
-            setActivityInstances(prev => prev.map(inst =>
-                inst.id === instanceId ? updatedInstance : inst
-            ));
-
-            // Persist to backend
-            try {
-                await fractalApi.updateActivityInstance(rootId, instanceId, {
-                    session_id: sessionId,
-                    activity_definition_id: instance.activity_definition_id,
-                    time_start: updatedInstance.time_start,
-                    time_stop: updatedInstance.time_stop,
-                    duration_seconds: updatedInstance.duration_seconds
-                });
-            } catch (err) {
-                console.error('Error syncing manual time update:', err);
-            }
-            return;
         }
 
-        // Handle metric updates
-        if (field === 'metrics') {
-            try {
-                await fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, {
-                    metrics: value
-                });
-
-                // Update local state
-                setActivityInstances(prev => prev.map(inst =>
-                    inst.id === instanceId ? { ...inst, metric_values: value } : inst
-                ));
-            } catch (err) {
-                console.error('Error updating metrics:', err);
-                alert(`Failed to update metrics: ${err.response?.data?.error || err.message}`);
-            }
-            return;
-        }
-
-        // For other fields (notes, completed, etc.), update the instance
-        const instance = activityInstances.find(inst => inst.id === instanceId);
-        if (!instance) return;
-
-        const updatedInstance = { ...instance, [field]: value };
+        // Update local state first
         setActivityInstances(prev => prev.map(inst =>
-            inst.id === instanceId ? updatedInstance : inst
-        ));
-
-        // Persist to backend (for fields like notes, completed)
-        try {
-            await fractalApi.updateActivityInstance(rootId, instanceId, {
-                session_id: sessionId,
-                activity_definition_id: instance.activity_definition_id,
-                [field]: value
-            });
-        } catch (err) {
-            console.error(`Error updating ${field}:`, err);
-        }
-    };
-
-    const handleToggleExerciseComplete = async (sectionIndex, exerciseIndex) => {
-        const section = sessionData.sections[sectionIndex];
-        const instanceId = section.activity_ids?.[exerciseIndex];
-        if (!instanceId) return;
-
-        const instance = activityInstances.find(inst => inst.id === instanceId);
-        if (!instance) return;
-
-        const newCompleted = !instance.completed;
-
-        // Update local state
-        setActivityInstances(prev => prev.map(inst =>
-            inst.id === instanceId ? { ...inst, completed: newCompleted } : inst
+            inst.id === instanceId ? { ...inst, ...payload } : inst
         ));
 
         // Persist to backend
@@ -531,10 +475,11 @@ function SessionDetail() {
             await fractalApi.updateActivityInstance(rootId, instanceId, {
                 session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
-                completed: newCompleted
+                ...payload
             });
         } catch (err) {
-            console.error('Error updating completed status:', err);
+            console.error('Error syncing activity instance update:', err);
+            alert(`Failed to update activity: ${err.response?.data?.error || err.message}`);
         }
     };
 
@@ -631,15 +576,8 @@ function SessionDetail() {
 
         // If we were trying to add it to a section, do that now
         if (sectionForNewActivity !== null) {
-            // Need to wait for state update or pass the new activity object directly
             // Since handleAddActivity looks up by ID from 'activities' state which might not be updated yet
-            // We'll modify handleAddActivity to accept an object OR wait for re-render
-            // Actually, handleAddActivity looks up using: const activity = activities.find(a => a.id === activityId);
-            // Since setState is async, 'activities' won't have the new one yet in this closure.
-
-            // So we'll manually call the logic inside handleAddActivity but with the new object
-            // Or better, update handleAddActivity to accept optional activity object
-
+            // We'll manually call the logic inside handleAddActivity but with the new object
             handleAddActivity(sectionForNewActivity, newActivity.id, newActivity);
             setSectionForNewActivity(null);
         }
@@ -674,12 +612,12 @@ function SessionDetail() {
         }
     };
 
-    const handleDeleteExercise = async (sectionIndex, exerciseIndex) => {
+    const handleDeleteActivity = async (sectionIndex, instanceId) => {
         const section = sessionData.sections[sectionIndex];
-        const instanceId = section.activity_ids?.[exerciseIndex];
+        const exerciseIndex = section.activity_ids?.indexOf(instanceId);
 
-        if (!instanceId) {
-            console.error('No instance ID found for exercise');
+        if (exerciseIndex === -1 || !instanceId) {
+            console.error('Instance ID not found in section for deletion');
             return;
         }
 
@@ -765,592 +703,121 @@ function SessionDetail() {
 
     return (
         <div className="page-container" style={{ color: 'white' }}>
-            {/* Header */}
-            <div style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 100,
-                background: '#121212',
-                paddingBottom: '20px',
-                borderBottom: '1px solid #444',
-                marginBottom: '20px'
-            }}>
-                <h1 style={{ fontWeight: 300, marginBottom: '16px' }}>
-                    {session.name}
-                </h1>
+            <div className="session-detail-container">
+                {/* Main Content Column */}
+                <div className="session-main-content">
 
-                {/* 2x5 Grid Layout */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'auto auto auto auto 1fr',
-                    gap: '16px 32px',
-                    fontSize: '14px',
-                    color: '#aaa',
-                    alignItems: 'start'
-                }}>
-                    {/* Row 1, Column 1: Program/Template */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {session.program_info ? (
-                            <>
-                                <span style={{ color: '#666', fontSize: '12px' }}>Program:</span>
-                                <Link
-                                    to={`/${rootId}/programs/${session.program_info.program_id}`}
-                                    style={{ color: '#2196f3', textDecoration: 'none', fontWeight: '500', fontSize: '14px' }}
-                                >
-                                    {session.program_info.program_name}
-                                </Link>
-                                <div style={{ fontSize: '11px', color: '#888' }}>
-                                    {session.program_info.block_name} • {session.program_info.day_name}
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <span style={{ color: '#666', fontSize: '12px' }}>Program:</span>
-                                <span style={{ color: '#ccc', fontSize: '14px' }}>—</span>
-                            </>
-                        )}
-                    </div>
+                    {/* Minimal Header */}
 
-                    {/* Row 1, Column 2: Session Start */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ color: '#666', fontSize: '12px' }}>Session Start:</label>
-                        <input
-                            type="text"
-                            placeholder="YYYY-MM-DD HH:MM:SS"
-                            value={localSessionStart}
-                            onChange={(e) => setLocalSessionStart(e.target.value)}
-                            onBlur={(e) => {
-                                if (e.target.value) {
-                                    try {
-                                        const isoValue = localToISO(e.target.value, timezone);
-                                        handleSessionStartChange(isoValue);
-                                    } catch (err) {
-                                        console.error('Invalid date format:', err);
-                                        setLocalSessionStart(sessionData.session_start ? formatForInput(sessionData.session_start, timezone) : '');
-                                    }
-                                } else {
-                                    handleSessionStartChange(null);
-                                }
-                            }}
-                            style={{
-                                padding: '4px 8px',
-                                background: '#333',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: '#ccc',
-                                fontSize: '12px',
-                                width: '160px',
-                                fontFamily: 'monospace'
-                            }}
-                        />
-                    </div>
 
-                    {/* Row 1, Column 3: Date Created */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Date Created:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.created_at, timezone)}</span>
-                    </div>
-
-                    {/* Row 1, Column 4: Total Duration (Planned) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Total Duration (Planned):</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{sessionData.total_duration_minutes} min</span>
-                    </div>
-
-                    {/* Row 1, Column 5: Short-Term Goals */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Short-Term Goals:</span>
-                        {parentGoals.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {parentGoals.map(goal => {
-                                    const goalColor = getGoalColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
-                                    const textColor = getGoalTextColor(goal.type || goal.attributes?.type || 'ShortTermGoal');
-                                    return (
-                                        <div
-                                            key={goal.id}
-                                            onClick={() => setSelectedGoal(goal)}
-                                            style={{
-                                                padding: '4px 10px',
-                                                background: '#2a2a2a',
-                                                border: `1px solid ${goalColor}`,
-                                                borderRadius: '4px',
-                                                color: goalColor,
-                                                fontSize: '12px',
-                                                fontWeight: '500',
-                                                whiteSpace: 'nowrap',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = goalColor;
-                                                e.currentTarget.style.color = textColor;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = '#2a2a2a';
-                                                e.currentTarget.style.color = goalColor;
-                                            }}
-                                        >
-                                            {goal.name}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <span style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>None</span>
-                        )}
-                    </div>
-
-                    {/* Row 2, Column 1: Template */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Template:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{sessionData.template_name || '—'}</span>
-                    </div>
-
-                    {/* Row 2, Column 2: Session End */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ color: '#666', fontSize: '12px' }}>Session End:</label>
-                        <input
-                            type="text"
-                            placeholder="YYYY-MM-DD HH:MM:SS"
-                            value={localSessionEnd}
-                            onChange={(e) => setLocalSessionEnd(e.target.value)}
-                            onBlur={(e) => {
-                                if (e.target.value) {
-                                    try {
-                                        const isoValue = localToISO(e.target.value, timezone);
-                                        handleSessionEndChange(isoValue);
-                                    } catch (err) {
-                                        console.error('Invalid date format:', err);
-                                        setLocalSessionEnd(sessionData.session_end ? formatForInput(sessionData.session_end, timezone) : '');
-                                    }
-                                } else {
-                                    handleSessionEndChange(null);
-                                }
-                            }}
-                            style={{
-                                padding: '4px 8px',
-                                background: '#333',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: '#ccc',
-                                fontSize: '12px',
-                                width: '160px',
-                                fontFamily: 'monospace'
-                            }}
-                        />
-                    </div>
-
-                    {/* Row 2, Column 3: Last Modified */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Last Modified:</span>
-                        <span style={{ color: '#ccc', fontSize: '14px' }}>{formatDateInTimezone(session.attributes?.updated_at, timezone)}</span>
-                    </div>
-
-                    {/* Row 2, Column 4: Total Duration (Completed) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Total Duration (Completed):</span>
-                        <span style={{
-                            color: '#4caf50',
-                            fontWeight: 'bold',
-                            fontFamily: 'monospace',
-                            fontSize: '14px'
-                        }}>
-                            {formatDuration(calculateTotalCompletedDuration(sessionData, activityInstances))}
-                        </span>
-                    </div>
-
-                    {/* Row 2, Column 5: Immediate Goals */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#666', fontSize: '12px' }}>Immediate Goals:</span>
-                        {session.immediate_goals && session.immediate_goals.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {session.immediate_goals.map(goal => {
-                                    const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
-                                    const textColor = getGoalTextColor(goal.type || 'ImmediateGoal');
-                                    return (
-                                        <div
-                                            key={goal.id}
-                                            onClick={() => setSelectedGoal(goal)}
-                                            style={{
-                                                padding: '4px 10px',
-                                                background: '#2a2a2a',
-                                                border: `1px solid ${goalColor}`,
-                                                borderRadius: '4px',
-                                                color: goalColor,
-                                                fontSize: '12px',
-                                                fontWeight: '500',
-                                                whiteSpace: 'nowrap',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = goalColor;
-                                                e.currentTarget.style.color = textColor;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = '#2a2a2a';
-                                                e.currentTarget.style.color = goalColor;
-                                            }}
-                                        >
-                                            {goal.name}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <span style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>None</span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Achieved Targets Indicator */}
-            {(() => {
-                const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
-                if (achievedTargets.length === 0) return null;
-
-                return (
-                    <div style={{
-                        marginTop: '16px',
-                        padding: '12px',
-                        background: '#1a2e1a',
-                        borderRadius: '6px',
-                        borderLeft: '3px solid #4caf50'
-                    }}>
-                        <div style={{ fontSize: '12px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
-                            🎯 Targets Achieved ({achievedTargets.length}):
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {achievedTargets.map((achieved, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        padding: '6px 12px',
-                                        background: '#2e7d32',
-                                        borderRadius: '4px',
-                                        fontSize: '12px',
-                                        color: 'white',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                >
-                                    <span>✓</span>
-                                    <span>{achieved.target.name || 'Target'}</span>
-                                    <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* Sections */}
-            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-                {sessionData.sections?.map((section, sectionIndex) => (
-                    <div
-                        key={sectionIndex}
-                        style={{
-                            background: '#1e1e1e',
-                            border: '1px solid #333',
-                            borderLeft: '4px solid #2196f3',
-                            borderRadius: '8px',
-                            padding: '20px',
-                            marginBottom: '20px'
-                        }}
-                    >
-                        {/* Section Header */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '16px',
-                            paddingBottom: '12px',
-                            borderBottom: '1px solid #333'
-                        }}>
-                            <h2 style={{ fontSize: '20px', margin: 0 }}>
-                                {section.name}
-                            </h2>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ color: '#aaa', fontSize: '14px' }}>
-                                    Duration:
-                                </span>
-                                <span style={{
-                                    color: '#4caf50',
-                                    fontSize: '16px',
-                                    fontWeight: 'bold',
-                                    fontFamily: 'monospace'
-                                }}>
-                                    {formatDuration(calculateSectionDuration(section, activityInstances))}
-                                </span>
-                                <span style={{ color: '#666', fontSize: '14px' }}>
-                                    (planned: {section.duration_minutes} min)
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Activities */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {section.activity_ids?.map((instanceId, exerciseIndex) => {
-                                // Look up the instance data from activityInstances state
-                                const instance = activityInstances.find(inst => inst.id === instanceId);
-                                if (!instance) return null; // Instance not loaded yet
-
-                                // Look up the activity definition
-                                const activityDef = activities.find(a => a.id === instance.activity_definition_id);
-                                if (!activityDef) return null;
-
-                                // Build exercise object for SessionActivityItem
-                                const exercise = {
-                                    type: 'activity',
-                                    name: activityDef.name,
-                                    activity_id: instance.activity_definition_id,
-                                    instance_id: instance.id,
-                                    description: activityDef.description,
-                                    has_sets: activityDef.has_sets,
-                                    has_metrics: activityDef.has_metrics,
-                                    has_splits: activityDef.has_splits || false,
-                                    time_start: instance.time_start,
-                                    time_stop: instance.time_stop,
-                                    duration_seconds: instance.duration_seconds,
-                                    metric_values: instance.metric_values || [],
-                                    metrics: instance.metric_values || [], // Map for compatibility with SessionActivityItem
-                                    sets: instance.sets || [], // Map sets from instance data
-                                    completed: instance.completed, // Add completed status
-                                    notes: instance.notes // Add notes
-                                };
-
-                                return (
-                                    <SessionActivityItem
-                                        key={instance.id}
-                                        exercise={exercise}
-                                        activityDefinition={activityDef}
-                                        onUpdate={(field, value) => handleExerciseChange(sectionIndex, exerciseIndex, field, value)}
-                                        onToggleComplete={() => handleToggleExerciseComplete(sectionIndex, exerciseIndex)}
-                                        onDelete={() => handleDeleteExercise(sectionIndex, exerciseIndex)}
-                                        onReorder={(direction) => handleReorderActivity(sectionIndex, exerciseIndex, direction)}
-                                        canMoveUp={exerciseIndex > 0}
-                                        canMoveDown={exerciseIndex < section.activity_ids.length - 1}
-                                        showReorderButtons={section.activity_ids.length > 1}
-                                    />
-                                );
-                            })}
-                        </div>
-                        {showActivitySelector[sectionIndex] ? (
-                            <div style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #444' }}>
-
-                                {selectorState[sectionIndex] ? (
-                                    // Specific Group View
-                                    <>
-                                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-                                            <button
-                                                onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: null }))}
-                                                style={{ marginRight: '10px', background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}
-                                            >
-                                                ← Back to Groups
-                                            </button>
-                                            <div style={{ fontSize: '12px', color: '#888', fontWeight: 'bold' }}>
-                                                {activityGroups.find(g => g.id === selectorState[sectionIndex])?.name || 'Group'}
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                            {/* Activities in Group */}
-                                            {activities.filter(a => a.group_id === selectorState[sectionIndex]).map(act => (
-                                                <button
-                                                    key={act.id}
-                                                    onClick={() => handleAddActivity(sectionIndex, act.id)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#333',
-                                                        border: '1px solid #555',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px'
-                                                    }}
-                                                >
-                                                    {act.name}
-                                                </button>
-                                            ))}
-                                            {activities.filter(a => a.group_id === selectorState[sectionIndex]).length === 0 && (
-                                                <div style={{ color: '#666', fontSize: '12px', width: '100%', fontStyle: 'italic' }}>No activities in this group</div>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    // Top Level View
-                                    <>
-                                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>Select an activity group or ungrouped activity:</div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                            {/* Groups */}
-                                            {activityGroups.map(group => (
-                                                <button
-                                                    key={group.id}
-                                                    onClick={() => setSelectorState(prev => ({ ...prev, [sectionIndex]: group.id }))}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#1a1a1a',
-                                                        border: '1px solid #666',
-                                                        borderRadius: '4px',
-                                                        color: '#fff',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px',
-                                                        fontWeight: 'bold',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px'
-                                                    }}
-                                                >
-                                                    {group.name} ›
-                                                </button>
-                                            ))}
-
-                                            {/* Ungrouped */}
-                                            {activities.filter(a => !a.group_id).map(act => (
-                                                <button
-                                                    key={act.id}
-                                                    onClick={() => handleAddActivity(sectionIndex, act.id)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        background: '#333',
-                                                        border: '1px solid #555',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px'
-                                                    }}
-                                                >
-                                                    {act.name}
-                                                </button>
-                                            ))}
-
-                                            <div style={{ width: '100%', height: '1px', background: '#333', margin: '4px 0' }}></div>
-
-                                            <button
-                                                onClick={() => handleOpenActivityBuilder(sectionIndex)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: '#1a1a1a',
-                                                    border: '1px dashed #666',
-                                                    borderRadius: '4px',
-                                                    color: '#aaa',
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px',
-                                                    fontWeight: 500
-                                                }}
-                                            >
-                                                + Create New Activity
-                                            </button>
-                                            <button
-                                                onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }))}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    color: '#888',
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px'
-                                                }}
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px dashed #444',
+                    {/* Achieved Targets */}
+                    {(() => {
+                        const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
+                        if (achievedTargets.length === 0) return null;
+                        return (
+                            <div style={{
+                                marginBottom: '24px',
+                                background: '#111',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid #222'
+                            }}>
+                                <div style={{
+                                    fontSize: '12px',
                                     color: '#888',
-                                    padding: '8px 16px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    width: '100%',
-                                    textAlign: 'center'
-                                }}
-                            >
-                                + Add Activity
-                            </button>
-                        )}
-                    </div>
-                ))}
+                                    marginBottom: '8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em'
+                                }}>
+                                    Achieved Targets
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    flexWrap: 'nowrap',
+                                    gap: '8px',
+                                    overflowX: 'auto',
+                                    padding: '4px 0'
+                                }}>
+                                    {achievedTargets.map((achieved, index) => (
+                                        <div
+                                            key={index}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                background: 'rgba(76, 175, 80, 0.1)',
+                                                border: '1px solid rgba(76, 175, 80, 0.3)',
+                                                borderRadius: '20px',
+                                                color: '#4caf50',
+                                                fontSize: '12px',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            title={`Achieved by: ${achieved.goalName}`}
+                                        >
+                                            <span>✓</span>
+                                            <span>{achieved.target.name || 'Target'}</span>
+                                            <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
-                {/* Save Button */}
-                <div style={{
-                    position: 'sticky',
-                    bottom: 0,
-                    background: '#121212',
-                    padding: '20px 0',
-                    borderTop: '1px solid #444',
-                    display: 'flex',
-                    gap: '12px',
-                    justifyContent: 'center'
-                }}>
-                    <button
-                        type="button"
-                        onClick={handleDeleteSessionClick}
-                        style={{
-                            padding: '12px 32px',
-                            background: '#d32f2f',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Delete Session
-                    </button>
-                    <button
-                        onClick={() => navigate(`/${rootId}/sessions`)}
-                        style={{
-                            padding: '12px 32px',
-                            background: '#666',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleToggleSessionComplete}
-                        style={{
-                            padding: '12px 32px',
-                            background: session.attributes?.completed ? '#4caf50' : 'transparent',
-                            border: session.attributes?.completed ? 'none' : '2px solid #666',
-                            borderRadius: '6px',
-                            color: session.attributes?.completed ? 'white' : '#ccc',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {session.attributes?.completed ? '✓ Completed' : 'Mark Complete'}
-                    </button>
-                    <button
-                        onClick={handleSaveSession}
-                        style={{
-                            padding: '12px 32px',
-                            background: '#2196f3',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Done
-                    </button>
+                    {/* Sections List */}
+                    <div className="session-sections-list">
+                        {sessionData.sections?.map((section, sectionIndex) => (
+                            <SessionSection
+                                key={sectionIndex}
+                                section={section}
+                                sectionIndex={sectionIndex}
+                                activityInstances={activityInstances}
+                                onDeleteActivity={handleDeleteActivity}
+                                onUpdateActivity={handleUpdateActivity}
+                                onFocusActivity={setSelectedActivity}
+                                selectedActivityId={selectedActivity?.id}
+                                rootId={rootId}
+                                showActivitySelector={showActivitySelector[sectionIndex]}
+                                onToggleActivitySelector={(val) => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: typeof val === 'boolean' ? val : !prev[sectionIndex] }))}
+                                onAddActivity={handleAddActivity}
+                                onOpenActivityBuilder={handleOpenActivityBuilder}
+                                groupedActivities={groupedActivities}
+                                groupMap={groupMap}
+                                activities={activities}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Controls */}
+                    <SessionControls
+                        isCompleted={session.attributes?.completed}
+                        onDelete={handleDeleteSessionClick}
+                        onCancel={() => navigate(`/${rootId}/sessions`)}
+                        onToggleComplete={handleToggleSessionComplete}
+                        onSave={handleSaveSession}
+                    />
+                </div>
+
+                {/* Sidebar */}
+                <div className="session-sidebar-wrapper">
+                    <div className="session-sidebar-sticky">
+                        <SessionSidePane
+                            rootId={rootId}
+                            sessionId={sessionId}
+                            session={session}
+                            sessionData={sessionData}
+                            parentGoals={parentGoals}
+                            totalDuration={calculateTotalCompletedDuration(sessionData, activityInstances)}
+                            selectedActivity={selectedActivity}
+                            activityInstances={activityInstances}
+                            activityDefinitions={activities}
+                            onNoteAdded={() => {
+                                // Could refresh notes or show feedback
+                            }}
+                            onGoalClick={(goal) => setSelectedGoal(goal)}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -1382,7 +849,7 @@ function SessionDetail() {
                 rootId={rootId}
             />
 
-            {/* Auto-save status indicator - Fixed position above environment badge */}
+            {/* Auto-save status indicator */}
             {
                 autoSaveStatus && (
                     <div style={{

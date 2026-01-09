@@ -121,43 +121,55 @@ function App() {
         return (
             <div className="top-nav-links">
                 <div className="nav-group">
-                    <span className="fractal-title">{fractalName}</span>
-                    <div className="nav-separator">|</div>
-                    <button
-                        className="nav-text-link add-session-btn"
-                        onClick={() => navigate(`/${rootId}/create-session`)}
-                        style={{
-                            background: '#4caf50',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        + ADD SESSION
-                    </button>
-                    <div className="nav-separator">|</div>
-                    {navItems.map(item => (
+                    {/* Left Side: Title and Primary Nav */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <span className="fractal-title" style={{ fontSize: '18px', marginRight: '20px' }}>{fractalName}</span>
+
                         <button
-                            key={item.path}
-                            className={`nav-text-link ${location.pathname === item.path ? 'active' : ''}`}
-                            onClick={() => navigate(item.path)}
+                            className="nav-text-link add-session-btn"
+                            onClick={() => navigate(`/${rootId}/create-session`)}
+                            style={{
+                                background: '#4caf50',
+                                color: 'white',
+                                padding: '6px 14px',
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                                border: 'none',
+                                fontSize: '11px',
+                                marginRight: '10px'
+                            }}
                         >
-                            {item.label}
+                            + ADD SESSION
                         </button>
-                    ))}
 
-                    {/* Render Page Specific Actions */}
-                    {headerActions && (
-                        <>
-                            <div className="nav-separator">|</div>
-                            {headerActions}
-                        </>
-                    )}
+                        {navItems.map(item => (
+                            <button
+                                key={item.path}
+                                className={`nav-text-link ${location.pathname === item.path ? 'active' : ''}`}
+                                onClick={() => navigate(item.path)}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
 
-                    <div className="nav-separator">|</div>
-                    <button className="nav-text-link home-link" onClick={() => navigate('/')}>
-                        EXIT TO HOME
-                    </button>
+                    {/* Right Side: Actions and Exit */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginLeft: 'auto' }}>
+                        {/* Add Session removed from here */}
+
+                        {/* Render Page Specific Actions */}
+                        {headerActions && (
+                            <>
+                                <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
+                                {headerActions}
+                            </>
+                        )}
+
+                        <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
+                        <button className="nav-text-link home-link" onClick={() => navigate('/')}>
+                            EXIT TO HOME
+                        </button>
+                    </div>
                 </div>
             </div>
         );

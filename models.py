@@ -519,6 +519,62 @@ class MetricValue(Base):
             "split_name": self.split.name if self.split else None
         }
 
+
+class Note(Base):
+    """
+    Timestamped notes that can be attached to various entities.
+    
+    context_type determines what the note is attached to:
+    - 'session': General session-level note
+    - 'activity_instance': Note for a specific activity occurrence
+    - 'set': Note for a specific set within an activity
+    """
+    __tablename__ = 'notes'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    # Polymorphic context - what is this note attached to?
+    context_type = Column(String, nullable=False)  # 'session', 'activity_instance', 'set'
+    context_id = Column(String, nullable=False, index=True)  # ID of the parent entity
+    
+    # Denormalized foreign keys for efficient queries
+    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
+    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
+    
+    # For set-level notes
+    set_index = Column(Integer, nullable=True)  # 0-indexed set number
+    
+    # Content
+    content = Column(Text, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    session = relationship("Session", backref="notes_list")
+    activity_instance = relationship("ActivityInstance", backref="notes_list")
+    activity_definition = relationship("ActivityDefinition", backref="notes_list")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "context_type": self.context_type,
+            "context_id": self.context_id,
+            "session_id": self.session_id,
+            "activity_instance_id": self.activity_instance_id,
+            "activity_definition_id": self.activity_definition_id,
+            "set_index": self.set_index,
+            "content": self.content,
+            "created_at": format_utc(self.created_at),
+            "updated_at": format_utc(self.updated_at)
+        }
+
+
 class SessionTemplate(Base):
     __tablename__ = 'session_templates'
     

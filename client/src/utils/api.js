@@ -400,6 +400,77 @@ export const fractalApi = {
      */
     getActiveProgramDays: (rootId) =>
         axios.get(`${API_BASE}/${rootId}/programs/active-days`),
+
+    // ========== Notes ==========
+
+    /**
+     * Get all notes for a session (includes activity instance notes)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     */
+    getSessionNotes: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/notes`),
+
+    /**
+     * Get notes for a specific activity instance
+     * @param {string} rootId - ID of the fractal
+     * @param {string} instanceId - ID of the activity instance
+     */
+    getActivityInstanceNotes: (rootId, instanceId) =>
+        axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/notes`),
+
+    /**
+     * Get notes for an activity definition (across all sessions)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity definition
+     * @param {Object} options - {limit, exclude_session}
+     */
+    getActivityDefinitionNotes: (rootId, activityId, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.limit) params.append('limit', options.limit);
+        if (options.excludeSession) params.append('exclude_session', options.excludeSession);
+        const queryString = params.toString();
+        return axios.get(`${API_BASE}/${rootId}/activities/${activityId}/notes${queryString ? '?' + queryString : ''}`);
+    },
+
+    /**
+     * Get previous instances of an activity (for history display)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity definition
+     * @param {Object} options - {limit, excludeSession}
+     */
+    getActivityHistory: (rootId, activityId, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.limit) params.append('limit', options.limit);
+        if (options.excludeSession) params.append('exclude_session', options.excludeSession);
+        const queryString = params.toString();
+        return axios.get(`${API_BASE}/${rootId}/activities/${activityId}/history${queryString ? '?' + queryString : ''}`);
+    },
+
+    /**
+     * Create a new note
+     * @param {string} rootId - ID of the fractal
+     * @param {Object} data - {context_type, context_id, session_id, activity_instance_id, activity_definition_id, set_index, content}
+     */
+    createNote: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/notes`, data),
+
+    /**
+     * Update a note's content
+     * @param {string} rootId - ID of the fractal
+     * @param {string} noteId - ID of the note
+     * @param {Object} data - {content}
+     */
+    updateNote: (rootId, noteId, data) =>
+        axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
+
+    /**
+     * Delete a note (soft delete)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} noteId - ID of the note
+     */
+    deleteNote: (rootId, noteId) =>
+        axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),
 };
 
 /**

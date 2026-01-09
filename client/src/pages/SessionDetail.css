@@ -1,0 +1,101 @@
+/* SessionDetail.css */
+
+.session-detail-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 30px;
+    width: 100%;
+    position: relative;
+    padding-bottom: 80px;
+    /* Space for fixed controls */
+}
+
+/* Sidebar Wrapper */
+.session-sidebar-wrapper {
+    position: relative;
+}
+
+.session-sidebar-sticky {
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+/* Sections List */
+.session-sections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+    /* Important for grid item to not overflow */
+}
+
+/* Session Controls */
+.session-controls-bar {
+    position: sticky;
+    bottom: 0;
+    background: #121212;
+    padding: 20px 0;
+    border-top: 1px solid #444;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    z-index: 100;
+    margin-top: 40px;
+}
+
+.session-control-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-delete {
+    background: #d32f2f;
+}
+
+.btn-delete:hover {
+    background: #b71c1c;
+}
+
+.btn-cancel {
+    background: #666;
+}
+
+.btn-cancel:hover {
+    background: #555;
+}
+
+.btn-complete {
+    background: transparent;
+    border: 2px solid #666;
+    color: #ccc;
+}
+
+.btn-complete.completed {
+    background: #4caf50;
+    border: none;
+    color: white;
+}
+
+.btn-complete:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-complete.completed:hover {
+    background: #43a047;
+}
+
+.btn-done {
+    background: #2196f3;
+}
+
+.btn-done:hover {
+    background: #1976d2;
+}

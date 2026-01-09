@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useTimezone } from '../contexts/TimezoneContext';
-import { formatForInput, localToISO } from '../utils/dateUtils';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatForInput, localToISO } from '../../utils/dateUtils';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -46,7 +46,7 @@ function SessionActivityItem({
     // If we don't have definition, we can't render much (maybe just name)
     // But we should have it passed in from parent lookups
     const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [], split_definitions: [] };
-    const hasSets = exercise.has_sets; // Snapshot from creation
+    const hasSets = exercise.has_sets ?? def.has_sets; // Snapshot or definition default
     const hasSplits = def.has_splits && def.split_definitions && def.split_definitions.length > 0;
     // Check if metrics exist by looking at the definition, not just the flag
     const hasMetrics = def.metric_definitions && def.metric_definitions.length > 0;
@@ -174,15 +174,15 @@ function SessionActivityItem({
                     )}
                     <div>
                         <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#4caf50' }}>
-                            {exercise.name} <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(Activity)</span>
+                            {def.name} <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(Activity)</span>
                         </div>
-                        {exercise.description && <div style={{ fontSize: '12px', color: '#aaa' }}>{exercise.description}</div>}
+                        {def.description && <div style={{ fontSize: '12px', color: '#aaa' }}>{def.description}</div>}
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {/* Timer Controls - New Design */}
-                    {exercise.instance_id && (
+                    {exercise.id && (
                         <>
                             {/* DateTime Start Field */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

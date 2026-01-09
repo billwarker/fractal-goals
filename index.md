@@ -237,6 +237,28 @@ Recorded metric values for activity instances.
 - `split_definition_id` (String, FK to split_definitions.id, nullable)
 - `value` (Float)
 
+#### `notes`
+Timestamped notes attached to sessions, activity instances, or sets.
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `root_id` (String, FK to goals.id) - For fractal scoping
+- `context_type` (String) - 'session', 'activity_instance', or 'set'
+- `context_id` (String) - ID of the parent entity
+- `session_id` (String, FK to sessions.id, nullable)
+- `activity_instance_id` (String, FK to activity_instances.id, nullable)
+- `activity_definition_id` (String, FK to activity_definitions.id, nullable)
+- `set_index` (Integer, nullable) - For set-level notes
+- `content` (Text)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+- `deleted_at` (DateTime, nullable)
+
+**Relationships:**
+- Belongs to Session (optional)
+- Belongs to ActivityInstance (optional)
+- Belongs to ActivityDefinition (optional)
+
 #### `session_templates`
 Reusable session templates.
 
@@ -380,6 +402,18 @@ Manages training programs, blocks, and scheduled sessions.
 - `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
+
+#### `notes_api.py`
+Manages timestamped notes for sessions, activities, and sets.
+
+**Key Endpoints:**
+- `GET /api/<root_id>/sessions/<session_id>/notes` - Get all notes for a session
+- `GET /api/<root_id>/activity-instances/<instance_id>/notes` - Get notes for activity instance
+- `GET /api/<root_id>/activities/<activity_id>/notes` - Get notes across sessions for activity
+- `GET /api/<root_id>/activities/<activity_id>/history` - Get previous activity instances
+- `POST /api/<root_id>/notes` - Create note
+- `PUT /api/<root_id>/notes/<note_id>` - Update note
+- `DELETE /api/<root_id>/notes/<note_id>` - Soft delete note
 
 #### `pages.py`
 Serves static pages (minimal usage, mostly SPA).
@@ -555,7 +589,7 @@ Fractal selection/home page.
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
 - **`ActivitiesManager.jsx`** - Activity selection and management interface
 - **`ActivityCard.jsx`** - Card display for activities
-- **`SessionActivityItem.jsx`** - Activity item in session with timer controls
+
 - **`AddTargetModal.jsx`** - Modal for adding targets to goals
 - **`TargetCard.jsx`** - Display card for targets
 - **`ConfirmationModal.jsx`** - Reusable confirmation dialog
@@ -581,6 +615,26 @@ Fractal selection/home page.
 #### Analytics Components (in `/client/src/components/analytics/`)
 
 - Analytics-specific visualization components
+
+#### Session Detail Components (in `/client/src/components/sessionDetail/`)
+
+- **`SessionSidePane.jsx`** - Persistent side panel with Notes and History modes
+- **`SessionInfoPanel.jsx`** - Collapsible header panel showing session metadata and goals (used in Sidebar)
+- **`SessionSection.jsx`** - Renders a session section with its activities
+- **`SessionControls.jsx`** - Sticky footer controls for session actions (Delete, Cancel, Mark Complete, Done)
+- **`SessionActivityItem.jsx`** - Activity item in session with timer controls (moved from components root)
+- **`NotesPanel.jsx`** - Notes mode with quick-add, timeline, and previous session notes
+- **`NoteQuickAdd.jsx`** - Quick input for adding notes with Enter key submission
+- **`NoteTimeline.jsx`** - Chronological list of notes
+- **`NoteItem.jsx`** - Individual note with inline edit/delete
+- **`PreviousNotesSection.jsx`** - Collapsible section showing notes from previous sessions
+- **`HistoryPanel.jsx`** - Activity history mode showing previous instance metrics
+
+### Hooks (in `/client/src/hooks/`)
+
+- **`useSessionNotes.js`** - Session notes CRUD operations with previous notes fetching
+- **`useActivityHistory.js`** - Fetch previous activity instances for history panel
+- **`useAutoSave.js`** - Reusable debounced auto-save with status tracking
 
 ### Contexts (in `/client/src/contexts/`)
 
