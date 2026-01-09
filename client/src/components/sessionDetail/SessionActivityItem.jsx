@@ -31,7 +31,8 @@ function SessionActivityItem({
     rootId,
     onNoteCreated, // Optional callback to trigger refresh
     sessionId, // Explicit session ID
-    onFocus // Added prop
+    onFocus, // Added prop
+    isSelected // Added prop for styling
 }) {
     // Get timezone from context
     const timezone = useTimezone();
@@ -146,12 +147,23 @@ function SessionActivityItem({
     };
 
     return (
-        <div style={{
-            background: '#2a2a2a',
-            border: '1px solid #4caf50', // Green border to distinguish Activity vs regular Exercise
-            borderRadius: '6px',
-            padding: '16px'
-        }}>
+        <div
+            onClick={(e) => {
+                // Prevent triggering when clicking interactive elements that act on their own, 
+                // but inputs usually should trigger selection too.
+                // We'll let it bubble unless strictly necessary.
+                if (onFocus) onFocus();
+            }}
+            style={{
+                background: isSelected ? '#333' : '#2a2a2a',
+                border: isSelected ? '1px solid #4caf50' : '1px solid #333',
+                // Green border legacy comment removed as we now use it for selection
+                borderRadius: '6px',
+                padding: '16px',
+                cursor: 'default', // Don't show pointer everywhere to avoid confusion with buttons
+                boxShadow: isSelected ? '0 0 0 1px rgba(76, 175, 80, 0.2)' : 'none',
+                transition: 'all 0.2s ease'
+            }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     {/* Reorder Buttons */}
