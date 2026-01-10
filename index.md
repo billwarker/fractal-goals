@@ -417,9 +417,10 @@ Manages timestamped notes for sessions, activities, and sets.
 
 **Key Endpoints:**
 - `GET /api/<root_id>/sessions/<session_id>/notes` - Get all notes for a session
+- `GET /api/<root_id>/sessions/<session_id>/previous-session-notes` - Get session-level notes from last 3 sessions (grouped by session)
 - `GET /api/<root_id>/activity-instances/<instance_id>/notes` - Get notes for activity instance
 - `GET /api/<root_id>/activities/<activity_id>/notes` - Get notes across sessions for activity
-- `GET /api/<root_id>/activities/<activity_id>/history` - Get previous activity instances
+- `GET /api/<root_id>/activities/<activity_id>/history` - Get previous activity instances (default limit: 3)
 - `POST /api/<root_id>/notes` - Create note
 - `PUT /api/<root_id>/notes/<note_id>` - Update note
 - `DELETE /api/<root_id>/notes/<note_id>` - Soft delete note
@@ -641,7 +642,7 @@ Fractal selection/home page.
 
 ### Hooks (in `/client/src/hooks/`)
 
-- **`useSessionNotes.js`** - Session notes CRUD operations with previous notes fetching
+- **`useSessionNotes.js`** - Session notes CRUD with `notes`, `previousNotes` (activity-specific), and `previousSessionNotes` (last 3 sessions)
 - **`useActivityHistory.js`** - Fetch previous activity instances for history panel
 - **`useAutoSave.js`** - Reusable debounced auto-save with status tracking
 
