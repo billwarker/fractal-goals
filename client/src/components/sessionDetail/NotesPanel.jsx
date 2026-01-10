@@ -2,16 +2,16 @@
  * NotesPanel - Notes mode for SessionSidePane
  * 
  * Features:
- * - Quick-add input at top
- * - Timeline of notes for current session
+ * - Quick-add input at top for session notes
+ * - Timeline of session-level notes for current session
  * - Previous session notes section (session-level notes from last 3 sessions)
- * - Previous activity notes section (when activity is selected)
+ * 
+ * Note: Activity-level previous notes are shown in HistoryPanel instead.
  */
 
 import React, { useState } from 'react';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
-import PreviousNotesSection from './PreviousNotesSection';
 
 function NotesPanel({
     rootId,
@@ -113,13 +113,7 @@ function NotesPanel({
                 </div>
             )}
 
-            {/* Previous Activity Notes (for selected activity) */}
-            {selectedActivityDef && previousNotes.length > 0 && (
-                <PreviousNotesSection
-                    notes={previousNotes}
-                    activityName={selectedActivityDef.name}
-                />
-            )}
+
         </div>
     );
 }

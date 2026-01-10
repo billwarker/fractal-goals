@@ -480,6 +480,17 @@ def create_fractal_goal(root_id):
         if not data.get('type'):
             return jsonify({"error": "Goal type is required"}), 400
         
+        # Parse deadline if provided
+        deadline = None
+        if data.get('deadline'):
+            try:
+                d_str = data['deadline']
+                if 'T' in d_str:
+                    d_str = d_str.split('T')[0]
+                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
+        
         # Create new goal
         new_goal = Goal(
             id=str(uuid.uuid4()),
@@ -487,7 +498,7 @@ def create_fractal_goal(root_id):
             description=data.get('description', ''),
             type=data['type'],
             parent_id=data.get('parent_id'),
-            deadline=data.get('deadline'),
+            deadline=deadline,
             completed=False,
             root_id=root_id  # Set root_id for performance
         )
