@@ -54,18 +54,57 @@ const SessionSection = ({
     allNotes,
     onAddNote,
     onUpdateNote,
-    onDeleteNote
+    onDeleteNote,
+    // Drag and drop props
+    onMoveActivity,
+    onReorderActivity,
+    draggedItem,
+    setDraggedItem
 }) => {
     const [viewGroupId, setViewGroupId] = useState(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     // Filter ungrouped activities
     const ungroupedActivities = activities.filter(a => !a.group_id);
 
+    // Drag handlers for the section (drop target)
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        if (draggedItem && draggedItem.sourceSectionIndex !== sectionIndex) {
+            setIsDragOver(true);
+        }
+    };
+
+    const handleDragLeave = (e) => {
+        // Only set to false if we're leaving the section entirely
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setIsDragOver(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+
+        if (draggedItem && draggedItem.sourceSectionIndex !== sectionIndex) {
+            // Move activity from source section to this section
+            onMoveActivity(
+                draggedItem.sourceSectionIndex,
+                sectionIndex,
+                draggedItem.instanceId
+            );
+        }
+        setDraggedItem(null);
+    };
+
     return (
         <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             style={{
                 background: '#1e1e1e',
-                border: '1px solid #333',
+                border: isDragOver ? '2px dashed #4caf50' : '1px solid #333',
                 borderLeft: '4px solid #2196f3',
                 borderRadius: '8px',
                 padding: '20px',
@@ -91,29 +130,68 @@ const SessionSection = ({
                     const instance = activityInstances.find(i => i.id === instanceId);
                     if (!instance) return null;
                     const definition = activities.find(a => a.id === instance.activity_definition_id);
+                    const isDragging = draggedItem?.instanceId === instanceId;
 
                     return (
-                        <SessionActivityItem
+                        <div
                             key={instanceId}
-                            exercise={instance}
-                            activityDefinition={definition}
-                            onDelete={() => onDeleteActivity(sectionIndex, instanceId)}
-                            onUpdate={(key, value) => onUpdateActivity(instanceId, { [key]: value })}
-                            onFocus={() => onFocusActivity(instance)}
-                            isSelected={selectedActivityId === instanceId}
-                            rootId={rootId}
-                            canMoveUp={sectionIndex > 0 || (section.activity_ids.indexOf(instanceId) > 0 && true)} // Simplified for now
-                            canMoveDown={true}
-                            showReorderButtons={true}
-                            onNoteCreated={onNoteCreated}
-                            sessionId={sessionId}
-                            allNotes={allNotes}
-                            onAddNote={onAddNote}
-                            onUpdateNote={onUpdateNote}
-                            onDeleteNote={onDeleteNote}
-                        />
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDraggedItem({
+                                    instanceId,
+                                    sourceSectionIndex: sectionIndex,
+                                    activityName: definition?.name || 'Activity'
+                                });
+                            }}
+                            onDragEnd={() => {
+                                setDraggedItem(null);
+                            }}
+                            style={{
+                                opacity: isDragging ? 0.5 : 1,
+                                cursor: 'grab'
+                            }}
+                        >
+                            <SessionActivityItem
+                                exercise={instance}
+                                activityDefinition={definition}
+                                onDelete={() => onDeleteActivity(sectionIndex, instanceId)}
+                                onUpdate={(key, value) => onUpdateActivity(instanceId, { [key]: value })}
+                                onFocus={(instance, setIndex) => onFocusActivity(instance, setIndex)}
+                                isSelected={selectedActivityId === instanceId}
+                                rootId={rootId}
+                                onReorder={(direction) => onReorderActivity(sectionIndex, section.activity_ids.indexOf(instanceId), direction)}
+                                canMoveUp={section.activity_ids.indexOf(instanceId) > 0}
+                                canMoveDown={section.activity_ids.indexOf(instanceId) < section.activity_ids.length - 1}
+                                showReorderButtons={true}
+                                onNoteCreated={onNoteCreated}
+                                sessionId={sessionId}
+                                allNotes={allNotes}
+                                onAddNote={onAddNote}
+                                onUpdateNote={onUpdateNote}
+                                onDeleteNote={onDeleteNote}
+                                isDragging={isDragging}
+                            />
+                        </div>
                     );
                 })}
+
+                {/* Drop Zone Indicator */}
+                {isDragOver && draggedItem && (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '16px',
+                        color: '#4caf50',
+                        fontSize: '13px',
+                        fontStyle: 'italic',
+                        background: 'rgba(76, 175, 80, 0.1)',
+                        border: '1px dashed #4caf50',
+                        borderRadius: '6px',
+                        marginTop: '8px'
+                    }}>
+                        Drop "{draggedItem.activityName}" here
+                    </div>
+                )}
 
                 {/* Add Activity Button / Selector */}
                 {showActivitySelector ? (

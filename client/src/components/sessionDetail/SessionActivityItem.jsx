@@ -33,12 +33,15 @@ function SessionActivityItem({
     rootId,
     onNoteCreated, // Optional callback to trigger refresh
     sessionId, // Explicit session ID
-    onFocus, // Added prop
+    onFocus, // Added prop - called with (instance, setIndex) to update context
     isSelected, // Added prop for styling
     allNotes,
     onAddNote,
     onUpdateNote,
-    onDeleteNote
+    onDeleteNote,
+    // Drag and drop props
+    isDragging,
+    dragHandleProps
 }) {
     // Get timezone from context
     const timezone = useTimezone();
@@ -152,23 +155,28 @@ function SessionActivityItem({
         return m ? m.value : '';
     };
 
+    // Handler for clicking on the activity panel (not a specific set)
+    const handleActivityCardClick = (e) => {
+        // Don't trigger for interactive elements
+        if (e.target.closest('input, button, textarea')) return;
+
+        // Clear set selection and focus on whole activity
+        setSelectedSetIndex(null);
+        if (onFocus) onFocus(exercise, null);
+    };
+
     return (
         <div
-            onClick={(e) => {
-                // Prevent triggering when clicking interactive elements that act on their own, 
-                // but inputs usually should trigger selection too.
-                // We'll let it bubble unless strictly necessary.
-                if (onFocus) onFocus();
-            }}
+            onClick={handleActivityCardClick}
             style={{
                 background: isSelected ? '#333' : '#2a2a2a',
                 border: isSelected ? '1px solid #4caf50' : '1px solid #333',
-                // Green border legacy comment removed as we now use it for selection
                 borderRadius: '6px',
                 padding: '16px',
-                cursor: 'default', // Don't show pointer everywhere to avoid confusion with buttons
+                cursor: 'default',
                 boxShadow: isSelected ? '0 0 0 1px rgba(76, 175, 80, 0.2)' : 'none',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                opacity: isDragging ? 0.5 : 1
             }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -221,7 +229,32 @@ function SessionActivityItem({
                             </button>
                         </div>
                     )}
-                    <div>
+                    {/* Drag Handle */}
+                    {dragHandleProps && (
+                        <div
+                            {...dragHandleProps}
+                            style={{
+                                cursor: 'grab',
+                                padding: '4px 8px',
+                                color: '#666',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                            title="Drag to reorder"
+                        >
+                            ⋮⋮
+                        </div>
+                    )}
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            // Clicking on activity name/header clears set selection
+                            setSelectedSetIndex(null);
+                            if (onFocus) onFocus(exercise, null);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
                         <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#4caf50' }}>
                             {def.name} <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(Activity)</span>
                         </div>
@@ -428,7 +461,13 @@ function SessionActivityItem({
                             {exercise.sets?.map((set, setIdx) => (
                                 <div
                                     key={set.instance_id}
-                                    onClick={() => setSelectedSetIndex(selectedSetIndex === setIdx ? null : setIdx)}
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // Prevent card click from firing
+                                        const newSetIndex = selectedSetIndex === setIdx ? null : setIdx;
+                                        setSelectedSetIndex(newSetIndex);
+                                        // Notify parent of set selection change
+                                        if (onFocus) onFocus(exercise, newSetIndex);
+                                    }}
                                     style={{
                                         display: 'flex',
                                         gap: '10px',

@@ -100,6 +100,42 @@ function SessionDetail() {
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
     const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
     const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
+    const [selectedSetIndex, setSelectedSetIndex] = useState(null); // For set-level note context
+    const [draggedItem, setDraggedItem] = useState(null); // For drag-and-drop between sections
+
+    // Handler for activity/set focus changes
+    const handleActivityFocus = (instance, setIndex = null) => {
+        setSelectedActivity(instance);
+        setSelectedSetIndex(setIndex);
+    };
+
+    // Handler for moving activity between sections via drag-and-drop
+    const handleMoveActivity = (sourceSectionIndex, targetSectionIndex, instanceId) => {
+        if (sourceSectionIndex === targetSectionIndex) return;
+
+        const updatedData = { ...sessionData };
+        const sourceSection = { ...updatedData.sections[sourceSectionIndex] };
+        const targetSection = { ...updatedData.sections[targetSectionIndex] };
+
+        // Remove from source section
+        const sourceActivityIds = [...(sourceSection.activity_ids || [])];
+        const activityIndex = sourceActivityIds.indexOf(instanceId);
+        if (activityIndex === -1) return;
+
+        sourceActivityIds.splice(activityIndex, 1);
+        sourceSection.activity_ids = sourceActivityIds;
+
+        // Add to target section
+        const targetActivityIds = [...(targetSection.activity_ids || [])];
+        targetActivityIds.push(instanceId);
+        targetSection.activity_ids = targetActivityIds;
+
+        // Update the sections
+        updatedData.sections[sourceSectionIndex] = sourceSection;
+        updatedData.sections[targetSectionIndex] = targetSection;
+
+        setSessionData(updatedData);
+    };
 
     // Centralized Notes Management
     const {
@@ -786,7 +822,7 @@ function SessionDetail() {
                                 activityInstances={activityInstances}
                                 onDeleteActivity={handleDeleteActivity}
                                 onUpdateActivity={handleUpdateActivity}
-                                onFocusActivity={setSelectedActivity}
+                                onFocusActivity={handleActivityFocus}
                                 selectedActivityId={selectedActivity?.id}
                                 rootId={rootId}
                                 showActivitySelector={showActivitySelector[sectionIndex]}
@@ -802,6 +838,11 @@ function SessionDetail() {
                                 onAddNote={addNote}
                                 onUpdateNote={updateNote}
                                 onDeleteNote={deleteNote}
+                                // Drag and drop props
+                                onMoveActivity={handleMoveActivity}
+                                onReorderActivity={handleReorderActivity}
+                                draggedItem={draggedItem}
+                                setDraggedItem={setDraggedItem}
                             />
                         ))}
                     </div>
@@ -819,6 +860,7 @@ function SessionDetail() {
                             parentGoals={parentGoals}
                             totalDuration={calculateTotalCompletedDuration(sessionData, activityInstances)}
                             selectedActivity={selectedActivity}
+                            selectedSetIndex={selectedSetIndex}
                             activityInstances={activityInstances}
                             activityDefinitions={activities}
                             onNoteAdded={refreshNotes}

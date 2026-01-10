@@ -18,6 +18,7 @@ function NotesPanel({
     sessionId,
     selectedActivity,
     selectedActivityDef,
+    selectedSetIndex,
     onNoteAdded,
     activityInstances,
     activityDefinitions,
@@ -50,7 +51,7 @@ function NotesPanel({
 
     return (
         <div className="notes-panel">
-            {/* Quick Add - Always for Session Notes */}
+            {/* Quick Add - Session Notes Only */}
             <NoteQuickAdd
                 onSubmit={handleAddNote}
                 placeholder="Add a session note..."

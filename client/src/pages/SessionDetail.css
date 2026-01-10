@@ -99,3 +99,38 @@
 .btn-done:hover {
     background: #1976d2;
 }
+
+/* Drag and Drop Styles */
+.activity-draggable {
+    cursor: grab;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.activity-draggable:active {
+    cursor: grabbing;
+}
+
+.activity-draggable.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+}
+
+.session-section-drop-zone {
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.session-section-drop-zone.drag-over {
+    border: 2px dashed #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.drag-hint {
+    text-align: center;
+    padding: 12px;
+    color: #4caf50;
+    font-size: 12px;
+    font-style: italic;
+    background: rgba(76, 175, 80, 0.1);
+    border-radius: 4px;
+    margin-top: 8px;
+}

@@ -21,6 +21,7 @@ function SessionSidePane({
     parentGoals,          // Short-term goals
     totalDuration,        // Total completed duration in seconds
     selectedActivity,     // Currently focused activity instance (for context)
+    selectedSetIndex,     // Currently focused set index (null = whole activity)
     activityInstances,    // All activity instances in session
     activityDefinitions,  // Activity definitions for lookup
     onNoteAdded,          // Callback when note is added
@@ -137,6 +138,7 @@ function SessionSidePane({
                             sessionId={sessionId}
                             selectedActivity={selectedActivity}
                             selectedActivityDef={selectedActivityDef}
+                            selectedSetIndex={selectedSetIndex}
                             onNoteAdded={onNoteAdded}
                             activityInstances={activityInstances}
                             activityDefinitions={activityDefinitions}

@@ -45,7 +45,9 @@
   - Enhanced **Activity History** to display notes with timestamps and set badges for each previous instance.
   - Refined **Side Pane UI**: Removed redundant context indicator, improved "Details" tab layout with collapsible metadata.
   - **Click-to-Select Activity**: Activities cards are now selectable by clicking anywhere on the card.
-  - **Note Context**: Ability to attach notes to specific sets within an activity.
+  - **Click-to-Deselect Set**: Click on activity header/name to clear set selection and return context to whole activity.
+  - **Activity Reordering**: Up/down arrow buttons for within-section reordering; drag-and-drop for between-section moves.
+  - **Note Separation**: SidePane is for session-level notes only; activity/set notes are in the activity cards.
   - **Editable Metadata**: Edit Session Start/End times directly in Side Pane.
   - **Previous Notes**: Side pane shows session-level notes from last 3 sessions; History tab limits activity instances to last 3.
 
