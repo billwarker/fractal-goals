@@ -412,6 +412,14 @@ export const fractalApi = {
         axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/notes`),
 
     /**
+     * Get session-level notes from the last 3 previous sessions
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the current session (to exclude)
+     */
+    getPreviousSessionNotes: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/previous-session-notes`),
+
+    /**
      * Get notes for a specific activity instance
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance

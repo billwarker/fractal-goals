@@ -47,6 +47,7 @@
   - **Click-to-Select Activity**: Activities cards are now selectable by clicking anywhere on the card.
   - **Note Context**: Ability to attach notes to specific sets within an activity.
   - **Editable Metadata**: Edit Session Start/End times directly in Side Pane.
+  - **Previous Notes**: Side pane shows session-level notes from last 3 sessions; History tab limits activity instances to last 3.
 
 ### 3. Activity System
 - Reusable activity definitions organized by groups

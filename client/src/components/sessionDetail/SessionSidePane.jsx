@@ -28,6 +28,7 @@ function SessionSidePane({
     refreshTrigger,       // Counter to trigger notes refresh
     notes,
     previousNotes,
+    previousSessionNotes,
     addNote,
     updateNote,
     deleteNote,
@@ -142,6 +143,7 @@ function SessionSidePane({
                             refreshTrigger={refreshTrigger}
                             notes={notes}
                             previousNotes={previousNotes}
+                            previousSessionNotes={previousSessionNotes}
                             addNote={addNote}
                             updateNote={updateNote}
                             deleteNote={deleteNote}

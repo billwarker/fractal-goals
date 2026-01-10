@@ -4,10 +4,11 @@
  * Features:
  * - Quick-add input at top
  * - Timeline of notes for current session
- * - Previous session notes section (when activity is selected)
+ * - Previous session notes section (session-level notes from last 3 sessions)
+ * - Previous activity notes section (when activity is selected)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import PreviousNotesSection from './PreviousNotesSection';
@@ -23,15 +24,15 @@ function NotesPanel({
     refreshTrigger,
     notes,
     previousNotes,
+    previousSessionNotes,
     addNote,
     updateNote,
     deleteNote
 }) {
+    const [showPreviousSessionNotes, setShowPreviousSessionNotes] = useState(false);
+
     // Filter for Session-Level Notes (always show these)
     const sessionNotes = notes.filter(n => n.context_type === 'session');
-
-    // Filter for Activity-Level Notes (only if needed, but user requested they stay on card)
-    // We will NOT show current activity notes here based on request.
 
     const handleAddNote = async (content) => {
         try {
@@ -75,7 +76,43 @@ function NotesPanel({
                 )}
             </div>
 
-            {/* Previous Session Notes (for selected activity) */}
+            {/* Previous Session Notes (from last 3 sessions) */}
+            {previousSessionNotes && previousSessionNotes.length > 0 && (
+                <div className="previous-notes-section">
+                    <div
+                        className="previous-notes-header"
+                        onClick={() => setShowPreviousSessionNotes(!showPreviousSessionNotes)}
+                    >
+                        <span className="previous-notes-toggle">
+                            {showPreviousSessionNotes ? '▼' : '▶'}
+                        </span>
+                        <h4>Previous Session Notes</h4>
+                    </div>
+                    {showPreviousSessionNotes && (
+                        <div className="previous-notes-content">
+                            {previousSessionNotes.map(session => (
+                                <div key={session.session_id} className="previous-session-group">
+                                    <div className="previous-session-date">
+                                        {session.session_date}
+                                        <span className="previous-session-name">
+                                            {session.session_name}
+                                        </span>
+                                    </div>
+                                    <div className="previous-session-notes">
+                                        {session.notes.map(note => (
+                                            <div key={note.id} className="previous-note-item">
+                                                {note.content}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Previous Activity Notes (for selected activity) */}
             {selectedActivityDef && previousNotes.length > 0 && (
                 <PreviousNotesSection
                     notes={previousNotes}

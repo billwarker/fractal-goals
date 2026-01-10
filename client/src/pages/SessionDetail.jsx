@@ -105,6 +105,7 @@ function SessionDetail() {
     const {
         notes: sessionNotes,
         previousNotes,
+        previousSessionNotes,
         addNote,
         updateNote,
         deleteNote,
@@ -825,6 +826,7 @@ function SessionDetail() {
                             refreshTrigger={0} // Deprecated
                             notes={sessionNotes}
                             previousNotes={previousNotes}
+                            previousSessionNotes={previousSessionNotes}
                             addNote={addNote}
                             updateNote={updateNote}
                             deleteNote={deleteNote}

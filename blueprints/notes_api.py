@@ -58,6 +58,56 @@ def get_activity_instance_notes(root_id, instance_id):
         db.close()
 
 
+@notes_bp.route('/<root_id>/sessions/<session_id>/previous-session-notes', methods=['GET'])
+def get_previous_session_notes(root_id, session_id):
+    """
+    Get session-level notes from the last 3 sessions (excluding current).
+    
+    Returns notes grouped by session, ordered by session date (most recent first).
+    """
+    db = get_session(get_engine())
+    try:
+        # Get the 3 most recent sessions before this one
+        # Use nullslast() so sessions with actual start times are prioritized
+        previous_sessions = db.query(Session).filter(
+            Session.root_id == root_id,
+            Session.id != session_id,
+            Session.deleted_at == None
+        ).order_by(Session.session_start.desc().nullslast(), Session.created_at.desc()).limit(3).all()
+        
+        if not previous_sessions:
+            return jsonify([])
+        
+        session_ids = [s.id for s in previous_sessions]
+        
+        # Fetch session-level notes from these sessions
+        notes = db.query(Note).filter(
+            Note.root_id == root_id,
+            Note.session_id.in_(session_ids),
+            Note.context_type == 'session',
+            Note.deleted_at == None
+        ).order_by(Note.created_at.desc()).all()
+        
+        # Group notes by session
+        results = []
+        for session in previous_sessions:
+            session_notes = [n.to_dict() for n in notes if n.session_id == session.id]
+            if session_notes:  # Only include sessions that have notes
+                results.append({
+                    'session_id': session.id,
+                    'session_name': session.name,
+                    'session_date': format_utc(session.session_start or session.created_at),
+                    'notes': session_notes
+                })
+        
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Error fetching previous session notes: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
 @notes_bp.route('/<root_id>/activities/<activity_id>/notes', methods=['GET'])
 def get_activity_definition_notes(root_id, activity_id):
     """
@@ -106,12 +156,12 @@ def get_activity_history(root_id, activity_id):
     Get previous instances of an activity with their metrics.
     
     Query params:
-    - limit: Maximum number of instances to return (default 10)
+    - limit: Maximum number of instances to return (default 3)
     - exclude_session: Session ID to exclude from results (typically current session)
     """
     db = get_session(get_engine())
     try:
-        limit = request.args.get('limit', 10, type=int)
+        limit = request.args.get('limit', 3, type=int)
         exclude_session_id = request.args.get('exclude_session', None)
         
         query = db.query(ActivityInstance).filter(

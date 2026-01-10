@@ -16,10 +16,11 @@ import { fractalApi } from '../utils/api';
 export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
     const [notes, setNotes] = useState([]);
     const [previousNotes, setPreviousNotes] = useState([]);
+    const [previousSessionNotes, setPreviousSessionNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Fetch all notes for the session
+    // Fetch all notes for the session + previous session notes
     useEffect(() => {
         if (!rootId || !sessionId) {
             setLoading(false);
@@ -30,8 +31,12 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
             setLoading(true);
             setError(null);
             try {
-                const response = await fractalApi.getSessionNotes(rootId, sessionId);
-                setNotes(response.data || []);
+                const [currentRes, previousRes] = await Promise.all([
+                    fractalApi.getSessionNotes(rootId, sessionId),
+                    fractalApi.getPreviousSessionNotes(rootId, sessionId)
+                ]);
+                setNotes(currentRes.data || []);
+                setPreviousSessionNotes(previousRes.data || []);
             } catch (err) {
                 console.error('Failed to fetch session notes:', err);
                 setError(err.message || 'Failed to fetch notes');
@@ -153,6 +158,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
     return {
         notes,
         previousNotes,
+        previousSessionNotes,
         loading,
         error,
         addNote,
