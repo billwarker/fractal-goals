@@ -11,6 +11,25 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const inputRef = useRef(null);
 
+    const adjustHeight = (el) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    };
+
+    const handleChange = (e) => {
+        setContent(e.target.value);
+        adjustHeight(e.target);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
+    // Reset height on submit
     const handleSubmit = async (e) => {
         e?.preventDefault();
 
@@ -21,8 +40,10 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
         try {
             await onSubmit(trimmedContent);
             setContent('');
-            // Keep focus on input for rapid note-taking
-            inputRef.current?.focus();
+            if (inputRef.current) {
+                inputRef.current.style.height = 'auto';
+                inputRef.current.focus();
+            }
         } catch (err) {
             // Error handling done in parent
         } finally {
@@ -30,31 +51,29 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
         }
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
-        }
-    };
-
     return (
         <form className="note-quick-add" onSubmit={handleSubmit}>
-            <input
+            <textarea
                 ref={inputRef}
-                type="text"
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={handleChange}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
                 disabled={isSubmitting}
                 className="note-input"
-                autoComplete="off"
+                rows={1}
+                style={{
+                    resize: 'none',
+                    overflow: 'hidden',
+                    minHeight: '38px', // Match previous input height approx
+                    lineHeight: '1.4'
+                }}
             />
             <button
                 type="submit"
                 disabled={!content.trim() || isSubmitting}
                 className="note-submit-btn"
-                title="Add note (Enter)"
+                title="Add note (Enter, Shift+Enter for new line)"
             >
                 {isSubmitting ? '...' : '📝'}
             </button>

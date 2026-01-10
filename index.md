@@ -39,6 +39,14 @@
   - CreateSession page allows selecting STGs and their child IGs in a unified flow
   - SessionDetail header displays associated STGs and IGs with clickable links
   - GoalDetailModal shows associated sessions for both STGs and IGs
+- **Refactored Session Detail**:
+  - Moved **Session Controls** (Complete, Save, Cancel, Delete) to the Side Pane for better ergonomics (2x2 Grid, Badge style).
+  - Implemented **Auto-expanding Note Inputs** (Textarea) for better writing experience.
+  - Enhanced **Activity History** to display notes with timestamps and set badges for each previous instance.
+  - Refined **Side Pane UI**: Removed redundant context indicator, improved "Details" tab layout with collapsible metadata.
+  - **Click-to-Select Activity**: Activities cards are now selectable by clicking anywhere on the card.
+  - **Note Context**: Ability to attach notes to specific sets within an activity.
+  - **Editable Metadata**: Edit Session Start/End times directly in Side Pane.
 
 ### 3. Activity System
 - Reusable activity definitions organized by groups

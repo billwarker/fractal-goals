@@ -2,7 +2,7 @@
  * NoteItem - Single note with edit/delete functionality
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 
 function NoteItem({ note, onUpdate, onDelete, compact = false }) {
@@ -10,6 +10,28 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
     const timezone = useTimezone();
+    const textareaRef = useRef(null);
+
+    const adjustHeight = (el) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    };
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            adjustHeight(textareaRef.current);
+            // Focus and move cursor to end
+            const length = textareaRef.current.value.length;
+            textareaRef.current.setSelectionRange(length, length);
+            textareaRef.current.focus();
+        }
+    }, [isEditing]);
+
+    const handleChange = (e) => {
+        setEditContent(e.target.value);
+        adjustHeight(e.target);
+    };
 
     // Format timestamp
     const formatTime = (isoString) => {
@@ -109,13 +131,19 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
 
             {isEditing ? (
                 <div className="note-item-edit">
-                    <input
-                        type="text"
+                    <textarea
+                        ref={textareaRef}
                         value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
+                        onChange={handleChange}
                         onKeyDown={handleKeyDown}
                         className="note-edit-input"
-                        autoFocus
+                        rows={1}
+                        style={{
+                            resize: 'none',
+                            overflow: 'hidden',
+                            minHeight: '32px',
+                            lineHeight: '1.4'
+                        }}
                     />
                     <div className="note-edit-actions">
                         <button onClick={handleSave} className="note-save-btn">✓</button>

@@ -25,9 +25,21 @@ function SessionSidePane({
     activityDefinitions,  // Activity definitions for lookup
     onNoteAdded,          // Callback when note is added
     onGoalClick,          // Callback when goal badge is clicked
-    refreshTrigger        // Counter to trigger notes refresh
+    refreshTrigger,       // Counter to trigger notes refresh
+    notes,
+    previousNotes,
+    addNote,
+    updateNote,
+    deleteNote,
+    // Control Props
+    onDelete,
+    onCancel,
+    onToggleComplete,
+    onSave,
+    isCompleted,
+    onSessionChange
 }) {
-    const [mode, setMode] = useState('notes'); // 'notes' | 'history'
+    const [mode, setMode] = useState('details'); // 'details' | 'history'
 
     // Get unique activity definitions from current session
     const sessionActivityDefs = useMemo(() => {
@@ -45,63 +57,96 @@ function SessionSidePane({
 
     return (
         <div className="session-sidepane">
-            {/* Session Info Header */}
-            {session && (
-                <SessionInfoPanel
-                    session={session}
-                    sessionData={sessionData}
-                    parentGoals={parentGoals}
-                    rootId={rootId}
-                    onGoalClick={onGoalClick}
-                    totalDuration={totalDuration}
-                />
-            )}
-
             {/* Mode Toggle Header */}
             <div className="sidepane-header">
                 <div className="sidepane-tabs">
                     <button
-                        className={`tab ${mode === 'notes' ? 'active' : ''}`}
-                        onClick={() => setMode('notes')}
+                        className={`sidepane-tab ${mode === 'details' ? 'active' : ''}`}
+                        onClick={() => setMode('details')}
                     >
-                        📝 Notes
+                        Details
                     </button>
                     <button
-                        className={`tab ${mode === 'history' ? 'active' : ''}`}
+                        className={`sidepane-tab ${mode === 'history' ? 'active' : ''}`}
                         onClick={() => setMode('history')}
                     >
-                        📊 History
+                        History
                     </button>
                 </div>
 
-                {/* Context indicator */}
-                <div className="sidepane-context">
-                    {mode === 'notes' && (
-                        selectedActivity ? (
-                            <span>📌 {selectedActivityDef?.name || 'Activity'}</span>
-                        ) : (
-                            <span>Session Notes</span>
-                        )
-                    )}
-                    {mode === 'history' && selectedActivityDef && (
-                        <span>📌 {selectedActivityDef.name}</span>
-                    )}
-                </div>
+
             </div>
 
             {/* Mode Content */}
             <div className="sidepane-content">
-                {mode === 'notes' ? (
-                    <NotesPanel
-                        rootId={rootId}
-                        sessionId={sessionId}
-                        selectedActivity={selectedActivity}
-                        selectedActivityDef={selectedActivityDef}
-                        onNoteAdded={onNoteAdded}
-                        activityInstances={activityInstances}
-                        activityDefinitions={activityDefinitions}
-                        refreshTrigger={refreshTrigger}
-                    />
+                {mode === 'details' ? (
+                    <div className="details-view">
+                        {/* Session Metadata Panel */}
+                        <SessionInfoPanel
+                            session={session}
+                            sessionData={sessionData}
+                            parentGoals={parentGoals}
+                            rootId={rootId}
+                            onGoalClick={onGoalClick}
+                            totalDuration={totalDuration}
+                            onSessionUpdate={onSessionChange}
+                        />
+
+                        {/* Session Controls */}
+                        <div className="sidebar-actions">
+                            <button
+                                onClick={onToggleComplete}
+                                className={`sidebar-control-btn sidebar-btn-complete ${isCompleted ? 'completed' : ''}`}
+                                title="Mark Session Complete"
+                            >
+                                {isCompleted ? '✓ Done' : 'Complete'}
+                            </button>
+                            <button
+                                onClick={onSave}
+                                className="sidebar-control-btn sidebar-btn-done"
+                                title="Save & Exit"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={onCancel}
+                                className="sidebar-control-btn sidebar-btn-cancel"
+                                title="Cancel (Go Back)"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={onDelete}
+                                className="sidebar-control-btn sidebar-btn-delete"
+                                title="Delete Session"
+                            >
+                                Delete
+                            </button>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{
+                            borderBottom: '1px solid #333',
+                            marginBottom: '20px'
+                        }}></div>
+
+                        {/* Notes Management */}
+                        <NotesPanel
+                            rootId={rootId}
+                            sessionId={sessionId}
+                            selectedActivity={selectedActivity}
+                            selectedActivityDef={selectedActivityDef}
+                            onNoteAdded={onNoteAdded}
+                            activityInstances={activityInstances}
+                            activityDefinitions={activityDefinitions}
+                            refreshTrigger={refreshTrigger}
+                            notes={notes}
+                            previousNotes={previousNotes}
+                            addNote={addNote}
+                            updateNote={updateNote}
+                            deleteNote={deleteNote}
+                        />
+                    </div>
                 ) : (
                     <HistoryPanel
                         rootId={rootId}

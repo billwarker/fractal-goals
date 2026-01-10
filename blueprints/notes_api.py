@@ -125,13 +125,33 @@ def get_activity_history(root_id, activity_id):
         
         instances = query.order_by(ActivityInstance.created_at.desc()).limit(limit).all()
         
-        # Include session info for context
+        # Get IDs for fetching notes
+        instance_ids = [inst.id for inst in instances]
+        
+        # Fetch notes for these instances
+        notes_by_instance = {}
+        if instance_ids:
+            notes = db.query(Note).filter(
+                Note.activity_instance_id.in_(instance_ids),
+                Note.deleted_at == None
+            ).order_by(Note.created_at).all()
+            
+            for n in notes:
+                if n.activity_instance_id not in notes_by_instance:
+                    notes_by_instance[n.activity_instance_id] = []
+                notes_by_instance[n.activity_instance_id].append(n.to_dict())
+        
+        # Include session info and notes
         results = []
         for inst in instances:
             data = inst.to_dict()
             if inst.session:
                 data['session_name'] = inst.session.name
                 data['session_date'] = format_utc(inst.session.session_start or inst.session.created_at)
+            
+            # Attach notes
+            data['notes'] = notes_by_instance.get(inst.id, [])
+            
             results.append(data)
         
         return jsonify(results)

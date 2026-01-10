@@ -86,6 +86,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                                 instance={instance}
                                 activityDef={selectedDef}
                                 formatDate={formatDate}
+                                timezone={timezone}
                             />
                         ))}
                     </div>
@@ -102,7 +103,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
 /**
  * ActivityHistoryCard - Display a previous activity instance
  */
-function ActivityHistoryCard({ instance, activityDef, formatDate }) {
+function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
     // Parse sets from instance data
     const sets = instance.sets || [];
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
@@ -113,6 +114,20 @@ function ActivityHistoryCard({ instance, activityDef, formatDate }) {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${String(secs).padStart(2, '0')}`;
+    };
+
+    // Format time for notes
+    const formatTime = (isoString) => {
+        if (!isoString) return '';
+        try {
+            return new Date(isoString).toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZone: timezone
+            });
+        } catch (e) {
+            return '';
+        }
     };
 
     // Calculate duration from time_start and time_stop
@@ -150,11 +165,16 @@ function ActivityHistoryCard({ instance, activityDef, formatDate }) {
                         <div key={set.instance_id || idx} className="history-set">
                             <span className="history-set-num">#{idx + 1}</span>
                             <div className="history-set-metrics">
-                                {set.metrics?.map((m, mIdx) => (
-                                    <span key={mIdx} className="history-metric">
-                                        {m.value}
-                                    </span>
-                                ))}
+                                {set.metrics?.map((m, mIdx) => {
+                                    const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
+                                    return (
+                                        <span key={mIdx} className="history-metric">
+                                            {def?.name && <span style={{ opacity: 0.7, marginRight: '4px' }}>{def.name}:</span>}
+                                            {m.value}
+                                            {def?.unit && <span style={{ opacity: 0.7, marginLeft: '2px' }}>{def.unit}</span>}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
@@ -173,9 +193,30 @@ function ActivityHistoryCard({ instance, activityDef, formatDate }) {
             )}
 
             {/* Notes preview */}
-            {instance.notes && (
+            {instance.notes && instance.notes.length > 0 && (
                 <div className="history-card-notes">
-                    💬 {instance.notes}
+                    {instance.notes.map((note, nIdx) => (
+                        <div key={note.id || nIdx} style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginTop: '4px' }}>
+                            <span style={{ color: '#666', fontSize: '11px', minWidth: '50px' }}>
+                                {formatTime(note.created_at)}
+                            </span>
+                            {note.set_index !== null && note.set_index !== undefined && (
+                                <span style={{
+                                    fontSize: '10px',
+                                    background: '#333',
+                                    padding: '1px 4px',
+                                    borderRadius: '3px',
+                                    color: '#aaa',
+                                    flexShrink: 0
+                                }}>
+                                    Set {note.set_index + 1}
+                                </span>
+                            )}
+                            <span style={{ color: '#aaa', fontSize: '12px' }}>
+                                💬 {note.content}
+                            </span>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { fractalApi } from '../../utils/api';
+import NoteQuickAdd from './NoteQuickAdd';
+import NoteTimeline from './NoteTimeline';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -32,7 +34,11 @@ function SessionActivityItem({
     onNoteCreated, // Optional callback to trigger refresh
     sessionId, // Explicit session ID
     onFocus, // Added prop
-    isSelected // Added prop for styling
+    isSelected, // Added prop for styling
+    allNotes,
+    onAddNote,
+    onUpdateNote,
+    onDeleteNote
 }) {
     // Get timezone from context
     const timezone = useTimezone();
@@ -40,30 +46,30 @@ function SessionActivityItem({
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');
     const [localStopTime, setLocalStopTime] = useState('');
+    const [selectedSetIndex, setSelectedSetIndex] = useState(null);
 
-    // Quick Note State
-    const [localNotes, setLocalNotes] = useState('');
-    const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+    // Filter notes for this activity
+    const activityNotes = allNotes?.filter(n => n.activity_instance_id === exercise.id) || [];
 
-    const handleAddNote = async () => {
-        if (!localNotes.trim() || !rootId || !exercise.id) return;
+    const handleAddNote = async (content) => {
+        if (!content.trim() || !onAddNote || !exercise.id) return;
 
-        setIsSubmittingNote(true);
         try {
-            await fractalApi.createNote(rootId, {
+            await onAddNote({
                 context_type: 'activity_instance',
                 context_id: exercise.id,
                 session_id: sessionId || exercise.practice_session_id,
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
-                content: localNotes.trim()
+                set_index: selectedSetIndex,
+                content: content.trim()
             });
-            setLocalNotes('');
             if (onNoteCreated) onNoteCreated();
+
+            // Optional: Deselect set after adding note?
+            // setSelectedSetIndex(null); 
         } catch (err) {
             console.error('Failed to create note', err);
-        } finally {
-            setIsSubmittingNote(false);
         }
     };
 
@@ -420,7 +426,21 @@ function SessionActivityItem({
                     <div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {exercise.sets?.map((set, setIdx) => (
-                                <div key={set.instance_id} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#222', padding: '8px', borderRadius: '4px' }}>
+                                <div
+                                    key={set.instance_id}
+                                    onClick={() => setSelectedSetIndex(selectedSetIndex === setIdx ? null : setIdx)}
+                                    style={{
+                                        display: 'flex',
+                                        gap: '10px',
+                                        alignItems: 'center',
+                                        background: selectedSetIndex === setIdx ? 'rgba(76, 175, 80, 0.1)' : '#222',
+                                        padding: '8px',
+                                        borderRadius: '4px',
+                                        border: selectedSetIndex === setIdx ? '1px solid #4caf50' : '1px solid transparent',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
                                     <div style={{ width: '30px', color: '#666', fontSize: '12px', fontWeight: 'bold' }}>#{setIdx + 1}</div>
 
                                     {hasMetrics && (
@@ -520,65 +540,25 @@ function SessionActivityItem({
                 )}
 
                 {/* Quick Note Add */}
+                {/* Notes Section - Timeline + Quick Add */}
                 <div style={{ marginTop: '15px' }}>
-                    <div style={{ position: 'relative' }}>
-                        <textarea
-                            placeholder="Add a note about this activity..."
-                            value={localNotes}
-                            onChange={(e) => setLocalNotes(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleAddNote();
-                                }
-                            }}
-                            style={{
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                background: '#1a1a1a',
-                                border: '1px solid #333',
-                                borderLeft: '3px solid #666',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '13px',
-                                padding: '6px 10px',
-                                minHeight: '36px',
-                                maxHeight: '120px',
-                                resize: 'vertical',
-                                outline: 'none',
-                                transition: 'border-color 0.2s',
-                                fontFamily: 'inherit'
-                            }}
-                            onFocus={(e) => {
-                                e.target.style.borderColor = '#4caf50';
-                                if (onFocus) onFocus();
-                            }}
-                            onBlur={(e) => e.target.style.borderColor = '#333'}
-                        />
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            marginTop: '4px'
-                        }}>
-                            <button
-                                onClick={handleAddNote}
-                                disabled={!localNotes.trim() || isSubmittingNote}
-                                style={{
-                                    background: localNotes.trim() ? '#4caf50' : '#333',
-                                    color: localNotes.trim() ? 'white' : '#666',
-                                    border: 'none',
-                                    padding: '4px 12px',
-                                    borderRadius: '4px',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    cursor: localNotes.trim() ? 'pointer' : 'default',
-                                    transition: 'background 0.2s'
-                                }}
-                            >
-                                {isSubmittingNote ? 'Adding...' : 'Add Note'}
-                            </button>
+                    {activityNotes.length > 0 && (
+                        <div style={{ marginBottom: '10px' }}>
+                            <NoteTimeline
+                                notes={activityNotes}
+                                onUpdate={onUpdateNote}
+                                onDelete={onDeleteNote}
+                                compact={false}
+                            />
                         </div>
-                    </div>
+                    )}
+                    <NoteQuickAdd
+                        onSubmit={handleAddNote}
+                        placeholder={selectedSetIndex !== null
+                            ? `Note for Set #${selectedSetIndex + 1}...`
+                            : "Add a note about this activity..."
+                        }
+                    />
                 </div>
             </div>
         </div>

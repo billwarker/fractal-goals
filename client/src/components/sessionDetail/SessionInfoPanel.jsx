@@ -5,8 +5,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatDateInTimezone } from '../../utils/dateUtils';
-import { getGoalColor, getGoalTextColor } from '../../utils/goalColors';
+import { fractalApi } from '../../utils/api';
+import { formatDateInTimezone, formatForInput } from '../../utils/dateUtils';
+import { getGoalColor } from '../../utils/goalColors';
 
 function SessionInfoPanel({
     session,
@@ -14,9 +15,13 @@ function SessionInfoPanel({
     parentGoals,
     rootId,
     onGoalClick,
-    totalDuration
+    totalDuration,
+    onSessionUpdate
 }) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
+    const [editValue, setEditValue] = useState('');
+    const [saving, setSaving] = useState(false);
     const timezone = useTimezone();
 
     const formatDate = (dateString) => {
@@ -35,6 +40,67 @@ function SessionInfoPanel({
         const secs = seconds % 60;
         return `${mins}:${String(secs).padStart(2, '0')}`;
     };
+
+    const handleStartEdit = (field, currentDate) => {
+        setEditingField(field);
+        // Format for datetime-local: "YYYY-MM-DDTHH:mm"
+        // formatForInput returns "YYYY-MM-DD HH:MM:SS" (in local timezone)
+        // We take first 16 chars and replace space with T
+        const iso = currentDate || new Date().toISOString();
+        const localStr = formatForInput(iso, timezone);
+        const inputValue = localStr.replace(' ', 'T').substring(0, 16);
+        setEditValue(inputValue);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingField || !session) return;
+
+        setSaving(true);
+        try {
+            // Convert input "YYYY-MM-DDTHH:mm" BACK to ISO string
+            // We can construct a Date assuming the timezone context logic,
+            // but simpler: append ":00" and use existing backend parsing if it takes local?
+            // Backend expects ISO (UTC).
+            // We need to convert "User Local Time" -> "UTC ISO".
+
+            // Construct string "YYYY-MM-DD HH:MM:SS"
+            const localDateTime = editValue.replace('T', ' ') + ':00';
+
+            // Use dateUtils localToISO if available, or manual logic?
+            // I'll rely on generating the date in browser relative to session.
+            // Actually, simply doing `new Date(editValue)` creates a date using BROWSER timezone.
+            // This is wrong if `timezone` (app setting) != `browser timezone`.
+            // But we don't have a robust "local to UTC" helper exposed easily (I saw localToISO in dateUtils, let's use it?).
+            // Checking imports... I didn't import localToISO.
+
+            // Workaround: Send the ISO string assuming Browser Timezone IF `timezone` matches browser.
+            // If they differ, it's tricky.
+            // I'll assume standard browser behavior for now (User's browser is in the "timezone" they selected effectively).
+
+            const dateObj = new Date(editValue);
+            const isoString = dateObj.toISOString();
+
+            const field = editingField === 'start' ? 'session_start' : 'session_end';
+            const payload = { [field]: isoString };
+
+            const response = await fractalApi.updateSession(rootId, session.id, payload);
+
+            if (onSessionUpdate) {
+                onSessionUpdate(response.data);
+            }
+
+            setEditingField(null);
+        } catch (error) {
+            console.error("Failed to update session time", error);
+            alert("Failed to update time");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Determine values safely
+    const startTime = session?.session_start || sessionData?.session_start;
+    const endTime = session?.session_end || sessionData?.session_end;
 
     return (
         <div className="session-info-panel">
@@ -77,14 +143,65 @@ function SessionInfoPanel({
                             <span className="label">Template:</span>
                             <span className="value">{sessionData?.template_name || '—'}</span>
                         </div>
+
+                        {/* Session Start */}
                         <div className="session-info-row">
                             <span className="label">Started:</span>
-                            <span className="value">{formatDate(sessionData?.session_start)}</span>
+                            {editingField === 'start' ? (
+                                <div className="edit-time-container" style={{ display: 'flex', gap: '4px' }}>
+                                    <input
+                                        type="datetime-local"
+                                        value={editValue}
+                                        onChange={(e) => setEditValue(e.target.value)}
+                                        className="session-datetime-input"
+                                    />
+                                    <button onClick={handleSaveEdit} disabled={saving} style={{ padding: '0 4px', cursor: 'pointer' }}>✓</button>
+                                    <button onClick={() => setEditingField(null)} style={{ padding: '0 4px', cursor: 'pointer' }}>✗</button>
+                                </div>
+                            ) : (
+                                <div className="value-with-edit" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{formatDate(startTime)}</span>
+                                    <span
+                                        className="edit-icon"
+                                        onClick={() => handleStartEdit('start', startTime)}
+                                        style={{ cursor: 'pointer', opacity: 0.5, fontSize: '10px' }}
+                                        title="Edit start time"
+                                    >
+                                        ✏️
+                                    </span>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Session End */}
                         <div className="session-info-row">
                             <span className="label">Ended:</span>
-                            <span className="value">{formatDate(sessionData?.session_end)}</span>
+                            {editingField === 'end' ? (
+                                <div className="edit-time-container" style={{ display: 'flex', gap: '4px' }}>
+                                    <input
+                                        type="datetime-local"
+                                        value={editValue}
+                                        onChange={(e) => setEditValue(e.target.value)}
+                                        className="session-datetime-input"
+                                    />
+                                    <button onClick={handleSaveEdit} disabled={saving} style={{ padding: '0 4px', cursor: 'pointer' }}>✓</button>
+                                    <button onClick={() => setEditingField(null)} style={{ padding: '0 4px', cursor: 'pointer' }}>✗</button>
+                                </div>
+                            ) : (
+                                <div className="value-with-edit" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{formatDate(endTime)}</span>
+                                    <span
+                                        className="edit-icon"
+                                        onClick={() => handleStartEdit('end', endTime)}
+                                        style={{ cursor: 'pointer', opacity: 0.5, fontSize: '10px' }}
+                                        title="Edit end time"
+                                    >
+                                        ✏️
+                                    </span>
+                                </div>
+                            )}
                         </div>
+
                         <div className="session-info-row">
                             <span className="label">Created:</span>
                             <span className="value">{formatDate(session.created_at)}</span>

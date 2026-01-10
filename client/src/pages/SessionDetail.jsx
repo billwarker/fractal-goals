@@ -9,8 +9,8 @@ import { formatForInput, localToISO, formatDateInTimezone } from '../utils/dateU
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
 import SessionInfoPanel from '../components/sessionDetail/SessionInfoPanel';
-import SessionControls from '../components/sessionDetail/SessionControls';
 import { SessionSidePane } from '../components/sessionDetail'; // Keep this for now, as it's used in the side pane
+import useSessionNotes from '../hooks/useSessionNotes';
 import './SessionDetail.css'; // New CSS import
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors'; // Keep both for now, getGoalColor is used in SessionSidePane
 import '../App.css';
@@ -98,13 +98,18 @@ function SessionDetail() {
     const [showBuilder, setShowBuilder] = useState(false); // For creating new activity
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null); // Track which section to add new activity to
     const [autoSaveStatus, setAutoSaveStatus] = useState(''); // 'saving', 'saved', 'error', or ''
-    const [notesRefreshTrigger, setNotesRefreshTrigger] = useState(0);
-
-    const handleNoteCreated = () => {
-        setNotesRefreshTrigger(prev => prev + 1);
-    };
     const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
     const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
+
+    // Centralized Notes Management
+    const {
+        notes: sessionNotes,
+        previousNotes,
+        addNote,
+        updateNote,
+        deleteNote,
+        refreshNotes
+    } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
 
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
@@ -790,20 +795,16 @@ function SessionDetail() {
                                 groupedActivities={groupedActivities}
                                 groupMap={groupMap}
                                 activities={activities}
-                                onNoteCreated={handleNoteCreated}
+                                onNoteCreated={refreshNotes}
                                 sessionId={sessionId}
+                                allNotes={sessionNotes}
+                                onAddNote={addNote}
+                                onUpdateNote={updateNote}
+                                onDeleteNote={deleteNote}
                             />
                         ))}
                     </div>
 
-                    {/* Controls */}
-                    <SessionControls
-                        isCompleted={session.attributes?.completed}
-                        onDelete={handleDeleteSessionClick}
-                        onCancel={() => navigate(`/${rootId}/sessions`)}
-                        onToggleComplete={handleToggleSessionComplete}
-                        onSave={handleSaveSession}
-                    />
                 </div>
 
                 {/* Sidebar */}
@@ -819,9 +820,31 @@ function SessionDetail() {
                             selectedActivity={selectedActivity}
                             activityInstances={activityInstances}
                             activityDefinitions={activities}
-                            onNoteAdded={() => setNotesRefreshTrigger(prev => prev + 1)}
+                            onNoteAdded={refreshNotes}
                             onGoalClick={(goal) => setSelectedGoal(goal)}
-                            refreshTrigger={notesRefreshTrigger}
+                            refreshTrigger={0} // Deprecated
+                            notes={sessionNotes}
+                            previousNotes={previousNotes}
+                            addNote={addNote}
+                            updateNote={updateNote}
+                            deleteNote={deleteNote}
+                            isCompleted={session.attributes?.completed}
+                            onDelete={handleDeleteSessionClick}
+                            onCancel={() => navigate(`/${rootId}/sessions`)}
+                            onToggleComplete={handleToggleSessionComplete}
+
+                            onSave={handleSaveSession}
+                            onSessionChange={(updatedSession) => {
+                                setSession(updatedSession);
+                                // Update sessionData if datetime fields changed
+                                if (updatedSession.session_start || updatedSession.session_end) {
+                                    setSessionData(prev => ({
+                                        ...prev,
+                                        session_start: updatedSession.session_start,
+                                        session_end: updatedSession.session_end
+                                    }));
+                                }
+                            }}
                         />
                     </div>
                 </div>

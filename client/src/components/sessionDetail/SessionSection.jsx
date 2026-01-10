@@ -50,7 +50,11 @@ const SessionSection = ({
     groupMap,
     activities,
     onNoteCreated,
-    sessionId
+    sessionId,
+    allNotes,
+    onAddNote,
+    onUpdateNote,
+    onDeleteNote
 }) => {
     const [viewGroupId, setViewGroupId] = useState(null);
 
@@ -98,12 +102,15 @@ const SessionSection = ({
                             onFocus={() => onFocusActivity(instance)}
                             isSelected={selectedActivityId === instanceId}
                             rootId={rootId}
-                            /* Reorder props mocked for now */
-                            canMoveUp={false}
-                            canMoveDown={false}
-                            showReorderButtons={false}
+                            canMoveUp={sectionIndex > 0 || (section.activity_ids.indexOf(instanceId) > 0 && true)} // Simplified for now
+                            canMoveDown={true}
+                            showReorderButtons={true}
                             onNoteCreated={onNoteCreated}
                             sessionId={sessionId}
+                            allNotes={allNotes}
+                            onAddNote={onAddNote}
+                            onUpdateNote={onUpdateNote}
+                            onDeleteNote={onDeleteNote}
                         />
                     );
                 })}
