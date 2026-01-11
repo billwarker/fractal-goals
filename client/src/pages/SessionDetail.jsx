@@ -78,7 +78,7 @@ function formatDuration(seconds) {
 
 /**
  * Session Detail Page
- * Fill in practice session details based on template sections
+ * Fill in session details based on template sections
  */
 function SessionDetail() {
     const { rootId, sessionId } = useParams();

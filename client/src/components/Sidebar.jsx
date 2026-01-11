@@ -42,7 +42,7 @@ const Sidebar = ({
                         <p>Select a Goal in the graph to view details.</p>
                         {selectedRootId ? (
                             <button
-                                className="practice-session-btn w-100 mt-20"
+                                className="session-btn w-100 mt-20"
                                 onClick={onAddSession}
                             >
                                 + Create New Session

@@ -242,7 +242,7 @@ function Programs() {
                             maxWidth: '500px',
                             margin: '0 auto 24px'
                         }}>
-                            Create your first training program to organize your practice sessions into a structured weekly schedule.
+                            Create your first training program to organize your sessions into a structured weekly schedule.
                         </p>
                         <button
                             onClick={() => setShowBuilder(true)}

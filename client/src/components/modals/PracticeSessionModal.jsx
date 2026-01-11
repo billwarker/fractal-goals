@@ -39,14 +39,14 @@ const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal practice-session-modal" onClick={(e) => e.stopPropagation()}>
-                <h2>Create Practice Session</h2>
+            <div className="modal session-modal" onClick={(e) => e.stopPropagation()}>
+                <h2>Create Session</h2>
 
                 <div className="modal-content-scroll">
                     {/* Auto-generated name preview */}
                     <div className="session-name-preview">
                         <strong>Session Name:</strong>
-                        <p>Practice Session # - {new Date().toLocaleDateString()}</p>
+                        <p>Session # - {new Date().toLocaleDateString()}</p>
                         <p style={{ fontSize: '0.8em', color: '#888', fontStyle: 'italic', marginTop: '5px' }}>
                             (Name will be automatically generated with the next database index)
                         </p>
@@ -152,7 +152,7 @@ const PracticeSessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }
                         className="action-btn primary"
                         onClick={handleCreate}
                     >
-                        Create Practice Session
+                        Create Session
                     </button>
                     <button
                         type="button"

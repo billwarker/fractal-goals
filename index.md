@@ -805,6 +805,9 @@ From `/my-implementation-plans/features.txt`:
 - **Backend Performance:** Optimized `get_session_activities` with eager loading to eliminate N+1 queries. Removed dead code `sync_session_activities`.
 - **Frontend Performance:** Refactored `CreateSession.jsx` to parallelize immediate goal creation requests using `Promise.all`.
 - **Data Fetching Optimization:** Addressed inefficient data loading in `CreateSession.jsx` by implementing a dedicated `goals/selection` endpoint that fetches only active Short-Term and Immediate goals, avoiding full-tree traversal.
+- **Session Display:** Updated `Sessions.jsx` duration calculation to prioritize the difference between Session End and Session Start times, resolving a discrepancy where the displayed duration did not match the visual timeframe.
+- **Goal Detail Display:** Limited the number of practice sessions shown in `GoalDetailModal` (and Sidebar) to the most recent 5, with a count for additional sessions, improving load times and visual clutter.
+- **Refactor "Practice Session" -> "Session" API:** Removed "practice" prefix from UI text, standardizing terminology to "Session" across the application (Sidebar, Modals, Pages, CSS).
 
 ---
 

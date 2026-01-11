@@ -58,7 +58,7 @@ const CustomNode = ({ data }) => {
         } else if (absDays > 6) {
             timeStr = `${(absDays / 7).toFixed(1)}w`;
         } else {
-            timeStr = `${Math.floor(absDays)}d`;
+            timeStr = `${Math.ceil(absDays)}d`;
         }
 
         return isPast ? `-${timeStr}` : timeStr;

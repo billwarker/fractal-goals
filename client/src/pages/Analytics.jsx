@@ -7,7 +7,7 @@ import LineGraph from '../components/analytics/LineGraph';
 import '../App.css';
 
 /**
- * Analytics Page - View insights and statistics about practice sessions
+ * Analytics Page - View insights and statistics about sessions
  */
 function Analytics() {
     const { rootId } = useParams();

@@ -4,8 +4,8 @@ import AlertModal from '../components/modals/AlertModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 
 /**
- * Programming Page - Create composable fractal practice session templates
- * Builds JSON data structures for practice session templates
+ * Programming Page - Create composable fractal session templates
+ * Builds JSON data structures for session templates
  */
 function Programming() {
     const [templates, setTemplates] = useState([]);
@@ -133,7 +133,7 @@ function Programming() {
     return (
         <div className="programming-page" style={{ padding: '20px', color: 'white' }}>
             <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '20px' }}>
-                Practice Session Programming
+                Session Programming
             </h1>
 
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
@@ -165,7 +165,7 @@ function Programming() {
                             <textarea
                                 value={currentTemplate.description}
                                 onChange={(e) => setCurrentTemplate({ ...currentTemplate, description: e.target.value })}
-                                placeholder="Describe this practice template..."
+                                placeholder="Describe this session template..."
                                 style={{
                                     width: '100%',
                                     minHeight: '80px',

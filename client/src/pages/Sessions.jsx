@@ -9,8 +9,8 @@ import { formatDateInTimezone } from '../utils/dateUtils';
 import '../App.css';
 
 /**
- * Sessions Page - View and manage practice sessions
- * Displays all practice sessions for the current fractal in card format with horizontal sections
+ * Sessions Page - View and manage sessions
+ * Displays all sessions for the current fractal in card format with horizontal sections
  */
 function Sessions() {
     const { rootId } = useParams();
@@ -72,7 +72,7 @@ function Sessions() {
             setParentGoals(goalsMap);
             setLoading(false);
         } catch (err) {
-            console.error("Failed to fetch practice sessions", err);
+            console.error("Failed to fetch sessions", err);
             setLoading(false);
             if (err.response?.status === 404) {
                 navigate('/');

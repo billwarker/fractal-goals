@@ -151,7 +151,7 @@ html {
     background: #2b7cdb;
 }
 
-.practice-session-btn {
+.session-btn {
     margin-top: 12px;
     padding: 12px;
     background: #4caf50;
@@ -163,7 +163,7 @@ html {
     transition: background 0.2s;
 }
 
-.practice-session-btn:hover {
+.session-btn:hover {
     background: #45a049;
 }
 
@@ -505,8 +505,8 @@ html {
     min-height: 0;
 }
 
-/* Practice Sessions Grid */
-.practice-sessions-grid {
+/* Sessions Grid */
+.sessions-grid {
     height: 200px;
     background: var(--sidebar-bg);
     border-top: 2px solid var(--border-color);
@@ -514,7 +514,7 @@ html {
     overflow-y: auto;
 }
 
-.practice-sessions-grid h3 {
+.sessions-grid h3 {
     margin: 0 0 15px 0;
     color: #fff;
     font-size: 1.1rem;
@@ -576,8 +576,8 @@ html {
     color: #4caf50;
 }
 
-/* Practice Session Modal */
-.practice-session-modal {
+/* Session Modal */
+.session-modal {
     width: 600px;
     max-width: 90vw;
     max-height: 90vh;

@@ -48,8 +48,8 @@ export const isTargetAchieved = (target, activityInstance) => {
 };
 
 /**
- * Get all achieved targets for a practice session
- * @param {Object} session - The practice session object
+ * Get all achieved targets for a session
+ * @param {Object} session - The session object
  * @param {Array} goals - Array of parent goal objects with targets
  * @returns {Array} - Array of achieved target objects with goal info
  */

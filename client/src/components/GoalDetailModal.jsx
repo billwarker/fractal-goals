@@ -13,8 +13,8 @@ import TargetCard from './TargetCard';
  * - "panel": Renders inline as a sidebar panel
  * 
  * Session Relationships:
- * - ShortTermGoals: Practice sessions are CHILDREN (sessions reference this goal as parent_id)
- * - ImmediateGoals: Practice sessions are PARENTS (this goal's parent_id is a session)
+ * - ShortTermGoals: Sessions are CHILDREN (sessions reference this goal as parent_id)
+ * - ImmediateGoals: Sessions are PARENTS (this goal's parent_id is a session)
  */
 function GoalDetailModal({
     isOpen,
@@ -23,9 +23,8 @@ function GoalDetailModal({
     onUpdate,
     activityDefinitions = [],
     onToggleCompletion,
-    onAddChild,
     onDelete,
-    practiceSessions = [],
+    sessions = [],
     rootId,
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
@@ -251,17 +250,27 @@ function GoalDetailModal({
     const isShortTermGoal = goalType === 'ShortTermGoal';
     const isImmediateGoal = goalType === 'ImmediateGoal';
 
-    // For STGs: Find sessions that have this goal in their parent_ids (short_term goals)
+    // For STGs: Find sessions that have this goal in their short_term_goals array OR parent_ids
     const childSessions = (isShortTermGoal && mode !== 'create')
-        ? practiceSessions.filter(session => {
+        ? sessions.filter(session => {
+            // Check new format: short_term_goals array
+            const shortTermGoals = session.short_term_goals || [];
+            if (shortTermGoals.some(stg => stg.id === goalId)) return true;
+
+            // Check legacy format: attributes.parent_ids
             const parentIds = session.attributes?.parent_ids || [];
             return parentIds.includes(goalId);
         })
         : [];
 
-    // For IGs: Find sessions that have this goal in their goal_ids (all associated goals)
+    // For IGs: Find sessions that have this goal in their immediate_goals array OR goal_ids
     const associatedSessions = (isImmediateGoal && mode !== 'create')
-        ? practiceSessions.filter(session => {
+        ? sessions.filter(session => {
+            // Check new format: immediate_goals array
+            const immediateGoals = session.immediate_goals || [];
+            if (immediateGoals.some(ig => ig.id === goalId)) return true;
+
+            // Check legacy format: attributes.goal_ids
             const goalIds = session.attributes?.goal_ids || [];
             return goalIds.includes(goalId);
         })
@@ -1195,19 +1204,19 @@ function GoalDetailModal({
                         </div>
                     </div>
 
-                    {/* Practice Sessions - For ShortTermGoals */}
+                    {/* Sessions - For ShortTermGoals */}
                     {isShortTermGoal && (
                         <div>
                             <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                Practice Sessions ({childSessions.length}):
+                                Sessions ({childSessions.length}):
                             </label>
                             {childSessions.length === 0 ? (
                                 <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    No practice sessions yet
+                                    No sessions yet
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {childSessions.map(session => (
+                                    {childSessions.slice(0, 5).map(session => (
                                         <div
                                             key={session.id}
                                             onClick={() => {
@@ -1234,6 +1243,11 @@ function GoalDetailModal({
                                             )}
                                         </div>
                                     ))}
+                                    {childSessions.length > 5 && (
+                                        <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                            ... and {childSessions.length - 5} more
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1251,7 +1265,7 @@ function GoalDetailModal({
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {associatedSessions.map(session => (
+                                    {associatedSessions.slice(0, 5).map(session => (
                                         <div
                                             key={session.id}
                                             onClick={() => {
@@ -1278,6 +1292,11 @@ function GoalDetailModal({
                                             )}
                                         </div>
                                     ))}
+                                    {associatedSessions.length > 5 && (
+                                        <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                            ... and {associatedSessions.length - 5} more
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
