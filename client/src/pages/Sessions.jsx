@@ -129,7 +129,26 @@ function Sessions() {
 
     // Helper to get formatted duration from activity instances
     const getDuration = (session) => {
-        // Priority 1: Use total_duration_seconds if available (set when session is completed)
+        const sessionData = session.attributes?.session_data;
+
+        // Priority 1: Calculate from session_start and session_end (Matches visual display)
+        if (sessionData?.session_start && sessionData?.session_end) {
+            const start = new Date(sessionData.session_start);
+            const end = new Date(sessionData.session_end);
+            const diffSeconds = Math.floor((end - start) / 1000);
+
+            if (diffSeconds > 0) {
+                const hours = Math.floor(diffSeconds / 3600);
+                const minutes = Math.floor((diffSeconds % 3600) / 60);
+
+                if (hours > 0) {
+                    return `${hours}:${String(minutes).padStart(2, '0')}`;
+                }
+                return `0:${String(minutes).padStart(2, '0')}`;
+            }
+        }
+
+        // Priority 2: Use total_duration_seconds if available (set when session is completed)
         const totalDurationSeconds = session.attributes?.total_duration_seconds;
         if (totalDurationSeconds != null && totalDurationSeconds > 0) {
             const hours = Math.floor(totalDurationSeconds / 3600);
@@ -141,9 +160,7 @@ function Sessions() {
             return `0:${String(minutes).padStart(2, '0')}`;
         }
 
-        const sessionData = session.attributes?.session_data;
-
-        // Priority 2: Calculate total duration from all activity instances across all sections
+        // Priority 3: Calculate total duration from all activity instances across all sections
         let totalSeconds = 0;
         if (sessionData?.sections) {
             for (const section of sessionData.sections) {
@@ -166,23 +183,6 @@ function Sessions() {
                 return `${hours}:${String(minutes).padStart(2, '0')}`;
             }
             return `0:${String(minutes).padStart(2, '0')}`;
-        }
-
-        // Priority 3: Fallback - Calculate from session_start and session_end
-        if (sessionData?.session_start && sessionData?.session_end) {
-            const start = new Date(sessionData.session_start);
-            const end = new Date(sessionData.session_end);
-            const diffSeconds = Math.floor((end - start) / 1000);
-
-            if (diffSeconds > 0) {
-                const hours = Math.floor(diffSeconds / 3600);
-                const minutes = Math.floor((diffSeconds % 3600) / 60);
-
-                if (hours > 0) {
-                    return `${hours}:${String(minutes).padStart(2, '0')}`;
-                }
-                return `0:${String(minutes).padStart(2, '0')}`;
-            }
         }
 
         return '-';
