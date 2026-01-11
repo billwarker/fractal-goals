@@ -808,6 +808,7 @@ From `/my-implementation-plans/features.txt`:
 - **Session Display:** Updated `Sessions.jsx` duration calculation to prioritize the difference between Session End and Session Start times, resolving a discrepancy where the displayed duration did not match the visual timeframe.
 - **Goal Detail Display:** Limited the number of practice sessions shown in `GoalDetailModal` (and Sidebar) to the most recent 5, with a count for additional sessions, improving load times and visual clutter.
 - **Refactor "Practice Session" -> "Session" API:** Removed "practice" prefix from UI text, standardizing terminology to "Session" across the application (Sidebar, Modals, Pages, CSS).
+- **Renamed PracticeSessionModal**: Renamed `PracticeSessionModal.jsx` to `SessionModal.jsx` and updated component definition.
 
 ---
 
