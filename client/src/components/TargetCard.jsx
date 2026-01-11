@@ -135,7 +135,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, isCompleted
                 paddingLeft: '28px'
             }}>
                 {target.metrics?.map(metric => {
-                    const metricDef = activityDef.metric_definitions.find(m => m.id === metric.metric_id);
+                    const metricDef = activityDef.metric_definitions?.find(m => m.id === metric.metric_id);
                     if (!metricDef) return null;
 
                     return (

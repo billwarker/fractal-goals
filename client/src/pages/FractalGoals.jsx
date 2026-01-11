@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
+import ErrorBoundary from '../components/ErrorBoundary';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import AlertModal from '../components/modals/AlertModal';
@@ -205,26 +206,28 @@ function FractalGoals() {
 
             {/* Sidebar */}
             {sidebarMode && (
-                <Sidebar
-                    selectedNode={viewingGoal}
-                    selectedRootId={rootId}
-                    onClose={() => {
-                        setSidebarMode(null);
-                        setViewingGoal(null);
-                    }}
-                    onUpdate={handleUpdateNode}
-                    onDelete={(node) => setFractalToDelete(node)}
-                    onAddChild={handleAddChildClick}
-                    onAddSession={() => {
-                        const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
-                        navigate(`/${rootId}/create-session?goalId=${goalId}`);
-                    }}
-                    onToggleCompletion={handleToggleCompletion}
-                    treeData={fractalData}
-                    sessions={sessions}
-                    activityDefinitions={activities}
-                    programs={programs}
-                />
+                <ErrorBoundary>
+                    <Sidebar
+                        selectedNode={viewingGoal}
+                        selectedRootId={rootId}
+                        onClose={() => {
+                            setSidebarMode(null);
+                            setViewingGoal(null);
+                        }}
+                        onUpdate={handleUpdateNode}
+                        onDelete={(node) => setFractalToDelete(node)}
+                        onAddChild={handleAddChildClick}
+                        onAddSession={() => {
+                            const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                            navigate(`/${rootId}/create-session?goalId=${goalId}`);
+                        }}
+                        onToggleCompletion={handleToggleCompletion}
+                        treeData={fractalData}
+                        sessions={sessions}
+                        activityDefinitions={activities}
+                        programs={programs}
+                    />
+                </ErrorBoundary>
             )}
 
             {/* Modals */}

@@ -21,20 +21,27 @@ function GoalDetailModal({
     onClose,
     goal,
     onUpdate,
-    activityDefinitions = [],
+    activityDefinitions: activityDefinitionsRaw = [],
     onToggleCompletion,
     onDelete,
-    sessions = [],
+    onAddChild,  // Handler for adding child goals
+    sessions: sessionsRaw = [],
     rootId,
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
-    programs = [],  // For showing associated programs on completion
+    programs: programsRaw = [],  // For showing associated programs on completion
     // Create mode props
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
     parentGoal  // Parent goal for context when creating
 }) {
     const navigate = useNavigate();
+    // Normalize activityDefinitions to always be an array (handles null case)
+    const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
+    // Normalize sessions to always be an array (handles null case)
+    const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : [];
+    // Normalize programs to always be an array (handles null case)
+    const programs = Array.isArray(programsRaw) ? programsRaw : [];
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -253,9 +260,10 @@ function GoalDetailModal({
     // For STGs: Find sessions that have this goal in their short_term_goals array OR parent_ids
     const childSessions = (isShortTermGoal && mode !== 'create')
         ? sessions.filter(session => {
+            if (!session) return false;
             // Check new format: short_term_goals array
             const shortTermGoals = session.short_term_goals || [];
-            if (shortTermGoals.some(stg => stg.id === goalId)) return true;
+            if (shortTermGoals.some(stg => stg?.id === goalId)) return true;
 
             // Check legacy format: attributes.parent_ids
             const parentIds = session.attributes?.parent_ids || [];
@@ -266,9 +274,10 @@ function GoalDetailModal({
     // For IGs: Find sessions that have this goal in their immediate_goals array OR goal_ids
     const associatedSessions = (isImmediateGoal && mode !== 'create')
         ? sessions.filter(session => {
+            if (!session) return false;
             // Check new format: immediate_goals array
             const immediateGoals = session.immediate_goals || [];
-            if (immediateGoals.some(ig => ig.id === goalId)) return true;
+            if (immediateGoals.some(ig => ig?.id === goalId)) return true;
 
             // Check legacy format: attributes.goal_ids
             const goalIds = session.attributes?.goal_ids || [];

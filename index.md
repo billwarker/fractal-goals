@@ -809,6 +809,11 @@ From `/my-implementation-plans/features.txt`:
 - **Goal Detail Display:** Limited the number of practice sessions shown in `GoalDetailModal` (and Sidebar) to the most recent 5, with a count for additional sessions, improving load times and visual clutter.
 - **Refactor "Practice Session" -> "Session" API:** Removed "practice" prefix from UI text, standardizing terminology to "Session" across the application (Sidebar, Modals, Pages, CSS).
 - **Renamed PracticeSessionModal**: Renamed `PracticeSessionModal.jsx` to `SessionModal.jsx` and updated component definition.
+- **GoalDetailModal Resilience**: Added safety checks in `GoalDetailModal` to prevent crashes when filtering sessions with potential null/undefined values or when `sessions` is not an array.
+- **Restored SessionModal**: Restored `SessionModal.jsx` which was accidentally deleted during the rename process.
+- **TargetCard Safety**: Updated `TargetCard.jsx` to safely access `metric_definitions` using optional chaining to prevent crashes for activities with missing definitions.
+- **GoalDetailModal Activity Safety**: Added `Array.isArray(activityDefinitions)` checks in `GoalDetailModal` to prevent crashes when `activityDefinitions` prop is null or invalid.
+- **CRITICAL FIX: Missing onAddChild Prop**: Added `onAddChild` to `GoalDetailModal` props destructuring. This missing prop caused a `ReferenceError` that crashed the entire sidebar when clicking any goal. Also added `ErrorBoundary` component to `FractalGoals.jsx` to catch and display future errors gracefully.
 
 ---
 
