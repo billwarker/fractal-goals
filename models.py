@@ -475,6 +475,7 @@ class ActivityInstance(Base):
 
     def to_dict(self):
         data_dict = json.loads(self.data) if self.data else {}
+        metric_values_list = [m.to_dict() for m in self.metric_values]
         return {
             "id": self.id,
             "session_id": self.session_id,
@@ -489,7 +490,8 @@ class ActivityInstance(Base):
             "notes": self.notes,
             "sets": data_dict.get('sets', []),
             "data": data_dict,
-            "metric_values": [m.to_dict() for m in self.metric_values]
+            "metric_values": metric_values_list,
+            "metrics": metric_values_list  # Frontend alias for consistency
         }
 
 class MetricValue(Base):
