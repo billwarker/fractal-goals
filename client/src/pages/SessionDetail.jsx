@@ -495,7 +495,55 @@ function SessionDetail() {
             return;
         }
 
-        // Prepare payload for API update
+        // Handle metrics updates specially - call the dedicated metrics API
+        if (updatedFields.metrics !== undefined) {
+            const metricsPayload = updatedFields.metrics.map(m => ({
+                metric_id: m.metric_id,
+                split_id: m.split_id || null,
+                value: m.value
+            }));
+
+            // Update local state first
+            setActivityInstances(prev => prev.map(inst =>
+                inst.id === instanceId ? { ...inst, metrics: updatedFields.metrics } : inst
+            ));
+
+            // Persist to backend via dedicated metrics endpoint
+            try {
+                await fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, {
+                    metrics: metricsPayload
+                });
+            } catch (err) {
+                console.error('Error syncing activity metrics update:', err);
+                alert(`Failed to update metrics: ${err.response?.data?.error || err.message}`);
+            }
+            return;
+        }
+
+        // Handle sets updates specially - extract metrics and call the metrics API for each set
+        if (updatedFields.sets !== undefined) {
+            // Update local state first
+            setActivityInstances(prev => prev.map(inst =>
+                inst.id === instanceId ? { ...inst, sets: updatedFields.sets } : inst
+            ));
+
+            // For set-based activities, we need to store sets in the instance's data field
+            // and also sync individual set metrics to the metric_values table
+            // For now, persist the sets structure via the regular update endpoint
+            try {
+                await fractalApi.updateActivityInstance(rootId, instanceId, {
+                    session_id: sessionId,
+                    activity_definition_id: instance.activity_definition_id,
+                    sets: updatedFields.sets
+                });
+            } catch (err) {
+                console.error('Error syncing activity sets update:', err);
+                alert(`Failed to update sets: ${err.response?.data?.error || err.message}`);
+            }
+            return;
+        }
+
+        // Prepare payload for other API updates
         const payload = { ...updatedFields };
 
         // Recalculate duration if time_start or time_stop are updated
