@@ -369,9 +369,13 @@ function SessionDetail() {
 
         const createMissingInstances = async () => {
             console.log('Verifying/Creating activity instances from session data...');
+            console.log('Session sections:', sessionData.sections?.length || 0);
+
             let createdCount = 0;
+            const createdInstances = [];
 
             for (const section of sessionData.sections || []) {
+                console.log(`Section "${section.name}": ${section.exercises?.length || 0} exercises`);
                 for (const exercise of section.exercises || []) {
                     // Only process activities (not rest periods, etc.)
                     if (exercise.type === 'activity' && exercise.instance_id && exercise.activity_id) {
@@ -381,11 +385,12 @@ function SessionDetail() {
                         if (!instanceExists) {
                             try {
                                 // Try to create the instance
-                                await fractalApi.addActivityToSession(rootId, sessionId, {
+                                const response = await fractalApi.addActivityToSession(rootId, sessionId, {
                                     instance_id: exercise.instance_id,
                                     activity_definition_id: exercise.activity_id
                                 });
                                 createdCount++;
+                                createdInstances.push(response.data);
                                 console.log(`Created instance ${exercise.instance_id.substring(0, 8)}... for activity ${exercise.name}`);
                             } catch (err) {
                                 // Silently fail - instance might already exist in DB
@@ -395,8 +400,15 @@ function SessionDetail() {
                     }
                 }
             }
-            console.log(`Finished creating instances. Total processed: ${createdCount}`);
+
+            console.log(`Finished creating instances. Total created: ${createdCount}`);
             instancesCreatedRef.current = true;
+
+            // If we created any instances, refresh the activityInstances state
+            if (createdCount > 0) {
+                // Fetch fresh data from database to ensure consistency
+                await fetchActivityInstances();
+            }
         };
 
         createMissingInstances();
