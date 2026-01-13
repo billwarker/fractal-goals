@@ -597,7 +597,14 @@ def update_fractal_goal(root_id, goal_id):
             goal.description = data['description']
         if 'deadline' in data:
             if data['deadline']:
-                goal.deadline = datetime.strptime(data['deadline'], '%Y-%m-%d').date()
+                try:
+                    d_str = data['deadline']
+                    # Handle ISO datetime strings (e.g., "2026-01-15T00:00:00.000Z")
+                    if 'T' in d_str:
+                        d_str = d_str.split('T')[0]
+                    goal.deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
             else:
                 goal.deadline = None
         if 'targets' in data:

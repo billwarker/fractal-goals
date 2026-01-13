@@ -754,7 +754,7 @@ function SessionDetail() {
 
     const handleUpdateGoal = async (goalId, updates) => {
         try {
-            await fractalApi.updateGoal(goalId, updates);
+            await fractalApi.updateGoal(rootId, goalId, updates);
 
             // Update local state
             if (selectedGoal && selectedGoal.id === goalId) {
