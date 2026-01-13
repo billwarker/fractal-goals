@@ -225,7 +225,8 @@ def create_note(root_id):
         "activity_instance_id": "<optional>",
         "activity_definition_id": "<optional>",
         "set_index": <optional integer>,
-        "content": "<note text>"
+        "content": "<note text>",
+        "image_data": "<optional base64 encoded image>"
     }
     """
     db = get_session(get_engine())
@@ -233,8 +234,15 @@ def create_note(root_id):
         data = request.get_json()
         
         content = data.get('content', '').strip()
-        if not content:
-            return jsonify({"error": "Note content is required"}), 400
+        image_data = data.get('image_data')
+        
+        # Either content or image_data is required
+        if not content and not image_data:
+            return jsonify({"error": "Note content or image is required"}), 400
+        
+        # If only image, set a default content placeholder
+        if not content and image_data:
+            content = "[Image]"
         
         context_type = data.get('context_type', 'session')
         if context_type not in ('session', 'activity_instance', 'set'):
@@ -249,7 +257,8 @@ def create_note(root_id):
             activity_instance_id=data.get('activity_instance_id'),
             activity_definition_id=data.get('activity_definition_id'),
             set_index=data.get('set_index'),
-            content=content
+            content=content,
+            image_data=image_data
         )
         
         db.add(note)

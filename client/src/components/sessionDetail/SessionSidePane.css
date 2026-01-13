@@ -208,7 +208,59 @@
 /* Quick Add */
 .note-quick-add {
     display: flex;
+    flex-direction: column;
     gap: 8px;
+}
+
+.note-input-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* Image Preview in Quick Add */
+.note-image-preview-container {
+    position: relative;
+    max-width: 200px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #444;
+}
+
+.note-image-preview {
+    width: 100%;
+    max-height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+.note-image-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.note-image-remove:hover {
+    background: rgba(244, 67, 54, 0.9);
+}
+
+.note-hint {
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+    margin-top: -4px;
 }
 
 .note-input {
@@ -335,6 +387,57 @@
 
 .note-item.compact .note-item-content {
     font-size: 13px;
+}
+
+/* Note Image Thumbnail */
+.note-image-wrapper {
+    position: relative;
+    max-width: 200px;
+    margin: 8px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid #444;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.note-image-wrapper:hover {
+    border-color: #4caf50;
+    transform: scale(1.02);
+}
+
+.note-image-thumbnail {
+    width: 100%;
+    max-height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+.note-image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 20px 8px 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.note-image-wrapper:hover .note-image-overlay {
+    opacity: 1;
+}
+
+.note-image-overlay span {
+    font-size: 11px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.note-item.has-image .note-item-actions {
+    top: auto;
+    bottom: 8px;
 }
 
 .note-item-actions {

@@ -550,6 +550,7 @@ class Note(Base):
     
     # Content
     content = Column(Text, nullable=False)
+    image_data = Column(Text, nullable=True)  # Base64-encoded image data for pasted images
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
@@ -572,6 +573,7 @@ class Note(Base):
             "activity_definition_id": self.activity_definition_id,
             "set_index": self.set_index,
             "content": self.content,
+            "image_data": self.image_data,
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at)
         }

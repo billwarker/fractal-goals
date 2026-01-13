@@ -1,14 +1,16 @@
 /**
- * NoteItem - Single note with edit/delete functionality
+ * NoteItem - Single note with edit/delete functionality and image support
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import ImageViewerModal from './ImageViewerModal';
 
 function NoteItem({ note, onUpdate, onDelete, compact = false }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showImageViewer, setShowImageViewer] = useState(false);
     const timezone = useTimezone();
     const textareaRef = useRef(null);
 
@@ -100,6 +102,16 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
         }
     };
 
+    const handleImageClick = () => {
+        if (note.image_data) {
+            setShowImageViewer(true);
+        }
+    };
+
+    // Check if this is an image-only note
+    const isImageOnly = note.content === '[Image]' && note.image_data;
+    const hasImage = !!note.image_data;
+
     if (isDeleting) {
         return (
             <div className="note-item note-item-deleting">
@@ -109,80 +121,107 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
     }
 
     return (
-        <div className={`note-item ${compact ? 'compact' : ''}`}>
-            <div className="note-item-time">
-                {formatDate(note.created_at)}
-                {note.activityName && (
-                    <span style={{
-                        marginLeft: '8px',
-                        fontSize: '11px',
-                        color: '#4caf50',
-                        background: 'rgba(76, 175, 80, 0.1)',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
-                    }}>
-                        {note.activityName}
-                    </span>
+        <>
+            <div className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''}`}>
+                <div className="note-item-time">
+                    {formatDate(note.created_at)}
+                    {note.activityName && (
+                        <span style={{
+                            marginLeft: '8px',
+                            fontSize: '11px',
+                            color: '#4caf50',
+                            background: 'rgba(76, 175, 80, 0.1)',
+                            padding: '2px 6px',
+                            borderRadius: '4px'
+                        }}>
+                            {note.activityName}
+                        </span>
+                    )}
+                    {note.set_index !== null && note.set_index !== undefined && (
+                        <span className="note-item-set-badge">Set {note.set_index + 1}</span>
+                    )}
+                </div>
+
+                {/* Image display */}
+                {hasImage && (
+                    <div className="note-image-wrapper" onClick={handleImageClick}>
+                        <img
+                            src={note.image_data}
+                            alt="Note attachment"
+                            className="note-image-thumbnail"
+                        />
+                        <div className="note-image-overlay">
+                            <span>Click to view</span>
+                        </div>
+                    </div>
                 )}
-                {note.set_index !== null && note.set_index !== undefined && (
-                    <span className="note-item-set-badge">Set {note.set_index + 1}</span>
+
+                {isEditing ? (
+                    <div className="note-item-edit">
+                        <textarea
+                            ref={textareaRef}
+                            value={editContent}
+                            onChange={handleChange}
+                            onKeyDown={handleKeyDown}
+                            className="note-edit-input"
+                            rows={1}
+                            style={{
+                                resize: 'none',
+                                overflow: 'hidden',
+                                minHeight: '32px',
+                                lineHeight: '1.4'
+                            }}
+                        />
+                        <div className="note-edit-actions">
+                            <button onClick={handleSave} className="note-save-btn">✓</button>
+                            <button onClick={() => {
+                                setEditContent(note.content);
+                                setIsEditing(false);
+                            }} className="note-cancel-btn">✕</button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Only show text content if it's not just the placeholder */}
+                        {!isImageOnly && (
+                            <div className="note-item-content">
+                                {note.content}
+                            </div>
+                        )}
+                        {(onUpdate || onDelete) && (
+                            <div className="note-item-actions">
+                                {onUpdate && !isImageOnly && (
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="note-action-btn"
+                                        title="Edit"
+                                    >
+                                        ✏️
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <button
+                                        onClick={handleDelete}
+                                        className="note-action-btn note-delete-btn"
+                                        title="Delete"
+                                    >
+                                        🗑️
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
-            {isEditing ? (
-                <div className="note-item-edit">
-                    <textarea
-                        ref={textareaRef}
-                        value={editContent}
-                        onChange={handleChange}
-                        onKeyDown={handleKeyDown}
-                        className="note-edit-input"
-                        rows={1}
-                        style={{
-                            resize: 'none',
-                            overflow: 'hidden',
-                            minHeight: '32px',
-                            lineHeight: '1.4'
-                        }}
-                    />
-                    <div className="note-edit-actions">
-                        <button onClick={handleSave} className="note-save-btn">✓</button>
-                        <button onClick={() => {
-                            setEditContent(note.content);
-                            setIsEditing(false);
-                        }} className="note-cancel-btn">✕</button>
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <div className="note-item-content">
-                        {note.content}
-                    </div>
-                    {(onUpdate || onDelete) && (
-                        <div className="note-item-actions">
-                            {onUpdate && (
-                                <button
-                                    onClick={() => setIsEditing(true)}
-                                    className="note-action-btn"
-                                    title="Edit"
-                                >
-                                    ✏️
-                                </button>
-                            )}
-                            {onDelete && (
-                                <button
-                                    onClick={handleDelete}
-                                    className="note-action-btn note-delete-btn"
-                                    title="Delete"
-                                >
-                                    🗑️
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </>
+            {/* Image Viewer Modal */}
+            {showImageViewer && note.image_data && (
+                <ImageViewerModal
+                    imageData={note.image_data}
+                    onClose={() => setShowImageViewer(false)}
+                />
             )}
-        </div>
+        </>
     );
 }
 

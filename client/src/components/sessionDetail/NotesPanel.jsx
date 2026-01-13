@@ -35,13 +35,14 @@ function NotesPanel({
     // Filter for Session-Level Notes (always show these)
     const sessionNotes = notes.filter(n => n.context_type === 'session');
 
-    const handleAddNote = async (content) => {
+    const handleAddNote = async (content, imageData = null) => {
         try {
             await addNote({
                 context_type: 'session', // Always add as session note from sidepane
                 context_id: sessionId,
                 session_id: sessionId,
-                content
+                content,
+                image_data: imageData
             });
             onNoteAdded?.();
         } catch (err) {

@@ -54,8 +54,9 @@ function SessionActivityItem({
     // Filter notes for this activity
     const activityNotes = allNotes?.filter(n => n.activity_instance_id === exercise.id) || [];
 
-    const handleAddNote = async (content) => {
-        if (!content.trim() || !onAddNote || !exercise.id) return;
+    const handleAddNote = async (content, imageData = null) => {
+        // Either content or image is required
+        if ((!content.trim() && !imageData) || !onAddNote || !exercise.id) return;
 
         try {
             await onAddNote({
@@ -65,7 +66,8 @@ function SessionActivityItem({
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
                 set_index: selectedSetIndex,
-                content: content.trim()
+                content: content.trim() || (imageData ? '[Image]' : ''),
+                image_data: imageData
             });
             if (onNoteCreated) onNoteCreated();
 
