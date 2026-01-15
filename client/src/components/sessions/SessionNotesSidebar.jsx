@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import './SessionNotesSidebar.css';
 
 function SessionNotesSidebar({
@@ -23,6 +24,7 @@ function SessionNotesSidebar({
     onSelectNote
 }) {
     const [allNotes, setAllNotes] = useState([]);
+    const [viewImage, setViewImage] = useState(null);
     const timezone = useTimezone();
     const scrollContainerRef = useRef(null);
     const firstNoteRefs = useRef({});
@@ -130,7 +132,14 @@ function SessionNotesSidebar({
                                         {note.content}
                                     </div>
                                     {note.image_data && (
-                                        <div className="note-image">
+                                        <div
+                                            className="note-image"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setViewImage(note.image_data);
+                                            }}
+                                            style={{ cursor: 'zoom-in' }}
+                                        >
                                             <img
                                                 src={note.image_data}
                                                 alt="Note attachment"
@@ -143,6 +152,13 @@ function SessionNotesSidebar({
                     </div>
                 )}
             </div>
+
+            {viewImage && (
+                <ImageViewerModal
+                    imageData={viewImage}
+                    onClose={() => setViewImage(null)}
+                />
+            )}
         </div>
     );
 }
