@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from './ImageViewerModal';
 
-function NoteItem({ note, onUpdate, onDelete, compact = false }) {
+function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSelect }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -83,7 +83,8 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
         }
     };
 
-    const handleDelete = async () => {
+    const handleDelete = async (e) => {
+        e.stopPropagation(); // Prevent selection when deleting
         setIsDeleting(true);
         try {
             await onDelete(note.id);
@@ -102,7 +103,8 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
         }
     };
 
-    const handleImageClick = () => {
+    const handleImageClick = (e) => {
+        e.stopPropagation();
         if (note.image_data) {
             setShowImageViewer(true);
         }
@@ -112,6 +114,14 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
     const isImageOnly = note.content === '[Image]' && note.image_data;
     const hasImage = !!note.image_data;
 
+    // Debug logging
+    // console.log(`NoteItem render: ${note.id}, selected=${isSelected}`);
+
+    const handleClick = (e) => {
+        e.stopPropagation();
+        if (onSelect) onSelect();
+    };
+
     if (isDeleting) {
         return (
             <div className="note-item note-item-deleting">
@@ -120,9 +130,20 @@ function NoteItem({ note, onUpdate, onDelete, compact = false }) {
         );
     }
 
+    const highlightStyle = isSelected ? {
+        background: 'rgba(33, 150, 243, 0.15)',
+        borderLeft: '4px solid #2196f3',
+        paddingLeft: '8px',
+        borderRadius: '4px'
+    } : {};
+
     return (
         <>
-            <div className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''}`}>
+            <div
+                className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''}`}
+                onClick={handleClick}
+                style={highlightStyle}
+            >
                 <div className="note-item-time">
                     {formatDate(note.created_at)}
                     {note.activityName && (

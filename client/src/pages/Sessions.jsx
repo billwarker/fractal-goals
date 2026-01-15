@@ -26,6 +26,9 @@ function Sessions() {
     const [activities, setActivities] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
+    // Sorting state
+    const [sortBy, setSortBy] = useState('start_date'); // 'start_date' | 'last_modified'
+    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
 
     useEffect(() => {
         if (!rootId) {
@@ -62,6 +65,17 @@ function Sessions() {
             setActivities(res.data);
         } catch (err) {
             console.error("Failed to fetch activities", err);
+        }
+    };
+
+    const handleSortChange = (criteria) => {
+        if (sortBy === criteria) {
+            // Toggle order if clicking same criteria
+            setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+        } else {
+            // New criteria, default to desc
+            setSortBy(criteria);
+            setSortOrder('desc');
         }
     };
 
@@ -106,6 +120,28 @@ function Sessions() {
         if (filterCompleted === 'completed') return session.attributes?.completed;
         if (filterCompleted === 'incomplete') return !session.attributes?.completed;
         return true;
+    }).sort((a, b) => {
+        let timeA = 0;
+        let timeB = 0;
+
+        if (sortBy === 'start_date') {
+            // Try canonical column first, then session_data, then created_at
+            const startA = a.session_start || a.attributes?.session_data?.session_start || a.attributes?.created_at;
+            const startB = b.session_start || b.attributes?.session_data?.session_start || b.attributes?.created_at;
+            timeA = new Date(startA).getTime();
+            timeB = new Date(startB).getTime();
+        } else {
+            // Last modified
+            const modA = a.attributes?.updated_at || a.attributes?.created_at;
+            const modB = b.attributes?.updated_at || b.attributes?.created_at;
+            timeA = new Date(modA).getTime();
+            timeB = new Date(modB).getTime();
+        }
+
+        if (isNaN(timeA)) timeA = 0;
+        if (isNaN(timeB)) timeB = 0;
+
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
     });
 
     // Helper to format date - handles timezone correctly
@@ -151,7 +187,30 @@ function Sessions() {
 
     // Helper to get formatted duration from activity instances
     const getDuration = (session) => {
-        // Priority 1: Use total_duration_seconds if available (set when session is completed)
+        const sessionData = session.attributes?.session_data;
+
+        // Priority 1: Calculate from session_start and session_end
+        // This is the most accurate reflection of the "wall clock" duration
+        if (sessionData?.session_start && sessionData?.session_end) {
+            const start = new Date(sessionData.session_start);
+            const end = new Date(sessionData.session_end);
+
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const diffSeconds = Math.floor((end - start) / 1000);
+
+                if (diffSeconds > 0) {
+                    const hours = Math.floor(diffSeconds / 3600);
+                    const minutes = Math.floor((diffSeconds % 3600) / 60);
+
+                    if (hours > 0) {
+                        return `${hours}:${String(minutes).padStart(2, '0')}`;
+                    }
+                    return `0:${String(minutes).padStart(2, '0')}`;
+                }
+            }
+        }
+
+        // Priority 2: Use total_duration_seconds if available (set when session is completed)
         const totalDurationSeconds = session.attributes?.total_duration_seconds;
         if (totalDurationSeconds != null && totalDurationSeconds > 0) {
             const hours = Math.floor(totalDurationSeconds / 3600);
@@ -163,9 +222,7 @@ function Sessions() {
             return `0:${String(minutes).padStart(2, '0')}`;
         }
 
-        const sessionData = session.attributes?.session_data;
-
-        // Priority 2: Calculate total duration from all activity instances across all sections
+        // Priority 3: Calculate total duration from all activity instances across all sections
         let totalSeconds = 0;
         if (sessionData?.sections) {
             for (const section of sessionData.sections) {
@@ -188,23 +245,6 @@ function Sessions() {
                 return `${hours}:${String(minutes).padStart(2, '0')}`;
             }
             return `0:${String(minutes).padStart(2, '0')}`;
-        }
-
-        // Priority 3: Fallback - Calculate from session_start and session_end
-        if (sessionData?.session_start && sessionData?.session_end) {
-            const start = new Date(sessionData.session_start);
-            const end = new Date(sessionData.session_end);
-            const diffSeconds = Math.floor((end - start) / 1000);
-
-            if (diffSeconds > 0) {
-                const hours = Math.floor(diffSeconds / 3600);
-                const minutes = Math.floor((diffSeconds % 3600) / 60);
-
-                if (hours > 0) {
-                    return `${hours}:${String(minutes).padStart(2, '0')}`;
-                }
-                return `0:${String(minutes).padStart(2, '0')}`;
-            }
         }
 
         return '-';
@@ -286,6 +326,56 @@ function Sessions() {
                         >
                             Completed
                         </button>
+
+                        {/* Divider */}
+                        <div style={{ width: '1px', background: '#333', margin: '0 8px' }}></div>
+
+                        {/* Sort Controls */}
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', color: '#666', marginRight: '4px' }}>Sort:</span>
+                            <button
+                                onClick={() => handleSortChange('start_date')}
+                                style={{
+                                    padding: '6px 12px',
+                                    background: sortBy === 'start_date' ? '#2196f3' : 'transparent',
+                                    border: sortBy === 'start_date' ? '1px solid #2196f3' : '1px solid #444',
+                                    borderRadius: '4px',
+                                    color: sortBy === 'start_date' ? 'white' : '#888',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                Date
+                                {sortBy === 'start_date' && (
+                                    <span>{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => handleSortChange('last_modified')}
+                                style={{
+                                    padding: '6px 12px',
+                                    background: sortBy === 'last_modified' ? '#2196f3' : 'transparent',
+                                    border: sortBy === 'last_modified' ? '1px solid #2196f3' : '1px solid #444',
+                                    borderRadius: '4px',
+                                    color: sortBy === 'last_modified' ? 'white' : '#888',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                Modified
+                                {sortBy === 'last_modified' && (
+                                    <span>{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '12px' }}>
@@ -872,9 +962,11 @@ function Sessions() {
                 <SessionNotesSidebar
                     rootId={rootId}
                     selectedSessionId={selectedSessionId}
+                    selectedNoteId={selectedNoteId}
                     sessions={sessions}
                     activities={activities}
                     onSelectSession={setSelectedSessionId}
+                    onSelectNote={setSelectedNoteId}
                 />
             </div>
         </div>

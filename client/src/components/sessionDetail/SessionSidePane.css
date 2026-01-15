@@ -345,6 +345,16 @@
     background: transparent;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     position: relative;
+    transition: background 0.2s;
+}
+
+.note-item.highlighted {
+    background: rgba(33, 150, 243, 0.15);
+    border-left: 3px solid #2196f3;
+    padding-left: 8px;
+    /* Compensate for border to keep content aligned if desired, or just add offset */
+    border-radius: 4px;
+    /* Optional: adds rounded corners */
 }
 
 .note-item:last-child {
@@ -591,6 +601,18 @@
     line-height: 1.4;
     padding-left: 8px;
     border-left: 2px solid #333;
+    cursor: pointer;
+    /* Require cursor for clickability */
+    transition: all 0.2s;
+    padding: 4px 8px;
+    /* Add padding for better touch target */
+}
+
+.previous-note-item.highlighted {
+    background: rgba(33, 150, 243, 0.15);
+    border-left-color: #2196f3;
+    color: #fff;
+    border-radius: 0 4px 4px 0;
 }
 
 /* History Panel */

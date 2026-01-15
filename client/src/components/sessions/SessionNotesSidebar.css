@@ -46,7 +46,7 @@
 .notes-timeline {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
 }
 
 .note-item {

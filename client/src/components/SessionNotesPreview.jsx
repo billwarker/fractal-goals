@@ -16,6 +16,7 @@ function SessionNotesPreview({ rootId, sessionId }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activities, setActivities] = useState([]);
+    const [selectedNoteId, setSelectedNoteId] = useState(null);
     const timezone = useTimezone();
 
     useEffect(() => {
@@ -112,8 +113,22 @@ function SessionNotesPreview({ rootId, sessionId }) {
             <div className="notes-list">
                 {notes.map(note => {
                     const context = getNoteContext(note);
+                    const isSelected = selectedNoteId === note.id;
+
                     return (
-                        <div key={note.id} className="note-item">
+                        <div
+                            key={note.id}
+                            className="note-item"
+                            onClick={() => setSelectedNoteId(note.id)}
+                            style={{
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                border: isSelected ? '1px solid #2196f3' : '1px solid transparent', // Full border for consistency
+                                background: isSelected ? '#1a2a3a' : '#252525',
+                                borderRadius: '6px',
+                                padding: '16px'
+                            }}
+                        >
                             <div className="note-header">
                                 <span className={`note-context-badge ${context.className}`}>
                                     {context.label}

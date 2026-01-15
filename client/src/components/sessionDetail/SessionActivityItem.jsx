@@ -50,6 +50,7 @@ function SessionActivityItem({
     const [localStartTime, setLocalStartTime] = useState('');
     const [localStopTime, setLocalStopTime] = useState('');
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
+    const [selectedNoteId, setSelectedNoteId] = useState(null);
 
     // Filter notes for this activity
     const activityNotes = allNotes?.filter(n => n.activity_instance_id === exercise.id) || [];
@@ -590,6 +591,8 @@ function SessionActivityItem({
                                 onUpdate={onUpdateNote}
                                 onDelete={onDeleteNote}
                                 compact={false}
+                                selectedNoteId={selectedNoteId} // Use local state
+                                onNoteSelect={setSelectedNoteId}
                             />
                         </div>
                     )}

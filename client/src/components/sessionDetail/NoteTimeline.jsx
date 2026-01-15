@@ -5,7 +5,7 @@
 import React from 'react';
 import NoteItem from './NoteItem';
 
-function NoteTimeline({ notes, onUpdate, onDelete, compact = false }) {
+function NoteTimeline({ notes, onUpdate, onDelete, compact = false, selectedNoteId, onNoteSelect }) {
     if (!notes || notes.length === 0) {
         return null;
     }
@@ -19,6 +19,8 @@ function NoteTimeline({ notes, onUpdate, onDelete, compact = false }) {
                     onUpdate={onUpdate}
                     onDelete={onDelete}
                     compact={compact}
+                    isSelected={selectedNoteId === note.id}
+                    onSelect={() => onNoteSelect && onNoteSelect(note.id)}
                 />
             ))}
         </div>

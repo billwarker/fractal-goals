@@ -289,7 +289,13 @@ function SessionDetail() {
             setSession(foundSession);
 
             // Parse session_data
-            const parsedData = foundSession.attributes?.session_data;
+            const parsedData = foundSession.attributes?.session_data || {};
+
+            // Sync canonical columns to sessionData to ensure consistency
+            // This ensures duration calculation (End - Start) uses the correct timestamps
+            if (foundSession.session_start) parsedData.session_start = foundSession.session_start;
+            if (foundSession.session_end) parsedData.session_end = foundSession.session_end;
+
             if (parsedData) {
                 // Backwards compatibility: Populate activity_ids from exercises if missing
                 // This ensures sessions created before the migration still display their activities

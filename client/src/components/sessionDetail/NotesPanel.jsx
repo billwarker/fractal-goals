@@ -31,6 +31,7 @@ function NotesPanel({
     deleteNote
 }) {
     const [showPreviousSessionNotes, setShowPreviousSessionNotes] = useState(false);
+    const [selectedNoteId, setSelectedNoteId] = useState(null);
 
     // Filter for Session-Level Notes (always show these)
     const sessionNotes = notes.filter(n => n.context_type === 'session');
@@ -70,6 +71,8 @@ function NotesPanel({
                         onUpdate={updateNote}
                         onDelete={deleteNote}
                         compact={false}
+                        selectedNoteId={selectedNoteId}
+                        onNoteSelect={setSelectedNoteId}
                     />
                 ) : (
                     <div className="notes-empty">
@@ -102,7 +105,19 @@ function NotesPanel({
                                     </div>
                                     <div className="previous-session-notes">
                                         {session.notes.map(note => (
-                                            <div key={note.id} className="previous-note-item">
+                                            <div
+                                                key={note.id}
+                                                className="previous-note-item"
+                                                onClick={() => setSelectedNoteId(note.id)}
+                                                style={selectedNoteId === note.id ? {
+                                                    background: 'rgba(33, 150, 243, 0.15)',
+                                                    borderLeft: '3px solid #2196f3',
+                                                    borderLeftColor: '#2196f3', // Ensure color wins
+                                                    color: '#fff',
+                                                    borderRadius: '0 4px 4px 0',
+                                                    paddingLeft: '8px' // Override/match CSS
+                                                } : {}}
+                                            >
                                                 {note.content}
                                             </div>
                                         ))}
