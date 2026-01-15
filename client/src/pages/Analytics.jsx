@@ -60,11 +60,14 @@ function Analytics() {
                                     if (!instancesMap[exercise.activity_id]) {
                                         instancesMap[exercise.activity_id] = [];
                                     }
+                                    // Determine session date (prioritize session_start)
+                                    const sessionStart = session.session_start || session.attributes?.session_data?.session_start || session.attributes?.created_at;
+
                                     instancesMap[exercise.activity_id].push({
                                         ...exercise,
                                         session_id: session.id,
                                         session_name: session.name,
-                                        session_date: session.attributes?.created_at
+                                        session_date: sessionStart
                                     });
                                 }
                             });
