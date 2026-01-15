@@ -463,6 +463,7 @@ Practice sessions list and management.
 - Session creation from templates
 - Session deletion
 - Navigation to session detail
+- **Expandable Notes Accordion:** Each session card has a "📝 Notes" toggle that expands to show session-level notes, with note count badge
 
 #### `SessionDetail.jsx`
 Detailed view of a single practice session.

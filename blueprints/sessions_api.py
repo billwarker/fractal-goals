@@ -58,7 +58,11 @@ def get_fractal_sessions(root_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get sessions filtered by root_id, sorted by date (newest first)
-        sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
+        # Eager load notes and activity instances with their notes for accurate count
+        sessions = db_session.query(Session).options(
+            joinedload(Session.notes_list),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list)
+        ).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
         result = [s.to_dict() for s in sessions]
         return jsonify(result)
         

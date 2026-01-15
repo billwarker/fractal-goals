@@ -1,0 +1,130 @@
+/**
+ * SessionNotesPreview styles
+ * Consistent with app's dark theme and existing notes styling
+ */
+
+.session-notes-preview {
+    padding: 16px;
+    background: #1a1a1a;
+    border-top: 1px solid #333;
+}
+
+.notes-loading,
+.notes-error,
+.notes-empty-state {
+    color: #666;
+    font-size: 13px;
+    text-align: center;
+    padding: 12px;
+}
+
+.notes-error {
+    color: #f44336;
+}
+
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.note-item {
+    background: #252525;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.note-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.note-context-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: #888;
+}
+
+/* Session notes */
+.note-context-badge.context-session {
+    color: #999;
+}
+
+/* Activity notes */
+.note-context-badge.context-activity {
+    color: #7cb342;
+}
+
+/* Set notes */
+.note-context-badge.context-set {
+    color: #64b5f6;
+}
+
+.note-timestamp {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.note-content {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.note-image {
+    margin-top: 8px;
+}
+
+.note-image img {
+    border: 1px solid #333;
+}
+
+/* Notes toggle button styles (used in Sessions.jsx) */
+.notes-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #888;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.notes-toggle-btn:hover {
+    background: #252525;
+    border-color: #2196f3;
+    color: #2196f3;
+}
+
+.notes-toggle-btn.has-notes {
+    color: #aaa;
+}
+
+.notes-toggle-btn .notes-count-badge {
+    background: #2196f3;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.notes-toggle-btn .toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.notes-toggle-btn.expanded .toggle-icon {
+    transform: rotate(180deg);
+}

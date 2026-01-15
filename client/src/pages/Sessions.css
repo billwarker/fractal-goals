@@ -1,0 +1,47 @@
+/**
+ * Sessions Page Layout
+ * Master-detail two-column layout with independent scrolling
+ */
+
+.sessions-page {
+    display: flex;
+    height: calc(100vh - 60px);
+    /* Account for header */
+    overflow: hidden;
+}
+
+.sessions-page-left {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.sessions-page-right {
+    width: 350px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .sessions-page-right {
+        width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sessions-page {
+        flex-direction: column;
+    }
+
+    .sessions-page-left {
+        flex: 1;
+    }
+
+    .sessions-page-right {
+        width: 100%;
+        height: 40%;
+        border-left: none;
+        border-top: 1px solid #333;
+    }
+}

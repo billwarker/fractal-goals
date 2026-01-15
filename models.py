@@ -340,6 +340,32 @@ class Session(Base):
         if program_info:
             result["program_info"] = program_info
         
+        # Collect all notes for this session
+        all_notes = {}
+        
+        # 1. Notes directly linked to session via session_id
+        if hasattr(self, 'notes_list') and self.notes_list:
+            for n in self.notes_list:
+                if n.deleted_at is None:
+                    all_notes[n.id] = n
+
+        # 2. Notes linked via activity instances (in case session_id wasn't set on them)
+        if hasattr(self, 'activity_instances'):
+            for ai in self.activity_instances:
+                if hasattr(ai, 'notes_list') and ai.notes_list:
+                    for n in ai.notes_list:
+                        if n.deleted_at is None:
+                            all_notes[n.id] = n
+        
+        # Convert to dict list
+        notes_data = [n.to_dict() for n in all_notes.values()]
+        
+        # Sort by creation time (descending)
+        notes_data.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        result["notes"] = notes_data
+        result["notes_count"] = len(notes_data)
+        
         return result
 
 
