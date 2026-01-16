@@ -144,23 +144,28 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                 onClick={handleClick}
                 style={highlightStyle}
             >
-                <div className="note-item-time">
-                    {formatDate(note.created_at)}
-                    {note.activityName && (
+                {note.activityName && (
+                    <div style={{ marginBottom: '4px' }}>
                         <span style={{
-                            marginLeft: '8px',
                             fontSize: '11px',
                             color: '#4caf50',
                             background: 'rgba(76, 175, 80, 0.1)',
                             padding: '2px 6px',
-                            borderRadius: '4px'
+                            borderRadius: '4px',
+                            fontWeight: '500'
                         }}>
                             {note.activityName}
                         </span>
-                    )}
+                    </div>
+                )}
+                <div className="note-item-time">
                     {note.set_index !== null && note.set_index !== undefined && (
-                        <span className="note-item-set-badge">Set {note.set_index + 1}</span>
+                        <>
+                            <span className="note-item-set-badge">Set {note.set_index + 1}</span>
+                            <span style={{ margin: '0 6px', color: '#666' }}>-</span>
+                        </>
                     )}
+                    <span className="note-date">{formatDate(note.created_at)}</span>
                 </div>
 
                 {/* Image display */}

@@ -8,10 +8,12 @@
     height: 100%;
     background: #1a1a1a;
     border-left: 1px solid #333;
+    width: 360px;
+    flex-shrink: 0;
 }
 
 .sidebar-header {
-    padding: 16px;
+    padding: 80px 16px 16px 16px;
     border-bottom: 1px solid #333;
     flex-shrink: 0;
 }
@@ -31,7 +33,7 @@
 .sidebar-content {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: 0 16px 16px 16px;
 }
 
 .sidebar-placeholder,
@@ -47,6 +49,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-top: 12px;
 }
 
 .note-item {

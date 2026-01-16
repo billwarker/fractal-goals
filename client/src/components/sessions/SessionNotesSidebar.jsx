@@ -71,12 +71,17 @@ function SessionNotesSidebar({
 
     const getNoteContext = (note) => {
         if (note.context_type === 'session') {
-            return { label: 'Session Note', className: 'context-session' };
-        } else if (note.context_type === 'activity_instance') {
+            return { type: 'session', label: 'Session Note', className: 'context-session' };
+        } else if (note.context_type === 'activity_instance' || note.context_type === 'set') {
             const activityName = getActivityName(note.activity_definition_id);
-            return { label: activityName || 'Activity', className: 'context-activity' };
+            return {
+                type: 'activity',
+                activityName: activityName || 'Activity',
+                setIndex: note.set_index,
+                className: 'context-activity'
+            };
         }
-        return { label: 'Note', className: '' };
+        return { type: 'other', label: 'Note', className: '' };
     };
 
     const handleNoteClick = (e, note) => {
@@ -90,7 +95,7 @@ function SessionNotesSidebar({
     return (
         <div className="session-notes-sidebar">
             <div className="sidebar-header">
-                <h3 className="sidebar-title">Notes Timeline</h3>
+                <h3 className="sidebar-title">Notes</h3>
                 <div className="sidebar-subtitle">
                     {allNotes.length} notes total
                 </div>
@@ -122,12 +127,33 @@ function SessionNotesSidebar({
                                         padding: '16px' // Explicit padding adjustment
                                     }}
                                 >
-                                    <div className={`note-context ${context.className}`}>
-                                        {context.label}
-                                    </div>
-                                    <div className="note-timestamp">
-                                        {formatNoteTime(note.created_at)}
-                                    </div>
+                                    {context.type === 'activity' ? (
+                                        <>
+                                            <div style={{ marginBottom: '4px' }}>
+                                                <span className={`note-context ${context.className}`} style={{ display: 'inline-block' }}>
+                                                    {context.activityName}
+                                                </span>
+                                            </div>
+                                            <div className="note-timestamp" style={{ display: 'flex', alignItems: 'center' }}>
+                                                {context.setIndex !== null && context.setIndex !== undefined && (
+                                                    <>
+                                                        <span className="note-item-set-badge" style={{ fontSize: '10px' }}>Set {context.setIndex + 1}</span>
+                                                        <span style={{ margin: '0 6px', color: '#666' }}>-</span>
+                                                    </>
+                                                )}
+                                                {formatNoteTime(note.created_at)}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className={`note-context ${context.className}`}>
+                                                {context.label}
+                                            </div>
+                                            <div className="note-timestamp">
+                                                {formatNoteTime(note.created_at)}
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="note-content">
                                         {note.content}
                                     </div>

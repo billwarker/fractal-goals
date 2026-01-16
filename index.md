@@ -798,6 +798,7 @@ From `/my-implementation-plans/features.txt`:
 - **DayViewModal:** Unified display of Scheduled Program Days (Sessions) and Legacy Days, added "Unassign" capability, and restricted single-day scheduling.
 - **Calendar Rendering Fix:** Added `program_day_id` to `Goal.to_dict()` serialization so scheduled sessions properly link to their template program days for calendar display.
 - **Datetime Standardization:** Implemented global `format_utc` in `models.py` to ensure all `DateTime` fields (Sessions, Goals, Activities, Programs) are serialized as ISO 8601 strings with 'Z' suffix, ensuring correct UTC-to-Local conversion on the frontend.
+- **Note Display (2026-01-16):** Updated notes timeline in Sessions list and Note Items to display Activity Name on its own line, followed by Set Index (if applicable) and Timestamp separated by a hyphen, improving readability.
 - **Session Duration Calculation:** Fixed issue where session duration was incorrectly calculated using "Last Modified" time instead of "Session End" time. Updated `Sessions.jsx` and `SessionDetail.jsx` to prioritize `End - Start` calculation using canonical session timestamps.
 - **Notes System Implementation:**
   - Implemented comprehensive `SessionSidePane` with collapsible metadata, Notes, and History panels.
