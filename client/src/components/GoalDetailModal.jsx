@@ -4,6 +4,8 @@ import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
 import TargetCard from './TargetCard';
 import SMARTIndicator from './SMARTIndicator';
+import SelectActivitiesModal from './modals/SelectActivitiesModal';
+import { fractalApi } from '../utils/api';
 
 /**
  * GoalDetailModal Component
@@ -31,6 +33,7 @@ function GoalDetailModal({
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
     programs: programsRaw = [],  // For showing associated programs on completion
+    activityGroups: activityGroupsRaw = [],  // For activities modal grouping
     // Create mode props
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
@@ -43,6 +46,8 @@ function GoalDetailModal({
     const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : [];
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
+    // Normalize activityGroups to always be an array (handles null case)
+    const activityGroups = Array.isArray(activityGroupsRaw) ? activityGroupsRaw : [];
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -66,6 +71,11 @@ function GoalDetailModal({
     const [targetName, setTargetName] = useState('');
     const [targetDescription, setTargetDescription] = useState('');
     const [metricValues, setMetricValues] = useState({});
+
+    // Associated activities state
+    const [associatedActivities, setAssociatedActivities] = useState([]);
+    const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+    const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     // Initialize form state from goal - use specific dependencies for completion state
     const depGoalId = goal?.attributes?.id || goal?.id;
@@ -109,6 +119,75 @@ function GoalDetailModal({
             setViewState('goal');
         }
     }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
+
+    // Fetch associated activities when goal changes
+    useEffect(() => {
+        const fetchAssociatedActivities = async () => {
+            if (mode === 'create' || !rootId || !depGoalId) {
+                setAssociatedActivities([]);
+                return;
+            }
+
+            setIsLoadingActivities(true);
+            try {
+                const response = await fractalApi.getGoalActivities(rootId, depGoalId);
+                setAssociatedActivities(response.data || []);
+            } catch (error) {
+                console.error('Error fetching associated activities:', error);
+                setAssociatedActivities([]);
+            } finally {
+                setIsLoadingActivities(false);
+            }
+        };
+
+        fetchAssociatedActivities();
+    }, [rootId, depGoalId, mode]);
+
+    // Handler for adding activities from the modal
+    const handleAddActivities = async (activityIds) => {
+        if (!rootId || !depGoalId || activityIds.length === 0) {
+            setIsActivityModalOpen(false);
+            return;
+        }
+
+        try {
+            // Combine existing IDs with new IDs
+            const existingIds = associatedActivities.map(a => a.id);
+            const allIds = [...new Set([...existingIds, ...activityIds])];
+
+            // For each new activity, we need to add the goal to its associations
+            for (const activityId of activityIds) {
+                const activity = activityDefinitions.find(a => a.id === activityId);
+                if (activity) {
+                    // Get current goals for this activity and add our goal
+                    const currentGoals = activity.goal_ids || [];
+                    const newGoalIds = [...new Set([...currentGoals, depGoalId])];
+                    await fractalApi.setActivityGoals(rootId, activityId, newGoalIds);
+                }
+            }
+
+            // Refresh the associations
+            const response = await fractalApi.getGoalActivities(rootId, depGoalId);
+            setAssociatedActivities(response.data || []);
+        } catch (error) {
+            console.error('Error adding activity associations:', error);
+        }
+
+        setIsActivityModalOpen(false);
+    };
+
+    // Handler for removing an activity association
+    const handleRemoveActivity = async (activityId) => {
+        if (!rootId || !depGoalId) return;
+
+        try {
+            await fractalApi.removeActivityGoal(rootId, activityId, depGoalId);
+            // Update local state
+            setAssociatedActivities(prev => prev.filter(a => a.id !== activityId));
+        } catch (error) {
+            console.error('Error removing activity association:', error);
+        }
+    };
 
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
@@ -1169,9 +1248,96 @@ function GoalDetailModal({
                 </div>
             ) : (
                 /* ============ VIEW MODE ============ */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: goalColor }}>
                         {goal.name}
+                    </div>
+
+                    {/* Action Buttons - 2x2 Grid */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '6px'
+                    }}>
+                        {onToggleCompletion && (
+                            <button
+                                onClick={() => {
+                                    if (isCompleted) {
+                                        setViewState('uncomplete-confirm');
+                                    } else {
+                                        setViewState('complete-confirm');
+                                    }
+                                }}
+                                style={{
+                                    padding: '8px 10px',
+                                    background: isCompleted ? '#4caf50' : 'transparent',
+                                    border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    color: isCompleted ? 'white' : '#ccc',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: isCompleted ? 'bold' : 'normal'
+                                }}
+                            >
+                                {isCompleted ? '✓ Completed' : 'Mark Complete'}
+                            </button>
+                        )}
+
+                        {onAddChild && childType && (
+                            <button
+                                onClick={() => {
+                                    if (displayMode === 'modal' && onClose) onClose();
+                                    onAddChild(goal);
+                                }}
+                                style={{
+                                    padding: '8px 10px',
+                                    background: 'transparent',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    color: '#ccc',
+                                    cursor: 'pointer',
+                                    fontSize: '12px'
+                                }}
+                            >
+                                + Add {childType}
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            style={{
+                                padding: '8px 10px',
+                                background: goalColor,
+                                border: 'none',
+                                borderRadius: '4px',
+                                color: textColor,
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 600
+                            }}
+                        >
+                            Edit Goal
+                        </button>
+
+                        {onDelete && (
+                            <button
+                                onClick={() => {
+                                    if (displayMode === 'modal' && onClose) onClose();
+                                    onDelete(goal);
+                                }}
+                                style={{
+                                    padding: '8px 10px',
+                                    background: 'transparent',
+                                    border: '1px solid #d32f2f',
+                                    borderRadius: '4px',
+                                    color: '#d32f2f',
+                                    cursor: 'pointer',
+                                    fontSize: '12px'
+                                }}
+                            >
+                                Delete Goal
+                            </button>
+                        )}
                     </div>
 
                     <div style={{ fontSize: '12px', color: '#888' }}>
@@ -1259,6 +1425,29 @@ function GoalDetailModal({
                             </div>
                         );
                     })()}
+
+                    {/* Associated Activities Section - View Mode (Count Only) */}
+                    {mode !== 'create' && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '12px', color: '#aaa' }}>
+                                Associated Activities ({isLoadingActivities ? '...' : associatedActivities.length})
+                            </label>
+                            <button
+                                onClick={() => setIsActivityModalOpen(true)}
+                                style={{
+                                    background: 'transparent',
+                                    border: '1px solid #4caf50',
+                                    color: '#4caf50',
+                                    fontSize: '10px',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                + Add
+                            </button>
+                        </div>
+                    )}
 
                     {/* Targets Section - View Mode */}
                     <div>
@@ -1400,100 +1589,6 @@ function GoalDetailModal({
                         </div>
                     )}
 
-                    {/* Action Buttons */}
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        paddingTop: '12px',
-                        borderTop: '1px solid #333'
-                    }}>
-                        {onToggleCompletion && (
-                            <button
-                                onClick={() => {
-                                    if (isCompleted) {
-                                        // Un-completing: show confirmation view
-                                        setViewState('uncomplete-confirm');
-                                    } else {
-                                        // Completing: show confirmation view
-                                        setViewState('complete-confirm');
-                                    }
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: isCompleted ? '#4caf50' : 'transparent',
-                                    border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
-                                    borderRadius: '4px',
-                                    color: isCompleted ? 'white' : '#ccc',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: isCompleted ? 'bold' : 'normal'
-                                }}
-                            >
-                                {isCompleted ? '✓ Completed' : 'Mark Complete'}
-                            </button>
-                        )}
-
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                background: goalColor,
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: textColor,
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600
-                            }}
-                        >
-                            Edit Goal
-                        </button>
-
-                        {onAddChild && childType && (
-                            <button
-                                onClick={() => {
-                                    if (displayMode === 'modal' && onClose) onClose();
-                                    onAddChild(goal);
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: 'transparent',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    color: '#ccc',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                + Add {childType}
-                            </button>
-                        )}
-
-                        {onDelete && (
-                            <button
-                                onClick={() => {
-                                    if (displayMode === 'modal' && onClose) onClose();
-                                    onDelete(goal);
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: 'transparent',
-                                    border: '1px solid #d32f2f',
-                                    borderRadius: '4px',
-                                    color: '#d32f2f',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                Delete Goal
-                            </button>
-                        )}
-                    </div>
                 </div>
             )}
         </>
@@ -1515,51 +1610,80 @@ function GoalDetailModal({
     if (displayMode === 'panel') {
         return (
             <div style={{
-                padding: '16px',
-                color: 'white',
-                height: '100%',
-                overflowY: 'auto'
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                minHeight: 0,
+                maxHeight: 'calc(100vh - 200px)',
+                overflow: 'hidden'
             }}>
-                {content}
+                <div style={{
+                    padding: '16px',
+                    paddingBottom: '24px',
+                    color: 'white',
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: 'auto'
+                }}>
+                    {content}
+                </div>
+                <SelectActivitiesModal
+                    isOpen={isActivityModalOpen}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
+                    onClose={() => setIsActivityModalOpen(false)}
+                    onConfirm={handleAddActivities}
+                />
             </div>
         );
     }
 
     // Modal mode
     return (
-        <div
-            className="modal-overlay"
-            onClick={onClose}
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-            }}
-        >
+        <>
             <div
-                onClick={(e) => e.stopPropagation()}
+                className="modal-overlay"
+                onClick={onClose}
                 style={{
-                    background: '#1e1e1e',
-                    border: `2px solid ${goalColor}`,
-                    borderRadius: '8px',
-                    padding: '24px',
-                    maxWidth: '700px',
-                    width: '90%',
-                    maxHeight: '90vh',
-                    overflowY: 'auto',
-                    color: 'white'
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
                 }}
             >
-                {content}
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        background: '#1e1e1e',
+                        border: `2px solid ${goalColor}`,
+                        borderRadius: '8px',
+                        padding: '24px',
+                        maxWidth: '700px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        color: 'white'
+                    }}
+                >
+                    {content}
+                </div>
             </div>
-        </div>
+            <SelectActivitiesModal
+                isOpen={isActivityModalOpen}
+                activityDefinitions={activityDefinitions}
+                activityGroups={activityGroups}
+                alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
+                onClose={() => setIsActivityModalOpen(false)}
+                onConfirm={handleAddActivities}
+            />
+        </>
     );
 }
 

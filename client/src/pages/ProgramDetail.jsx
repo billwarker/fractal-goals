@@ -23,6 +23,7 @@ const ProgramDetail = () => {
     const [loading, setLoading] = useState(true);
     const [goals, setGoals] = useState([]);
     const [activities, setActivities] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [showEditBuilder, setShowEditBuilder] = useState(false);
 
@@ -61,6 +62,7 @@ const ProgramDetail = () => {
             fetchProgramData();
             fetchGoals();
             fetchActivities();
+            fetchActivityGroups();
             fetchSessions();
         }
     }, [rootId, programId]);
@@ -92,6 +94,15 @@ const ProgramDetail = () => {
             setActivities(res.data);
         } catch (err) {
             console.error('Failed to fetch activities:', err);
+        }
+    };
+
+    const fetchActivityGroups = async () => {
+        try {
+            const res = await fractalApi.getActivityGroups(rootId);
+            setActivityGroups(res.data);
+        } catch (err) {
+            console.error('Failed to fetch activity groups:', err);
         }
     };
 
@@ -1045,6 +1056,7 @@ const ProgramDetail = () => {
                 rootId={rootId}
                 programs={[program]} // Pass current program as array for association context
                 activityDefinitions={activities}
+                activityGroups={activityGroups}
                 displayMode="modal"
             />
         </div>

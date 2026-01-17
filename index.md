@@ -613,11 +613,13 @@ Fractal selection/home page.
   - View/Edit goal name, description, deadline
   - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
   - **Associated/Targeting Programs display**
+  - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`
   - Inline target builder (add/edit/delete targets)
   - Completion confirmation flow with program/target summary
   - Display completed_at date for finished goals
   - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
-  - Action buttons: Mark Complete, Edit, Add Child, Delete
+  - **Action buttons layout:** 2x2 grid above description (Mark Complete | Add Child, Edit Goal | Delete Goal)
+- **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
 - **`ActivitiesManager.jsx`** - Activity selection and management interface

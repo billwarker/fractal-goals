@@ -24,6 +24,7 @@ const Sidebar = ({
     treeData,
     sessions = [],
     activityDefinitions = [],
+    activityGroups = [],
     programs = []
 }) => {
 
@@ -59,7 +60,7 @@ const Sidebar = ({
     // Goal View - Use GoalDetailModal in Panel Mode
     return (
         <div className="details-window">
-            <div className="window-content" style={{ padding: 0 }}>
+            <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <GoalDetailModal
                     isOpen={true}
                     onClose={onClose}
@@ -74,6 +75,7 @@ const Sidebar = ({
                     treeData={treeData}
                     displayMode="panel"
                     programs={programs}
+                    activityGroups={activityGroups}
                 />
             </div>
         </div>

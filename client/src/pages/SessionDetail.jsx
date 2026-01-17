@@ -985,6 +985,7 @@ function SessionDetail() {
                 goal={selectedGoal}
                 onUpdate={handleUpdateGoal}
                 activityDefinitions={activities}
+                activityGroups={activityGroups}
                 rootId={rootId}
             />
 

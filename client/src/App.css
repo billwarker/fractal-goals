@@ -1182,7 +1182,8 @@ html {
     right: 20px;
     width: 33vw;
     min-width: 400px;
-    bottom: 20px;
+    bottom: 60px;
+    max-height: calc(100vh - 160px);
     background: rgba(20, 20, 20, 0.95);
     border: 1px solid #444;
     border-radius: 12px;

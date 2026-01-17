@@ -42,7 +42,9 @@ function FractalGoals() {
 
     const {
         activities,
-        fetchActivities
+        activityGroups,
+        fetchActivities,
+        fetchActivityGroups
     } = useActivities();
 
     // Programs State
@@ -85,6 +87,7 @@ function FractalGoals() {
         fetchFractalTree(rootId);
         fetchSessions(rootId);
         fetchActivities(rootId);
+        fetchActivityGroups(rootId);
         fetchPrograms(rootId);
     }, [rootId, navigate]);
 
@@ -225,6 +228,7 @@ function FractalGoals() {
                         treeData={fractalData}
                         sessions={sessions}
                         activityDefinitions={activities}
+                        activityGroups={activityGroups}
                         programs={programs}
                     />
                 </ErrorBoundary>
@@ -238,6 +242,7 @@ function FractalGoals() {
                 onCreate={handleCreateGoal}
                 parentGoal={selectedParent}
                 activityDefinitions={activities}
+                activityGroups={activityGroups}
                 rootId={rootId}
             />
 

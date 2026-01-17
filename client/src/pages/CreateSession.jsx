@@ -38,6 +38,7 @@ function CreateSession() {
     const [programsByName, setProgramsByName] = useState({});
     const [existingImmediateGoals, setExistingImmediateGoals] = useState([]);
     const [activityDefinitions, setActivityDefinitions] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
 
     // Selection state
     const [selectedProgram, setSelectedProgram] = useState(null);
@@ -68,11 +69,12 @@ function CreateSession() {
 
     const fetchData = async () => {
         try {
-            const [templatesRes, goalsRes, programDaysRes, activitiesRes] = await Promise.all([
+            const [templatesRes, goalsRes, programDaysRes, activitiesRes, groupsRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
                 fractalApi.getGoalsForSelection(rootId),
                 fractalApi.getActiveProgramDays(rootId),
-                fractalApi.getActivities(rootId)
+                fractalApi.getActivities(rootId),
+                fractalApi.getActivityGroups(rootId)
             ]);
 
             setTemplates(templatesRes.data);
@@ -107,6 +109,7 @@ function CreateSession() {
             );
             setExistingImmediateGoals(allImmediateGoals);
             setActivityDefinitions(activitiesRes.data || []);
+            setActivityGroups(groupsRes.data || []);
 
             // Pre-select goal from URL if provided
             const goalIdFromUrl = searchParams.get('goalId');
@@ -421,6 +424,7 @@ function CreateSession() {
                     attributes: { type: 'ShortTermGoal' }
                 } : null}
                 activityDefinitions={activityDefinitions}
+                activityGroups={activityGroups}
                 rootId={rootId}
             />
 
