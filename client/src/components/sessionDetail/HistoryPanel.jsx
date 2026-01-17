@@ -213,7 +213,7 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
                                 </span>
                             )}
                             <span style={{ color: '#aaa', fontSize: '12px' }}>
-                                💬 {note.content}
+                                {note.content}
                             </span>
                         </div>
                     ))}
