@@ -1001,8 +1001,8 @@ function GoalDetailModal({
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                Description:
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                Description
                             </label>
                             <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                                 {goal.attributes?.description || goal.description ||
@@ -1013,8 +1013,8 @@ function GoalDetailModal({
                         {/* Relevance Statement - View Mode */}
                         {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?
                                 </label>
                                 <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                                     {goal.attributes?.relevance_statement || relevanceStatement}

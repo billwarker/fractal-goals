@@ -26,7 +26,9 @@ const TargetManager = ({
     const [viewState, setViewState] = useState(initialTarget ? 'edit' : 'list');
     const [editingTarget, setEditingTarget] = useState(initialTarget);
     const [targetToDelete, setTargetToDelete] = useState(null);
-    const [deleteTargetCallback, setDeleteTargetCallback] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Form State
 
     // Form State
     const [selectedActivityId, setSelectedActivityId] = useState(initialTarget?.activity_id || '');
@@ -139,15 +141,19 @@ const TargetManager = ({
     };
 
     const confirmAndDeleteTarget = (targetId) => {
-        // In this simplified version, we can just use window.confirm or a local state 
-        // effectively similar to the parent, but for now lets keep it simple inside the builder view
-        // logic or just call delete if we are in the edit view.
-        // The original code had a confirmation step.
-        // Let's implement immediate delete for the edit view since user is deliberately there.
-        handleDeleteTarget(targetId);
-        setViewState('list');
-        setEditingTarget(null);
-        if (onCloseBuilder) onCloseBuilder();
+        setTargetToDelete(targetId);
+        setShowDeleteConfirm(true);
+    };
+
+    const executeDeleteTarget = () => {
+        if (targetToDelete) {
+            handleDeleteTarget(targetToDelete);
+            setViewState('list');
+            setEditingTarget(null);
+            setTargetToDelete(null);
+            setShowDeleteConfirm(false);
+            if (onCloseBuilder) onCloseBuilder();
+        }
     };
 
     const handleCancel = () => {
@@ -395,12 +401,61 @@ const TargetManager = ({
         );
     }
 
+    // Confirmation Modal Render
+    const renderDeleteConfirm = () => {
+        if (!showDeleteConfirm) return null;
+        return (
+            <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.7)', zIndex: 1002,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+                <div style={{
+                    background: '#252525', padding: '24px', borderRadius: '12px',
+                    width: '90%', maxWidth: '400px', border: '1px solid #444',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                }}>
+                    <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'white' }}>Delete Target?</h3>
+                    <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#ccc', lineHeight: '1.5' }}>
+                        Are you sure you want to delete this target? This action cannot be undone.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                        <button
+                            onClick={() => {
+                                setShowDeleteConfirm(false);
+                                setTargetToDelete(null);
+                            }}
+                            style={{
+                                padding: '8px 16px', background: 'transparent',
+                                border: '1px solid #555', borderRadius: '6px',
+                                color: '#ccc', cursor: 'pointer', fontSize: '13px'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={executeDeleteTarget}
+                            style={{
+                                padding: '8px 16px', background: '#d32f2f',
+                                border: 'none', borderRadius: '6px',
+                                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '600'
+                            }}
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // Default List View
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {renderDeleteConfirm()}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa' }}>
-                    Measurable Targets ({targets.length})
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                    Targets ({targets.length})
                 </label>
                 {isEditing && (
                     <button
@@ -428,12 +483,17 @@ const TargetManager = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {targets.map((target, index) => (
                         <div key={target.id || index} style={{ position: 'relative' }}>
-                            <TargetCard
-                                target={target}
-                                activityDefinitions={activityDefinitions}
-                                onEdit={isEditing ? () => handleOpenEditTarget(target) : undefined}
-                                onDelete={isEditing ? () => handleDeleteTarget(target.id) : undefined}
-                            />
+                            <div onClick={() => isEditing && handleOpenEditTarget(target)} style={{ cursor: isEditing ? 'pointer' : 'default' }}>
+                                <TargetCard
+                                    target={target}
+                                    activityDefinitions={activityDefinitions}
+                                    onEdit={undefined} // Handled by parent div click
+                                    onDelete={isEditing ? (e) => {
+                                        e.stopPropagation(); // Prevent opening edit mode
+                                        confirmAndDeleteTarget(target.id);
+                                    } : undefined}
+                                />
+                            </div>
                         </div>
                     ))}
                 </div>

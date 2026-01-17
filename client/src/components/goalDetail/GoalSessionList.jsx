@@ -62,8 +62,8 @@ const GoalSessionList = ({
             {/* Sessions - For ShortTermGoals (Goal is Parent of Session) */}
             {isShortTermGoal && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Sessions ({childSessions.length})
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                        Associated Sessions ({childSessions.length})
                     </label>
                     {childSessions.length === 0 ? (
                         <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
@@ -108,7 +108,7 @@ const GoalSessionList = ({
             {/* Associated Sessions - For ImmediateGoals (Goal is Child of Session) */}
             {isImmediateGoal && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
                         Associated Sessions ({associatedSessions.length})
                     </label>
                     {associatedSessions.length === 0 ? (

@@ -279,8 +279,8 @@ const ActivityAssociator = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa' }}>
-                    Achievable (Activities)
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                    Associated Activities ({associatedActivities.length})
                 </label>
                 {isEditing && (
                     <button
