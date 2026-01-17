@@ -647,7 +647,7 @@ Fractal selection/home page.
 - **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
 - **`ProgramDayModal.jsx`** - Modal for creating/editing program days
 - **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
-- **`DeleteProgramModal.jsx`** - Modal for confirming program deletion with session count warning
+- **DeleteProgramModal.jsx** - Modal for confirming program deletion with session count warning. Supports `requireMatchingText` to enforce typing a specific string.
 - **`DayViewModal.jsx`** - Detailed view of a calendar day (schedule + goal deadlines)
 - **`PracticeSessionModal.jsx`** - Modal for creating/editing practice sessions
 - **`GroupBuilderModal.jsx`** - Modal for creating/editing activity groups

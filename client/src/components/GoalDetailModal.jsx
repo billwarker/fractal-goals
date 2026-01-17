@@ -4,6 +4,7 @@ import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
 import TargetCard from './TargetCard';
 import SMARTIndicator from './SMARTIndicator';
+import ConfirmationModal from './ConfirmationModal';
 import { fractalApi } from '../utils/api';
 
 /**
@@ -76,6 +77,10 @@ function GoalDetailModal({
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+    // Delete confirmation state
+    const [targetToDelete, setTargetToDelete] = useState(null);
+    const [deleteTargetCallback, setDeleteTargetCallback] = useState(null);
 
     // Initialize form state from goal - use specific dependencies for completion state
     const depGoalId = goal?.attributes?.id || goal?.id;
@@ -327,7 +332,34 @@ function GoalDetailModal({
     };
 
     const handleDeleteTarget = (targetId) => {
-        setTargets(prev => prev.filter(t => t.id !== targetId));
+        const newTargets = targets.filter(t => t.id !== targetId);
+        setTargets(newTargets);
+
+        // If not in full edit mode, persist immediately
+        if (!isEditing && mode !== 'create') {
+            onUpdate(goal.id, {
+                name,
+                description,
+                deadline: deadline || null,
+                targets: newTargets,
+                targets: newTargets,
+                relevance_statement: relevanceStatement
+            });
+        }
+    };
+
+    const confirmAndDeleteTarget = (targetId, onSuccess) => {
+        setTargetToDelete(targetId);
+        setDeleteTargetCallback(() => onSuccess); // Wrap in function to avoid immediate execution if onSuccess is a function
+    };
+
+    const handleFinalizeDeleteTarget = () => {
+        if (targetToDelete) {
+            handleDeleteTarget(targetToDelete);
+            if (deleteTargetCallback) deleteTargetCallback();
+        }
+        setTargetToDelete(null);
+        setDeleteTargetCallback(null);
     };
 
     const handleActivityChange = (activityId) => {
@@ -673,37 +705,61 @@ function GoalDetailModal({
             )}
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                <button
-                    onClick={handleCancelTargetEdit}
-                    style={{
-                        padding: '8px 14px',
-                        background: 'transparent',
-                        border: '1px solid #666',
-                        borderRadius: '4px',
-                        color: '#ccc',
-                        cursor: 'pointer',
-                        fontSize: '13px'
-                    }}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={handleSaveTarget}
-                    disabled={!selectedActivityId}
-                    style={{
-                        padding: '8px 14px',
-                        background: selectedActivityId ? '#4caf50' : '#333',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: selectedActivityId ? 'white' : '#666',
-                        cursor: selectedActivityId ? 'pointer' : 'not-allowed',
-                        fontSize: '13px',
-                        fontWeight: 600
-                    }}
-                >
-                    {editingTarget ? 'Update Target' : 'Add Target'}
-                </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #333' }}>
+                {editingTarget ? (
+                    <button
+                        onClick={() => {
+                            confirmAndDeleteTarget(editingTarget.id, () => {
+                                setViewState('goal');
+                                setEditingTarget(null);
+                            });
+                        }}
+                        style={{
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: '1px solid #f44336',
+                            borderRadius: '4px',
+                            color: '#f44336',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        Delete Target
+                    </button>
+                ) : <div />}
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={handleCancelTargetEdit}
+                        style={{
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: '1px solid #666',
+                            borderRadius: '4px',
+                            color: '#ccc',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSaveTarget}
+                        disabled={!selectedActivityId}
+                        style={{
+                            padding: '8px 14px',
+                            background: selectedActivityId ? '#4caf50' : '#333',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: selectedActivityId ? 'white' : '#666',
+                            cursor: selectedActivityId ? 'pointer' : 'not-allowed',
+                            fontSize: '13px',
+                            fontWeight: 600
+                        }}
+                    >
+                        {editingTarget ? 'Update Target' : 'Add Target'}
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -1648,52 +1704,54 @@ function GoalDetailModal({
                             />
                         </div>
 
-                        {/* Targets Section - Edit Mode */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <label style={{ fontSize: '12px', color: '#aaa' }}>Targets:</label>
-                                {activitiesForTargets.length > 0 && (
-                                    <button
-                                        onClick={handleOpenAddTarget}
-                                        style={{
-                                            background: '#4caf50',
-                                            border: 'none',
-                                            color: 'white',
-                                            fontSize: '11px',
-                                            padding: '4px 10px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        + Add Target
-                                    </button>
-                                )}
+                        {/* Targets Section - Edit Mode (Only show creation, otherwise handled in View mode) */}
+                        {mode === 'create' && (
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '12px', color: '#aaa' }}>Targets:</label>
+                                    {activitiesForTargets.length > 0 && (
+                                        <button
+                                            onClick={handleOpenAddTarget}
+                                            style={{
+                                                background: '#4caf50',
+                                                border: 'none',
+                                                color: 'white',
+                                                fontSize: '11px',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            + Add Target
+                                        </button>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {targets.length === 0 ? (
+                                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                                            {activitiesForTargets.length === 0
+                                                ? (associatedActivities.length === 0
+                                                    ? 'Associate activities first to set targets'
+                                                    : 'No associated activities have metrics')
+                                                : 'No targets defined'}
+                                        </div>
+                                    ) : (
+                                        targets.map(target => (
+                                            <TargetCard
+                                                key={target.id}
+                                                target={target}
+                                                activityDefinitions={activityDefinitions}
+                                                onEdit={() => handleOpenEditTarget(target)}
+                                                onDelete={() => confirmAndDeleteTarget(target.id)}
+                                                isCompleted={false}
+                                                isEditMode={true}
+                                            />
+                                        ))
+                                    )}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {targets.length === 0 ? (
-                                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                        {activitiesForTargets.length === 0
-                                            ? (associatedActivities.length === 0
-                                                ? 'Associate activities first to set targets'
-                                                : 'No associated activities have metrics')
-                                            : 'No targets defined'}
-                                    </div>
-                                ) : (
-                                    targets.map(target => (
-                                        <TargetCard
-                                            key={target.id}
-                                            target={target}
-                                            activityDefinitions={activityDefinitions}
-                                            onEdit={() => handleOpenEditTarget(target)}
-                                            onDelete={() => handleDeleteTarget(target.id)}
-                                            isCompleted={false}
-                                            isEditMode={true}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        </div>
+                        )}
 
                         {/* Edit Actions */}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
@@ -2054,6 +2112,8 @@ function GoalDetailModal({
                                             activityDefinitions={activityDefinitions}
                                             isCompleted={isCompleted}
                                             isEditMode={false}
+                                            onDelete={() => confirmAndDeleteTarget(target.id)}
+                                            onClick={() => handleOpenEditTarget(target)}
                                         />
                                     ))
                                 )}
@@ -2179,6 +2239,21 @@ function GoalDetailModal({
     }
 
     // ============ RENDER ============
+    const confirmModalComponent = (
+        <ConfirmationModal
+            isOpen={!!targetToDelete}
+            onClose={() => {
+                setTargetToDelete(null);
+                setDeleteTargetCallback(null);
+            }}
+            onConfirm={handleFinalizeDeleteTarget}
+            title="Delete Target"
+            message="Are you sure you want to delete this target? This action cannot be undone."
+            confirmText="Delete"
+            cancelText="Cancel"
+        />
+    );
+
     if (displayMode === 'panel') {
         return (
             <div style={{
@@ -2199,6 +2274,7 @@ function GoalDetailModal({
                 }}>
                     {content}
                 </div>
+                {confirmModalComponent}
             </div>
         );
     }
@@ -2239,6 +2315,8 @@ function GoalDetailModal({
                     {content}
                 </div>
             </div>
+            {/* Confirmation Modal for Target Deletion */}
+            {confirmModalComponent}
         </>
     );
 }
