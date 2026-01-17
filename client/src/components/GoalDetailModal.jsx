@@ -204,6 +204,33 @@ function GoalDetailModal({
 
     // Handler for removing an activity association
     const handleRemoveActivity = async (activityId) => {
+        // Find activity object to check name
+        const activityToRemove = associatedActivities.find(a => String(a.id) === String(activityId));
+
+        // Check if activity is used in any target (ID or Name match)
+        const isUsedInTarget = targets.some(t => {
+            // ID match
+            if (String(t.activity_id) === String(activityId)) return true;
+
+            // Name match (if activity found)
+            if (activityToRemove) {
+                const normalize = s => s ? String(s).trim().toLowerCase() : '';
+                const activityName = normalize(activityToRemove.name);
+
+                const targetActivityDef = activityDefinitions.find(ad => ad.id === t.activity_id);
+                if (targetActivityDef && normalize(targetActivityDef.name) === activityName) return true;
+
+                // Check target name override
+                if (t.name && normalize(t.name) === activityName) return true;
+            }
+            return false;
+        });
+
+        if (isUsedInTarget) {
+            alert('Cannot remove this activity because it is used in one or more targets for this goal. Please remove the targets first.');
+            return;
+        }
+
         if (!rootId || !depGoalId) return;
 
         try {
@@ -1581,7 +1608,7 @@ function GoalDetailModal({
                                     Relevance (SMART):
                                 </label>
                                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
+                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
                                 </div>
                                 <textarea
                                     value={relevanceStatement}
@@ -1829,7 +1856,7 @@ function GoalDetailModal({
                         {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
                             <div>
                                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
+                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
                                 </label>
                                 <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                                     {goal.attributes?.relevance_statement || relevanceStatement}
@@ -1910,44 +1937,66 @@ function GoalDetailModal({
                                     </div>
                                 ) : (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                        {associatedActivities.slice(0, 10).map(activity => (
-                                            <div
-                                                key={activity.id}
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    padding: '4px 10px',
-                                                    background: '#2a3a2a',
-                                                    border: '1px solid #4caf50',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    color: '#4caf50'
-                                                }}
-                                            >
-                                                <span>{activity.name}</span>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleRemoveActivity(activity.id);
-                                                    }}
+                                        {associatedActivities.slice(0, 10).map(activity => {
+                                            const isUsed = targets.some(t => {
+                                                // ID Match
+                                                if (String(t.activity_id) === String(activity.id)) return true;
+
+                                                // Name Match (Normalization Helper)
+                                                const normalize = s => s ? String(s).trim().toLowerCase() : '';
+                                                const activityName = normalize(activity.name);
+
+                                                // Check via Activity Definition
+                                                const targetActivityDef = activityDefinitions.find(ad => ad.id === t.activity_id);
+                                                if (targetActivityDef && normalize(targetActivityDef.name) === activityName) return true;
+
+                                                // Check target name override
+                                                if (t.name && normalize(t.name) === activityName) return true;
+
+                                                return false;
+                                            });
+
+                                            return (
+                                                <div
+                                                    key={activity.id}
                                                     style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: '#888',
-                                                        fontSize: '14px',
-                                                        cursor: 'pointer',
-                                                        padding: '0',
-                                                        lineHeight: 1,
                                                         display: 'flex',
-                                                        alignItems: 'center'
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        padding: '4px 10px',
+                                                        background: '#2a3a2a',
+                                                        border: '1px solid #4caf50',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        color: '#4caf50'
                                                     }}
-                                                    title="Remove association"
                                                 >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        ))}
+                                                    <span>{activity.name}</span>
+                                                    {!isUsed && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveActivity(activity.id);
+                                                            }}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: '#888',
+                                                                fontSize: '14px',
+                                                                cursor: 'pointer',
+                                                                padding: '0',
+                                                                lineHeight: 1,
+                                                                display: 'flex',
+                                                                alignItems: 'center'
+                                                            }}
+                                                            title="Remove association"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                         {associatedActivities.length > 10 && (
                                             <button
                                                 onClick={handleOpenActivitySelector}
