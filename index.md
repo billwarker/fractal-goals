@@ -616,7 +616,7 @@ Fractal selection/home page.
   - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`.
     - View limit: Shows up to 10 activities, with clickable "and X more" text to expand.
     - Activity Selector: Card-based group selection + individual activity selection with "Currently Associated" list at the bottom.
-  - **Inline target builder:** Add/Edit targets with bubble-based activity selection interface.
+  - **Inline target builder:** Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode; requires manual save in Edit Mode.
   - Completion confirmation flow with program/target summary
   - **SMART Indicator:** Real-time feedback based on current editing state (targets, description, deadline, etc.)
   - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates below action buttons.

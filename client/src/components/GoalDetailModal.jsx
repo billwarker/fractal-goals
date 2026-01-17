@@ -339,10 +339,24 @@ function GoalDetailModal({
             metrics
         };
 
+        let newTargets;
         if (editingTarget) {
-            setTargets(prev => prev.map(t => t.id === target.id ? target : t));
+            newTargets = targets.map(t => t.id === target.id ? target : t);
         } else {
-            setTargets(prev => [...prev, target]);
+            newTargets = [...targets, target];
+        }
+
+        setTargets(newTargets);
+
+        // If not in full edit mode, persist immediately
+        if (!isEditing && mode !== 'create') {
+            onUpdate(goal.id, {
+                name,
+                description,
+                deadline: deadline || null,
+                targets: newTargets,
+                relevance_statement: relevanceStatement
+            });
         }
 
         setViewState('goal');
@@ -1881,8 +1895,8 @@ function GoalDetailModal({
                                             background: 'transparent',
                                             border: '1px solid #4caf50',
                                             color: '#4caf50',
-                                            fontSize: '10px',
-                                            padding: '2px 8px',
+                                            fontSize: '12px',
+                                            padding: '4px 10px',
                                             borderRadius: '4px',
                                             cursor: 'pointer'
                                         }}
@@ -1968,8 +1982,8 @@ function GoalDetailModal({
                                             background: 'transparent',
                                             border: '1px solid #4caf50',
                                             color: '#4caf50',
-                                            fontSize: '10px',
-                                            padding: '2px 8px',
+                                            fontSize: '12px',
+                                            padding: '4px 10px',
                                             borderRadius: '4px',
                                             cursor: 'pointer'
                                         }}
