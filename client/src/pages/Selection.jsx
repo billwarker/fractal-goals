@@ -76,8 +76,8 @@ function Selection() { // No props needed anymore
         });
     };
 
-    const getHighestLevelColor = () => {
-        if (!fractals || fractals.length === 0) return getGoalColor('UltimateGoal');
+    const getHighestLevelType = () => {
+        if (!fractals || fractals.length === 0) return 'UltimateGoal';
 
         const hierarchy = [
             'UltimateGoal',
@@ -89,14 +89,17 @@ function Selection() { // No props needed anymore
 
         for (const type of hierarchy) {
             if (fractals.some(f => f.type === type)) {
-                return getGoalColor(type);
+                return type;
             }
         }
 
-        return getGoalColor('UltimateGoal');
+        return 'UltimateGoal';
     };
 
-    const headerColor = getHighestLevelColor();
+    const headerType = getHighestLevelType();
+    const headerColor = getGoalColor(headerType);
+    const headerTextColor = getGoalTextColor(headerType);
+    const isDarkText = headerTextColor === '#1a1a1a';
 
     if (loading) {
         return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading fractals...</div>;
@@ -126,11 +129,11 @@ function Selection() { // No props needed anymore
                 }}>
                     {/* The App Name */}
                     <h1 style={{
-                        color: 'white',
+                        color: headerTextColor,
                         fontWeight: 800,
                         fontSize: '28px',
                         margin: 0,
-                        textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+                        textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
                         letterSpacing: '2px',
                         textTransform: 'uppercase',
                         textAlign: 'center',

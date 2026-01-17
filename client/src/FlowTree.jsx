@@ -94,7 +94,7 @@ const CustomNode = ({ data }) => {
                     height: '30px',
                     borderRadius: '50%',
                     background: fillColor,
-                    border: '2px solid #fff',
+                    border: 'none',
                     boxShadow: isCompleted
                         ? '0 0 10px rgba(255, 215, 0, 0.6)'
                         : '0 2px 4px rgba(0,0,0,0.3)',
@@ -109,11 +109,10 @@ const CustomNode = ({ data }) => {
                     <div
                         style={{
                             position: 'absolute',
-                            width: '44px',
-                            height: '44px',
+                            width: '38px',
+                            height: '38px',
                             borderRadius: '50%',
                             border: `3px solid ${smartRingColor}`,
-                            boxShadow: `0 0 12px ${smartRingColor}, 0 0 20px ${smartRingColor}40`,
                             left: '50%',
                             top: '50%',
                             transform: 'translate(-50%, -50%)',
