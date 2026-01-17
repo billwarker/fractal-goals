@@ -4,7 +4,6 @@ import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
 import TargetCard from './TargetCard';
 import SMARTIndicator from './SMARTIndicator';
-import SelectActivitiesModal from './modals/SelectActivitiesModal';
 import { fractalApi } from '../utils/api';
 
 /**
@@ -61,9 +60,11 @@ function GoalDetailModal({
     // Target editing state
     const [targets, setTargets] = useState([]);
 
-    // View state: 'goal' (main view), 'target-add', 'target-edit', 'complete-confirm', 'uncomplete-confirm'
+    // View state: 'goal' (main view), 'target-add', 'target-edit', 'complete-confirm', 'uncomplete-confirm', 'activity-selector'
     const [viewState, setViewState] = useState('goal');
     const [editingTarget, setEditingTarget] = useState(null);
+    const [activitySelectorGroupId, setActivitySelectorGroupId] = useState(null);  // null = show groups, string = show activities in group
+    const [tempSelectedActivities, setTempSelectedActivities] = useState([]);  // For temp selection in activity selector
 
 
     // Target form state (for inline target builder)
@@ -74,7 +75,6 @@ function GoalDetailModal({
 
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
-    const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     // Initialize form state from goal - use specific dependencies for completion state
@@ -143,20 +143,18 @@ function GoalDetailModal({
         fetchAssociatedActivities();
     }, [rootId, depGoalId, mode]);
 
-    // Handler for adding activities from the modal
-    const handleAddActivities = async (activityIds) => {
-        if (!rootId || !depGoalId || activityIds.length === 0) {
-            setIsActivityModalOpen(false);
+    // Handler for confirming activity selection from inline view
+    const handleConfirmActivitySelection = async () => {
+        if (!rootId || !depGoalId || tempSelectedActivities.length === 0) {
+            setViewState('goal');
+            setActivitySelectorGroupId(null);
+            setTempSelectedActivities([]);
             return;
         }
 
         try {
-            // Combine existing IDs with new IDs
-            const existingIds = associatedActivities.map(a => a.id);
-            const allIds = [...new Set([...existingIds, ...activityIds])];
-
             // For each new activity, we need to add the goal to its associations
-            for (const activityId of activityIds) {
+            for (const activityId of tempSelectedActivities) {
                 const activity = activityDefinitions.find(a => a.id === activityId);
                 if (activity) {
                     // Get current goals for this activity and add our goal
@@ -173,7 +171,35 @@ function GoalDetailModal({
             console.error('Error adding activity associations:', error);
         }
 
-        setIsActivityModalOpen(false);
+        setViewState('goal');
+        setActivitySelectorGroupId(null);
+        setTempSelectedActivities([]);
+    };
+
+    // Handler for opening activity selector view
+    const handleOpenActivitySelector = () => {
+        setTempSelectedActivities([]);
+        setActivitySelectorGroupId(null);
+        setViewState('activity-selector');
+    };
+
+    // Handler for canceling activity selection
+    const handleCancelActivitySelector = () => {
+        setViewState('goal');
+        setActivitySelectorGroupId(null);
+        setTempSelectedActivities([]);
+    };
+
+    // Handler for toggling activity in temp selection
+    const handleToggleActivitySelection = (activityId) => {
+        if (associatedActivities.some(a => a.id === activityId)) {
+            return; // Already associated, don't toggle
+        }
+        setTempSelectedActivities(prev =>
+            prev.includes(activityId)
+                ? prev.filter(id => id !== activityId)
+                : [...prev, activityId]
+        );
     };
 
     // Handler for removing an activity association
@@ -371,8 +397,14 @@ function GoalDetailModal({
         : [];
 
     // Get activities with metrics for target builder
+    // First, filter by associated activities, then by having metrics
+    const associatedActivityIds = associatedActivities.map(a => a.id);
     const activitiesWithMetrics = activityDefinitions.filter(a =>
         a.has_metrics && a.metric_definitions && a.metric_definitions.length > 0
+    );
+    // For targets: only activities that are BOTH associated AND have metrics
+    const activitiesForTargets = activitiesWithMetrics.filter(a =>
+        associatedActivityIds.includes(a.id)
     );
     const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
 
@@ -464,15 +496,17 @@ function GoalDetailModal({
                     }}
                 >
                     <option value="">Select an activity...</option>
-                    {activitiesWithMetrics.map(activity => (
+                    {activitiesForTargets.map(activity => (
                         <option key={activity.id} value={activity.id}>
                             {activity.name}
                         </option>
                     ))}
                 </select>
-                {activitiesWithMetrics.length === 0 && (
+                {activitiesForTargets.length === 0 && (
                     <div style={{ fontSize: '11px', color: '#f44336', marginTop: '4px' }}>
-                        No activities with metrics found. Create one first.
+                        {associatedActivities.length === 0
+                            ? 'No activities associated with this goal. Add activities first before setting targets.'
+                            : 'No associated activities have metrics. Add metrics to activities or associate activities with metrics.'}
                     </div>
                 )}
             </div>
@@ -611,6 +645,367 @@ function GoalDetailModal({
             </div>
         </div>
     );
+
+    // ============ ACTIVITY SELECTOR VIEW ============
+    const renderActivitySelector = () => {
+        // Group activities by their group
+        const groupedActivities = {};
+        const ungroupedActivities = [];
+
+        activityDefinitions.forEach(activity => {
+            if (activity.group_id) {
+                if (!groupedActivities[activity.group_id]) {
+                    groupedActivities[activity.group_id] = [];
+                }
+                groupedActivities[activity.group_id].push(activity);
+            } else {
+                ungroupedActivities.push(activity);
+            }
+        });
+
+        const alreadyAssociatedIds = associatedActivities.map(a => a.id);
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Header */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid #4caf50'
+                }}>
+                    <button
+                        onClick={() => {
+                            if (activitySelectorGroupId !== null) {
+                                setActivitySelectorGroupId(null);
+                            } else {
+                                handleCancelActivitySelector();
+                            }
+                        }}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#888',
+                            fontSize: '18px',
+                            cursor: 'pointer',
+                            padding: '0 4px'
+                        }}
+                    >
+                        ←
+                    </button>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white', flex: 1 }}>
+                        {activitySelectorGroupId === null
+                            ? 'Select Activity Group'
+                            : activitySelectorGroupId === 'ungrouped'
+                                ? 'Ungrouped Activities'
+                                : activityGroups.find(g => g.id === activitySelectorGroupId)?.name || 'Activities'}
+                    </h3>
+                    <button
+                        onClick={handleCancelActivitySelector}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#888',
+                            cursor: 'pointer',
+                            fontSize: '18px'
+                        }}
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <p style={{ color: '#888', fontSize: '13px', margin: 0 }}>
+                    Select activities that this goal requires. Associated activities help track the "Achievable" criterion in SMART goals.
+                </p>
+
+                {activityDefinitions.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        <p>No activities found. Create activities in the Manage Activities page.</p>
+                    </div>
+                ) : activitySelectorGroupId === null ? (
+                    /* LEVEL 1: GROUPS */
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                        gap: '10px',
+                        marginTop: '8px'
+                    }}>
+                        {/* Group Cards */}
+                        {activityGroups.map(group => {
+                            const groupActivities = groupedActivities[group.id] || [];
+                            if (groupActivities.length === 0) return null;
+
+                            // Count how many are already selected
+                            const selectedCount = groupActivities.filter(a =>
+                                alreadyAssociatedIds.includes(a.id) || tempSelectedActivities.includes(a.id)
+                            ).length;
+
+                            return (
+                                <button
+                                    key={group.id}
+                                    onClick={() => setActivitySelectorGroupId(group.id)}
+                                    style={{
+                                        padding: '16px 12px',
+                                        background: '#333',
+                                        border: selectedCount > 0 ? '2px solid #4caf50' : '1px solid #555',
+                                        borderRadius: '8px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.2s',
+                                        textAlign: 'center'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#444'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#333'}
+                                >
+                                    <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{group.name}</div>
+                                    <div style={{ fontSize: '11px', color: '#888' }}>
+                                        {groupActivities.length} activities
+                                    </div>
+                                    {selectedCount > 0 && (
+                                        <div style={{
+                                            fontSize: '10px',
+                                            color: '#4caf50',
+                                            background: '#1a3a1a',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px'
+                                        }}>
+                                            {selectedCount} selected
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
+
+                        {/* Ungrouped Card */}
+                        {ungroupedActivities.length > 0 && (
+                            <button
+                                onClick={() => setActivitySelectorGroupId('ungrouped')}
+                                style={{
+                                    padding: '16px 12px',
+                                    background: '#333',
+                                    border: '1px dashed #666',
+                                    borderRadius: '8px',
+                                    color: '#ccc',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    textAlign: 'center'
+                                }}
+                            >
+                                <div style={{ fontSize: '14px', fontStyle: 'italic' }}>Ungrouped</div>
+                                <div style={{ fontSize: '11px', color: '#888' }}>{ungroupedActivities.length} activities</div>
+                            </button>
+                        )}
+                    </div>
+
+
+                ) : (
+                    /* LEVEL 2: ACTIVITIES */
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        maxHeight: '320px',
+                        overflowY: 'auto',
+                        paddingRight: '8px'
+                    }}>
+                        {(activitySelectorGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[activitySelectorGroupId] || []).map(activity => {
+                            const isAlreadyAssociated = alreadyAssociatedIds.includes(activity.id);
+                            const isSelected = tempSelectedActivities.includes(activity.id);
+                            const hasMetrics = activity.metrics && activity.metrics.length > 0;
+
+                            return (
+                                <div
+                                    key={activity.id}
+                                    onClick={() => handleToggleActivitySelection(activity.id)}
+                                    style={{
+                                        background: isSelected ? '#2a4a2a' : '#1e1e1e',
+                                        border: `2px solid ${isSelected || isAlreadyAssociated ? '#4caf50' : '#444'}`,
+                                        borderRadius: '6px',
+                                        padding: '12px 14px',
+                                        cursor: isAlreadyAssociated ? 'not-allowed' : 'pointer',
+                                        opacity: isAlreadyAssociated ? 0.6 : 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isAlreadyAssociated && !isSelected) {
+                                            e.currentTarget.style.borderColor = '#4caf50';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isAlreadyAssociated && !isSelected) {
+                                            e.currentTarget.style.borderColor = '#444';
+                                        }
+                                    }}
+                                >
+                                    {/* Checkbox */}
+                                    <div style={{
+                                        width: '22px',
+                                        height: '22px',
+                                        borderRadius: '4px',
+                                        border: `2px solid ${isSelected || isAlreadyAssociated ? '#4caf50' : '#666'}`,
+                                        background: isSelected || isAlreadyAssociated ? '#4caf50' : 'transparent',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#1a1a1a',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        flexShrink: 0
+                                    }}>
+                                        {(isSelected || isAlreadyAssociated) && '✓'}
+                                    </div>
+
+                                    {/* Activity Info */}
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontWeight: 'bold',
+                                            fontSize: '14px',
+                                            color: isSelected || isAlreadyAssociated ? '#4caf50' : '#ccc',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            {activity.name}
+                                            {isAlreadyAssociated && (
+                                                <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>
+                                                    (Already associated)
+                                                </span>
+                                            )}
+                                        </div>
+                                        {activity.description && (
+                                            <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                                                {activity.description}
+                                            </div>
+                                        )}
+                                        {hasMetrics && (
+                                            <div style={{
+                                                fontSize: '11px',
+                                                color: '#555',
+                                                marginTop: '4px',
+                                                display: 'flex',
+                                                gap: '8px',
+                                                flexWrap: 'wrap'
+                                            }}>
+                                                {activity.metrics.map((m, idx) => (
+                                                    <span key={idx} style={{
+                                                        background: '#2a2a2a',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '3px'
+                                                    }}>
+                                                        {m.name} ({m.unit})
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )
+                }
+
+                {/* Actions Footer */}
+                <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    justifyContent: 'flex-end',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #333'
+                }}>
+                    <button
+                        onClick={handleCancelActivitySelector}
+                        style={{
+                            padding: '10px 20px',
+                            background: 'transparent',
+                            border: '1px solid #666',
+                            color: '#ccc',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleConfirmActivitySelection}
+                        disabled={tempSelectedActivities.length === 0}
+                        style={{
+                            padding: '10px 20px',
+                            background: tempSelectedActivities.length === 0 ? '#444' : '#4caf50',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: tempSelectedActivities.length === 0 ? '#888' : 'white',
+                            fontWeight: 'bold',
+                            cursor: tempSelectedActivities.length === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        Add Selected ({tempSelectedActivities.length})
+                    </button>
+                </div>
+
+                {/* Currently Associated Activities - shown at the bottom */}
+                {associatedActivities.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '8px' }}>
+                            Currently Associated ({associatedActivities.length}):
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {associatedActivities.map(activity => (
+                                <div
+                                    key={activity.id}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '4px 10px',
+                                        background: '#2a3a2a',
+                                        border: '1px solid #4caf50',
+                                        borderRadius: '12px',
+                                        fontSize: '12px',
+                                        color: '#4caf50'
+                                    }}
+                                >
+                                    <span>{activity.name}</span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveActivity(activity.id);
+                                        }}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#888',
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            lineHeight: 1,
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                        title="Remove association"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div >
+        );
+    };
 
     // ============ COMPLETION CONFIRMATION VIEW ============
     const renderCompletionConfirm = () => {
@@ -1172,7 +1567,7 @@ function GoalDetailModal({
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <label style={{ fontSize: '12px', color: '#aaa' }}>Targets:</label>
-                            {activitiesWithMetrics.length > 0 && (
+                            {activitiesForTargets.length > 0 && (
                                 <button
                                     onClick={handleOpenAddTarget}
                                     style={{
@@ -1193,8 +1588,10 @@ function GoalDetailModal({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {targets.length === 0 ? (
                                 <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    {activitiesWithMetrics.length === 0
-                                        ? 'No activities with metrics available'
+                                    {activitiesForTargets.length === 0
+                                        ? (associatedActivities.length === 0
+                                            ? 'Associate activities first to set targets'
+                                            : 'No associated activities have metrics')
                                         : 'No targets defined'}
                                 </div>
                             ) : (
@@ -1426,26 +1823,90 @@ function GoalDetailModal({
                         );
                     })()}
 
-                    {/* Associated Activities Section - View Mode (Count Only) */}
+                    {/* Associated Activities Section - View Mode */}
                     {mode !== 'create' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label style={{ fontSize: '12px', color: '#aaa' }}>
-                                Associated Activities ({isLoadingActivities ? '...' : associatedActivities.length})
-                            </label>
-                            <button
-                                onClick={() => setIsActivityModalOpen(true)}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid #4caf50',
-                                    color: '#4caf50',
-                                    fontSize: '10px',
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                + Add
-                            </button>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <label style={{ fontSize: '12px', color: '#aaa' }}>
+                                    Associated Activities ({isLoadingActivities ? '...' : associatedActivities.length})
+                                </label>
+                                <button
+                                    onClick={handleOpenActivitySelector}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid #4caf50',
+                                        color: '#4caf50',
+                                        fontSize: '10px',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    + Add
+                                </button>
+                            </div>
+                            {associatedActivities.length === 0 ? (
+                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                                    No activities associated
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                    {associatedActivities.slice(0, 10).map(activity => (
+                                        <div
+                                            key={activity.id}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                background: '#2a3a2a',
+                                                border: '1px solid #4caf50',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                color: '#4caf50'
+                                            }}
+                                        >
+                                            <span>{activity.name}</span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRemoveActivity(activity.id);
+                                                }}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: '#888',
+                                                    fontSize: '14px',
+                                                    cursor: 'pointer',
+                                                    padding: '0',
+                                                    lineHeight: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                                title="Remove association"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {associatedActivities.length > 10 && (
+                                        <button
+                                            onClick={handleOpenActivitySelector}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#4caf50',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                padding: '4px 6px',
+                                                textDecoration: 'underline'
+                                            }}
+                                        >
+                                            and {associatedActivities.length - 10} more
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1455,7 +1916,7 @@ function GoalDetailModal({
                             <label style={{ fontSize: '12px', color: '#aaa' }}>
                                 Targets ({targets.length}):
                             </label>
-                            {activitiesWithMetrics.length > 0 && (
+                            {activitiesForTargets.length > 0 && (
                                 <button
                                     onClick={handleOpenAddTarget}
                                     style={{
@@ -1598,6 +2059,8 @@ function GoalDetailModal({
     let content;
     if (viewState === 'target-add' || viewState === 'target-edit') {
         content = renderTargetBuilder();
+    } else if (viewState === 'activity-selector') {
+        content = renderActivitySelector();
     } else if (viewState === 'complete-confirm') {
         content = renderCompletionConfirm();
     } else if (viewState === 'uncomplete-confirm') {
@@ -1627,14 +2090,6 @@ function GoalDetailModal({
                 }}>
                     {content}
                 </div>
-                <SelectActivitiesModal
-                    isOpen={isActivityModalOpen}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
-                    onClose={() => setIsActivityModalOpen(false)}
-                    onConfirm={handleAddActivities}
-                />
             </div>
         );
     }
@@ -1675,14 +2130,6 @@ function GoalDetailModal({
                     {content}
                 </div>
             </div>
-            <SelectActivitiesModal
-                isOpen={isActivityModalOpen}
-                activityDefinitions={activityDefinitions}
-                activityGroups={activityGroups}
-                alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
-                onClose={() => setIsActivityModalOpen(false)}
-                onConfirm={handleAddActivities}
-            />
         </>
     );
 }
