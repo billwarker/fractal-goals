@@ -76,16 +76,70 @@ function Selection() { // No props needed anymore
         });
     };
 
+    const getHighestLevelColor = () => {
+        if (!fractals || fractals.length === 0) return getGoalColor('UltimateGoal');
+
+        const hierarchy = [
+            'UltimateGoal',
+            'LongTermGoal',
+            'MidTermGoal',
+            'ShortTermGoal',
+            'ImmediateGoal'
+        ];
+
+        for (const type of hierarchy) {
+            if (fractals.some(f => f.type === type)) {
+                return getGoalColor(type);
+            }
+        }
+
+        return getGoalColor('UltimateGoal');
+    };
+
+    const headerColor = getHighestLevelColor();
+
     if (loading) {
         return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading fractals...</div>;
     }
 
     return (
         <div className="fractal-selection-container">
-            <h1 style={{ color: 'white', fontWeight: 300, marginBottom: '10px' }}>
-                My Fractal Goals
-            </h1>
-            <p style={{ color: '#888' }}>Select a tree to focus on</p>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: '60px',
+                marginTop: '40px'
+            }}>
+                {/* The Goal Node Circle - Highest Level Color */}
+                <div style={{
+                    width: '280px',
+                    height: '280px',
+                    borderRadius: '50%',
+                    backgroundColor: headerColor,
+                    border: '5px solid white',
+                    boxShadow: '0 0 50px rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 0
+                }}>
+                    {/* The App Name */}
+                    <h1 style={{
+                        color: 'white',
+                        fontWeight: 800,
+                        fontSize: '28px',
+                        margin: 0,
+                        textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+                        letterSpacing: '2px',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        zIndex: 1
+                    }}>
+                        Fractal Goals
+                    </h1>
+                </div>
+            </div>
 
             <div className="fractal-selection-grid">
                 {fractals.map(fractal => (

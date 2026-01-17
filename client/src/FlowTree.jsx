@@ -170,9 +170,7 @@ const CustomNode = ({ data }) => {
                         color: isCompleted ? completedGold : '#e0e0e0',
                         fontSize: isUltimate ? '16px' : '14px',
                         fontWeight: (isCompleted || isUltimate) ? '700' : '600',
-                        textShadow: isUltimate
-                            ? `0 0 10px ${completedGold}, 0 0 2px ${completedGold}` // Golden Halo for Ultimate
-                            : '0 1px 3px rgba(0,0,0,0.8)',
+                        textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                         whiteSpace: data.label.length > 30 ? 'normal' : 'nowrap',
                         wordBreak: 'keep-all',
                         overflowWrap: 'break-word',

@@ -4,7 +4,7 @@
  */
 
 export const GOAL_COLORS = {
-    'UltimateGoal': '#070A13',      // Singularity Black - The void at the center
+    'UltimateGoal': '#5A2D82',      // Astral Purple - Vivid cosmic violet
     'LongTermGoal': '#0B3C5D',      // Abyss Navy - True navy, distinguishable from mid-term blue
     'MidTermGoal': '#3A86FF',       // Signal Blue - Bright, saturated blue
     'ShortTermGoal': '#2EC4B6',     // Astro Teal - Green-leaning teal
@@ -17,7 +17,7 @@ export const GOAL_COLORS = {
 };
 
 export const GOAL_COLOR_NAMES = {
-    'UltimateGoal': 'Singularity Black',
+    'UltimateGoal': 'Astral Purple',
     'LongTermGoal': 'Abyss Navy',
     'MidTermGoal': 'Signal Blue',
     'ShortTermGoal': 'Astro Teal',
