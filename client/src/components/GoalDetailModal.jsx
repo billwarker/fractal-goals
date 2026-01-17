@@ -1781,15 +1781,15 @@ function GoalDetailModal({
                             )}
                         </div>
 
-                        <div style={{ fontSize: '12px', color: '#888' }}>
+                        <div style={{ fontSize: '12px', color: '#888', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
                             {goal.attributes?.created_at && (
-                                <div style={{ marginBottom: '4px' }}>
+                                <div>
                                     Created: {new Date(goal.attributes.created_at).toLocaleDateString()}
                                     {' '}({calculateGoalAge(goal.attributes.created_at)})
                                 </div>
                             )}
                             {(goal.attributes?.deadline || goal.deadline) && (
-                                <div style={{ color: '#ff9800', marginBottom: '4px' }}>
+                                <div style={{ color: '#ff9800' }}>
                                     📅 Deadline: {new Date(goal.attributes?.deadline || goal.deadline).toLocaleDateString()}
                                 </div>
                             )}

@@ -619,7 +619,7 @@ Fractal selection/home page.
   - **Inline target builder:** Add/Edit targets with bubble-based activity selection interface.
   - Completion confirmation flow with program/target summary
   - **SMART Indicator:** Real-time feedback based on current editing state (targets, description, deadline, etc.)
-  - Display completed_at date for finished goals
+  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates below action buttons.
   - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
   - **Action buttons layout:** 2x2 grid above description (Mark Complete | Add Child, Edit Goal | Delete Goal)
 - **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
