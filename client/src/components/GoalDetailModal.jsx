@@ -1733,11 +1733,12 @@ function GoalDetailModal({
                                     style={{
                                         padding: '8px 10px',
                                         background: 'transparent',
-                                        border: '1px solid #666',
+                                        border: `1px solid ${getGoalColor(childType)}`,
                                         borderRadius: '4px',
-                                        color: '#ccc',
+                                        color: getGoalColor(childType),
                                         cursor: 'pointer',
-                                        fontSize: '12px'
+                                        fontSize: '12px',
+                                        fontWeight: 'bold'
                                     }}
                                 >
                                     + Add {childType}

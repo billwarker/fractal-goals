@@ -621,7 +621,7 @@ Fractal selection/home page.
   - **SMART Indicator:** Real-time feedback based on current editing state (targets, description, deadline, etc.)
   - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates below action buttons.
   - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
-  - **Action buttons layout:** 2x2 grid above description (Mark Complete | Add Child, Edit Goal | Delete Goal)
+  - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button (colored by child goal level).
 - **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
