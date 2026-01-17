@@ -613,9 +613,12 @@ Fractal selection/home page.
   - View/Edit goal name, description, deadline
   - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
   - **Associated/Targeting Programs display**
-  - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`
-  - Inline target builder (add/edit/delete targets)
+  - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`.
+    - View limit: Shows up to 10 activities, with clickable "and X more" text to expand.
+    - Activity Selector: Card-based group selection + individual activity selection with "Currently Associated" list at the bottom.
+  - **Inline target builder:** Add/Edit targets with bubble-based activity selection interface.
   - Completion confirmation flow with program/target summary
+  - **SMART Indicator:** Real-time feedback based on current editing state (targets, description, deadline, etc.)
   - Display completed_at date for finished goals
   - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
   - **Action buttons layout:** 2x2 grid above description (Mark Complete | Add Child, Edit Goal | Delete Goal)
