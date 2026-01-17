@@ -93,35 +93,54 @@ const CustomNode = ({ data }) => {
                     width: '30px',
                     height: '30px',
                     borderRadius: '50%',
-                    background: fillColor,
-                    border: 'none',
+                    background: isSmartGoal ? 'transparent' : fillColor,
+                    border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
                     boxShadow: isCompleted
                         ? '0 0 10px rgba(255, 215, 0, 0.6)'
                         : '0 2px 4px rgba(0,0,0,0.3)',
                     flexShrink: 0,
                     zIndex: 2,
                     position: 'relative', // Handles are positioned relative to this circle
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                 }}
                 onClick={data.onClick}
             >
-                {/* SMART Ring - outer glow for goals meeting all SMART criteria */}
+                {/* SMART Goal Structure: 3 layers (Outer Ring, Middle Ring, Core) */}
                 {isSmartGoal && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '50%',
-                            border: `3px solid ${smartRingColor}`,
-                            left: '50%',
-                            top: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            zIndex: -1,
-                            pointerEvents: 'none',
-                        }}
-                        title="SMART Goal"
-                    />
+                    <>
+                        {/* Middle Ring */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                border: `2.5px solid ${fillColor}`,
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                        {/* Inner Core */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: '14px',
+                                height: '14px',
+                                borderRadius: '50%',
+                                background: fillColor,
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                    </>
                 )}
+
                 {/* Target Handle - centered on circle */}
                 <Handle
                     type="target"

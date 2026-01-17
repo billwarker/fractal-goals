@@ -458,7 +458,7 @@ Serves static pages (minimal usage, mostly SPA).
 
 - **`main.jsx`** - Application entry point
 - **`AppRouter.jsx`** - Route configuration and navigation
-- **`FlowTree.jsx`** - ReactFlow-based goal tree visualization
+- **`FlowTree.jsx`** - ReactFlow-based goal tree visualization. Custom nodes with circular design, cosmic color coding, and 3-layer "bullseye" (outer ring, middle ring, core) for SMART goals.
 - **`App.css`** - Global styles
 - **`index.css`** - Base styles
 
