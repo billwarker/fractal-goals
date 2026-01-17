@@ -37,6 +37,14 @@ program_day_templates = Table(
     Column('order', Integer, default=0)  # For ordering templates within a day
 )
 
+# Junction table for linking Activities to Goals (for SMART "Achievable" criterion)
+activity_goal_associations = Table(
+    'activity_goal_associations', Base.metadata,
+    Column('activity_id', String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, default=utc_now)
+)
+
 class Goal(Base):
     """
     Represents all nodes in the fractal goal tree.
@@ -63,6 +71,10 @@ class Goal(Base):
     
     # Root goal reference (for performance queries)
     root_id = Column(String, nullable=True)
+    
+    # SMART goal fields
+    relevance_statement = Column(Text, nullable=True)  # "How does this goal help achieve [parent]?"
+    is_smart = Column(Boolean, default=False)  # Computed flag, updated on save
     
     # JSON Plans/Targets
     targets = Column(Text, nullable=True)
@@ -97,9 +109,35 @@ class Goal(Base):
         back_populates="goals",
         viewonly=True
     )
+    
+    # Activities associated with this goal (for SMART "Achievable" criterion)
+    associated_activities = relationship(
+        "ActivityDefinition",
+        secondary=activity_goal_associations,
+        back_populates="associated_goals",
+        viewonly=True
+    )
 
+    def calculate_smart_status(self):
+        """Calculate SMART criteria status for this goal."""
+        targets = json.loads(self.targets) if self.targets else []
+        return {
+            "specific": bool(self.description and self.description.strip()),
+            "measurable": len(targets) > 0,
+            "achievable": len(self.associated_activities) > 0 if self.associated_activities else False,
+            "relevant": bool(self.relevance_statement and self.relevance_statement.strip()),
+            "time_bound": self.deadline is not None
+        }
+    
+    def is_smart_goal(self):
+        """Check if this goal meets all SMART criteria."""
+        status = self.calculate_smart_status()
+        return all(status.values())
+    
     def to_dict(self, include_children=True):
         """Convert goal to dictionary format compatible with frontend."""
+        smart_status = self.calculate_smart_status()
+        
         result = {
             "name": self.name,
             "id": self.id,
@@ -117,6 +155,10 @@ class Goal(Base):
                 "created_at": format_utc(self.created_at),
                 "updated_at": format_utc(self.updated_at),
                 "targets": json.loads(self.targets) if self.targets else [],
+                "relevance_statement": self.relevance_statement,
+                "is_smart": all(smart_status.values()),
+                "smart_status": smart_status,
+                "associated_activity_ids": [a.id for a in self.associated_activities] if self.associated_activities else [],
             },
             "children": []
         }
@@ -412,6 +454,14 @@ class ActivityDefinition(Base):
 
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
+    
+    # Goals associated with this activity (for SMART "Achievable" criterion)
+    associated_goals = relationship(
+        "Goal",
+        secondary=activity_goal_associations,
+        back_populates="associated_activities",
+        viewonly=True
+    )
 
     def to_dict(self):
         return {
@@ -425,7 +475,8 @@ class ActivityDefinition(Base):
             "has_splits": self.has_splits,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "metric_definitions": [m.to_dict() for m in self.metric_definitions],
-            "split_definitions": [s.to_dict() for s in self.split_definitions]
+            "split_definitions": [s.to_dict() for s in self.split_definitions],
+            "associated_goal_ids": [g.id for g in self.associated_goals] if self.associated_goals else []
         }
 
 class MetricDefinition(Base):

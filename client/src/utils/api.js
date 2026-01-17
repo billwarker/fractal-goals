@@ -278,6 +278,42 @@ export const fractalApi = {
      */
     deleteActivity: (rootId, activityId) => axios.delete(`${API_BASE}/${rootId}/activities/${activityId}`),
 
+    // ========== Activity-Goal Associations (SMART Goals) ==========
+
+    /**
+     * Get all goals associated with an activity
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity
+     */
+    getActivityGoals: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/goals`),
+
+    /**
+     * Set goals associated with an activity (replaces existing)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity
+     * @param {Array<string>} goalIds - Array of goal IDs to associate
+     */
+    setActivityGoals: (rootId, activityId, goalIds) =>
+        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/goals`, { goal_ids: goalIds }),
+
+    /**
+     * Remove a goal association from an activity
+     * @param {string} rootId - ID of the fractal
+     * @param {string} activityId - ID of the activity
+     * @param {string} goalId - ID of the goal to remove
+     */
+    removeActivityGoal: (rootId, activityId, goalId) =>
+        axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/goals/${goalId}`),
+
+    /**
+     * Get all activities associated with a goal
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     */
+    getGoalActivities: (rootId, goalId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
+
     // ========== Activity Instance Time Tracking ==========
 
     /**

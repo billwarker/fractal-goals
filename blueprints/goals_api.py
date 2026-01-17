@@ -614,6 +614,9 @@ def update_fractal_goal(root_id, goal_id):
             # Allow reparenting (e.g. moving ImmediateGoal between ShortTermGoals)
             goal.parent_id = data['parent_id']
         
+        if 'relevance_statement' in data:
+            goal.relevance_statement = data['relevance_statement']
+        
         db_session.commit()
         
         return jsonify(goal.to_dict(include_children=False)), 200

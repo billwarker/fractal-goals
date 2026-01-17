@@ -4,27 +4,29 @@
  */
 
 export const GOAL_COLORS = {
-    'UltimateGoal': '#FFD166',      // Supernova Gold
-    'LongTermGoal': '#7B5CFF',      // Nebula Violet
-    'MidTermGoal': '#3A86FF',       // Orbital Blue
-    'ShortTermGoal': '#4ECDC4',     // Lunar Teal
-    'Session': '#FF9F1C',           // Thruster Orange (new name)
+    'UltimateGoal': '#070A13',      // Singularity Black - The void at the center
+    'LongTermGoal': '#0B3C5D',      // Abyss Navy - True navy, distinguishable from mid-term blue
+    'MidTermGoal': '#3A86FF',       // Signal Blue - Bright, saturated blue
+    'ShortTermGoal': '#2EC4B6',     // Astro Teal - Green-leaning teal
+    'Session': '#FF9F1C',           // Thruster Orange - Warm, high-energy
     'PracticeSession': '#FF9F1C',   // Thruster Orange (legacy alias)
-    'ImmediateGoal': '#F8F9FA',     // Starlight White
+    'ImmediateGoal': '#E63946',     // Pulse Red - High-urgency, unmistakable
     'MicroGoal': '#A8DADC',         // Placeholder - adjust as needed
-    'NanoGoal': '#E0E0E0'           // Placeholder - adjust as needed
+    'NanoGoal': '#E0E0E0',          // Placeholder - adjust as needed
+    'CompletedGoal': '#FFD700'      // Achievement Gold - bright gold for completed goals
 };
 
 export const GOAL_COLOR_NAMES = {
-    'UltimateGoal': 'Supernova Gold',
-    'LongTermGoal': 'Nebula Violet',
-    'MidTermGoal': 'Orbital Blue',
-    'ShortTermGoal': 'Lunar Teal',
+    'UltimateGoal': 'Singularity Black',
+    'LongTermGoal': 'Abyss Navy',
+    'MidTermGoal': 'Signal Blue',
+    'ShortTermGoal': 'Astro Teal',
     'Session': 'Thruster Orange',
     'PracticeSession': 'Thruster Orange',
-    'ImmediateGoal': 'Starlight White',
+    'ImmediateGoal': 'Pulse Red',
     'MicroGoal': 'Cosmic Cyan',
-    'NanoGoal': 'Stellar Silver'
+    'NanoGoal': 'Stellar Silver',
+    'CompletedGoal': 'Achievement Gold'
 };
 
 /**

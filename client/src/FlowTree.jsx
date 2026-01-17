@@ -9,18 +9,26 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import './FlowTree.css';
 import dagre from 'dagre';
-import { getGoalColor } from './utils/goalColors';
+import { getGoalColor, GOAL_COLORS } from './utils/goalColors';
+import { isSMART } from './utils/smartHelpers';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
     const isCompleted = data.completed || false;
+    const isSmartGoal = data.isSmart || false;
 
     // Use cosmic color palette based on goal type
     let fillColor = getGoalColor(data.type);
 
+    // Achievement Gold for completed goals
+    const completedGold = GOAL_COLORS.CompletedGoal;
+
+    // Check if it's an Ultimate Goal
+    const isUltimate = data.type === 'UltimateGoal';
+
     // Override with gold if completed
     if (isCompleted) {
-        fillColor = "#FFD700"; // Gold for completed
+        fillColor = completedGold;
     }
 
     // Calculate age if created_at exists
@@ -67,6 +75,9 @@ const CustomNode = ({ data }) => {
     const dueTime = getDueTime();
     const timingLabel = age ? `Age: ${age}` : null;
 
+    // Get the cosmic color for SMART ring (gold if completed, otherwise goal level color)
+    const smartRingColor = isCompleted ? completedGold : getGoalColor(data.type);
+
     return (
         <div
             style={{
@@ -93,6 +104,25 @@ const CustomNode = ({ data }) => {
                 }}
                 onClick={data.onClick}
             >
+                {/* SMART Ring - outer glow for goals meeting all SMART criteria */}
+                {isSmartGoal && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '50%',
+                            border: `3px solid ${smartRingColor}`,
+                            boxShadow: `0 0 12px ${smartRingColor}, 0 0 20px ${smartRingColor}40`,
+                            left: '50%',
+                            top: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: -1,
+                            pointerEvents: 'none',
+                        }}
+                        title="SMART Goal"
+                    />
+                )}
                 {/* Target Handle - centered on circle */}
                 <Handle
                     type="target"
@@ -137,10 +167,12 @@ const CustomNode = ({ data }) => {
             >
                 <div
                     style={{
-                        color: '#e0e0e0',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                        color: isCompleted ? completedGold : '#e0e0e0',
+                        fontSize: isUltimate ? '16px' : '14px',
+                        fontWeight: (isCompleted || isUltimate) ? '700' : '600',
+                        textShadow: isUltimate
+                            ? `0 0 10px ${completedGold}, 0 0 2px ${completedGold}` // Golden Halo for Ultimate
+                            : '0 1px 3px rgba(0,0,0,0.8)',
                         whiteSpace: data.label.length > 30 ? 'normal' : 'nowrap',
                         wordBreak: 'keep-all',
                         overflowWrap: 'break-word',
@@ -151,50 +183,54 @@ const CustomNode = ({ data }) => {
                 >
                     {data.label}
                 </div>
-                {(timingLabel || dueTime) && (
-                    <div
-                        style={{
-                            color: '#fff',
-                            fontSize: '12px',
-                            marginTop: '2px',
-                            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                            display: 'flex',
-                            gap: '8px',
-                            alignItems: 'center'
-                        }}
-                    >
-                        {timingLabel && <span>{timingLabel}</span>}
-                        {timingLabel && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
-                        {dueTime && (
-                            <span style={{
-                                color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
-                                fontWeight: 'bold'
-                            }}>
-                                Due: {dueTime}
-                            </span>
-                        )}
-                    </div>
-                )}
+                {
+                    (timingLabel || dueTime) && (
+                        <div
+                            style={{
+                                color: '#fff',
+                                fontSize: '12px',
+                                marginTop: '2px',
+                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'center'
+                            }}
+                        >
+                            {timingLabel && <span>{timingLabel}</span>}
+                            {timingLabel && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
+                            {dueTime && (
+                                <span style={{
+                                    color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
+                                    fontWeight: 'bold'
+                                }}>
+                                    Due: {dueTime}
+                                </span>
+                            )}
+                        </div>
+                    )
+                }
                 {/* Add Child Button - for all goal types that can have children */}
-                {data.onAddChild && data.childTypeName && (
-                    <div
-                        style={{
-                            color: '#ff9800',
-                            fontSize: '11px',
-                            marginTop: '4px',
-                            textDecoration: 'underline',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                        }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            data.onAddChild();
-                        }}
-                    >
-                        + Add {data.childTypeName}
-                    </div>
-                )}
+                {
+                    data.onAddChild && data.childTypeName && (
+                        <div
+                            style={{
+                                color: '#ff9800',
+                                fontSize: '11px',
+                                marginTop: '4px',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                data.onAddChild();
+                            }}
+                        >
+                            + Add {data.childTypeName}
+                        </div>
+                    )
+                }
             </div>
         </div>
     );
@@ -355,14 +391,16 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
 
         // Add Edges
         if (parentId) {
+            const isCompleted = node.attributes?.completed || node.completed;
             edges.push({
-                id: `${parentId}-${nodeId}`,
+                id: `${parentId}-${nodeId}-${isCompleted ? 'completed' : 'active'}`,
                 source: String(parentId),
                 target: nodeId,
                 type: 'straight',
+                className: isCompleted ? 'completed-edge' : '',
                 style: {
-                    stroke: '#ffffff',
-                    strokeWidth: 1.5,
+                    stroke: isCompleted ? '#FFD700' : '#ffffff', // Hardcoded gold
+                    strokeWidth: isCompleted ? 2.5 : 1.5,
                 },
             });
         }
@@ -383,6 +421,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
                 created_at: node.attributes?.created_at,
                 deadline: node.attributes?.deadline,
                 hasChildren: node.children && node.children.length > 0,
+                isSmart: node.attributes?.is_smart || isSMART(node),
                 onClick: () => onNodeClick(node),
                 onAddChild: childType ? () => onAddChild(node) : null,
                 childTypeName: childTypeName,

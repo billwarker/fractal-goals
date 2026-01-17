@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useActivities } from '../contexts/ActivitiesContext';
+import { useGoals } from '../contexts/GoalsContext';
+import { fractalApi } from '../utils/api';
+import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
 
 /**
@@ -7,6 +10,7 @@ import DeleteConfirmModal from './modals/DeleteConfirmModal';
  */
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
+    const { currentFractal, fetchFractalTree } = useGoals();
 
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
@@ -24,13 +28,36 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const [hasSplits, setHasSplits] = useState(false);
     const [splits, setSplits] = useState([{ name: 'Split #1' }, { name: 'Split #2' }]);
     const [groupId, setGroupId] = useState('');
+    const [selectedGoalIds, setSelectedGoalIds] = useState([]);
+    const [showGoalSelector, setShowGoalSelector] = useState(false);
+    const [currentGoalPath, setCurrentGoalPath] = useState([]); // Stack of goal nodes for navigation
 
-    // Fetch groups when opened
+    // Flatten goal tree for selection
+    const flattenGoals = (node, goals = []) => {
+        if (!node) return goals;
+        goals.push({
+            id: node.id || node.attributes?.id,
+            name: node.name,
+            type: node.attributes?.type || node.type
+        });
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => flattenGoals(child, goals));
+        }
+        return goals;
+    };
+
+    const allGoals = flattenGoals(currentFractal);
+
+    // Fetch groups and goals when opened
     useEffect(() => {
         if (isOpen && rootId) {
             fetchActivityGroups(rootId);
+            // Fetch goal tree if not already loaded
+            if (!currentFractal) {
+                fetchFractalTree(rootId);
+            }
         }
-    }, [isOpen, rootId, fetchActivityGroups]);
+    }, [isOpen, rootId, fetchActivityGroups, fetchFractalTree, currentFractal]);
 
     // Load activity data when editing
     useEffect(() => {
@@ -65,6 +92,9 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             } else {
                 setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
             }
+
+            // Load associated goal IDs
+            setSelectedGoalIds(editingActivity.associated_goal_ids || []);
         } else {
             resetForm();
         }
@@ -80,8 +110,47 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         setHasSplits(false);
         setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
         setGroupId('');
+        setSelectedGoalIds([]);
+        setShowGoalSelector(false);
+        setCurrentGoalPath([]); // Repurpose as selected level type
+        setSelectedLevel(null);
         setError(null);
     };
+
+    // Goal level type ordering and display names
+    const GOAL_LEVELS = [
+        { type: 'UltimateGoal', name: 'Ultimate' },
+        { type: 'LongTermGoal', name: 'Long Term' },
+        { type: 'MidTermGoal', name: 'Mid Term' },
+        { type: 'ShortTermGoal', name: 'Short Term' },
+        { type: 'ImmediateGoal', name: 'Immediate' },
+        { type: 'MicroGoal', name: 'Micro' },
+        { type: 'NanoGoal', name: 'Nano' }
+    ];
+
+    // Track which level is currently selected for viewing
+    const [selectedLevel, setSelectedLevel] = useState(null);
+
+    // Group goals by their type/level
+    const getGoalsByLevel = () => {
+        const goalsByLevel = {};
+        GOAL_LEVELS.forEach(level => {
+            goalsByLevel[level.type] = [];
+        });
+
+        allGoals.forEach(goal => {
+            if (goalsByLevel[goal.type]) {
+                goalsByLevel[goal.type].push(goal);
+            }
+        });
+
+        return goalsByLevel;
+    };
+
+    const goalsByLevel = getGoalsByLevel();
+
+    // Get levels that have goals
+    const levelsWithGoals = GOAL_LEVELS.filter(level => goalsByLevel[level.type]?.length > 0);
 
     const handleAddMetric = () => {
         if (metrics.length < 3) {
@@ -148,8 +217,14 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             let result;
             if (editingActivity) {
                 result = await updateActivity(rootId, editingActivity.id, dataToSubmit);
+                // Update goal associations
+                await fractalApi.setActivityGoals(rootId, editingActivity.id, selectedGoalIds);
             } else {
                 result = await createActivity(rootId, dataToSubmit);
+                // Set goal associations for new activity
+                if (result && result.id && selectedGoalIds.length > 0) {
+                    await fractalApi.setActivityGoals(rootId, result.id, selectedGoalIds);
+                }
             }
 
             resetForm();
@@ -294,6 +369,179 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                         resize: 'vertical'
                                     }}
                                 />
+                            </div>
+
+                            {/* Associated Goals Section - Tree Navigation */}
+                            <div>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: '6px'
+                                    }}
+                                >
+                                    <label style={{ fontSize: '12px', color: '#aaa' }}>
+                                        Associated Goals ({selectedGoalIds.length})
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowGoalSelector(!showGoalSelector);
+                                            if (!showGoalSelector) setSelectedLevel(null);
+                                        }}
+                                        style={{
+                                            padding: '4px 10px',
+                                            background: 'transparent',
+                                            border: '1px solid #4caf50',
+                                            borderRadius: '4px',
+                                            color: '#4caf50',
+                                            cursor: 'pointer',
+                                            fontSize: '11px'
+                                        }}
+                                    >
+                                        {showGoalSelector ? 'Done' : 'Select Goals'}
+                                    </button>
+                                </div>
+
+                                {/* Selected Goals Display */}
+                                {selectedGoalIds.length > 0 && !showGoalSelector && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                        {selectedGoalIds.map(goalId => {
+                                            const goal = allGoals.find(g => g.id === goalId);
+                                            if (!goal) return null;
+                                            const goalColor = getGoalColor(goal.type);
+                                            return (
+                                                <div
+                                                    key={goalId}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        background: `${goalColor}20`,
+                                                        border: `1px solid ${goalColor}`,
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        color: goalColor,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    {goal.name}
+                                                    <span
+                                                        onClick={() => setSelectedGoalIds(prev => prev.filter(id => id !== goalId))}
+                                                        style={{ cursor: 'pointer', fontWeight: 'bold' }}
+                                                    >
+                                                        ×
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Goal Level Navigator */}
+                                {showGoalSelector && (
+                                    <div style={{
+                                        background: '#252525',
+                                        padding: '16px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #444'
+                                    }}>
+                                        {/* Level Badges Row */}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: selectedLevel ? '12px' : '0' }}>
+                                            {levelsWithGoals.length === 0 ? (
+                                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                                                    No goals available
+                                                </div>
+                                            ) : (
+                                                levelsWithGoals.map(level => {
+                                                    const goalColor = getGoalColor(level.type);
+                                                    const textColor = getGoalTextColor(level.type);
+                                                    const count = goalsByLevel[level.type]?.length || 0;
+                                                    const isActive = selectedLevel === level.type;
+
+                                                    return (
+                                                        <button
+                                                            key={level.type}
+                                                            type="button"
+                                                            onClick={() => setSelectedLevel(isActive ? null : level.type)}
+                                                            style={{
+                                                                padding: '6px 14px',
+                                                                background: goalColor,
+                                                                border: isActive ? '2px solid white' : '2px solid transparent',
+                                                                borderRadius: '4px',
+                                                                color: textColor,
+                                                                cursor: 'pointer',
+                                                                fontSize: '12px',
+                                                                fontWeight: 'bold',
+                                                                transition: 'all 0.2s',
+                                                                whiteSpace: 'nowrap',
+                                                                opacity: isActive ? 1 : 0.85
+                                                            }}
+                                                        >
+                                                            {level.name} ({count})
+                                                        </button>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+
+                                        {/* Goals at Selected Level */}
+                                        {selectedLevel && (
+                                            <div style={{
+                                                borderTop: '1px solid #444',
+                                                paddingTop: '12px'
+                                            }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {goalsByLevel[selectedLevel]?.map(goal => {
+                                                        const goalColor = getGoalColor(goal.type);
+                                                        const isSelected = selectedGoalIds.includes(goal.id);
+
+                                                        return (
+                                                            <label
+                                                                key={goal.id}
+                                                                style={{
+                                                                    padding: '8px 12px',
+                                                                    background: isSelected ? `${goalColor}25` : '#333',
+                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid #555',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '8px',
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setSelectedGoalIds(prev => [...prev, goal.id]);
+                                                                        } else {
+                                                                            setSelectedGoalIds(prev => prev.filter(id => id !== goal.id));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <span style={{
+                                                                    fontSize: '13px',
+                                                                    color: isSelected ? goalColor : '#ccc',
+                                                                    fontWeight: isSelected ? 'bold' : 'normal'
+                                                                }}>
+                                                                    {goal.name}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+                                    Goals with associated activities meet the SMART "Achievable" criterion
+                                </div>
                             </div>
 
                             {/* Group Selection */}

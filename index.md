@@ -83,6 +83,24 @@
 - Environment-specific configuration via .env files
 - Environment indicator in UI
 
+### 8. SMART Goals
+Goals can be evaluated against SMART criteria with visual indicators:
+- **S**pecific: Goal has a description
+- **M**easurable: Goal has targets attached
+- **A**chievable: Goal has activities associated (via `activity_goal_associations` table)
+- **R**elevant: User provided a relevance statement explaining how goal helps achieve parent
+- **T**ime-bound: Goal has a deadline
+
+**Visual Indicators:**
+- `SMARTIndicator` component shows "SMART" text with each letter colored based on criterion status
+- `FlowTree` nodes display an outer glowing ring for goals meeting all SMART criteria
+- `GoalDetailModal` includes the SMART indicator in the header and a "Relevance" field in edit mode
+
+**Database Tables:**
+- `goals.relevance_statement` - Stores the user's explanation of goal relevance
+- `goals.is_smart` - Boolean flag computed when goal is saved
+- `activity_goal_associations` - Junction table linking activities to goals (for "A" criterion)
+
 ---
 
 ## Database Schema
@@ -105,6 +123,8 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - `parent_id` (String, FK to goals.id)
 - `root_id` (String) - Reference to ultimate goal
 - `targets` (Text/JSON) - Goal targets for completion tracking
+- `relevance_statement` (Text, nullable) - SMART "R" criterion: How goal helps achieve parent
+- `is_smart` (Boolean) - Whether goal meets all SMART criteria
 
 **PracticeSession-Specific Fields:**
 - `duration_minutes` (Integer)

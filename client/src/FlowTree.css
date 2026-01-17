@@ -4,6 +4,12 @@
     stroke-width: 1px !important;
 }
 
+/* Specific class for completed edges to override the default */
+.completed-edge .react-flow__edge-path {
+    stroke: #FFD700 !important;
+    stroke-width: 2.5px !important;
+}
+
 .react-flow__edge {
     pointer-events: all !important;
 }

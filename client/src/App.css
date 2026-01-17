@@ -65,6 +65,14 @@ html {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
+.metric-completed {
+    color: #4caf50;
+}
+
+.metric-missed {
+    color: #ff5252;
+}
+
 .sidebar {
     width: 33.33vw;
     min-width: 350px;

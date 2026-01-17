@@ -387,3 +387,121 @@ def delete_activity(root_id, activity_id):
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
+
+
+# ============================================================================
+# ACTIVITY-GOAL ASSOCIATION ENDPOINTS (for SMART goals)
+# ============================================================================
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/goals', methods=['GET'])
+def get_activity_goals(root_id, activity_id):
+    """Get all goals associated with an activity."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+        
+        goals = [{"id": g.id, "name": g.name, "type": g.type} for g in activity.associated_goals]
+        return jsonify(goals)
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/goals', methods=['POST'])
+def set_activity_goals(root_id, activity_id):
+    """Set goals associated with an activity (replaces existing associations)."""
+    from models import Goal, activity_goal_associations
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+        
+        data = request.get_json()
+        goal_ids = data.get('goal_ids', [])
+        
+        # Clear existing associations for this activity
+        session.execute(
+            activity_goal_associations.delete().where(
+                activity_goal_associations.c.activity_id == activity_id
+            )
+        )
+        
+        # Add new associations
+        for goal_id in goal_ids:
+            goal = session.query(Goal).filter_by(id=goal_id).first()
+            if goal:
+                session.execute(
+                    activity_goal_associations.insert().values(
+                        activity_id=activity_id,
+                        goal_id=goal_id
+                    )
+                )
+        
+        session.commit()
+        
+        # Refresh and return updated activity
+        session.refresh(activity)
+        return jsonify(activity.to_dict()), 200
+        
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/goals/<goal_id>', methods=['DELETE'])
+def remove_activity_goal(root_id, activity_id, goal_id):
+    """Remove a goal association from an activity."""
+    from models import activity_goal_associations
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+        
+        # Remove the association
+        result = session.execute(
+            activity_goal_associations.delete().where(
+                activity_goal_associations.c.activity_id == activity_id,
+                activity_goal_associations.c.goal_id == goal_id
+            )
+        )
+        
+        if result.rowcount == 0:
+            return jsonify({"error": "Association not found"}), 404
+        
+        session.commit()
+        return jsonify({"message": "Goal association removed"}), 200
+        
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/goals/<goal_id>/activities', methods=['GET'])
+def get_goal_activities(root_id, goal_id):
+    """Get all activities associated with a goal."""
+    from models import Goal
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = session.query(Goal).filter_by(id=goal_id).first()
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+        
+        activities = [{"id": a.id, "name": a.name, "description": a.description} for a in goal.associated_activities]
+        return jsonify(activities)
+    finally:
+        session.close()
+

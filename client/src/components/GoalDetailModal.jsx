@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
 import TargetCard from './TargetCard';
+import SMARTIndicator from './SMARTIndicator';
 
 /**
  * GoalDetailModal Component
@@ -46,6 +47,7 @@ function GoalDetailModal({
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
+    const [relevanceStatement, setRelevanceStatement] = useState('');
 
     // Local completion state for optimistic UI
     const [localCompleted, setLocalCompleted] = useState(false);
@@ -76,6 +78,7 @@ function GoalDetailModal({
             setName('');
             setDescription('');
             setDeadline('');
+            setRelevanceStatement('');
             setLocalCompleted(false);
             setLocalCompletedAt(null);
             setTargets([]);
@@ -85,6 +88,7 @@ function GoalDetailModal({
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
             setDeadline(goal.attributes?.deadline || goal.deadline || '');
+            setRelevanceStatement(goal.attributes?.relevance_statement || '');
             setLocalCompleted(goal.attributes?.completed || false);
             setLocalCompletedAt(goal.attributes?.completed_at || null);
 
@@ -132,7 +136,8 @@ function GoalDetailModal({
                 name,
                 description,
                 deadline: deadline || null,
-                targets: targets
+                targets: targets,
+                relevance_statement: relevanceStatement
             });
             setIsEditing(false);
         }
@@ -148,6 +153,7 @@ function GoalDetailModal({
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
             setDeadline(goal.attributes?.deadline || goal.deadline || '');
+            setRelevanceStatement(goal.attributes?.relevance_statement || '');
 
             let parsedTargets = [];
             if (goal.attributes?.targets) {
@@ -290,6 +296,46 @@ function GoalDetailModal({
         a.has_metrics && a.metric_definitions && a.metric_definitions.length > 0
     );
     const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
+
+    // Find parent goal name and type for SMART relevance question
+    const findParentGoalInfo = () => {
+        if (mode === 'create' && parentGoal) {
+            return {
+                name: parentGoal.name,
+                type: parentGoal.attributes?.type || parentGoal.type
+            };
+        }
+
+        const parentId = goal?.attributes?.parent_id;
+        if (!parentId || !treeData) return null;
+
+        // Recursively search the tree for the parent
+        const findNode = (node, targetId) => {
+            if (!node) return null;
+            const nodeId = node.id || node.attributes?.id;
+            if (nodeId === targetId) return node;
+
+            if (node.children && node.children.length > 0) {
+                for (const child of node.children) {
+                    const found = findNode(child, targetId);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const parentNode = findNode(treeData, parentId);
+        if (!parentNode) return null;
+
+        return {
+            name: parentNode.name,
+            type: parentNode.attributes?.type || parentNode.type
+        };
+    };
+
+    const parentGoalInfo = findParentGoalInfo();
+    const parentGoalName = parentGoalInfo?.name;
+    const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
 
     // ============ TARGET BUILDER VIEW ============
     const renderTargetBuilder = () => (
@@ -919,6 +965,9 @@ function GoalDetailModal({
                     }}>
                         {getTypeDisplayName(goalType)}
                     </div>
+                    {mode !== 'create' && (
+                        <SMARTIndicator goal={goal} goalType={goalType} />
+                    )}
                     {mode === 'create' && parentGoal && (
                         <span style={{ color: '#888', fontSize: '12px' }}>
                             under "{parentGoal.name}"
@@ -992,6 +1041,34 @@ function GoalDetailModal({
                             }}
                         />
                     </div>
+
+                    {/* Relevance Statement - SMART "R" Criterion */}
+                    {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                Relevance (SMART):
+                            </label>
+                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
+                                How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
+                            </div>
+                            <textarea
+                                value={relevanceStatement}
+                                onChange={(e) => setRelevanceStatement(e.target.value)}
+                                rows={2}
+                                placeholder="Explain how this goal contributes to your higher-level objective..."
+                                style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    background: '#2a2a2a',
+                                    border: relevanceStatement?.trim() ? '1px solid #4caf50' : '1px solid #555',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    resize: 'vertical'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <div>
                         <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
@@ -1125,6 +1202,18 @@ function GoalDetailModal({
                                 <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
                         </div>
                     </div>
+
+                    {/* Relevance Statement - View Mode */}
+                    {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
+                            </label>
+                            <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                {goal.attributes?.relevance_statement || relevanceStatement}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Associated Programs */}
                     {programs && (() => {
