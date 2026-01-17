@@ -193,59 +193,114 @@ function FractalGoals() {
         );
     }
 
+    const sidebarWidth = '400px';
+    const isSidebarOpen = showGoalModal || !!sidebarMode;
+
     return (
-        <div className="fractal-page-container">
-            {/* Main Content - FlowTree */}
-            <div className="fractal-view-wrapper">
-                <FractalView
-                    treeData={fractalData}
-                    onNodeClick={handleGoalNameClick}
-                    selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
-                    onAddChild={handleAddChildClick}
-                    sidebarOpen={!!sidebarMode}
-                    key={rootId} // Force refresh on root switch
-                />
+        <div className="fractal-page-container" style={{
+            height: '100vh',
+            width: '100vw',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+        }}>
+            {/* Nav Padding Spacer */}
+            <div style={{ height: '60px', flexShrink: 0 }} />
+
+            <div className="fractal-main-layout" style={{
+                display: 'flex',
+                flex: 1,
+                width: '100%',
+                minHeight: 0,
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                {/* Main Content - FlowTree (The Red Box Viewport) */}
+                <div
+                    className="fractal-view-wrapper"
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        height: '100%',
+                        border: '4px solid red',
+                        boxSizing: 'border-box',
+                        position: 'relative'
+                    }}
+                >
+                    <FractalView
+                        treeData={fractalData}
+                        onNodeClick={handleGoalNameClick}
+                        selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
+                        onAddChild={handleAddChildClick}
+                        sidebarOpen={isSidebarOpen}
+                        key={rootId}
+                    />
+                </div>
+
+                {/* Side Panel (View or Create) */}
+                {isSidebarOpen && (
+                    <div className="details-window sidebar docked" style={{
+                        width: sidebarWidth,
+                        minWidth: sidebarWidth,
+                        height: '100%',
+                        position: 'relative', // Force it into the flex flow
+                        top: 'auto',
+                        right: 'auto',
+                        bottom: 'auto',
+                        margin: 0,
+                        border: 'none',
+                        borderLeft: '1px solid #444',
+                        background: 'rgba(20, 20, 20, 0.95)',
+                        zIndex: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderRadius: 0,
+                        boxShadow: '-5px 0 15px rgba(0,0,0,0.3)'
+                    }}>
+                        <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                            {showGoalModal ? (
+                                <GoalDetailModal
+                                    isOpen={true}
+                                    onClose={() => setShowGoalModal(false)}
+                                    mode="create"
+                                    onCreate={handleCreateGoal}
+                                    parentGoal={selectedParent}
+                                    activityDefinitions={activities}
+                                    activityGroups={activityGroups}
+                                    rootId={rootId}
+                                    displayMode="panel"
+                                />
+                            ) : (
+                                <ErrorBoundary>
+                                    <Sidebar
+                                        selectedNode={viewingGoal}
+                                        selectedRootId={rootId}
+                                        onClose={() => {
+                                            setSidebarMode(null);
+                                            setViewingGoal(null);
+                                        }}
+                                        onUpdate={handleUpdateNode}
+                                        onDelete={(node) => setFractalToDelete(node)}
+                                        onAddChild={handleAddChildClick}
+                                        onAddSession={() => {
+                                            const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                                            navigate(`/${rootId}/create-session?goalId=${goalId}`);
+                                        }}
+                                        onToggleCompletion={handleToggleCompletion}
+                                        treeData={fractalData}
+                                        sessions={sessions}
+                                        activityDefinitions={activities}
+                                        activityGroups={activityGroups}
+                                        programs={programs}
+                                    />
+                                </ErrorBoundary>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Sidebar */}
-            {sidebarMode && (
-                <ErrorBoundary>
-                    <Sidebar
-                        selectedNode={viewingGoal}
-                        selectedRootId={rootId}
-                        onClose={() => {
-                            setSidebarMode(null);
-                            setViewingGoal(null);
-                        }}
-                        onUpdate={handleUpdateNode}
-                        onDelete={(node) => setFractalToDelete(node)}
-                        onAddChild={handleAddChildClick}
-                        onAddSession={() => {
-                            const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
-                            navigate(`/${rootId}/create-session?goalId=${goalId}`);
-                        }}
-                        onToggleCompletion={handleToggleCompletion}
-                        treeData={fractalData}
-                        sessions={sessions}
-                        activityDefinitions={activities}
-                        activityGroups={activityGroups}
-                        programs={programs}
-                    />
-                </ErrorBoundary>
-            )}
-
-            {/* Modals */}
-            <GoalDetailModal
-                isOpen={showGoalModal}
-                onClose={() => setShowGoalModal(false)}
-                mode="create"
-                onCreate={handleCreateGoal}
-                parentGoal={selectedParent}
-                activityDefinitions={activities}
-                activityGroups={activityGroups}
-                rootId={rootId}
-            />
-
+            {/* Modals (Delete/Alert only) */}
             <DeleteConfirmModal
                 isOpen={!!fractalToDelete}
                 onClose={() => setFractalToDelete(null)}

@@ -59,7 +59,7 @@ const Sidebar = ({
 
     // Goal View - Use GoalDetailModal in Panel Mode
     return (
-        <div className="details-window">
+        <div className="details-window sidebar docked">
             <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <GoalDetailModal
                     isOpen={true}
