@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
-import TargetCard from './TargetCard';
 import SMARTIndicator from './SMARTIndicator';
-import ConfirmationModal from './ConfirmationModal';
 import { fractalApi } from '../utils/api';
+import TargetManager from './goalDetail/TargetManager';
+import ActivityAssociator from './goalDetail/ActivityAssociator';
+import GoalSessionList from './goalDetail/GoalSessionList';
 
 /**
  * GoalDetailModal Component
@@ -60,27 +61,14 @@ function GoalDetailModal({
 
     // Target editing state
     const [targets, setTargets] = useState([]);
+    const [targetToEdit, setTargetToEdit] = useState(null);
 
-    // View state: 'goal' (main view), 'target-add', 'target-edit', 'complete-confirm', 'uncomplete-confirm', 'activity-selector'
+    // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator'
     const [viewState, setViewState] = useState('goal');
-    const [editingTarget, setEditingTarget] = useState(null);
-    const [activitySelectorGroupId, setActivitySelectorGroupId] = useState(null);  // null = show groups, string = show activities in group
-    const [tempSelectedActivities, setTempSelectedActivities] = useState([]);  // For temp selection in activity selector
-
-
-    // Target form state (for inline target builder)
-    const [selectedActivityId, setSelectedActivityId] = useState('');
-    const [targetName, setTargetName] = useState('');
-    const [targetDescription, setTargetDescription] = useState('');
-    const [metricValues, setMetricValues] = useState({});
 
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-
-    // Delete confirmation state
-    const [targetToDelete, setTargetToDelete] = useState(null);
-    const [deleteTargetCallback, setDeleteTargetCallback] = useState(null);
 
     // Initialize form state from goal - use specific dependencies for completion state
     const depGoalId = goal?.attributes?.id || goal?.id;
@@ -148,105 +136,6 @@ function GoalDetailModal({
         fetchAssociatedActivities();
     }, [rootId, depGoalId, mode]);
 
-    // Handler for confirming activity selection from inline view
-    const handleConfirmActivitySelection = async () => {
-        if (!rootId || !depGoalId || tempSelectedActivities.length === 0) {
-            setViewState('goal');
-            setActivitySelectorGroupId(null);
-            setTempSelectedActivities([]);
-            return;
-        }
-
-        try {
-            // For each new activity, we need to add the goal to its associations
-            for (const activityId of tempSelectedActivities) {
-                const activity = activityDefinitions.find(a => a.id === activityId);
-                if (activity) {
-                    // Get current goals for this activity and add our goal
-                    const currentGoals = activity.goal_ids || [];
-                    const newGoalIds = [...new Set([...currentGoals, depGoalId])];
-                    await fractalApi.setActivityGoals(rootId, activityId, newGoalIds);
-                }
-            }
-
-            // Refresh the associations
-            const response = await fractalApi.getGoalActivities(rootId, depGoalId);
-            setAssociatedActivities(response.data || []);
-        } catch (error) {
-            console.error('Error adding activity associations:', error);
-        }
-
-        setViewState('goal');
-        setActivitySelectorGroupId(null);
-        setTempSelectedActivities([]);
-    };
-
-    // Handler for opening activity selector view
-    const handleOpenActivitySelector = () => {
-        setTempSelectedActivities([]);
-        setActivitySelectorGroupId(null);
-        setViewState('activity-selector');
-    };
-
-    // Handler for canceling activity selection
-    const handleCancelActivitySelector = () => {
-        setViewState('goal');
-        setActivitySelectorGroupId(null);
-        setTempSelectedActivities([]);
-    };
-
-    // Handler for toggling activity in temp selection
-    const handleToggleActivitySelection = (activityId) => {
-        if (associatedActivities.some(a => a.id === activityId)) {
-            return; // Already associated, don't toggle
-        }
-        setTempSelectedActivities(prev =>
-            prev.includes(activityId)
-                ? prev.filter(id => id !== activityId)
-                : [...prev, activityId]
-        );
-    };
-
-    // Handler for removing an activity association
-    const handleRemoveActivity = async (activityId) => {
-        // Find activity object to check name
-        const activityToRemove = associatedActivities.find(a => String(a.id) === String(activityId));
-
-        // Check if activity is used in any target (ID or Name match)
-        const isUsedInTarget = targets.some(t => {
-            // ID match
-            if (String(t.activity_id) === String(activityId)) return true;
-
-            // Name match (if activity found)
-            if (activityToRemove) {
-                const normalize = s => s ? String(s).trim().toLowerCase() : '';
-                const activityName = normalize(activityToRemove.name);
-
-                const targetActivityDef = activityDefinitions.find(ad => ad.id === t.activity_id);
-                if (targetActivityDef && normalize(targetActivityDef.name) === activityName) return true;
-
-                // Check target name override
-                if (t.name && normalize(t.name) === activityName) return true;
-            }
-            return false;
-        });
-
-        if (isUsedInTarget) {
-            alert('Cannot remove this activity because it is used in one or more targets for this goal. Please remove the targets first.');
-            return;
-        }
-
-        if (!rootId || !depGoalId) return;
-
-        try {
-            await fractalApi.removeActivityGoal(rootId, activityId, depGoalId);
-            // Update local state
-            setAssociatedActivities(prev => prev.filter(a => a.id !== activityId));
-        } catch (error) {
-            console.error('Error removing activity association:', error);
-        }
-    };
-
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
     // Allow rendering without goal in create mode
@@ -307,126 +196,6 @@ function GoalDetailModal({
         setIsEditing(false);
     };
 
-    // Target builder handlers
-    const handleOpenAddTarget = () => {
-        setEditingTarget(null);
-        setSelectedActivityId('');
-        setTargetName('');
-        setTargetDescription('');
-        setMetricValues({});
-        setViewState('target-add');
-    };
-
-    const handleOpenEditTarget = (target) => {
-        setEditingTarget(target);
-        setSelectedActivityId(target.activity_id || '');
-        setTargetName(target.name || '');
-        setTargetDescription(target.description || '');
-        // Convert metrics array to object
-        const metricsObj = {};
-        target.metrics?.forEach(m => {
-            metricsObj[m.metric_id] = m.value;
-        });
-        setMetricValues(metricsObj);
-        setViewState('target-edit');
-    };
-
-    const handleDeleteTarget = (targetId) => {
-        const newTargets = targets.filter(t => t.id !== targetId);
-        setTargets(newTargets);
-
-        // If not in full edit mode, persist immediately
-        if (!isEditing && mode !== 'create') {
-            onUpdate(goal.id, {
-                name,
-                description,
-                deadline: deadline || null,
-                targets: newTargets,
-                targets: newTargets,
-                relevance_statement: relevanceStatement
-            });
-        }
-    };
-
-    const confirmAndDeleteTarget = (targetId, onSuccess) => {
-        setTargetToDelete(targetId);
-        setDeleteTargetCallback(() => onSuccess); // Wrap in function to avoid immediate execution if onSuccess is a function
-    };
-
-    const handleFinalizeDeleteTarget = () => {
-        if (targetToDelete) {
-            handleDeleteTarget(targetToDelete);
-            if (deleteTargetCallback) deleteTargetCallback();
-        }
-        setTargetToDelete(null);
-        setDeleteTargetCallback(null);
-    };
-
-    const handleActivityChange = (activityId) => {
-        setSelectedActivityId(activityId);
-        setMetricValues({});
-        const activity = activityDefinitions.find(a => a.id === activityId);
-        if (activity && !targetName) {
-            setTargetName(activity.name);
-        }
-    };
-
-    const handleMetricChange = (metricId, value) => {
-        setMetricValues(prev => ({
-            ...prev,
-            [metricId]: value
-        }));
-    };
-
-    const handleSaveTarget = () => {
-        if (!selectedActivityId) {
-            alert('Please select an activity');
-            return;
-        }
-
-        const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
-        const metrics = Object.entries(metricValues).map(([metric_id, value]) => ({
-            metric_id,
-            value: parseFloat(value) || 0
-        }));
-
-        const target = {
-            id: editingTarget?.id || crypto.randomUUID(),
-            activity_id: selectedActivityId,
-            name: targetName || selectedActivity?.name || 'Unnamed Target',
-            description: targetDescription,
-            metrics
-        };
-
-        let newTargets;
-        if (editingTarget) {
-            newTargets = targets.map(t => t.id === target.id ? target : t);
-        } else {
-            newTargets = [...targets, target];
-        }
-
-        setTargets(newTargets);
-
-        // If not in full edit mode, persist immediately
-        if (!isEditing && mode !== 'create') {
-            onUpdate(goal.id, {
-                name,
-                description,
-                deadline: deadline || null,
-                targets: newTargets,
-                relevance_statement: relevanceStatement
-            });
-        }
-
-        setViewState('goal');
-        setEditingTarget(null);
-    };
-
-    const handleCancelTargetEdit = () => {
-        setViewState('goal');
-        setEditingTarget(null);
-    };
-
     // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
     const goalType = mode === 'create'
         ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
@@ -441,34 +210,6 @@ function GoalDetailModal({
     const isShortTermGoal = goalType === 'ShortTermGoal';
     const isImmediateGoal = goalType === 'ImmediateGoal';
 
-    // For STGs: Find sessions that have this goal in their short_term_goals array OR parent_ids
-    const childSessions = (isShortTermGoal && mode !== 'create')
-        ? sessions.filter(session => {
-            if (!session) return false;
-            // Check new format: short_term_goals array
-            const shortTermGoals = session.short_term_goals || [];
-            if (shortTermGoals.some(stg => stg?.id === goalId)) return true;
-
-            // Check legacy format: attributes.parent_ids
-            const parentIds = session.attributes?.parent_ids || [];
-            return parentIds.includes(goalId);
-        })
-        : [];
-
-    // For IGs: Find sessions that have this goal in their immediate_goals array OR goal_ids
-    const associatedSessions = (isImmediateGoal && mode !== 'create')
-        ? sessions.filter(session => {
-            if (!session) return false;
-            // Check new format: immediate_goals array
-            const immediateGoals = session.immediate_goals || [];
-            if (immediateGoals.some(ig => ig?.id === goalId)) return true;
-
-            // Check legacy format: attributes.goal_ids
-            const goalIds = session.attributes?.goal_ids || [];
-            return goalIds.includes(goalId);
-        })
-        : [];
-
     // Get activities with metrics for target builder
     // First, filter by associated activities, then by having metrics
     const associatedActivityIds = associatedActivities.map(a => a.id);
@@ -479,7 +220,6 @@ function GoalDetailModal({
     const activitiesForTargets = activitiesWithMetrics.filter(a =>
         associatedActivityIds.includes(a.id)
     );
-    const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
 
     // Find parent goal name and type for SMART relevance question
     const findParentGoalInfo = () => {
@@ -520,610 +260,6 @@ function GoalDetailModal({
     const parentGoalInfo = findParentGoalInfo();
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
-
-    // ============ TARGET BUILDER VIEW ============
-    const renderTargetBuilder = () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #444'
-            }}>
-                <button
-                    onClick={handleCancelTargetEdit}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#888',
-                        fontSize: '18px',
-                        cursor: 'pointer',
-                        padding: '0 4px'
-                    }}
-                >
-                    ←
-                </button>
-                <h3 style={{ margin: 0, fontSize: '16px', color: 'white' }}>
-                    {editingTarget ? 'Edit Target' : 'Add Target'}
-                </h3>
-            </div>
-
-            {/* Activity Selector */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
-                    Activity *
-                </label>
-
-                {activitiesForTargets.length === 0 ? (
-                    <div style={{ fontSize: '11px', color: '#f44336', marginTop: '4px' }}>
-                        {associatedActivities.length === 0
-                            ? 'No activities associated with this goal. Add activities first before setting targets.'
-                            : 'No associated activities have metrics. Add metrics to activities or associate activities with metrics.'}
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {activitiesForTargets.map(activity => {
-                            const isSelected = selectedActivityId === activity.id;
-                            return (
-                                <button
-                                    key={activity.id}
-                                    onClick={() => handleActivityChange(activity.id)}
-                                    style={{
-                                        padding: '6px 12px',
-                                        background: isSelected ? '#1b3320' : '#2a2a2a',
-                                        border: `1px solid ${isSelected ? '#4caf50' : '#444'}`,
-                                        borderRadius: '16px',
-                                        color: isSelected ? '#4caf50' : '#ccc',
-                                        fontSize: '13px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                    onMouseOver={(e) => {
-                                        if (!isSelected) {
-                                            e.currentTarget.style.borderColor = '#666';
-                                            e.currentTarget.style.color = 'white';
-                                        }
-                                    }}
-                                    onMouseOut={(e) => {
-                                        if (!isSelected) {
-                                            e.currentTarget.style.borderColor = '#444';
-                                            e.currentTarget.style.color = '#ccc';
-                                        }
-                                    }}
-                                >
-                                    {isSelected && <span>✓</span>}
-                                    {activity.name}
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Target Name */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                    Target Name
-                </label>
-                <input
-                    type="text"
-                    value={targetName}
-                    onChange={(e) => setTargetName(e.target.value)}
-                    placeholder={selectedActivity?.name || 'Enter target name...'}
-                    style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: '#2a2a2a',
-                        border: '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '13px'
-                    }}
-                />
-            </div>
-
-            {/* Target Description */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                    Description
-                </label>
-                <textarea
-                    value={targetDescription}
-                    onChange={(e) => setTargetDescription(e.target.value)}
-                    placeholder="Optional description..."
-                    rows={2}
-                    style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: '#2a2a2a',
-                        border: '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '13px',
-                        resize: 'vertical'
-                    }}
-                />
-            </div>
-
-            {/* Metric Values */}
-            {selectedActivity && selectedActivity.metric_definitions?.length > 0 && (
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
-                        Target Metrics
-                    </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {selectedActivity.metric_definitions.map(metric => (
-                            <div key={metric.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '10px',
-                                background: '#2a2a2a',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
-                            }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '13px', color: 'white', fontWeight: '500' }}>
-                                        {metric.name}
-                                    </div>
-                                    {metric.description && (
-                                        <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
-                                            {metric.description}
-                                        </div>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input
-                                        type="number"
-                                        value={metricValues[metric.id] || ''}
-                                        onChange={(e) => handleMetricChange(metric.id, e.target.value)}
-                                        placeholder="0"
-                                        style={{
-                                            width: '70px',
-                                            padding: '6px',
-                                            background: '#1e1e1e',
-                                            border: '1px solid #555',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontSize: '13px',
-                                            textAlign: 'right'
-                                        }}
-                                    />
-                                    <span style={{ fontSize: '12px', color: '#888', minWidth: '40px' }}>
-                                        {metric.unit}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                {editingTarget ? (
-                    <button
-                        onClick={() => {
-                            confirmAndDeleteTarget(editingTarget.id, () => {
-                                setViewState('goal');
-                                setEditingTarget(null);
-                            });
-                        }}
-                        style={{
-                            padding: '8px 14px',
-                            background: 'transparent',
-                            border: '1px solid #f44336',
-                            borderRadius: '4px',
-                            color: '#f44336',
-                            cursor: 'pointer',
-                            fontSize: '13px'
-                        }}
-                    >
-                        Delete Target
-                    </button>
-                ) : <div />}
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                        onClick={handleCancelTargetEdit}
-                        style={{
-                            padding: '8px 14px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '13px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSaveTarget}
-                        disabled={!selectedActivityId}
-                        style={{
-                            padding: '8px 14px',
-                            background: selectedActivityId ? '#4caf50' : '#333',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: selectedActivityId ? 'white' : '#666',
-                            cursor: selectedActivityId ? 'pointer' : 'not-allowed',
-                            fontSize: '13px',
-                            fontWeight: 600
-                        }}
-                    >
-                        {editingTarget ? 'Update Target' : 'Add Target'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-
-    // ============ ACTIVITY SELECTOR VIEW ============
-    const renderActivitySelector = () => {
-        // Group activities by their group
-        const groupedActivities = {};
-        const ungroupedActivities = [];
-
-        activityDefinitions.forEach(activity => {
-            if (activity.group_id) {
-                if (!groupedActivities[activity.group_id]) {
-                    groupedActivities[activity.group_id] = [];
-                }
-                groupedActivities[activity.group_id].push(activity);
-            } else {
-                ungroupedActivities.push(activity);
-            }
-        });
-
-        const alreadyAssociatedIds = associatedActivities.map(a => a.id);
-
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #4caf50'
-                }}>
-                    <button
-                        onClick={() => {
-                            if (activitySelectorGroupId !== null) {
-                                setActivitySelectorGroupId(null);
-                            } else {
-                                handleCancelActivitySelector();
-                            }
-                        }}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white', flex: 1 }}>
-                        {activitySelectorGroupId === null
-                            ? 'Select Activity Group'
-                            : activitySelectorGroupId === 'ungrouped'
-                                ? 'Ungrouped Activities'
-                                : activityGroups.find(g => g.id === activitySelectorGroupId)?.name || 'Activities'}
-                    </h3>
-                    <button
-                        onClick={handleCancelActivitySelector}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#888',
-                            cursor: 'pointer',
-                            fontSize: '18px'
-                        }}
-                    >
-                        ×
-                    </button>
-                </div>
-
-                <p style={{ color: '#888', fontSize: '13px', margin: 0 }}>
-                    Select activities that this goal requires. Associated activities help track the "Achievable" criterion in SMART goals.
-                </p>
-
-                {activityDefinitions.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        <p>No activities found. Create activities in the Manage Activities page.</p>
-                    </div>
-                ) : activitySelectorGroupId === null ? (
-                    /* LEVEL 1: GROUPS */
-
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                        gap: '10px',
-                        marginTop: '8px'
-                    }}>
-                        {/* Group Cards */}
-                        {activityGroups.map(group => {
-                            const groupActivities = groupedActivities[group.id] || [];
-                            if (groupActivities.length === 0) return null;
-
-                            // Count how many are already selected
-                            const selectedCount = groupActivities.filter(a =>
-                                alreadyAssociatedIds.includes(a.id) || tempSelectedActivities.includes(a.id)
-                            ).length;
-
-                            return (
-                                <button
-                                    key={group.id}
-                                    onClick={() => setActivitySelectorGroupId(group.id)}
-                                    style={{
-                                        padding: '16px 12px',
-                                        background: '#333',
-                                        border: selectedCount > 0 ? '2px solid #4caf50' : '1px solid #555',
-                                        borderRadius: '8px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        transition: 'all 0.2s',
-                                        textAlign: 'center'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#444'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = '#333'}
-                                >
-                                    <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{group.name}</div>
-                                    <div style={{ fontSize: '11px', color: '#888' }}>
-                                        {groupActivities.length} activities
-                                    </div>
-                                    {selectedCount > 0 && (
-                                        <div style={{
-                                            fontSize: '10px',
-                                            color: '#4caf50',
-                                            background: '#1a3a1a',
-                                            padding: '2px 8px',
-                                            borderRadius: '10px'
-                                        }}>
-                                            {selectedCount} selected
-                                        </div>
-                                    )}
-                                </button>
-                            );
-                        })}
-
-                        {/* Ungrouped Card */}
-                        {ungroupedActivities.length > 0 && (
-                            <button
-                                onClick={() => setActivitySelectorGroupId('ungrouped')}
-                                style={{
-                                    padding: '16px 12px',
-                                    background: '#333',
-                                    border: '1px dashed #666',
-                                    borderRadius: '8px',
-                                    color: '#ccc',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    textAlign: 'center'
-                                }}
-                            >
-                                <div style={{ fontSize: '14px', fontStyle: 'italic' }}>Ungrouped</div>
-                                <div style={{ fontSize: '11px', color: '#888' }}>{ungroupedActivities.length} activities</div>
-                            </button>
-                        )}
-                    </div>
-
-
-                ) : (
-                    /* LEVEL 2: ACTIVITIES */
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        maxHeight: '320px',
-                        overflowY: 'auto',
-                        paddingRight: '8px'
-                    }}>
-                        {(activitySelectorGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[activitySelectorGroupId] || []).map(activity => {
-                            const isAlreadyAssociated = alreadyAssociatedIds.includes(activity.id);
-                            const isSelected = tempSelectedActivities.includes(activity.id);
-                            const hasMetrics = activity.metrics && activity.metrics.length > 0;
-
-                            return (
-                                <div
-                                    key={activity.id}
-                                    onClick={() => handleToggleActivitySelection(activity.id)}
-                                    style={{
-                                        background: isSelected ? '#2a4a2a' : '#1e1e1e',
-                                        border: `2px solid ${isSelected || isAlreadyAssociated ? '#4caf50' : '#444'}`,
-                                        borderRadius: '6px',
-                                        padding: '12px 14px',
-                                        cursor: isAlreadyAssociated ? 'not-allowed' : 'pointer',
-                                        opacity: isAlreadyAssociated ? 0.6 : 1,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isAlreadyAssociated && !isSelected) {
-                                            e.currentTarget.style.borderColor = '#4caf50';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isAlreadyAssociated && !isSelected) {
-                                            e.currentTarget.style.borderColor = '#444';
-                                        }
-                                    }}
-                                >
-                                    {/* Checkbox */}
-                                    <div style={{
-                                        width: '22px',
-                                        height: '22px',
-                                        borderRadius: '4px',
-                                        border: `2px solid ${isSelected || isAlreadyAssociated ? '#4caf50' : '#666'}`,
-                                        background: isSelected || isAlreadyAssociated ? '#4caf50' : 'transparent',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#1a1a1a',
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        flexShrink: 0
-                                    }}>
-                                        {(isSelected || isAlreadyAssociated) && '✓'}
-                                    </div>
-
-                                    {/* Activity Info */}
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontWeight: 'bold',
-                                            fontSize: '14px',
-                                            color: isSelected || isAlreadyAssociated ? '#4caf50' : '#ccc',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}>
-                                            {activity.name}
-                                            {isAlreadyAssociated && (
-                                                <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>
-                                                    (Already associated)
-                                                </span>
-                                            )}
-                                        </div>
-                                        {activity.description && (
-                                            <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                                                {activity.description}
-                                            </div>
-                                        )}
-                                        {hasMetrics && (
-                                            <div style={{
-                                                fontSize: '11px',
-                                                color: '#555',
-                                                marginTop: '4px',
-                                                display: 'flex',
-                                                gap: '8px',
-                                                flexWrap: 'wrap'
-                                            }}>
-                                                {activity.metrics.map((m, idx) => (
-                                                    <span key={idx} style={{
-                                                        background: '#2a2a2a',
-                                                        padding: '2px 6px',
-                                                        borderRadius: '3px'
-                                                    }}>
-                                                        {m.name} ({m.unit})
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )
-                }
-
-                {/* Actions Footer */}
-                <div style={{
-                    display: 'flex',
-                    gap: '10px',
-                    justifyContent: 'flex-end',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #333'
-                }}>
-                    <button
-                        onClick={handleCancelActivitySelector}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            color: '#ccc',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleConfirmActivitySelection}
-                        disabled={tempSelectedActivities.length === 0}
-                        style={{
-                            padding: '10px 20px',
-                            background: tempSelectedActivities.length === 0 ? '#444' : '#4caf50',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: tempSelectedActivities.length === 0 ? '#888' : 'white',
-                            fontWeight: 'bold',
-                            cursor: tempSelectedActivities.length === 0 ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        Add Selected ({tempSelectedActivities.length})
-                    </button>
-                </div>
-
-                {/* Currently Associated Activities - shown at the bottom */}
-                {associatedActivities.length > 0 && (
-                    <div style={{ marginTop: '16px' }}>
-                        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '8px' }}>
-                            Currently Associated ({associatedActivities.length}):
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                            {associatedActivities.map(activity => (
-                                <div
-                                    key={activity.id}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '4px 10px',
-                                        background: '#2a3a2a',
-                                        border: '1px solid #4caf50',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#4caf50'
-                                    }}
-                                >
-                                    <span>{activity.name}</span>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveActivity(activity.id);
-                                        }}
-                                        style={{
-                                            background: 'none',
-                                            border: 'none',
-                                            color: '#888',
-                                            fontSize: '14px',
-                                            cursor: 'pointer',
-                                            padding: '0',
-                                            lineHeight: 1,
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                        }}
-                                        title="Remove association"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div >
-        );
-    };
 
     // ============ COMPLETION CONFIRMATION VIEW ============
     const renderCompletionConfirm = () => {
@@ -1704,53 +840,17 @@ function GoalDetailModal({
                             />
                         </div>
 
-                        {/* Targets Section - Edit Mode (Only show creation, otherwise handled in View mode) */}
+                        {/* Targets Section - Edit Mode */}
                         {mode === 'create' && (
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                    <label style={{ fontSize: '12px', color: '#aaa' }}>Targets:</label>
-                                    {activitiesForTargets.length > 0 && (
-                                        <button
-                                            onClick={handleOpenAddTarget}
-                                            style={{
-                                                background: '#4caf50',
-                                                border: 'none',
-                                                color: 'white',
-                                                fontSize: '11px',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                fontWeight: 'bold'
-                                            }}
-                                        >
-                                            + Add Target
-                                        </button>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {targets.length === 0 ? (
-                                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                            {activitiesForTargets.length === 0
-                                                ? (associatedActivities.length === 0
-                                                    ? 'Associate activities first to set targets'
-                                                    : 'No associated activities have metrics')
-                                                : 'No targets defined'}
-                                        </div>
-                                    ) : (
-                                        targets.map(target => (
-                                            <TargetCard
-                                                key={target.id}
-                                                target={target}
-                                                activityDefinitions={activityDefinitions}
-                                                onEdit={() => handleOpenEditTarget(target)}
-                                                onDelete={() => confirmAndDeleteTarget(target.id)}
-                                                isCompleted={false}
-                                                isEditMode={true}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-                            </div>
+                            <TargetManager
+                                targets={targets}
+                                setTargets={setTargets}
+                                activityDefinitions={activityDefinitions}
+                                associatedActivities={associatedActivities}
+                                goalId={null}
+                                rootId={rootId}
+                                isEditing={true}
+                            />
                         )}
 
                         {/* Edit Actions */}
@@ -1969,254 +1069,58 @@ function GoalDetailModal({
 
                         {/* Associated Activities Section - View Mode */}
                         {mode !== 'create' && (
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                    <label style={{ fontSize: '12px', color: '#aaa' }}>
-                                        Associated Activities ({isLoadingActivities ? '...' : associatedActivities.length})
-                                    </label>
-                                    <button
-                                        onClick={handleOpenActivitySelector}
-                                        style={{
-                                            background: 'transparent',
-                                            border: '1px solid #4caf50',
-                                            color: '#4caf50',
-                                            fontSize: '12px',
-                                            padding: '4px 10px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        + Add
-                                    </button>
-                                </div>
-                                {associatedActivities.length === 0 ? (
-                                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                        No activities associated
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                        {associatedActivities.slice(0, 10).map(activity => {
-                                            const isUsed = targets.some(t => {
-                                                // ID Match
-                                                if (String(t.activity_id) === String(activity.id)) return true;
-
-                                                // Name Match (Normalization Helper)
-                                                const normalize = s => s ? String(s).trim().toLowerCase() : '';
-                                                const activityName = normalize(activity.name);
-
-                                                // Check via Activity Definition
-                                                const targetActivityDef = activityDefinitions.find(ad => ad.id === t.activity_id);
-                                                if (targetActivityDef && normalize(targetActivityDef.name) === activityName) return true;
-
-                                                // Check target name override
-                                                if (t.name && normalize(t.name) === activityName) return true;
-
-                                                return false;
-                                            });
-
-                                            return (
-                                                <div
-                                                    key={activity.id}
-                                                    style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        padding: '4px 10px',
-                                                        background: '#2a3a2a',
-                                                        border: '1px solid #4caf50',
-                                                        borderRadius: '12px',
-                                                        fontSize: '12px',
-                                                        color: '#4caf50'
-                                                    }}
-                                                >
-                                                    <span>{activity.name}</span>
-                                                    {!isUsed && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveActivity(activity.id);
-                                                            }}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                color: '#888',
-                                                                fontSize: '14px',
-                                                                cursor: 'pointer',
-                                                                padding: '0',
-                                                                lineHeight: 1,
-                                                                display: 'flex',
-                                                                alignItems: 'center'
-                                                            }}
-                                                            title="Remove association"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                        {associatedActivities.length > 10 && (
-                                            <button
-                                                onClick={handleOpenActivitySelector}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    color: '#4caf50',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer',
-                                                    padding: '4px 6px',
-                                                    textDecoration: 'underline'
-                                                }}
-                                            >
-                                                and {associatedActivities.length - 10} more
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            <ActivityAssociator
+                                associatedActivities={associatedActivities}
+                                setAssociatedActivities={setAssociatedActivities}
+                                activityDefinitions={activityDefinitions}
+                                activityGroups={activityGroups}
+                                rootId={rootId}
+                                goalId={goalId}
+                                isEditing={true}
+                                targets={targets}
+                                viewMode="list"
+                                onOpenSelector={() => setViewState('activity-associator')}
+                            />
                         )}
 
                         {/* Targets Section - View Mode */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <label style={{ fontSize: '12px', color: '#aaa' }}>
-                                    Targets ({targets.length}):
-                                </label>
-                                {activitiesForTargets.length > 0 && (
-                                    <button
-                                        onClick={handleOpenAddTarget}
-                                        style={{
-                                            background: 'transparent',
-                                            border: '1px solid #4caf50',
-                                            color: '#4caf50',
-                                            fontSize: '12px',
-                                            padding: '4px 10px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        + Add
-                                    </button>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {targets.length === 0 ? (
-                                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                        No targets defined
-                                    </div>
-                                ) : (
-                                    targets.map(target => (
-                                        <TargetCard
-                                            key={target.id}
-                                            target={target}
-                                            activityDefinitions={activityDefinitions}
-                                            isCompleted={isCompleted}
-                                            isEditMode={false}
-                                            onDelete={() => confirmAndDeleteTarget(target.id)}
-                                            onClick={() => handleOpenEditTarget(target)}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        </div>
+                        <TargetManager
+                            targets={targets}
+                            setTargets={setTargets}
+                            activityDefinitions={activityDefinitions}
+                            associatedActivities={associatedActivities}
+                            goalId={goalId}
+                            rootId={rootId}
+                            isEditing={true}
+                            viewMode="list"
+                            onOpenBuilder={(target) => {
+                                setTargetToEdit(target || null);
+                                setViewState('target-manager');
+                            }}
+                            onSave={(newTargets) => {
+                                // Persist changes immediately when in View mode
+                                // We use current local state for other fields to prevent overwriting with stale data
+                                // although View mode generally doesn't have stale form data.
+                                if (onUpdate && goalId) {
+                                    onUpdate(goalId, {
+                                        name,
+                                        description,
+                                        deadline,
+                                        relevance_statement: relevanceStatement,
+                                        targets: newTargets
+                                    });
+                                }
+                            }}
+                        />
 
-                        {/* Sessions - For ShortTermGoals */}
-                        {isShortTermGoal && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                    Sessions ({childSessions.length}):
-                                </label>
-                                {childSessions.length === 0 ? (
-                                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                        No sessions yet
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        {childSessions.slice(0, 5).map(session => (
-                                            <div
-                                                key={session.id}
-                                                onClick={() => {
-                                                    if (displayMode === 'modal' && onClose) onClose();
-                                                    navigate(`/${rootId}/session/${session.id}`);
-                                                }}
-                                                style={{
-                                                    padding: '8px 10px',
-                                                    background: '#2a2a2a',
-                                                    border: '1px solid #444',
-                                                    borderRadius: '4px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    fontSize: '13px'
-                                                }}
-                                            >
-                                                <span style={{ color: 'white' }}>{session.name}</span>
-                                                {session.attributes?.created_at && (
-                                                    <span style={{ fontSize: '11px', color: '#888' }}>
-                                                        {new Date(session.attributes.created_at).toLocaleDateString()}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {childSessions.length > 5 && (
-                                            <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
-                                                ... and {childSessions.length - 5} more
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Associated Sessions - For ImmediateGoals */}
-                        {isImmediateGoal && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                    Associated Sessions ({associatedSessions.length}):
-                                </label>
-                                {associatedSessions.length === 0 ? (
-                                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                        No associated sessions yet
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        {associatedSessions.slice(0, 5).map(session => (
-                                            <div
-                                                key={session.id}
-                                                onClick={() => {
-                                                    if (displayMode === 'modal' && onClose) onClose();
-                                                    navigate(`/${rootId}/session/${session.id}`);
-                                                }}
-                                                style={{
-                                                    padding: '8px 10px',
-                                                    background: '#2a2a2a',
-                                                    border: '1px solid #9c27b0',
-                                                    borderRadius: '4px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    fontSize: '13px'
-                                                }}
-                                            >
-                                                <span style={{ color: 'white' }}>{session.name}</span>
-                                                {session.attributes?.created_at && (
-                                                    <span style={{ fontSize: '11px', color: '#888' }}>
-                                                        {new Date(session.attributes.created_at).toLocaleDateString()}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {associatedSessions.length > 5 && (
-                                            <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
-                                                ... and {associatedSessions.length - 5} more
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {/* Sessions List */}
+                        <GoalSessionList
+                            goalType={goalType}
+                            sessions={sessions}
+                            goalId={goalId}
+                            rootId={rootId}
+                            onClose={onClose}
+                        />
 
                     </div>
                 )}
@@ -2226,33 +1130,61 @@ function GoalDetailModal({
 
     // ============ DETERMINE WHICH CONTENT TO RENDER ============
     let content;
-    if (viewState === 'target-add' || viewState === 'target-edit') {
-        content = renderTargetBuilder();
-    } else if (viewState === 'activity-selector') {
-        content = renderActivitySelector();
-    } else if (viewState === 'complete-confirm') {
+    if (viewState === 'complete-confirm') {
         content = renderCompletionConfirm();
     } else if (viewState === 'uncomplete-confirm') {
         content = renderUncompletionConfirm();
+    } else if (viewState === 'target-manager') {
+        content = (
+            <TargetManager
+                targets={targets}
+                setTargets={setTargets}
+                activityDefinitions={activityDefinitions}
+                associatedActivities={associatedActivities}
+                goalId={goalId}
+                rootId={rootId}
+                isEditing={true}
+                viewMode="builder"
+                initialTarget={targetToEdit}
+                onCloseBuilder={() => {
+                    setTargetToEdit(null);
+                    setViewState('goal');
+                }}
+                onSave={(newTargets) => {
+                    if (onUpdate && goalId) {
+                        onUpdate(goalId, {
+                            name,
+                            description,
+                            deadline,
+                            relevance_statement: relevanceStatement,
+                            targets: newTargets
+                        });
+                    }
+                    setViewState('goal');
+                }}
+            />
+        );
+    } else if (viewState === 'activity-associator') {
+        content = (
+            <ActivityAssociator
+                associatedActivities={associatedActivities}
+                setAssociatedActivities={setAssociatedActivities}
+                activityDefinitions={activityDefinitions}
+                activityGroups={activityGroups}
+                rootId={rootId}
+                goalId={goalId}
+                isEditing={true}
+                targets={targets}
+                viewMode="selector"
+                onCloseSelector={() => setViewState('goal')}
+            />
+        );
     } else {
         content = renderGoalContent();
     }
 
     // ============ RENDER ============
-    const confirmModalComponent = (
-        <ConfirmationModal
-            isOpen={!!targetToDelete}
-            onClose={() => {
-                setTargetToDelete(null);
-                setDeleteTargetCallback(null);
-            }}
-            onConfirm={handleFinalizeDeleteTarget}
-            title="Delete Target"
-            message="Are you sure you want to delete this target? This action cannot be undone."
-            confirmText="Delete"
-            cancelText="Cancel"
-        />
-    );
+
 
     if (displayMode === 'panel') {
         return (
@@ -2274,7 +1206,6 @@ function GoalDetailModal({
                 }}>
                     {content}
                 </div>
-                {confirmModalComponent}
             </div>
         );
     }
@@ -2316,7 +1247,7 @@ function GoalDetailModal({
                 </div>
             </div>
             {/* Confirmation Modal for Target Deletion */}
-            {confirmModalComponent}
+
         </>
     );
 }

@@ -610,20 +610,25 @@ Fractal selection/home page.
 - **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
 - **`GoalDetailModal.jsx`** - Unified goal viewing/editing/creating component with dual display modes (modal/panel):
   - **Mode support:** 'view', 'edit', or 'create' mode via `mode` prop
+  - **Refactored Architecture:** Complex logic extracted into focused sub-components (`TargetManager`, `ActivityAssociator`, `GoalSessionList`).
   - View/Edit goal name, description, deadline
   - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
   - **Associated/Targeting Programs display**
-  - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`.
-    - View limit: Shows up to 10 activities, with clickable "and X more" text to expand.
-    - Activity Selector: Card-based group selection + individual activity selection with "Currently Associated" list at the bottom.
-    - **Constraint:** Activities cannot be removed if they are used by any existing targets on the goal (matched by ID or Name).
-  - **Inline target builder:** Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode; requires manual save in Edit Mode.
+  - **Associated Activities (SMART Achievable):** Managed via `ActivityAssociator`. Shows count of activities linked to goal.
+    - Activity Selector: Card-based group selection + individual activity selection.
+    - **Constraint:** Activities cannot be removed if used by existing targets.
+  - **Inline target builder:** Managed via `TargetManager`. Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode.
   - Completion confirmation flow with program/target summary
-  - **SMART Indicator:** Real-time feedback based on current editing state (targets, description, deadline, etc.)
-  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates below action buttons.
-  - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
-  - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button (colored by child goal level).
+  - **SMART Indicator:** Real-time feedback based on current editing state.
+  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates.
+  - Practice session relationships: Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
+  - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button.
   - **Contextual Styling:** Parent goal references and question marks highlighted in parent goal color.
+
+**Sub-components (in `/client/src/components/goalDetail/`):**
+- `TargetManager.jsx` - Manages target list, deletion, and inline target creation/editing.
+- `ActivityAssociator.jsx` - Manages activity associations and the activity selector UI.
+- `GoalSessionList.jsx` - Displays associated sessions contextually based on goal type.
 - **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
