@@ -642,7 +642,7 @@ Fractal selection/home page.
 - **`SessionCreationModal.jsx`** - Modal for creating sessions
 - **`TemplateSelectionModal.jsx`** - Modal for selecting templates
 - **`AlertModal.jsx`** - Reusable alert/notification modal
-- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal
+- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal. Supports `requireMatchingText` to enforce typing a specific string to enable the delete button.
 - **`ProgramBuilder.jsx`** - Modal for creating/editing programs
 - **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
 - **`ProgramDayModal.jsx`** - Modal for creating/editing program days

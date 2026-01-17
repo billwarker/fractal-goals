@@ -252,6 +252,7 @@ function FractalGoals() {
                 onConfirm={handleDelete}
                 title="Delete Goal?"
                 message={`Are you sure you want to delete "${fractalToDelete?.name}" and all its children?`}
+                requireMatchingText="delete"
             />
 
             <AlertModal
