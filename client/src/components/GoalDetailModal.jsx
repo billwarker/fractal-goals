@@ -840,18 +840,35 @@ function GoalDetailModal({
                             />
                         </div>
 
-                        {/* Targets Section - Edit Mode */}
-                        {mode === 'create' && (
-                            <TargetManager
-                                targets={targets}
-                                setTargets={setTargets}
-                                activityDefinitions={activityDefinitions}
-                                associatedActivities={associatedActivities}
-                                goalId={null}
-                                rootId={rootId}
-                                isEditing={true}
-                            />
-                        )}
+                        {/* Associated Activities Section - Edit/Create Mode */}
+                        <ActivityAssociator
+                            associatedActivities={associatedActivities}
+                            setAssociatedActivities={setAssociatedActivities}
+                            activityDefinitions={activityDefinitions}
+                            activityGroups={activityGroups}
+                            rootId={rootId}
+                            goalId={goalId}
+                            isEditing={true}
+                            targets={targets}
+                            viewMode="list"
+                            onOpenSelector={() => setViewState('activity-associator')}
+                        />
+
+                        {/* Targets Section - Edit/Create Mode */}
+                        <TargetManager
+                            targets={targets}
+                            setTargets={setTargets}
+                            activityDefinitions={activityDefinitions}
+                            associatedActivities={associatedActivities}
+                            goalId={goalId}
+                            rootId={rootId}
+                            isEditing={true}
+                            viewMode="list"
+                            onOpenBuilder={(target) => {
+                                setTargetToEdit(target || null);
+                                setViewState('target-manager');
+                            }}
+                        />
 
                         {/* Edit Actions */}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
@@ -1067,23 +1084,20 @@ function GoalDetailModal({
                             );
                         })()}
 
-                        {/* Associated Activities Section - View Mode */}
-                        {mode !== 'create' && (
-                            <ActivityAssociator
-                                associatedActivities={associatedActivities}
-                                setAssociatedActivities={setAssociatedActivities}
-                                activityDefinitions={activityDefinitions}
-                                activityGroups={activityGroups}
-                                rootId={rootId}
-                                goalId={goalId}
-                                isEditing={true}
-                                targets={targets}
-                                viewMode="list"
-                                onOpenSelector={() => setViewState('activity-associator')}
-                            />
-                        )}
+                        {/* Associated Activities Section - View Mode (Read-only) */}
+                        <ActivityAssociator
+                            associatedActivities={associatedActivities}
+                            setAssociatedActivities={setAssociatedActivities}
+                            activityDefinitions={activityDefinitions}
+                            activityGroups={activityGroups}
+                            rootId={rootId}
+                            goalId={goalId}
+                            isEditing={false}
+                            targets={targets}
+                            viewMode="list"
+                        />
 
-                        {/* Targets Section - View Mode */}
+                        {/* Targets Section - View Mode (Read-only) */}
                         <TargetManager
                             targets={targets}
                             setTargets={setTargets}
@@ -1091,26 +1105,8 @@ function GoalDetailModal({
                             associatedActivities={associatedActivities}
                             goalId={goalId}
                             rootId={rootId}
-                            isEditing={true}
+                            isEditing={false}
                             viewMode="list"
-                            onOpenBuilder={(target) => {
-                                setTargetToEdit(target || null);
-                                setViewState('target-manager');
-                            }}
-                            onSave={(newTargets) => {
-                                // Persist changes immediately when in View mode
-                                // We use current local state for other fields to prevent overwriting with stale data
-                                // although View mode generally doesn't have stale form data.
-                                if (onUpdate && goalId) {
-                                    onUpdate(goalId, {
-                                        name,
-                                        description,
-                                        deadline,
-                                        relevance_statement: relevanceStatement,
-                                        targets: newTargets
-                                    });
-                                }
-                            }}
                         />
 
                         {/* Sessions List */}

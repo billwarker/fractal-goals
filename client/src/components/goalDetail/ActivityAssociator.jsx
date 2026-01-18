@@ -136,8 +136,13 @@ const ActivityAssociator = ({
 
     // Render Logic
     if (shouldRenderSelector) {
+        // When embedded=false (rendered as full modal view), skip the container styling
+        const containerStyle = viewMode === 'selector'
+            ? { display: 'flex', flexDirection: 'column', gap: '14px' }  // Full view - no container box
+            : { display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #4caf50' };  // Embedded - has container
+
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #4caf50' }}>
+            <div style={containerStyle}>
                 {/* Header */}
                 <div style={{
                     display: 'flex',
@@ -285,8 +290,13 @@ const ActivityAssociator = ({
                 {isEditing && (
                     <button
                         onClick={() => {
-                            setViewState('selector');
-                            if (onOpenSelector) onOpenSelector();
+                            // If parent controls view (onOpenSelector provided), only call parent
+                            // Otherwise use internal state
+                            if (onOpenSelector) {
+                                onOpenSelector();
+                            } else {
+                                setViewState('selector');
+                            }
                         }}
                         style={{
                             background: '#2a2a2a',

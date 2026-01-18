@@ -63,8 +63,13 @@ const TargetManager = ({
         setTargetName('');
         setTargetDescription('');
         setMetricValues({});
-        setViewState('add');
-        if (onOpenBuilder) onOpenBuilder(null);
+        // If parent controls view (onOpenBuilder provided), only call parent
+        // Otherwise use internal state
+        if (onOpenBuilder) {
+            onOpenBuilder(null);
+        } else {
+            setViewState('add');
+        }
     };
 
     const handleOpenEditTarget = (target) => {
@@ -80,8 +85,13 @@ const TargetManager = ({
             });
         }
         setMetricValues(metricsObj);
-        setViewState('edit');
-        if (onOpenBuilder) onOpenBuilder(target);
+        // If parent controls view (onOpenBuilder provided), only call parent
+        // Otherwise use internal state
+        if (onOpenBuilder) {
+            onOpenBuilder(target);
+        } else {
+            setViewState('edit');
+        }
     };
 
     const handleActivityChange = (activityId) => {
@@ -175,8 +185,14 @@ const TargetManager = ({
 
     // Render Logic
     if (shouldRenderBuilder) {
+        // When viewMode='builder' (rendered as full modal view), skip the container styling
+        // When triggered by internal state (add/edit), we're embedded so keep container styling
+        const containerStyle = viewMode === 'builder'
+            ? { display: 'flex', flexDirection: 'column', gap: '14px' }  // Full view - no container box
+            : { display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #444' };  // Embedded - has container
+
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #444' }}>
+            <div style={containerStyle}>
                 {/* Header */}
                 <div style={{
                     display: 'flex',
@@ -450,6 +466,8 @@ const TargetManager = ({
     };
 
     // Default List View
+    const canAddTargets = activitiesForTargets.length > 0;
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {renderDeleteConfirm()}
@@ -459,13 +477,14 @@ const TargetManager = ({
                 </label>
                 {isEditing && (
                     <button
-                        onClick={handleOpenAddTarget}
+                        onClick={canAddTargets ? handleOpenAddTarget : undefined}
+                        disabled={!canAddTargets}
                         style={{
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
+                            background: canAddTargets ? '#2a2a2a' : '#1a1a1a',
+                            border: `1px solid ${canAddTargets ? '#444' : '#333'}`,
                             borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
+                            color: canAddTargets ? '#ccc' : '#555',
+                            cursor: canAddTargets ? 'pointer' : 'not-allowed',
                             fontSize: '12px',
                             padding: '2px 6px'
                         }}
@@ -477,7 +496,9 @@ const TargetManager = ({
 
             {targets.length === 0 ? (
                 <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
-                    No targets set.
+                    {canAddTargets
+                        ? 'No targets set.'
+                        : 'Associate an activity with metrics to create a target.'}
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
