@@ -193,7 +193,8 @@ function FractalGoals() {
         );
     }
 
-    const sidebarWidth = '400px';
+    const sidebarWidth = '32.5vw';
+    const minSidebarWidth = '390px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
 
     return (
@@ -241,21 +242,21 @@ function FractalGoals() {
                 {isSidebarOpen && (
                     <div className="details-window sidebar docked" style={{
                         width: sidebarWidth,
-                        minWidth: sidebarWidth,
-                        height: '100%',
-                        position: 'relative', // Force it into the flex flow
+                        minWidth: minSidebarWidth,
+                        height: 'calc(100% - 40px)', // Vertical margin
+                        position: 'relative', // Keep in flex flow
                         top: 'auto',
                         right: 'auto',
                         bottom: 'auto',
-                        margin: 0,
-                        border: 'none',
-                        borderLeft: '1px solid #444',
+                        margin: '20px', // Floating margin
+                        border: '1px solid #444',
                         background: 'rgba(20, 20, 20, 0.95)',
                         zIndex: 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: 0,
-                        boxShadow: '-5px 0 15px rgba(0,0,0,0.3)'
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(10px)'
                     }}>
                         <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                             {showGoalModal ? (

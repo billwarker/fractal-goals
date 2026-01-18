@@ -18,6 +18,13 @@
     width: 100vw;
     position: relative;
     overflow: hidden;
+
+    /* Continuous Grid Background */
+    background-color: var(--bg-color);
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 20px 20px;
 }
 
 .fractal-main-layout {
@@ -26,6 +33,7 @@
     width: 100%;
     min-height: 0;
     position: relative;
+    background: transparent;
 }
 
 .fractal-view-wrapper {
@@ -33,32 +41,12 @@
     position: relative;
     height: 100%;
     min-width: 0;
-    /* Critical for shrinking */
 }
 
 /* 
-   Override App.css fixed positioning.
-   We target .docked to be more specific and surgical.
+   We keep .docked for flex behavior, but we use inline styles 
+   in FractalGoals.jsx to achieve the "floating" look.
 */
 .details-window.docked {
-    position: relative !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    height: 100% !important;
-    max-height: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    border-left: 1px solid var(--border-color) !important;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2) !important;
-    z-index: 10 !important;
-    animation: none !important;
-    /* Disable transition-related issues if any */
-
-    /* Flex Behavior */
-    flex: 0 0 33.33vw;
-    min-width: 400px;
-    display: flex;
-    flex-direction: column;
+    flex-shrink: 0;
 }

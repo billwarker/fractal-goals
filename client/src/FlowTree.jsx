@@ -503,6 +503,23 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
         }
     }, [layoutedNodes.length, rfInstance]);
 
+    // Re-center with fade transition when sidebar toggles or selected node changes
+    useEffect(() => {
+        if (rfInstance) {
+            // Fade out first
+            setIsVisible(false);
+
+            // Wait for fade-out, then fit view, then fade back in
+            const timer = setTimeout(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                // Fade back in after fitView animation completes
+                setTimeout(() => setIsVisible(true), 220);
+            }, 220); // Wait for fade-out transition (200ms) + small buffer
+
+            return () => clearTimeout(timer);
+        }
+    }, [sidebarOpen, selectedNodeId, rfInstance]);
+
     return (
         <div style={{
             width: '100%',
@@ -528,7 +545,6 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
                 }}
                 proOptions={{ hideAttribution: true }}
             >
-                <Background color="#333" gap={20} />
             </ReactFlow>
         </div>
     );

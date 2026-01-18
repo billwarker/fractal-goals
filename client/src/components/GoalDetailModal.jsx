@@ -1193,7 +1193,6 @@ function GoalDetailModal({
                 flexDirection: 'column',
                 flex: 1,
                 minHeight: 0,
-                maxHeight: 'calc(100vh - 200px)',
                 overflow: 'hidden'
             }}>
                 <div style={{
