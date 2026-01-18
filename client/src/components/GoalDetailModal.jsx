@@ -47,8 +47,8 @@ function GoalDetailModal({
     const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : [];
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
-    // Normalize activityGroups to always be an array (handles null case)
-    const activityGroups = Array.isArray(activityGroupsRaw) ? activityGroupsRaw : [];
+    // Normalize activityGroups to always be an array (handles null case) - use state so we can update it
+    const [activityGroups, setActivityGroups] = useState(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
     const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -63,12 +63,21 @@ function GoalDetailModal({
     const [targets, setTargets] = useState([]);
     const [targetToEdit, setTargetToEdit] = useState(null);
 
-    // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator'
+    // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator', 'activity-builder'
     const [viewState, setViewState] = useState('goal');
 
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+    // Inline activity builder form state
+    const [newActivityName, setNewActivityName] = useState('');
+    const [newActivityDescription, setNewActivityDescription] = useState('');
+    const [newActivityHasMetrics, setNewActivityHasMetrics] = useState(true);
+    const [newActivityMetrics, setNewActivityMetrics] = useState([{ name: '', unit: '' }]);
+    const [newActivityHasSets, setNewActivityHasSets] = useState(false);
+    const [newActivityGroupId, setNewActivityGroupId] = useState('');
+    const [isCreatingActivity, setIsCreatingActivity] = useState(false);
 
     // Initialize form state from goal - use specific dependencies for completion state
     const depGoalId = goal?.attributes?.id || goal?.id;
@@ -90,7 +99,15 @@ function GoalDetailModal({
         } else if (goal) {
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
-            setDeadline(goal.attributes?.deadline || goal.deadline || '');
+            // Format deadline for date input (needs YYYY-MM-DD format)
+            const rawDeadline = goal.attributes?.deadline || goal.deadline || '';
+            if (rawDeadline) {
+                // Handle various datetime formats - extract just the date portion
+                const dateOnly = rawDeadline.split('T')[0].split(' ')[0];
+                setDeadline(dateOnly);
+            } else {
+                setDeadline('');
+            }
             setRelevanceStatement(goal.attributes?.relevance_statement || '');
             setLocalCompleted(goal.attributes?.completed || false);
             setLocalCompletedAt(goal.attributes?.completed_at || null);
@@ -112,6 +129,11 @@ function GoalDetailModal({
             setViewState('goal');
         }
     }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
+
+    // Sync activityGroups when prop changes
+    useEffect(() => {
+        setActivityGroups(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
+    }, [activityGroupsRaw]);
 
     // Fetch associated activities when goal changes
     useEffect(() => {
@@ -178,7 +200,14 @@ function GoalDetailModal({
         if (goal) {
             setName(goal.name || '');
             setDescription(goal.attributes?.description || goal.description || '');
-            setDeadline(goal.attributes?.deadline || goal.deadline || '');
+            // Format deadline for date input (needs YYYY-MM-DD format)
+            const rawDeadline = goal.attributes?.deadline || goal.deadline || '';
+            if (rawDeadline) {
+                const dateOnly = rawDeadline.split('T')[0].split(' ')[0];
+                setDeadline(dateOnly);
+            } else {
+                setDeadline('');
+            }
             setRelevanceStatement(goal.attributes?.relevance_statement || '');
 
             let parsedTargets = [];
@@ -1095,6 +1124,7 @@ function GoalDetailModal({
                             isEditing={false}
                             targets={targets}
                             viewMode="list"
+                            onOpenSelector={() => setViewState('activity-associator')}
                         />
 
                         {/* Targets Section - View Mode (Read-only) */}
@@ -1167,13 +1197,316 @@ function GoalDetailModal({
                 setAssociatedActivities={setAssociatedActivities}
                 activityDefinitions={activityDefinitions}
                 activityGroups={activityGroups}
+                setActivityGroups={setActivityGroups}
                 rootId={rootId}
                 goalId={goalId}
+                goalName={name}
                 isEditing={true}
                 targets={targets}
                 viewMode="selector"
                 onCloseSelector={() => setViewState('goal')}
+                onCreateActivity={() => {
+                    // Reset form state and switch to activity builder view
+                    setNewActivityName('');
+                    setNewActivityDescription('');
+                    setNewActivityHasMetrics(true);
+                    setNewActivityMetrics([{ name: '', unit: '' }]);
+                    setNewActivityHasSets(false);
+                    setNewActivityGroupId('');
+                    setViewState('activity-builder');
+                }}
             />
+        );
+    } else if (viewState === 'activity-builder') {
+        // Inline activity creation form
+        const handleCreateActivity = async () => {
+            if (!newActivityName.trim()) {
+                alert('Please enter an activity name');
+                return;
+            }
+
+            setIsCreatingActivity(true);
+            try {
+                const validMetrics = newActivityHasMetrics
+                    ? newActivityMetrics.filter(m => m.name.trim() !== '')
+                    : [];
+
+                const activityData = {
+                    name: newActivityName,
+                    description: newActivityDescription,
+                    has_sets: newActivityHasSets,
+                    has_metrics: newActivityHasMetrics,
+                    metrics: validMetrics,
+                    group_id: newActivityGroupId || null
+                };
+
+                // Create the activity - axios returns response object, so extract .data
+                const response = await fractalApi.createActivity(rootId, activityData);
+                const newActivity = response.data;
+
+                // Automatically associate with this goal
+                if (newActivity && newActivity.id && goalId) {
+                    await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
+                    // Add to local associated activities
+                    setAssociatedActivities(prev => [...prev, newActivity]);
+                }
+
+                // Go back to activity-associator view
+                setViewState('activity-associator');
+            } catch (error) {
+                console.error('Error creating activity:', error);
+                alert('Failed to create activity: ' + error.message);
+            } finally {
+                setIsCreatingActivity(false);
+            }
+        };
+
+        content = (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Header */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid #4caf50'
+                }}>
+                    <button
+                        onClick={() => setViewState('activity-associator')}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#888',
+                            fontSize: '18px',
+                            cursor: 'pointer',
+                            padding: '0 4px'
+                        }}
+                    >
+                        ←
+                    </button>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white', flex: 1 }}>
+                        Create New Activity
+                    </h3>
+                </div>
+
+                {/* Activity Name */}
+                <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                        Activity Name *
+                    </label>
+                    <input
+                        type="text"
+                        value={newActivityName}
+                        onChange={(e) => setNewActivityName(e.target.value)}
+                        placeholder="e.g. Scale Practice"
+                        style={{
+                            width: '100%',
+                            padding: '10px',
+                            background: '#2a2a2a',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '14px'
+                        }}
+                    />
+                </div>
+
+                {/* Description */}
+                <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                        Description
+                    </label>
+                    <textarea
+                        value={newActivityDescription}
+                        onChange={(e) => setNewActivityDescription(e.target.value)}
+                        placeholder="Optional description..."
+                        rows={2}
+                        style={{
+                            width: '100%',
+                            padding: '10px',
+                            background: '#2a2a2a',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '13px',
+                            resize: 'vertical'
+                        }}
+                    />
+                </div>
+
+                {/* Group Selection */}
+                <div>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                        Activity Group
+                    </label>
+                    <select
+                        value={newActivityGroupId}
+                        onChange={(e) => setNewActivityGroupId(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '10px',
+                            background: '#2a2a2a',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: 'white',
+                            fontSize: '13px'
+                        }}
+                    >
+                        <option value="">(No Group)</option>
+                        {activityGroups && activityGroups.map(group => (
+                            <option key={group.id} value={group.id}>
+                                {group.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Flags */}
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            checked={newActivityHasSets}
+                            onChange={(e) => setNewActivityHasSets(e.target.checked)}
+                        />
+                        Track Sets
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            checked={newActivityHasMetrics}
+                            onChange={(e) => setNewActivityHasMetrics(e.target.checked)}
+                        />
+                        Enable Metrics
+                    </label>
+                </div>
+
+                {/* Metrics Section */}
+                {newActivityHasMetrics && (
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
+                            Metrics (needed for targets)
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {newActivityMetrics.map((metric, idx) => (
+                                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        value={metric.name}
+                                        onChange={(e) => {
+                                            const updated = [...newActivityMetrics];
+                                            updated[idx] = { ...updated[idx], name: e.target.value };
+                                            setNewActivityMetrics(updated);
+                                        }}
+                                        placeholder="Metric name (e.g. Speed)"
+                                        style={{
+                                            flex: 1,
+                                            padding: '8px',
+                                            background: '#2a2a2a',
+                                            border: '1px solid #444',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            fontSize: '13px'
+                                        }}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={metric.unit}
+                                        onChange={(e) => {
+                                            const updated = [...newActivityMetrics];
+                                            updated[idx] = { ...updated[idx], unit: e.target.value };
+                                            setNewActivityMetrics(updated);
+                                        }}
+                                        placeholder="Unit (e.g. bpm)"
+                                        style={{
+                                            width: '80px',
+                                            padding: '8px',
+                                            background: '#2a2a2a',
+                                            border: '1px solid #444',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            fontSize: '13px'
+                                        }}
+                                    />
+                                    {newActivityMetrics.length > 1 && (
+                                        <button
+                                            onClick={() => {
+                                                const updated = newActivityMetrics.filter((_, i) => i !== idx);
+                                                setNewActivityMetrics(updated);
+                                            }}
+                                            style={{
+                                                padding: '8px',
+                                                background: '#d32f2f',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            {newActivityMetrics.length < 3 && (
+                                <button
+                                    onClick={() => setNewActivityMetrics([...newActivityMetrics, { name: '', unit: '' }])}
+                                    style={{
+                                        padding: '8px',
+                                        background: '#333',
+                                        border: '1px dashed #666',
+                                        borderRadius: '4px',
+                                        color: '#aaa',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    + Add Metric
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Info about auto-association */}
+                <div style={{ fontSize: '11px', color: '#4caf50', fontStyle: 'italic', padding: '8px', background: '#1a2a1a', borderRadius: '4px' }}>
+                    This activity will be automatically associated with this goal.
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
+                    <button
+                        onClick={() => setViewState('activity-associator')}
+                        style={{
+                            padding: '8px 16px',
+                            background: 'transparent',
+                            border: '1px solid #666',
+                            borderRadius: '4px',
+                            color: '#ccc',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleCreateActivity}
+                        disabled={isCreatingActivity || !newActivityName.trim()}
+                        style={{
+                            padding: '8px 16px',
+                            background: isCreatingActivity || !newActivityName.trim() ? '#444' : '#4caf50',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: isCreatingActivity || !newActivityName.trim() ? '#888' : 'white',
+                            cursor: isCreatingActivity || !newActivityName.trim() ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        {isCreatingActivity ? 'Creating...' : 'Create Activity'}
+                    </button>
+                </div>
+            </div>
         );
     } else {
         content = renderGoalContent();
@@ -1184,24 +1517,26 @@ function GoalDetailModal({
 
     if (displayMode === 'panel') {
         return (
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                minHeight: 0,
-                overflow: 'hidden'
-            }}>
+            <>
                 <div style={{
-                    padding: '16px',
-                    paddingBottom: '24px',
-                    color: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
                     flex: 1,
                     minHeight: 0,
-                    overflowY: 'auto'
+                    overflow: 'hidden'
                 }}>
-                    {content}
+                    <div style={{
+                        padding: '16px',
+                        paddingBottom: '24px',
+                        color: 'white',
+                        flex: 1,
+                        minHeight: 0,
+                        overflowY: 'auto'
+                    }}>
+                        {content}
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
@@ -1241,8 +1576,6 @@ function GoalDetailModal({
                     {content}
                 </div>
             </div>
-            {/* Confirmation Modal for Target Deletion */}
-
         </>
     );
 }

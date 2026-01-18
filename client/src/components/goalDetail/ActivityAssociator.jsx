@@ -12,19 +12,27 @@ const ActivityAssociator = ({
     setAssociatedActivities,
     activityDefinitions,
     activityGroups,
+    setActivityGroups,  // To update groups after creation
     targets,
     rootId,
     goalId,
+    goalName,  // For prepopulating new group name
     isEditing,
     // New props for full view mode
     viewMode = 'list', // 'list' | 'selector'
     onOpenSelector,
-    onCloseSelector
+    onCloseSelector,
+    onCreateActivity  // Callback to open ActivityBuilder for creating new activity
 }) => {
     // Internal view state prioritized by props if available
     const [viewState, setViewState] = useState('list');
     const [activitySelectorGroupId, setActivitySelectorGroupId] = useState(null); // null = group view, string = specific group
     const [tempSelectedActivities, setTempSelectedActivities] = useState([]);
+
+    // Inline group creation state
+    const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
     // Derived state for selector
     const alreadyAssociatedIds = associatedActivities.map(a => a.id);
@@ -224,58 +232,302 @@ const ActivityAssociator = ({
                     </div>
                 ) : (
                     /* Activities */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-                        {(activitySelectorGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[activitySelectorGroupId] || []).map(activity => {
-                            const isAssoc = alreadyAssociatedIds.includes(activity.id);
-                            const isSel = tempSelectedActivities.includes(activity.id);
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {(activitySelectorGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[activitySelectorGroupId] || []).map(activity => {
+                                const isAssoc = alreadyAssociatedIds.includes(activity.id);
+                                const isSel = tempSelectedActivities.includes(activity.id);
+                                return (
+                                    <div
+                                        key={activity.id}
+                                        onClick={() => handleToggleActivitySelection(activity.id)}
+                                        style={{
+                                            background: isSel ? '#2a4a2a' : '#1e1e1e',
+                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#444'}`,
+                                            borderRadius: '6px',
+                                            padding: '10px',
+                                            cursor: isAssoc ? 'not-allowed' : 'pointer',
+                                            opacity: isAssoc ? 0.6 : 1,
+                                            display: 'flex', alignItems: 'center', gap: '10px'
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '18px', height: '18px', borderRadius: '4px',
+                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#666'}`,
+                                            background: isSel || isAssoc ? '#4caf50' : 'transparent',
+                                            color: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
+                                        }}>
+                                            {(isSel || isAssoc) && '✓'}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '13px', color: isSel || isAssoc ? '#4caf50' : '#ccc', fontWeight: 'bold' }}>{activity.name}</div>
+                                            {activity.description && <div style={{ fontSize: '11px', color: '#666' }}>{activity.description}</div>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Everything in this group checkbox */}
+                        {(() => {
+                            const activitiesInGroup = activitySelectorGroupId === 'ungrouped'
+                                ? ungroupedActivities
+                                : groupedActivities[activitySelectorGroupId] || [];
+                            const selectableActivities = activitiesInGroup.filter(a => !alreadyAssociatedIds.includes(a.id));
+                            const allSelectableSelected = selectableActivities.length > 0 &&
+                                selectableActivities.every(a => tempSelectedActivities.includes(a.id));
+
+                            if (selectableActivities.length === 0) return null;
+
                             return (
                                 <div
-                                    key={activity.id}
-                                    onClick={() => handleToggleActivitySelection(activity.id)}
+                                    onClick={() => {
+                                        if (allSelectableSelected) {
+                                            // Deselect all in this group
+                                            const idsToRemove = selectableActivities.map(a => a.id);
+                                            setTempSelectedActivities(prev => prev.filter(id => !idsToRemove.includes(id)));
+                                        } else {
+                                            // Select all in this group
+                                            const idsToAdd = selectableActivities.map(a => a.id);
+                                            setTempSelectedActivities(prev => [...new Set([...prev, ...idsToAdd])]);
+                                        }
+                                    }}
                                     style={{
-                                        background: isSel ? '#2a4a2a' : '#1e1e1e',
-                                        border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#444'}`,
+                                        marginTop: '8px',
+                                        padding: '10px 12px',
+                                        background: allSelectableSelected ? '#2a4a2a' : '#252525',
+                                        border: `1px solid ${allSelectableSelected ? '#4caf50' : '#555'}`,
                                         borderRadius: '6px',
-                                        padding: '10px',
-                                        cursor: isAssoc ? 'not-allowed' : 'pointer',
-                                        opacity: isAssoc ? 0.6 : 1,
-                                        display: 'flex', alignItems: 'center', gap: '10px'
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
                                     }}
                                 >
                                     <div style={{
                                         width: '18px', height: '18px', borderRadius: '4px',
-                                        border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#666'}`,
-                                        background: isSel || isAssoc ? '#4caf50' : 'transparent',
+                                        border: `1px solid ${allSelectableSelected ? '#4caf50' : '#666'}`,
+                                        background: allSelectableSelected ? '#4caf50' : 'transparent',
                                         color: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
                                     }}>
-                                        {(isSel || isAssoc) && '✓'}
+                                        {allSelectableSelected && '✓'}
                                     </div>
-                                    <div>
-                                        <div style={{ fontSize: '13px', color: isSel || isAssoc ? '#4caf50' : '#ccc', fontWeight: 'bold' }}>{activity.name}</div>
-                                        {activity.description && <div style={{ fontSize: '11px', color: '#666' }}>{activity.description}</div>}
+                                    <div style={{ fontSize: '13px', color: allSelectableSelected ? '#4caf50' : '#aaa', fontWeight: 'bold' }}>
+                                        Everything in this group ({selectableActivities.length})
                                     </div>
                                 </div>
                             );
-                        })}
+                        })()}
                     </div>
                 )}
 
                 {/* Footer */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
-                    <button onClick={handleCancelSelector} style={{ background: 'transparent', border: '1px solid #666', color: '#ccc', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' }}>Cancel</button>
-                    <button
-                        onClick={handleConfirmActivitySelection}
-                        disabled={tempSelectedActivities.length === 0}
-                        style={{
-                            background: tempSelectedActivities.length > 0 ? '#4caf50' : '#444',
-                            border: 'none', color: tempSelectedActivities.length > 0 ? 'white' : '#888',
-                            borderRadius: '4px', padding: '6px 12px', cursor: tempSelectedActivities.length > 0 ? 'pointer' : 'not-allowed',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        Add Selected ({tempSelectedActivities.length})
-                    </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
+                    {/* Create New Activity Button */}
+                    {onCreateActivity && (
+                        <button
+                            onClick={onCreateActivity}
+                            style={{
+                                background: 'transparent',
+                                border: '1px dashed #4caf50',
+                                color: '#4caf50',
+                                borderRadius: '4px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            + Create New Activity
+                        </button>
+                    )}
+
+                    {/* Create New Group button (only in group selection view) */}
+                    {activitySelectorGroupId === null && !isCreatingGroup && (
+                        <button
+                            onClick={() => {
+                                setNewGroupName(goalName || '');
+                                setIsCreatingGroup(true);
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: '1px dashed #888',
+                                color: '#888',
+                                borderRadius: '4px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            + Create New Group
+                        </button>
+                    )}
+
+                    {!onCreateActivity && !isCreatingGroup && activitySelectorGroupId !== null && <div />}
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button onClick={handleCancelSelector} style={{ background: 'transparent', border: '1px solid #666', color: '#ccc', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' }}>Cancel</button>
+                        <button
+                            onClick={handleConfirmActivitySelection}
+                            disabled={tempSelectedActivities.length === 0}
+                            style={{
+                                background: tempSelectedActivities.length > 0 ? '#4caf50' : '#444',
+                                border: 'none', color: tempSelectedActivities.length > 0 ? 'white' : '#888',
+                                borderRadius: '4px', padding: '6px 12px', cursor: tempSelectedActivities.length > 0 ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Add Selected ({tempSelectedActivities.length})
+                        </button>
+                    </div>
                 </div>
+
+                {/* Inline Group Creation Form */}
+                {isCreatingGroup && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        background: '#252525',
+                        borderRadius: '6px',
+                        border: '1px solid #444'
+                    }}>
+                        <input
+                            type="text"
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            placeholder="Enter group name..."
+                            autoFocus
+                            style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                background: '#2a2a2a',
+                                border: '1px solid #555',
+                                borderRadius: '4px',
+                                color: 'white',
+                                fontSize: '13px'
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newGroupName.trim()) {
+                                    handleCreateGroup();
+                                } else if (e.key === 'Escape') {
+                                    setIsCreatingGroup(false);
+                                    setNewGroupName('');
+                                }
+                            }}
+                        />
+                        <button
+                            onClick={async () => {
+                                if (!newGroupName.trim()) return;
+                                setIsSubmittingGroup(true);
+                                try {
+                                    const response = await fractalApi.createActivityGroup(rootId, { name: newGroupName.trim() });
+                                    const newGroup = response.data;
+                                    if (setActivityGroups) {
+                                        setActivityGroups(prev => [...prev, newGroup]);
+                                    }
+                                    setIsCreatingGroup(false);
+                                    setNewGroupName('');
+                                } catch (error) {
+                                    console.error('Error creating activity group:', error);
+                                    alert('Failed to create group: ' + error.message);
+                                } finally {
+                                    setIsSubmittingGroup(false);
+                                }
+                            }}
+                            disabled={isSubmittingGroup || !newGroupName.trim()}
+                            style={{
+                                padding: '8px 12px',
+                                background: isSubmittingGroup || !newGroupName.trim() ? '#444' : '#4caf50',
+                                border: 'none',
+                                borderRadius: '4px',
+                                color: isSubmittingGroup || !newGroupName.trim() ? '#888' : 'white',
+                                cursor: isSubmittingGroup || !newGroupName.trim() ? 'not-allowed' : 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {isSubmittingGroup ? '...' : 'Save'}
+                        </button>
+                        <button
+                            onClick={() => {
+                                setIsCreatingGroup(false);
+                                setNewGroupName('');
+                            }}
+                            style={{
+                                padding: '8px 12px',
+                                background: 'transparent',
+                                border: '1px solid #666',
+                                borderRadius: '4px',
+                                color: '#ccc',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+
+                {/* Associated Activities Display */}
+                {associatedActivities.length > 0 && (
+                    <>
+                        <div style={{ borderTop: '1px solid #444', marginTop: '4px', paddingTop: '14px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                Associated Activities ({associatedActivities.length})
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {associatedActivities.map(activity => {
+                                    // Check if activity is used in a target
+                                    const isUsedInTarget = targets.some(t => {
+                                        if (String(t.activity_id) === String(activity.id)) return true;
+                                        const normalize = s => s ? String(s).trim().toLowerCase() : '';
+                                        const activityName = normalize(activity.name);
+                                        const targetActivityDef = activityDefinitions.find(ad => ad.id === t.activity_id);
+                                        if (targetActivityDef && normalize(targetActivityDef.name) === activityName) return true;
+                                        if (t.name && normalize(t.name) === activityName) return true;
+                                        return false;
+                                    });
+
+                                    return (
+                                        <div
+                                            key={activity.id}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                background: '#2a3a2a',
+                                                border: '1px solid #4caf50',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                color: '#4caf50'
+                                            }}
+                                        >
+                                            <span>{activity.name}</span>
+                                            {!isUsedInTarget && (
+                                                <button
+                                                    onClick={() => handleRemoveActivity(activity.id)}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: '#888',
+                                                        fontSize: '14px',
+                                                        cursor: 'pointer',
+                                                        padding: '0',
+                                                        display: 'flex'
+                                                    }}
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         );
     }
@@ -318,8 +570,8 @@ const ActivityAssociator = ({
                     No activities associated.
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {associatedActivities.map(activity => (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                    {associatedActivities.slice(0, 10).map(activity => (
                         <div
                             key={activity.id}
                             style={{
@@ -353,7 +605,26 @@ const ActivityAssociator = ({
                             )}
                         </div>
                     ))}
-                    {/* Show expander if needed - simplified for this refactor to always show all or wrap */}
+                    {associatedActivities.length > 10 && (
+                        <span
+                            onClick={() => {
+                                if (onOpenSelector) {
+                                    onOpenSelector();
+                                } else {
+                                    setViewState('selector');
+                                }
+                            }}
+                            style={{
+                                fontSize: '12px',
+                                color: '#4caf50',
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                padding: '4px'
+                            }}
+                        >
+                            and {associatedActivities.length - 10} more
+                        </span>
+                    )}
                 </div>
             )}
         </div>
