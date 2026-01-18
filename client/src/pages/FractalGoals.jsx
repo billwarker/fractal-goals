@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -9,7 +9,9 @@ import AlertModal from '../components/modals/AlertModal';
 import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
+import { useDebug } from '../contexts/DebugContext';
 import { getChildType } from '../utils/goalHelpers';
+import { calculateMetrics } from '../utils/metricsHelpers';
 import '../App.css';
 import './FractalGoals.css';
 
@@ -47,6 +49,8 @@ function FractalGoals() {
         fetchActivityGroups
     } = useActivities();
 
+    const { debugMode } = useDebug();
+
     // Programs State
     const [programs, setPrograms] = useState([]);
     const [programsLoading, setProgramsLoading] = useState(false);
@@ -65,6 +69,11 @@ function FractalGoals() {
     };
 
     const loading = goalsLoading;
+
+    // Calculate metrics for the overlay (must be before any conditional returns)
+    const metrics = useMemo(() => {
+        return fractalData ? calculateMetrics(fractalData) : null;
+    }, [fractalData]);
 
     // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
@@ -216,18 +225,42 @@ function FractalGoals() {
                 position: 'relative',
                 overflow: 'hidden'
             }}>
-                {/* Main Content - FlowTree (The Red Box Viewport) */}
+                {/* Main Content - FlowTree (Debug border visible when Ctrl+Shift+D) */}
                 <div
                     className="fractal-view-wrapper"
                     style={{
                         flex: 1,
                         minWidth: 0,
                         height: '100%',
-                        border: '4px solid red',
+                        border: debugMode ? '4px solid red' : 'none',
                         boxSizing: 'border-box',
                         position: 'relative'
                     }}
                 >
+                    {/* Metrics Overlay - Top Left of Viewport */}
+                    {metrics && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '12px',
+                            left: '16px',
+                            zIndex: 100,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            pointerEvents: 'none'
+                        }}>
+                            <div className="metric-item">
+                                {metrics.totalGoals} goals (<span className="metric-completed">{metrics.goalCompletionPercentage}% completed</span>)
+                            </div>
+                            <div className="metric-item">
+                                {metrics.totalDeadlines} deadlines (<span className="metric-missed">{metrics.deadlineMissedPercentage}% missed</span>)
+                            </div>
+                            <div className="metric-item">
+                                {metrics.totalTargets} targets (<span className="metric-completed">{metrics.targetCompletionPercentage}% completed</span>)
+                            </div>
+                        </div>
+                    )}
+
                     <FractalView
                         treeData={fractalData}
                         onNodeClick={handleGoalNameClick}
