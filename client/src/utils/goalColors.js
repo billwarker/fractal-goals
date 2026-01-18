@@ -4,16 +4,16 @@
  */
 
 export const GOAL_COLORS = {
-    'UltimateGoal': '#E9F0FF',      // Stellar Frost - Bright cosmic white/blue
-    'LongTermGoal': '#0B3C5D',      // Abyss Navy - True navy, distinguishable from mid-term blue
-    'MidTermGoal': '#3A86FF',       // Signal Blue - Bright, saturated blue
-    'ShortTermGoal': '#2EC4B6',     // Astro Teal - Green-leaning teal
-    'Session': '#FF9F1C',           // Thruster Orange - Warm, high-energy
-    'PracticeSession': '#FF9F1C',   // Thruster Orange (legacy alias)
-    'ImmediateGoal': '#E63946',     // Pulse Red - High-urgency, unmistakable
-    'MicroGoal': '#A8DADC',         // Placeholder - adjust as needed
-    'NanoGoal': '#E0E0E0',          // Placeholder - adjust as needed
-    'CompletedGoal': '#FFD700'      // Achievement Gold - bright gold for completed goals
+    'UltimateGoal': 'var(--color-ultimate)',
+    'LongTermGoal': 'var(--color-long-term)',
+    'MidTermGoal': 'var(--color-mid-term)',
+    'ShortTermGoal': 'var(--color-short-term)',
+    'Session': 'var(--color-session)',
+    'PracticeSession': 'var(--color-session)',
+    'ImmediateGoal': 'var(--color-immediate)',
+    'MicroGoal': 'var(--color-micro)',
+    'NanoGoal': 'var(--color-nano)',
+    'CompletedGoal': 'var(--color-completed)'
 };
 
 export const GOAL_COLOR_NAMES = {
@@ -29,13 +29,26 @@ export const GOAL_COLOR_NAMES = {
     'CompletedGoal': 'Achievement Gold'
 };
 
+export const GOAL_TEXT_COLORS = {
+    'UltimateGoal': '#1a1a1a',
+    'LongTermGoal': '#ffffff',
+    'MidTermGoal': '#ffffff',
+    'ShortTermGoal': '#1a1a1a',
+    'Session': '#1a1a1a',
+    'PracticeSession': '#1a1a1a',
+    'ImmediateGoal': '#ffffff',
+    'MicroGoal': '#1a1a1a',
+    'NanoGoal': '#1a1a1a',
+    'CompletedGoal': '#1a1a1a'
+};
+
 /**
  * Get the color for a given goal type
  * @param {string} goalType - The type of goal
- * @returns {string} Hex color code
+ * @returns {string} Hex color code or CSS variable
  */
 export function getGoalColor(goalType) {
-    return GOAL_COLORS[goalType] || '#4caf50'; // Fallback to green
+    return GOAL_COLORS[goalType] || 'var(--success-color)';
 }
 
 /**
@@ -48,63 +61,11 @@ export function getGoalColorName(goalType) {
 }
 
 /**
- * Get a darker shade of the goal color (for borders, hover states, etc.)
+ * Determine if text should be dark or light based on goal type
  * @param {string} goalType - The type of goal
- * @param {number} amount - Amount to darken (0-1, default 0.2)
- * @returns {string} Darkened hex color
- */
-export function getGoalColorDark(goalType, amount = 0.2) {
-    const color = getGoalColor(goalType);
-    return adjustBrightness(color, -amount);
-}
-
-/**
- * Adjust brightness of a hex color
- * @param {string} hex - Hex color code
- * @param {number} percent - Percentage to adjust (-1 to 1)
- * @returns {string} Adjusted hex color
- */
-function adjustBrightness(hex, percent) {
-    // Remove # if present
-    hex = hex.replace('#', '');
-
-    // Convert to RGB
-    let r = parseInt(hex.substring(0, 2), 16);
-    let g = parseInt(hex.substring(2, 4), 16);
-    let b = parseInt(hex.substring(4, 6), 16);
-
-    // Adjust
-    r = Math.min(255, Math.max(0, r + (r * percent)));
-    g = Math.min(255, Math.max(0, g + (g * percent)));
-    b = Math.min(255, Math.max(0, b + (b * percent)));
-
-    // Convert back to hex
-    const rr = Math.round(r).toString(16).padStart(2, '0');
-    const gg = Math.round(g).toString(16).padStart(2, '0');
-    const bb = Math.round(b).toString(16).padStart(2, '0');
-
-    return `#${rr}${gg}${bb}`;
-}
-
-/**
- * Determine if text should be dark or light based on background color
- * @param {string} goalType - The type of goal
- * @returns {string} 'dark' or 'light'
+ * @returns {string} Hex color for text
  */
 export function getGoalTextColor(goalType) {
-    const color = getGoalColor(goalType);
-
-    // Remove # if present
-    const hex = color.replace('#', '');
-
-    // Convert to RGB
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    // Calculate perceived brightness
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-
-    // Return dark text for bright backgrounds, light text for dark backgrounds
-    return brightness > 155 ? '#1a1a1a' : '#ffffff';
+    return GOAL_TEXT_COLORS[goalType] || '#ffffff';
 }
+

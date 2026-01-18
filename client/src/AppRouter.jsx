@@ -15,6 +15,7 @@ import SessionDetail from './pages/SessionDetail';
 import CreateSession from './pages/CreateSession';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
 import ManageActivities from './pages/ManageActivities';
+import './components/NavigationHeader.css';
 import Analytics from './pages/Analytics';
 
 const API_URL = 'http://localhost:8000/api/goals';
@@ -119,33 +120,24 @@ function App() {
         ];
 
         return (
-            <div className="top-nav-links">
-                <div className="nav-group">
-                    {/* Left Side: Title and Primary Nav */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <span className="fractal-title" style={{ fontSize: '18px', marginRight: '20px' }}>{fractalName}</span>
+            <div className="nav-header-container">
+                <div className="nav-content">
+                    <div className="nav-title-group">
+                        <span className="nav-title" onClick={() => navigate('/')}>{fractalName}</span>
 
                         <button
-                            className="nav-text-link add-session-btn"
+                            className="btn btn-success btn-sm"
                             onClick={() => navigate(`/${rootId}/create-session`)}
-                            style={{
-                                background: '#4caf50',
-                                color: 'white',
-                                padding: '6px 14px',
-                                borderRadius: '4px',
-                                fontWeight: 'bold',
-                                border: 'none',
-                                fontSize: '11px',
-                                marginRight: '10px'
-                            }}
                         >
-                            + ADD SESSION
+                            + SESSION
                         </button>
+                    </div>
 
+                    <div className="nav-links">
                         {navItems.map(item => (
                             <button
                                 key={item.path}
-                                className={`nav-text-link ${location.pathname === item.path ? 'active' : ''}`}
+                                className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                                 onClick={() => navigate(item.path)}
                             >
                                 {item.label}
@@ -154,20 +146,17 @@ function App() {
                     </div>
 
                     {/* Right Side: Actions and Exit */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginLeft: 'auto' }}>
-                        {/* Add Session removed from here */}
-
-                        {/* Render Page Specific Actions */}
+                    <div className="nav-actions">
                         {headerActions && (
                             <>
-                                <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
+                                <div className="nav-separator"></div>
                                 {headerActions}
                             </>
                         )}
 
-                        <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
-                        <button className="nav-text-link home-link" onClick={() => navigate('/')}>
-                            EXIT TO HOME
+                        <div className="nav-separator"></div>
+                        <button className="nav-link" onClick={() => navigate('/')}>
+                            EXIT
                         </button>
                     </div>
                 </div>

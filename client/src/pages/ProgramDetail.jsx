@@ -700,12 +700,12 @@ const ProgramDetail = () => {
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', paddingTop: '60px' }}>
             <style>
                 {`
-                    .fc { color: #ddd; background: #1e1e1e; font-family: 'Inter', sans-serif; }
-                    .fc-toolbar-title { color: white; font-size: 1.2rem !important; }
-                    .fc-button { background-color: #333 !important; border-color: #444 !important; color: white !important; text-transform: capitalize; }
+                    .fc { color: #ddd; background: #1e1e1e; font-family: var(--font-family); }
+                    .fc-toolbar-title { color: white; font-size: 1.25rem !important; font-weight: 300; letter-spacing: 0.05em; text-transform: uppercase; }
+                    .fc-button { background-color: #333 !important; border-color: #444 !important; color: white !important; font-size: 0.85rem !important; }
                     .fc-button:hover { background-color: #444 !important; }
                     .fc-button-active { background-color: #3A86FF !important; border-color: #3A86FF !important; }
-                    .fc-daygrid-day-number, .fc-col-header-cell-cushion { color: #ccc; text-decoration: none; }
+                    .fc-daygrid-day-number, .fc-col-header-cell-cushion { color: #ccc; text-decoration: none; font-size: 0.9rem; }
                     .fc-day-today { background-color: #2a2a2a !important; }
                     .fc-theme-standard td, .fc-theme-standard th { border-color: #333; }
                     .clickable-goal-event { cursor: pointer; }
@@ -724,13 +724,13 @@ const ProgramDetail = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <button
                         onClick={() => navigate(`/${rootId}/programs`)}
-                        style={{ background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#ccc', cursor: 'pointer', padding: '8px 12px', fontSize: '14px' }}
+                        style={{ background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#ccc', cursor: 'pointer', padding: '8px 12px', fontSize: '13px', fontWeight: 600 }}
                     >
                         ← Back
                     </button>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, color: 'white' }}>{program.name}</h1>
-                        <div style={{ fontSize: '14px', color: '#888', marginTop: '4px' }}>
+                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 300, color: 'white', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{program.name}</h1>
+                        <div style={{ fontSize: '13px', color: '#888', marginTop: '4px' }}>
                             {formatDate(program.start_date)} - {formatDate(program.end_date)}
                         </div>
                     </div>
@@ -742,7 +742,7 @@ const ProgramDetail = () => {
                             style={{
                                 background: viewMode === 'calendar' ? '#444' : 'transparent',
                                 border: 'none', borderRadius: '4px', color: viewMode === 'calendar' ? 'white' : '#888',
-                                padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500
+                                padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase'
                             }}
                         >
                             Calendar
@@ -752,7 +752,7 @@ const ProgramDetail = () => {
                             style={{
                                 background: viewMode === 'blocks' ? '#444' : 'transparent',
                                 border: 'none', borderRadius: '4px', color: viewMode === 'blocks' ? 'white' : '#888',
-                                padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500
+                                padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase'
                             }}
                         >
                             Blocks
@@ -760,7 +760,7 @@ const ProgramDetail = () => {
                     </div>
                     <button
                         onClick={() => setShowEditBuilder(true)}
-                        style={{ background: '#3A86FF', border: 'none', borderRadius: '6px', color: 'white', padding: '10px 20px', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ background: '#3A86FF', border: 'none', borderRadius: '6px', color: 'white', padding: '10px 20px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}
                     >
                         Edit Program
                     </button>
@@ -772,14 +772,14 @@ const ProgramDetail = () => {
                 {/* Left Panel */}
                 <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', overflowY: 'auto', padding: '24px' }}>
                     <div style={{ marginBottom: '32px' }}>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Description</h3>
-                        <p style={{ color: '#ddd', lineHeight: '1.5', fontSize: '14px' }}>
+                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '11px', fontWeight: 700, marginBottom: '12px', letterSpacing: '0.1em' }}>Description</h3>
+                        <p style={{ color: '#ddd', lineHeight: '1.6', fontSize: '14px' }}>
                             {program.description || 'No description provided.'}
                         </p>
                     </div>
 
                     <div style={{ marginBottom: '32px' }}>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
+                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '11px', fontWeight: 700, marginBottom: '12px', letterSpacing: '0.1em' }}>Program Goals</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {programGoals.length === 0 ? (
                                 <div style={{ color: '#666', fontStyle: 'italic', fontSize: '13px' }}>No goals associated</div>

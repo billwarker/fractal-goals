@@ -130,11 +130,12 @@ function Selection() { // No props needed anymore
                     {/* The App Name */}
                     <h1 style={{
                         color: headerTextColor,
-                        fontWeight: 800,
-                        fontSize: '28px',
+                        fontFamily: 'var(--font-family)',
+                        fontWeight: 300,
+                        fontSize: '32px',
                         margin: 0,
                         textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
-                        letterSpacing: '2px',
+                        letterSpacing: '3px',
                         textTransform: 'uppercase',
                         textAlign: 'center',
                         zIndex: 1
@@ -168,7 +169,7 @@ function Selection() { // No props needed anymore
                             alignItems: 'center',
                             width: '100%'
                         }}>
-                            <h3 style={{ margin: '0 0 8px 0' }}>{fractal.name}</h3>
+                            <h3 style={{ margin: '0 0 8px 0', fontWeight: 300, letterSpacing: '0.05em', fontSize: '1.25rem' }}>{fractal.name}</h3>
 
                             {/* Type Badge */}
                             <div style={{

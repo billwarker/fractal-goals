@@ -102,50 +102,25 @@ Goals can be evaluated against SMART criteria with visual indicators:
 - `goals.is_smart` - Boolean flag computed when goal is saved
 - `activity_goal_associations` - Junction table linking activities to goals (for "A" criterion)
 
-### 9. Database & Migrations
+### 10. CSS Architecture & Design System
+The application uses a centralized CSS variables-based design system for consistency and mobile optimization.
 
-**Database Support:**
-- **Development:** PostgreSQL via Docker (preferred) or SQLite
-- **Production:** PostgreSQL (Cloud instance like Supabase, Neon, or RDS)
-
-**Local PostgreSQL Setup:**
-1. Ensure Docker Desktop is running.
-2. The infrastructure is defined in `docker-compose.yml`.
-3. Start the database:
-   ```bash
-   docker compose up -d
-   ```
-4. Connectivity: `DATABASE_URL=postgresql://fractal:fractal_dev_password@localhost:5432/fractal_goals`
-
-**Alembic Migrations:**
-Located in `/migrations/` directory. Use the helper script:
-
-```bash
-# Initialize/Stamp database
-python db_migrate.py init
-
-# Apply pending migrations
-python db_migrate.py upgrade
-
-# Create new migration
-python db_migrate.py create "Add feature"
-```
-
-**Data Migration (SQLite -> PostgreSQL):**
-Use the custom migration script to transfer existing SQLite data to a new PostgreSQL instance:
-```bash
-python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
-```
-
-**Key Files:**
-- `docker-compose.yml` - Local database infrastructure
-- `db_migrate.py` - Migration helper
-- `migrate_sqlite_to_postgres.py` - Data transfer tool
-- `alembic.ini` & `migrations/` - Schema versioning
+- **`theme.css`**: Core design tokens (colors, typography, spacing, shadows, transitions).
+  - **Typography**: Uses **IBM Plex Sans** as the primary font family.
+  - **Headings**: Standardized to weight 300 with uppercase transformation and letter tracking for a premium aesthetic.
+- **`index.css`**: Global resets and baseline styles.
+  - **Grid Background**: The premium grid background is applied globally to the `body` element.
+- **`goalColors.js`**: Maps goal types to CSS variables (e.g., `var(--color-ultimate)`).
+- **Mobile-First Design**:
+  - `GoalDetailModal` uses "Bottom Sheet" behavior on mobile.
+  - Sidebar transitions to a hidden fixed position on mobile with toggle support.
+  - Utility-based classes for buttons, forms, and layout grids.
+- **Component-Specific CSS**: Logic-heavy components have corresponding `.css` files (e.g., `GoalDetailModal.css`, `NavigationHeader.css`) to externalize all styling.
+  - **Scroll Management**: `GoalDetailModal` uses a `.modal-body` flexbox container to ensure scrollability across all view modes (View, Edit, Confirmation).
 
 ---
 
-## Database Schema
+## Database & Migrations
 
 ### Core Tables
 

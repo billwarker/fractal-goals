@@ -208,15 +208,12 @@ function FractalGoals() {
 
     return (
         <div className="fractal-page-container" style={{
-            height: '100vh',
+            height: '100%',
             width: '100vw',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden'
         }}>
-            {/* Nav Padding Spacer */}
-            <div style={{ height: '60px', flexShrink: 0 }} />
-
             <div className="fractal-main-layout" style={{
                 display: 'flex',
                 flex: 1,
@@ -225,7 +222,7 @@ function FractalGoals() {
                 position: 'relative',
                 overflow: 'hidden'
             }}>
-                {/* Main Content - FlowTree (Debug border visible when Ctrl+Shift+D) */}
+                {/* Main Content - FlowTree */}
                 <div
                     className="fractal-view-wrapper"
                     style={{
@@ -237,18 +234,9 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    {/* Metrics Overlay - Top Left of Viewport */}
+                    {/* Metrics Overlay */}
                     {metrics && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '12px',
-                            left: '16px',
-                            zIndex: 100,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            pointerEvents: 'none'
-                        }}>
+                        <div className="metrics-overlay">
                             <div className="metric-item">
                                 {metrics.totalGoals} goals (<span className="metric-completed">{metrics.goalCompletionPercentage}% completed</span>)
                             </div>
@@ -260,6 +248,7 @@ function FractalGoals() {
                             </div>
                         </div>
                     )}
+
 
                     <FractalView
                         treeData={fractalData}
@@ -276,19 +265,16 @@ function FractalGoals() {
                     <div className="details-window sidebar docked" style={{
                         width: sidebarWidth,
                         minWidth: minSidebarWidth,
-                        height: 'calc(100% - 40px)', // Vertical margin
+                        height: '100%',
                         position: 'relative', // Keep in flex flow
                         top: 'auto',
                         right: 'auto',
                         bottom: 'auto',
-                        margin: '20px', // Floating margin
-                        border: '1px solid #444',
+                        borderLeft: '1px solid var(--border-color)',
                         background: 'rgba(20, 20, 20, 0.95)',
                         zIndex: 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
                         backdropFilter: 'blur(10px)'
                     }}>
                         <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>

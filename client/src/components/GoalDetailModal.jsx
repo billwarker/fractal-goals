@@ -7,6 +7,7 @@ import { fractalApi } from '../utils/api';
 import TargetManager from './goalDetail/TargetManager';
 import ActivityAssociator from './goalDetail/ActivityAssociator';
 import GoalSessionList from './goalDetail/GoalSessionList';
+import './GoalDetailModal.css';
 
 /**
  * GoalDetailModal Component
@@ -284,185 +285,57 @@ function GoalDetailModal({
         const associatedPrograms = findProgramsForGoal();
 
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="confirm-view">
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #4caf50'
-                }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: '#4caf50' }}>
-                        ✓ Confirm Goal Completion
-                    </h3>
+                <div className="confirm-header" style={{ borderBottomColor: 'var(--success-color)' }}>
+                    <button className="back-btn" onClick={() => setViewState('goal')}>←</button>
+                    <h3 className="confirm-title success">✓ Confirm Goal Completion</h3>
                 </div>
 
-                {/* Goal Name */}
-                <div style={{
-                    padding: '14px',
-                    background: '#2a3a2a',
-                    border: '1px solid #4caf50',
-                    borderRadius: '6px'
-                }}>
-                    <div style={{ fontSize: '11px', color: '#4caf50', marginBottom: '4px' }}>
-                        Completing Goal:
+                <div className="modal-body">
+                    {/* Goal Name */}
+                    <div className="info-card" style={{ borderColor: 'var(--success-color)', background: 'rgba(76, 175, 80, 0.1)' }}>
+                        <div className="meta-label" style={{ color: 'var(--success-color)' }}>Completing Goal:</div>
+                        <div className="confirm-title" style={{ fontSize: 'var(--text-base)' }}>{goal.name}</div>
+                        <div className="meta-value" style={{ color: 'var(--text-dim)' }}>Type: {goalType}</div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-                        {goal.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        Type: {goalType}
-                    </div>
-                </div>
 
-                {/* Completion Date */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Will be marked as completed:
-                    </label>
-                    <div style={{
-                        padding: '12px',
-                        background: '#2a2a2a',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        color: 'white'
-                    }}>
-                        📅 {completionDate.toLocaleDateString()} at {completionDate.toLocaleTimeString()}
-                    </div>
-                </div>
-
-                {/* Associated Programs */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Programs that will log this completion:
-                    </label>
-                    {associatedPrograms.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No programs found
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {associatedPrograms.map((program, idx) => (
-                                <div key={idx} style={{
-                                    padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
-                                    <span style={{ color: '#66bb6a' }}>📁</span>
-                                    {program.name}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Associated Targets */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Targets associated with this goal ({targets.length}):
-                    </label>
-                    {targets.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No targets defined for this goal
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.map(target => {
-                                const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                                return (
-                                    <div key={target.id} style={{
-                                        padding: '10px 12px',
-                                        background: '#252525',
-                                        border: '1px solid #555',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
-                                            🎯 {target.name || activity?.name || 'Target'}
-                                        </div>
-                                        {target.metrics && target.metrics.length > 0 && (
-                                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                                                {target.metrics.map(metric => {
-                                                    const metricDef = activity?.metric_definitions?.find(m => m.id === metric.metric_id);
-                                                    return (
-                                                        <span key={metric.metric_id} style={{
-                                                            padding: '2px 8px',
-                                                            background: '#333',
-                                                            borderRadius: '4px',
-                                                            fontSize: '11px',
-                                                            color: '#ccc'
-                                                        }}>
-                                                            {metricDef?.name || 'Metric'}: {metric.value} {metricDef?.unit || ''}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                    {/* Associated Programs */}
+                    <div className="form-group">
+                        <label className="section-label">Associated Programs</label>
+                        {associatedPrograms.length > 0 ? (
+                            <div className="info-grid">
+                                {associatedPrograms.map(prog => (
+                                    <div key={prog.id} className="list-item">
+                                        <span style={{ color: 'var(--success-color)' }}>🎯</span>
+                                        <span>{prog.name}</span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-italic">No directly associated programs found.</p>
+                        )}
+                    </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLocalCompleted(true);
-                            setLocalCompletedAt(completionDate.toISOString());
-                            onToggleCompletion(goalId, false);  // false = currently not completed
-                            setViewState('goal');
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: '#4caf50',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        ✓ Complete Goal
-                    </button>
+                    <div className="separator" />
+
+                    {/* Submit Actions */}
+                    <div className="action-group">
+                        <button className="btn btn-outline" onClick={() => setViewState('goal')}>
+                            Cancel
+                        </button>
+                        <button
+                            className="btn btn-success btn-full"
+                            onClick={() => {
+                                setLocalCompleted(true);
+                                setLocalCompletedAt(completionDate.toISOString());
+                                onToggleCompletion(goalId, false);
+                                setViewState('goal');
+                            }}
+                        >
+                            Mark as Completed
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -485,181 +358,55 @@ function GoalDetailModal({
         const associatedPrograms = findProgramsForGoal();
 
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="confirm-view">
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #ff9800'
-                }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: '#ff9800' }}>
-                        ⚠ Confirm Mark as Incomplete
-                    </h3>
+                <div className="confirm-header" style={{ borderBottomColor: 'var(--warning-color)' }}>
+                    <button className="back-btn" onClick={() => setViewState('goal')}>←</button>
+                    <h3 className="confirm-title warning">⚠ Confirm Mark as Incomplete</h3>
                 </div>
 
-                {/* Goal Name */}
-                <div style={{
-                    padding: '14px',
-                    background: '#3a3020',
-                    border: '1px solid #ff9800',
-                    borderRadius: '6px'
-                }}>
-                    <div style={{ fontSize: '11px', color: '#ff9800', marginBottom: '4px' }}>
-                        Marking as Incomplete:
+                <div className="modal-body">
+                    {/* Goal Name */}
+                    <div className="info-card" style={{ borderColor: 'var(--warning-color)', background: 'rgba(255, 152, 0, 0.1)' }}>
+                        <div className="meta-label" style={{ color: 'var(--warning-color)' }}>Marking as Incomplete:</div>
+                        <div className="confirm-title" style={{ fontSize: 'var(--text-base)' }}>{goal.name}</div>
+                        <div className="meta-value" style={{ color: 'var(--text-dim)' }}>Type: {goalType}</div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-                        {goal.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        Type: {goalType}
-                    </div>
-                </div>
 
-                {/* Originally Completed Date */}
-                {localCompletedAt && (
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                            Was completed on:
-                        </label>
-                        <div style={{
-                            padding: '12px',
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            color: '#4caf50'
-                        }}>
-                            📅 {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Warning */}
-                <div style={{
-                    padding: '12px',
-                    background: '#3a2a20',
-                    border: '1px solid #ff9800',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    color: '#ffcc80'
-                }}>
-                    ⚠️ This will remove the completion status and completion date from this goal.
-                </div>
-
-                {/* Associated Programs */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Programs that will update:
-                    </label>
-                    {associatedPrograms.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No programs found
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {associatedPrograms.map((program, idx) => (
-                                <div key={idx} style={{
-                                    padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
-                                    <span style={{ color: '#ff9800' }}>📁</span>
-                                    {program.name}
-                                </div>
-                            ))}
+                    {/* Originally Completed Date */}
+                    {localCompletedAt && (
+                        <div className="meta-item">
+                            <label className="meta-label">Originally completed on:</label>
+                            <div className="meta-value" style={{ color: 'var(--success-color)' }}>
+                                📅 {new Date(localCompletedAt).toLocaleDateString()}
+                            </div>
                         </div>
                     )}
-                </div>
 
-                {/* Associated Targets */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Targets that will be marked incomplete ({targets.length}):
-                    </label>
-                    {targets.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No targets defined for this goal
+                    {/* Warning */}
+                    <div className="info-card" style={{ background: 'rgba(255, 152, 0, 0.05)', borderStyle: 'dashed' }}>
+                        <div className="section-content" style={{ color: 'var(--warning-color)' }}>
+                            ⚠️ This will remove the completion status and date from this goal and its associated targets.
                         </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.map(target => {
-                                const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                                return (
-                                    <div key={target.id} style={{
-                                        padding: '10px 12px',
-                                        background: '#252525',
-                                        border: '1px solid #555',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
-                                            🎯 {target.name || activity?.name || 'Target'}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                    </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLocalCompleted(false);
-                            setLocalCompletedAt(null);
-                            onToggleCompletion(goalId, true);  // true = currently completed
-                            setViewState('goal');
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: '#ff9800',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        Mark Incomplete
-                    </button>
+                    {/* Actions */}
+                    <div className="action-group">
+                        <button className="btn btn-outline" onClick={() => setViewState('goal')}>
+                            Cancel
+                        </button>
+                        <button
+                            className="btn btn-warning btn-full"
+                            onClick={() => {
+                                setLocalCompleted(false);
+                                setLocalCompletedAt(null);
+                                onToggleCompletion(goalId, true);
+                                setViewState('goal');
+                            }}
+                        >
+                            Confirm Mark Incomplete
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -690,153 +437,79 @@ function GoalDetailModal({
         };
 
         return (
-            <>
+            <div className="confirm-view">
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingBottom: '16px',
-                    marginBottom: '16px',
-                    borderBottom: `2px solid ${goalColor}`
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div className="modal-header">
+                    <div className="header-left">
                         {mode === 'create' && (
-                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                + Create
-                            </span>
+                            <span className="create-label">+ Create</span>
                         )}
-                        <div style={{
-                            padding: '5px 12px',
-                            background: goalColor,
-                            color: textColor,
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                        }}>
+                        <div className="type-badge">
                             {getTypeDisplayName(goalType)}
                         </div>
                         {mode !== 'create' && (
                             <SMARTIndicator goal={goalForSmart} goalType={goalType} />
                         )}
                         {mode === 'create' && parentGoal && (
-                            <span style={{ color: '#888', fontSize: '12px' }}>
-                                under "{parentGoal.name}"
-                            </span>
+                            <span className="parent-context">under "{parentGoal.name}"</span>
                         )}
                         {mode !== 'create' && isCompleted && (
-                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                ✓ Completed
-                            </span>
+                            <span className="completion-badge">✓ Completed</span>
                         )}
                     </div>
                     {onClose && (
-                        <button
-                            onClick={onClose}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#888',
-                                fontSize: '22px',
-                                cursor: 'pointer',
-                                padding: '0 4px',
-                                lineHeight: 1
-                            }}
-                        >
-                            ×
-                        </button>
+                        <button className="close-btn" onClick={onClose}>×</button>
                     )}
                 </div>
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                Name:
-                            </label>
+                    <div className="modal-body">
+                        <div className="form-group">
+                            <label className="section-label">Name</label>
                             <input
                                 type="text"
+                                className="form-input"
+                                style={{ fontFamily: 'var(--font-family)', fontWeight: 300, fontSize: '1.25rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '15px',
-                                    fontWeight: 'bold'
-                                }}
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                Description:
-                            </label>
+                        <div className="form-group">
+                            <label className="section-label">Description</label>
                             <textarea
+                                className="form-textarea"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 rows={3}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    resize: 'vertical'
-                                }}
                             />
                         </div>
 
                         {/* Relevance Statement - SMART "R" Criterion */}
                         {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                    Relevance (SMART):
+                            <div className="form-group">
+                                <label className="section-label">
+                                    Relevance to <span style={{ color: parentGoalColor || 'var(--accent-color)' }}>{parentGoalName}</span>
                                 </label>
-                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
-                                </div>
                                 <textarea
+                                    className="form-textarea"
+                                    style={{ borderColor: relevanceStatement?.trim() ? 'var(--success-color)' : 'var(--border-color)' }}
                                     value={relevanceStatement}
                                     onChange={(e) => setRelevanceStatement(e.target.value)}
                                     rows={2}
-                                    placeholder="Explain how this goal contributes to your higher-level objective..."
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        background: '#2a2a2a',
-                                        border: relevanceStatement?.trim() ? '1px solid #4caf50' : '1px solid #555',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '13px',
-                                        resize: 'vertical'
-                                    }}
+                                    placeholder="How does this goal help?"
                                 />
                             </div>
                         )}
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                Deadline:
-                            </label>
+                        <div className="form-group">
+                            <label className="section-label">Deadline</label>
                             <input
                                 type="date"
+                                className="form-input"
                                 value={deadline}
                                 onChange={(e) => setDeadline(e.target.value)}
-                                style={{
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
                             />
                         </div>
 
@@ -853,71 +526,39 @@ function GoalDetailModal({
                             />
                         )}
 
+                        <div className="separator" />
+
                         {/* Edit Actions */}
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                            <button
-                                onClick={handleCancel}
-                                style={{
-                                    padding: '8px 14px',
-                                    background: 'transparent',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    color: '#ccc',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                }}
-                            >
+                        <div className="action-group" style={{ justifyContent: 'flex-end' }}>
+                            <button className="btn btn-outline" onClick={handleCancel}>
                                 Cancel
                             </button>
-                            <button
-                                onClick={handleSave}
-                                style={{
-                                    padding: '8px 14px',
-                                    background: goalColor,
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: textColor,
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 600
-                                }}
-                            >
+                            <button className="btn btn-edit" onClick={handleSave}>
                                 {mode === 'create' ? 'Create' : 'Save'}
                             </button>
                         </div>
                     </div>
                 ) : (
                     /* ============ VIEW MODE ============ */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: goalColor }}>
+                    <div className="modal-body">
+                        <h2 style={{
+                            margin: 0,
+                            fontFamily: 'var(--font-family)',
+                            fontWeight: 300,
+                            fontSize: '1.5rem',
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            color: goalColor || 'var(--text-bright)'
+                        }}>
                             {goal.name}
-                        </div>
+                        </h2>
 
                         {/* Action Buttons - 2x2 Grid */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '6px'
-                        }}>
+                        <div className="action-grid">
                             {onToggleCompletion && (
                                 <button
-                                    onClick={() => {
-                                        if (isCompleted) {
-                                            setViewState('uncomplete-confirm');
-                                        } else {
-                                            setViewState('complete-confirm');
-                                        }
-                                    }}
-                                    style={{
-                                        padding: '8px 10px',
-                                        background: isCompleted ? '#4caf50' : 'transparent',
-                                        border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
-                                        borderRadius: '4px',
-                                        color: isCompleted ? 'white' : '#ccc',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: isCompleted ? 'bold' : 'normal'
-                                    }}
+                                    onClick={() => isCompleted ? setViewState('uncomplete-confirm') : setViewState('complete-confirm')}
+                                    className={`btn ${isCompleted ? 'btn-completed' : 'btn-outline'}`}
                                 >
                                     {isCompleted ? '✓ Completed' : 'Mark Complete'}
                                 </button>
@@ -929,16 +570,7 @@ function GoalDetailModal({
                                         if (displayMode === 'modal' && onClose) onClose();
                                         onAddChild(goal);
                                     }}
-                                    style={{
-                                        padding: '8px 10px',
-                                        background: 'transparent',
-                                        border: `1px solid ${getGoalColor(childType)}`,
-                                        borderRadius: '4px',
-                                        color: getGoalColor(childType),
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: 'bold'
-                                    }}
+                                    className="btn btn-add-child"
                                 >
                                     + Add {childType}
                                 </button>
@@ -946,16 +578,7 @@ function GoalDetailModal({
 
                             <button
                                 onClick={() => setIsEditing(true)}
-                                style={{
-                                    padding: '8px 10px',
-                                    background: goalColor,
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: textColor,
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: 600
-                                }}
+                                className="btn btn-edit"
                             >
                                 Edit Goal
                             </button>
@@ -966,22 +589,14 @@ function GoalDetailModal({
                                         if (displayMode === 'modal' && onClose) onClose();
                                         onDelete(goal);
                                     }}
-                                    style={{
-                                        padding: '8px 10px',
-                                        background: 'transparent',
-                                        border: '1px solid #d32f2f',
-                                        borderRadius: '4px',
-                                        color: '#d32f2f',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                    }}
+                                    className="btn btn-delete"
                                 >
                                     Delete Goal
                                 </button>
                             )}
                         </div>
 
-                        <div style={{ fontSize: '12px', color: '#888', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+                        <div className="meta-row">
                             {goal.attributes?.created_at && (
                                 <div>
                                     Created: {new Date(goal.attributes.created_at).toLocaleDateString()}
@@ -989,34 +604,32 @@ function GoalDetailModal({
                                 </div>
                             )}
                             {(goal.attributes?.deadline || goal.deadline) && (
-                                <div style={{ color: '#ff9800' }}>
+                                <div className="meta-deadline">
                                     📅 Deadline: {new Date(goal.attributes?.deadline || goal.deadline).toLocaleDateString()}
                                 </div>
                             )}
                             {isCompleted && localCompletedAt && (
-                                <div style={{ color: '#4caf50' }}>
-                                    ✓ Completed: {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <div className="meta-completed">
+                                    ✓ Completed: {new Date(localCompletedAt).toLocaleDateString()}
                                 </div>
                             )}
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
-                                Description
-                            </label>
-                            <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                        <div className="form-group">
+                            <label className="section-label">Description</label>
+                            <div className="section-content">
                                 {goal.attributes?.description || goal.description ||
-                                    <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
+                                    <span className="text-italic">No description</span>}
                             </div>
                         </div>
 
                         {/* Relevance Statement - View Mode */}
                         {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?
+                            <div className="form-group">
+                                <label className="section-label">
+                                    Helping achieve <span style={{ color: parentGoalColor || 'var(--accent-color)' }}>{parentGoalName}</span>
                                 </label>
-                                <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                <div className="section-content">
                                     {goal.attributes?.relevance_statement || relevanceStatement}
                                 </div>
                             </div>
@@ -1124,7 +737,7 @@ function GoalDetailModal({
 
                     </div>
                 )}
-            </>
+            </div>
         );
     };
 
@@ -1185,69 +798,31 @@ function GoalDetailModal({
 
     // ============ RENDER ============
 
+    const containerClasses = `goal-detail-container ${displayMode === 'panel' ? 'panel-mode' : ''}`;
+    const dynamicStyles = {
+        '--goal-color': goalColor,
+        '--goal-text-color': textColor
+    };
 
     if (displayMode === 'panel') {
         return (
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 1,
-                minHeight: 0,
-                overflow: 'hidden'
-            }}>
-                <div style={{
-                    padding: '16px',
-                    paddingBottom: '24px',
-                    color: 'white',
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: 'auto'
-                }}>
-                    {content}
-                </div>
+            <div className={containerClasses} style={dynamicStyles}>
+                {content}
             </div>
         );
     }
 
     // Modal mode
     return (
-        <>
+        <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-overlay"
-                onClick={onClose}
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}
+                className={containerClasses}
+                style={dynamicStyles}
+                onClick={(e) => e.stopPropagation()}
             >
-                <div
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                        background: '#1e1e1e',
-                        border: `2px solid ${goalColor}`,
-                        borderRadius: '8px',
-                        padding: '24px',
-                        maxWidth: '700px',
-                        width: '90%',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        color: 'white'
-                    }}
-                >
-                    {content}
-                </div>
+                {content}
             </div>
-            {/* Confirmation Modal for Target Deletion */}
-
-        </>
+        </div>
     );
 }
 

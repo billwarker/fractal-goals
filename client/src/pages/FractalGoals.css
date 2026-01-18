@@ -14,17 +14,10 @@
 .fractal-page-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     width: 100vw;
     position: relative;
     overflow: hidden;
-
-    /* Continuous Grid Background */
-    background-color: var(--bg-color);
-    background-image:
-        linear-gradient(var(--grid-color) 1px, transparent 1px),
-        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-    background-size: 20px 20px;
 }
 
 .fractal-main-layout {

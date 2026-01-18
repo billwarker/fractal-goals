@@ -1,0 +1,97 @@
+.nav-header-container {
+    height: var(--header-height);
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-6);
+    z-index: 1000;
+}
+
+.nav-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    gap: var(--space-6);
+}
+
+.nav-title-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.nav-title {
+    font-family: var(--font-family);
+    font-size: var(--text-lg);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent-color), var(--color-mid-term));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-links {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.nav-link {
+    font-family: var(--font-family);
+    background: transparent;
+    border: none;
+    padding: var(--space-2) var(--space-4);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-base);
+}
+
+.nav-link:hover {
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-link.active {
+    color: var(--text-bright);
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 -2px 0 var(--accent-color);
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-left: auto;
+}
+
+.nav-separator {
+    height: 20px;
+    width: 1px;
+    background: var(--border-color);
+}
+
+@media (max-width: 768px) {
+    .nav-header-container {
+        padding: 0 var(--space-4);
+    }
+
+    .nav-links {
+        display: none;
+        /* We will implement a mobile menu later */
+    }
+
+    .nav-title {
+        font-size: var(--text-base);
+    }
+}

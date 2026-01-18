@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    /* 
+     * Base Typography
+     */
+    --font-family: 'IBM Plex Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    --font-family-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+
+    /* 
+     * Base Colors
+     */
+    --bg-color: #1e1e1e;
+    --sidebar-bg: #252526;
+    --text-color: #d4d4d4;
+    --text-dim: #888888;
+    --text-bright: #ffffff;
+    --accent-color: #3794ff;
+    --accent-hover: #2b7cdb;
+    --grid-color: #333333;
+    --card-bg: #2d2d2d;
+    --hover-bg: #3e3e42;
+    --border-color: #454545;
+
+    /* Status Colors */
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #f44336;
+    --info-color: #2196f3;
+
+    /* 
+     * Goal Cosmic Palette
+     */
+    --color-ultimate: #E9F0FF;
+    --color-long-term: #0B3C5D;
+    --color-mid-term: #3A86FF;
+    --color-short-term: #2EC4B6;
+    --color-immediate: #E63946;
+    --color-micro: #A8DADC;
+    --color-nano: #E0E0E0;
+    --color-session: #FF9F1C;
+    --color-completed: #FFD700;
+
+    /* 
+     * Responsive Typography Scale
+     * Using clamp for smooth fluid scaling 
+     */
+    --text-xs: clamp(0.65rem, 0.6rem + 0.25vw, 0.75rem);
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.3vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem);
+    --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+
+    /* 
+     * Spacing System
+     */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+
+    /* 
+     * Transitions & Effects
+     */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+
+    /* 
+     * Mobile Specific Overrides
+     */
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Base resets & global styles using variables */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    font-weight: 400;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-family);
+    color: var(--text-bright);
+    margin-top: 0;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Touch targets for mobile */
+@media (max-width: 600px) {
+
+    button,
+    [role="button"],
+    input[type="checkbox"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
