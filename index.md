@@ -96,6 +96,12 @@ Goals can be evaluated against SMART criteria with visual indicators:
 - `SMARTIndicator` component shows "SMART" text with each letter colored based on criterion status
 - `FlowTree` nodes display an outer glowing ring for goals meeting all SMART criteria
 - `GoalDetailModal` includes the SMART indicator in the header and a "Relevance" field in edit mode
+- **Conditional Completion Logic:** Goals can customize how progress is measured:
+  - **Activities & Targets:** Track specific performance data.
+  - **Completed via Children:** Completion is derived from child goal status (for goals above `ShortTermGoal`).
+  - **Manual Completion:** Allow users to manually toggle completion status in the modal.
+  - **Dynamic Completion Status:** When manual completion is disabled, the "Mark Complete" button becomes a status badge showing the automatic criteria (e.g., "Complete via Children").
+- **Associated Children View:** `GoalDetailModal` displays a list of child goals at the level below for better context.
 
 **Database Tables:**
 - `goals.relevance_statement` - Stores the user's explanation of goal relevance
@@ -167,6 +173,9 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - `targets` (Text/JSON) - Goal targets for completion tracking
 - `relevance_statement` (Text, nullable) - SMART "R" criterion: How goal helps achieve parent
 - `is_smart` (Boolean) - Whether goal meets all SMART criteria
+- `completed_via_children` (Boolean) - If true, completion is derived from child goals
+- `track_activities` (Boolean) - If true, goal tracks activities and targets
+- `allow_manual_completion` (Boolean) - If true, goal can be manually marked as complete
 
 **PracticeSession-Specific Fields:**
 - `duration_minutes` (Integer)
@@ -682,6 +691,8 @@ Fractal selection/home page.
   - Practice session relationships: Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
   - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button.
   - **Contextual Styling:** Parent goal references and question marks highlighted in parent goal color.
+  - **Completion Choices:** For higher-level goals, choose between tracking activities or delegating to child goals.
+  - **Associated Children:** View list of child goals directly in the modal.
 
 **Sub-components (in `/client/src/components/goalDetail/`):**
 - `TargetManager.jsx` - Manages target list, deletion, and inline target creation/editing.

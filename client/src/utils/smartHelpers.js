@@ -33,6 +33,9 @@ export function calculateSMARTStatus(goal) {
     const relevanceStatement = attrs.relevance_statement || goal.relevance_statement || '';
     const deadline = attrs.deadline || goal.deadline;
     const associatedActivityIds = attrs.associated_activity_ids || goal.associated_activity_ids || [];
+    const completedViaChildren = attrs.completed_via_children || goal.completed_via_children || false;
+
+    const trackActivities = attrs.track_activities !== undefined ? attrs.track_activities : (goal.track_activities !== undefined ? goal.track_activities : true);
 
     // Or use pre-calculated smart_status from backend if available
     if (attrs.smart_status) {
@@ -47,8 +50,8 @@ export function calculateSMARTStatus(goal) {
 
     return {
         specific: !!(description && description.trim().length > 0),
-        measurable: Array.isArray(targets) && targets.length > 0,
-        achievable: Array.isArray(associatedActivityIds) && associatedActivityIds.length > 0,
+        measurable: !trackActivities || (Array.isArray(targets) && targets.length > 0) || completedViaChildren,
+        achievable: !trackActivities || (Array.isArray(associatedActivityIds) && associatedActivityIds.length > 0) || completedViaChildren,
         relevant: !!(relevanceStatement && relevanceStatement.trim().length > 0),
         timeBound: !!deadline
     };

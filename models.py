@@ -84,7 +84,10 @@ class Goal(Base):
     # SMART goal fields
     relevance_statement = Column(Text, nullable=True)  # "How does this goal help achieve [parent]?"
     is_smart = Column(Boolean, default=False)  # Computed flag, updated on save
-    
+    completed_via_children = Column(Boolean, default=False)  # If true, completion is derived from children
+    allow_manual_completion = Column(Boolean, default=True)
+    track_activities = Column(Boolean, default=True)
+
     # JSON Plans/Targets
     targets = Column(Text, nullable=True)
     
@@ -139,14 +142,21 @@ class Goal(Base):
         """Calculate SMART criteria status for this goal."""
         targets = json.loads(self.targets) if self.targets else []
         
-        # Achievable: has associated activities OR has associated activity groups
-        has_activities = len(self.associated_activities) > 0 if self.associated_activities else False
-        has_groups = len(self.associated_activity_groups) > 0 if self.associated_activity_groups else False
+        # Achievable: has associated activities OR has associated activity groups OR completed via children
+        # If track_activities is False, we consider it achievable by default (user's responsibility)
+        if self.track_activities:
+            has_activities = len(self.associated_activities) > 0 if self.associated_activities else False
+            has_groups = len(self.associated_activity_groups) > 0 if self.associated_activity_groups else False
+            is_achievable = has_activities or has_groups or self.completed_via_children
+            is_measurable = len(targets) > 0 or self.completed_via_children
+        else:
+            is_achievable = True
+            is_measurable = True
         
         return {
             "specific": bool(self.description and self.description.strip()),
-            "measurable": len(targets) > 0,
-            "achievable": has_activities or has_groups,
+            "measurable": is_measurable,
+            "achievable": is_achievable,
             "relevant": bool(self.relevance_statement and self.relevance_statement.strip()),
             "time_bound": self.deadline is not None
         }
@@ -178,6 +188,9 @@ class Goal(Base):
                 "updated_at": format_utc(self.updated_at),
                 "targets": json.loads(self.targets) if self.targets else [],
                 "relevance_statement": self.relevance_statement,
+                "completed_via_children": self.completed_via_children,
+                "allow_manual_completion": self.allow_manual_completion,
+                "track_activities": self.track_activities,
                 "is_smart": all(smart_status.values()),
                 "smart_status": smart_status,
                 "associated_activity_ids": [a.id for a in self.associated_activities] if self.associated_activities else [],

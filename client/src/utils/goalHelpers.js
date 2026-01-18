@@ -18,6 +18,19 @@ export const getChildType = (parentType) => {
     return map[parentType];
 };
 
+export const isAboveShortTermGoal = (type) => {
+    const levels = {
+        'UltimateGoal': 1,
+        'LongTermGoal': 2,
+        'MidTermGoal': 3,
+        'ShortTermGoal': 4,
+        'ImmediateGoal': 5,
+        'MicroGoal': 6,
+        'NanoGoal': 7
+    };
+    return levels[type] < 4;
+};
+
 export const getTypeDisplayName = (type) => {
     const names = {
         'UltimateGoal': 'Ultimate Goal',

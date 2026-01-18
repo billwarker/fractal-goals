@@ -24,7 +24,9 @@ const ActivityAssociator = ({
     viewMode = 'list', // 'list' | 'selector'
     onOpenSelector,
     onCloseSelector,
-    onCreateActivity  // Callback to open ActivityBuilder for creating new activity
+    onCreateActivity,  // Callback to open ActivityBuilder for creating new activity
+    completedViaChildren = false,
+    isAboveShortTermGoal = false
 }) => {
     // Internal view state prioritized by props if available
     const [viewState, setViewState] = useState('list');
@@ -568,7 +570,7 @@ const ActivityAssociator = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
-                    Associated Activities ({associatedActivities.length})
+                    Associated Activities
                 </label>
                 {isEditing && (
                     <button
@@ -596,9 +598,12 @@ const ActivityAssociator = ({
                 )}
             </div>
 
+
             {associatedActivities.length === 0 ? (
                 <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
-                    No activities associated.
+                    {isAboveShortTermGoal && !completedViaChildren
+                        ? "No activities associated. Can also be completed via children."
+                        : "No activities associated."}
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
@@ -657,8 +662,9 @@ const ActivityAssociator = ({
                         </span>
                     )}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 

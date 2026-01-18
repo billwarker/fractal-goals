@@ -70,6 +70,7 @@ def create_goal(validated_data):
             description=validated_data.get('description', ''),
             deadline=deadline,
             completed=False,
+            completed_via_children=validated_data.get('completed_via_children', False),
             parent_id=parent_id
         )
         
@@ -176,6 +177,8 @@ def update_goal_endpoint(goal_id: str):
                 logger.debug(f"Received targets data: {data['targets']}")
                 goal.targets = json.dumps(data['targets']) if data['targets'] else None
                 logger.debug(f"Stored targets in goal: {goal.targets}")
+            if 'completed_via_children' in data:
+                goal.completed_via_children = data['completed_via_children']
             db_session.commit()
             logger.debug(f"Committed changes. Goal targets after commit: {goal.targets}")
             return jsonify(goal.to_dict(include_children=False))
@@ -472,6 +475,9 @@ def create_fractal_goal(root_id, validated_data):
             parent_id=validated_data.get('parent_id'),
             deadline=deadline,
             completed=False,
+            completed_via_children=validated_data.get('completed_via_children', False),
+            allow_manual_completion=validated_data.get('allow_manual_completion', True),
+            track_activities=validated_data.get('track_activities', True),
             root_id=root_id  # Set root_id for performance
         )
         
@@ -590,7 +596,17 @@ def update_fractal_goal(root_id, goal_id):
         if 'relevance_statement' in data:
             goal.relevance_statement = data['relevance_statement']
         
+        if 'completed_via_children' in data:
+            goal.completed_via_children = data['completed_via_children']
+        
+        if 'allow_manual_completion' in data:
+            goal.allow_manual_completion = data['allow_manual_completion']
+            
+        if 'track_activities' in data:
+            goal.track_activities = data['track_activities']
+        
         db_session.commit()
+        db_session.refresh(goal)
         
         return jsonify(goal.to_dict(include_children=False)), 200
         

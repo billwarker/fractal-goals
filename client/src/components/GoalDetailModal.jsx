@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
-import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
+import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
 import SMARTIndicator from './SMARTIndicator';
 import { fractalApi } from '../utils/api';
 import TargetManager from './goalDetail/TargetManager';
@@ -54,6 +54,9 @@ function GoalDetailModal({
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
+    const [completedViaChildren, setCompletedViaChildren] = useState(false);
+    const [trackActivities, setTrackActivities] = useState(true);
+    const [allowManualCompletion, setAllowManualCompletion] = useState(true);
 
     // Local completion state for optimistic UI
     const [localCompleted, setLocalCompleted] = useState(false);
@@ -95,6 +98,9 @@ function GoalDetailModal({
             setLocalCompleted(false);
             setLocalCompletedAt(null);
             setTargets([]);
+            setCompletedViaChildren(false);
+            setTrackActivities(true);
+            setAllowManualCompletion(true);
             setIsEditing(true);  // Start in edit mode for creation
             setViewState('goal');
         } else if (goal) {
@@ -112,6 +118,9 @@ function GoalDetailModal({
             setRelevanceStatement(goal.attributes?.relevance_statement || '');
             setLocalCompleted(goal.attributes?.completed || false);
             setLocalCompletedAt(goal.attributes?.completed_at || null);
+            setCompletedViaChildren(goal.attributes?.completed_via_children || false);
+            setTrackActivities(goal.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true);
+            setAllowManualCompletion(goal.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true);
 
             // Parse targets
             let parsedTargets = [];
@@ -173,30 +182,38 @@ function GoalDetailModal({
     // Allow rendering without goal in create mode
     if (!goal && mode !== 'create') return null;
 
-    const handleSave = () => {
-        if (mode === 'create') {
-            // Create mode: call onCreate with new goal data
-            const parentType = parentGoal?.attributes?.type || parentGoal?.type;
-            const childType = getChildType(parentType);
-            const parentId = parentGoal?.attributes?.id || parentGoal?.id;
+    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
+    const goalType = mode === 'create'
+        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
+        : (goal.attributes?.type || goal.type);
+    const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
 
-            onCreate({
-                name,
-                description,
-                deadline: deadline || null,
-                type: childType,
-                parent_id: parentId,
-                targets: targets
-            });
+    const handleSave = () => {
+        const payload = mode === 'create' ? {
+            name,
+            description,
+            deadline: deadline || null,
+            type: goalType,
+            parent_id: parentGoal?.attributes?.id || parentGoal?.id,
+            targets: targets,
+            completed_via_children: completedViaChildren,
+            track_activities: trackActivities,
+            allow_manual_completion: allowManualCompletion
+        } : {
+            name,
+            description,
+            deadline: deadline || null,
+            targets: targets,
+            relevance_statement: relevanceStatement,
+            completed_via_children: completedViaChildren,
+            track_activities: trackActivities,
+            allow_manual_completion: allowManualCompletion
+        };
+
+        if (mode === 'create') {
+            onCreate(payload);
         } else {
-            // Edit mode: update existing goal
-            onUpdate(goal.id, {
-                name,
-                description,
-                deadline: deadline || null,
-                targets: targets,
-                relevance_statement: relevanceStatement
-            });
+            onUpdate(goalId, payload);
             setIsEditing(false);
         }
     };
@@ -219,6 +236,9 @@ function GoalDetailModal({
                 setDeadline('');
             }
             setRelevanceStatement(goal.attributes?.relevance_statement || '');
+            setCompletedViaChildren(goal.attributes?.completed_via_children || false);
+            setTrackActivities(goal.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true);
+            setAllowManualCompletion(goal.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true);
 
             let parsedTargets = [];
             if (goal.attributes?.targets) {
@@ -235,14 +255,9 @@ function GoalDetailModal({
         setIsEditing(false);
     };
 
-    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
-    const goalType = mode === 'create'
-        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
-        : (goal.attributes?.type || goal.type);
     const goalColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
     const isCompleted = localCompleted;  // Use local state for optimistic UI
-    const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
     const childType = getChildType(goalType);
 
     // Session relationships
@@ -717,6 +732,7 @@ function GoalDetailModal({
                 associated_activity_ids: associatedActivities ? associatedActivities.map(a => a.id) : [],
                 deadline: deadline,
                 relevance_statement: relevanceStatement,
+                completed_via_children: completedViaChildren,
                 // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
                 smart_status: undefined,
                 is_smart: undefined
@@ -725,7 +741,8 @@ function GoalDetailModal({
             description: description,
             targets: Array.isArray(targets) ? targets : [],
             deadline: deadline,
-            relevance_statement: relevanceStatement
+            relevance_statement: relevanceStatement,
+            completed_via_children: completedViaChildren
         };
 
         return (
@@ -879,39 +896,138 @@ function GoalDetailModal({
                             />
                         </div>
 
+                        {/* How is progress measured? */}
+                        <div style={{
+                            padding: '12px',
+                            background: '#333',
+                            borderRadius: '6px',
+                            marginBottom: '10px'
+                        }}>
+                            <label style={{ display: 'block', marginBottom: '10px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                How is progress measured? (Select all that apply)
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={trackActivities}
+                                        onChange={(e) => setTrackActivities(e.target.checked)}
+                                    />
+                                    Activities & Targets
+                                </label>
+                                {isAboveShortTermGoal(goalType) && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={completedViaChildren}
+                                            onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                        />
+                                        Completed via Children
+                                    </label>
+                                )}
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={allowManualCompletion}
+                                        onChange={(e) => setAllowManualCompletion(e.target.checked)}
+                                    />
+                                    Manual Completion
+                                </label>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                                {trackActivities && (
+                                    <div style={{
+                                        padding: '6px 10px',
+                                        background: 'rgba(76, 175, 80, 0.1)',
+                                        border: '1px solid rgba(76, 175, 80, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        color: '#4caf50',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <span style={{ fontSize: '13px' }}>✓</span>
+                                        <span>Goal is complete when target(s) are achieved.</span>
+                                    </div>
+                                )}
+
+                                {completedViaChildren && (
+                                    <div style={{
+                                        padding: '6px 10px',
+                                        background: 'rgba(76, 175, 80, 0.1)',
+                                        border: '1px solid rgba(76, 175, 80, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        color: '#4caf50',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <span style={{ fontSize: '13px' }}>✓</span>
+                                        <span>Goal is complete when all child goals are done (Delegated).</span>
+                                    </div>
+                                )}
+
+                                {allowManualCompletion && (
+                                    <div style={{
+                                        padding: '6px 10px',
+                                        background: 'rgba(76, 175, 80, 0.1)',
+                                        border: '1px solid rgba(76, 175, 80, 0.3)',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        color: '#4caf50',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <span style={{ fontSize: '13px' }}>✓</span>
+                                        <span>Goal can be marked as complete by the user.</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Associated Activities Section - Edit/Create Mode */}
-                        <ActivityAssociator
-                            associatedActivities={associatedActivities}
-                            setAssociatedActivities={setAssociatedActivities}
-                            associatedActivityGroups={associatedActivityGroups}
-                            setAssociatedActivityGroups={setAssociatedActivityGroups}
-                            activityDefinitions={activityDefinitions}
-                            activityGroups={activityGroups}
-                            setActivityGroups={setActivityGroups}
-                            rootId={rootId}
-                            goalId={goalId}
-                            isEditing={true}
-                            targets={targets}
-                            goalName={name}
-                            viewMode="list"
-                            onOpenSelector={() => setViewState('activity-associator')}
-                        />
+                        {trackActivities && (
+                            <ActivityAssociator
+                                associatedActivities={associatedActivities}
+                                setAssociatedActivities={setAssociatedActivities}
+                                associatedActivityGroups={associatedActivityGroups}
+                                setAssociatedActivityGroups={setAssociatedActivityGroups}
+                                activityDefinitions={activityDefinitions}
+                                activityGroups={activityGroups}
+                                setActivityGroups={setActivityGroups}
+                                rootId={rootId}
+                                goalId={goalId}
+                                isEditing={true}
+                                targets={targets}
+                                goalName={name}
+                                viewMode="list"
+                                onOpenSelector={() => setViewState('activity-associator')}
+                                completedViaChildren={completedViaChildren}
+                                isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
+                            />
+                        )}
 
                         {/* Targets Section - Edit/Create Mode */}
-                        <TargetManager
-                            targets={targets}
-                            setTargets={setTargets}
-                            activityDefinitions={activityDefinitions}
-                            associatedActivities={associatedActivities}
-                            goalId={goalId}
-                            rootId={rootId}
-                            isEditing={true}
-                            viewMode="list"
-                            onOpenBuilder={(target) => {
-                                setTargetToEdit(target || null);
-                                setViewState('target-manager');
-                            }}
-                        />
+                        {trackActivities && (
+                            <TargetManager
+                                targets={targets}
+                                setTargets={setTargets}
+                                activityDefinitions={activityDefinitions}
+                                associatedActivities={associatedActivities}
+                                goalId={goalId}
+                                rootId={rootId}
+                                isEditing={true}
+                                viewMode="list"
+                                onOpenBuilder={(target) => {
+                                    setTargetToEdit(target || null);
+                                    setViewState('target-manager');
+                                }}
+                            />
+                        )}
 
                         {/* Edit Actions */}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
@@ -964,22 +1080,31 @@ function GoalDetailModal({
                                     onClick={() => {
                                         if (isCompleted) {
                                             setViewState('uncomplete-confirm');
-                                        } else {
+                                        } else if (allowManualCompletion) {
                                             setViewState('complete-confirm');
                                         }
                                     }}
+                                    disabled={!isCompleted && !allowManualCompletion}
                                     style={{
                                         padding: '8px 10px',
                                         background: isCompleted ? '#4caf50' : 'transparent',
-                                        border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
+                                        border: `1px solid ${isCompleted ? '#4caf50' : (allowManualCompletion ? '#666' : '#444')}`,
                                         borderRadius: '4px',
-                                        color: isCompleted ? 'white' : '#ccc',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: isCompleted ? 'bold' : 'normal'
+                                        color: isCompleted ? 'white' : (allowManualCompletion ? '#ccc' : '#888'),
+                                        cursor: (isCompleted || allowManualCompletion) ? 'pointer' : 'default',
+                                        fontSize: '11px',
+                                        fontWeight: isCompleted ? 'bold' : 'normal',
+                                        opacity: (!isCompleted && !allowManualCompletion) ? 0.8 : 1
                                     }}
                                 >
-                                    {isCompleted ? '✓ Completed' : 'Mark Complete'}
+                                    {isCompleted ? '✓ Completed' : (
+                                        allowManualCompletion ? 'Mark Complete' : (
+                                            trackActivities && completedViaChildren ? 'Complete via Children & Targets' :
+                                                trackActivities ? 'Complete via Target(s)' :
+                                                    completedViaChildren ? 'Complete via Children' :
+                                                        'Auto-completing...'
+                                        )
+                                    )}
                                 </button>
                             )}
 
@@ -1060,6 +1185,7 @@ function GoalDetailModal({
                             )}
                         </div>
 
+
                         <div>
                             <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
                                 Description
@@ -1128,34 +1254,86 @@ function GoalDetailModal({
                         })()}
 
                         {/* Associated Activities Section - View Mode (Read-only) */}
-                        <ActivityAssociator
-                            associatedActivities={associatedActivities}
-                            setAssociatedActivities={setAssociatedActivities}
-                            associatedActivityGroups={associatedActivityGroups}
-                            setAssociatedActivityGroups={setAssociatedActivityGroups}
-                            activityDefinitions={activityDefinitions}
-                            activityGroups={activityGroups}
-                            setActivityGroups={setActivityGroups}
-                            rootId={rootId}
-                            goalId={goalId}
-                            isEditing={false}
-                            targets={targets}
-                            goalName={name}
-                            viewMode="list"
-                            onOpenSelector={() => setViewState('activity-associator')}
-                        />
+                        {trackActivities && (
+                            <ActivityAssociator
+                                associatedActivities={associatedActivities}
+                                setAssociatedActivities={setAssociatedActivities}
+                                associatedActivityGroups={associatedActivityGroups}
+                                setAssociatedActivityGroups={setAssociatedActivityGroups}
+                                activityDefinitions={activityDefinitions}
+                                activityGroups={activityGroups}
+                                setActivityGroups={setActivityGroups}
+                                rootId={rootId}
+                                goalId={goalId}
+                                isEditing={false}
+                                targets={targets}
+                                goalName={name}
+                                viewMode="list"
+                                onOpenSelector={() => setViewState('activity-associator')}
+                                completedViaChildren={completedViaChildren}
+                                isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
+                            />
+                        )}
 
                         {/* Targets Section - View Mode (Read-only) */}
-                        <TargetManager
-                            targets={targets}
-                            setTargets={setTargets}
-                            activityDefinitions={activityDefinitions}
-                            associatedActivities={associatedActivities}
-                            goalId={goalId}
-                            rootId={rootId}
-                            isEditing={false}
-                            viewMode="list"
-                        />
+                        {trackActivities && (
+                            <TargetManager
+                                targets={targets}
+                                setTargets={setTargets}
+                                activityDefinitions={activityDefinitions}
+                                associatedActivities={associatedActivities}
+                                goalId={goalId}
+                                rootId={rootId}
+                                isEditing={false}
+                                viewMode="list"
+                            />
+                        )}
+
+                        {/* Associated Children Section */}
+                        {(() => {
+                            const node = findGoalById(treeData, goalId);
+                            const children = node?.children || [];
+                            if (children.length === 0) return null;
+
+                            return (
+                                <div style={{ borderTop: '1px solid #333', paddingTop: '14px', marginTop: '4px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                        Associated {getTypeDisplayName(childType)}s
+                                    </label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {children.map(child => {
+                                            const childId = child.attributes?.id || child.id;
+                                            const childCompleted = child.attributes?.completed || child.completed;
+                                            const childColor = getGoalColor(childType);
+                                            return (
+                                                <div
+                                                    key={childId}
+                                                    style={{
+                                                        padding: '10px 12px',
+                                                        background: '#252525',
+                                                        borderLeft: `3px solid ${childColor}`,
+                                                        borderRadius: '4px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        opacity: childCompleted ? 0.7 : 1
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
+                                                        {child.name}
+                                                    </span>
+                                                    {childCompleted && (
+                                                        <span style={{ color: '#4caf50', fontSize: '11px', fontWeight: 'bold' }}>
+                                                            ✓ Done
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Sessions List */}
                         <GoalSessionList
@@ -1167,7 +1345,8 @@ function GoalDetailModal({
                         />
 
                     </div>
-                )}
+                )
+                }
             </>
         );
     };

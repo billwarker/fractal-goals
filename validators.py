@@ -170,6 +170,9 @@ class GoalCreateSchema(BaseModel):
     parent_id: Optional[str] = None
     deadline: Optional[str] = None
     targets: Optional[List[Dict[str, Any]]] = None
+    completed_via_children: Optional[bool] = False
+    allow_manual_completion: Optional[bool] = True
+    track_activities: Optional[bool] = True
     
     @field_validator('name')
     @classmethod
@@ -214,6 +217,9 @@ class GoalUpdateSchema(BaseModel):
     targets: Optional[List[Dict[str, Any]]] = None
     relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     completed: Optional[bool] = None
+    completed_via_children: Optional[bool] = None
+    allow_manual_completion: Optional[bool] = None
+    track_activities: Optional[bool] = None
     
     @field_validator('name')
     @classmethod
