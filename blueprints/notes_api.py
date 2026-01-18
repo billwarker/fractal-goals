@@ -10,6 +10,7 @@ import uuid
 import logging
 
 from models import get_engine, get_session, Note, Session, ActivityInstance, ActivityDefinition, format_utc
+from validators import validate_request, NoteCreateSchema, NoteUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +214,8 @@ def get_activity_history(root_id, activity_id):
 
 
 @notes_bp.route('/<root_id>/notes', methods=['POST'])
-def create_note(root_id):
+@validate_request(NoteCreateSchema)
+def create_note(root_id, validated_data):
     """
     Create a new note.
     
@@ -231,32 +233,23 @@ def create_note(root_id):
     """
     db = get_session(get_engine())
     try:
-        data = request.get_json()
+        content = validated_data.get('content', '')  # Already sanitized
+        image_data = validated_data.get('image_data')
         
-        content = data.get('content', '').strip()
-        image_data = data.get('image_data')
-        
-        # Either content or image_data is required
-        if not content and not image_data:
-            return jsonify({"error": "Note content or image is required"}), 400
-        
+        # Either content or image_data is required (content is required by schema)
         # If only image, set a default content placeholder
         if not content and image_data:
             content = "[Image]"
         
-        context_type = data.get('context_type', 'session')
-        if context_type not in ('session', 'activity_instance', 'set'):
-            return jsonify({"error": "Invalid context_type. Must be 'session', 'activity_instance', or 'set'"}), 400
-        
         note = Note(
             id=str(uuid.uuid4()),
             root_id=root_id,
-            context_type=context_type,
-            context_id=data.get('context_id'),
-            session_id=data.get('session_id'),
-            activity_instance_id=data.get('activity_instance_id'),
-            activity_definition_id=data.get('activity_definition_id'),
-            set_index=data.get('set_index'),
+            context_type=validated_data['context_type'],  # Already validated by schema
+            context_id=validated_data['context_id'],
+            session_id=validated_data.get('session_id'),
+            activity_instance_id=validated_data.get('activity_instance_id'),
+            activity_definition_id=validated_data.get('activity_definition_id'),
+            set_index=validated_data.get('set_index'),
             content=content,
             image_data=image_data
         )
@@ -264,7 +257,7 @@ def create_note(root_id):
         db.add(note)
         db.commit()
         
-        logger.info(f"Created note {note.id} for {context_type} {note.context_id}")
+        logger.info(f"Created note {note.id} for {validated_data['context_type']} {note.context_id}")
         return jsonify(note.to_dict()), 201
         
     except Exception as e:
@@ -276,7 +269,8 @@ def create_note(root_id):
 
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['PUT'])
-def update_note(root_id, note_id):
+@validate_request(NoteUpdateSchema)
+def update_note(root_id, note_id, validated_data):
     """
     Update a note's content.
     
@@ -296,12 +290,8 @@ def update_note(root_id, note_id):
         if not note:
             return jsonify({"error": "Note not found"}), 404
         
-        data = request.get_json()
-        if 'content' in data:
-            content = data['content'].strip()
-            if not content:
-                return jsonify({"error": "Note content cannot be empty"}), 400
-            note.content = content
+        if 'content' in validated_data:
+            note.content = validated_data['content']  # Already sanitized
         
         db.commit()
         

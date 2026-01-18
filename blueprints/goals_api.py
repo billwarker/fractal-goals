@@ -13,6 +13,12 @@ from models import (
     build_goal_tree,
     validate_root_goal
 )
+from validators import (
+    validate_request,
+    GoalCreateSchema, GoalUpdateSchema,
+    FractalCreateSchema,
+    parse_date_string
+)
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -37,15 +43,14 @@ def get_goals():
 
 
 @goals_bp.route('/goals', methods=['POST'])
-def create_goal():
+@validate_request(GoalCreateSchema)
+def create_goal(validated_data):
     """Create a new goal."""
-    data = request.get_json()
-    
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
         parent = None
-        parent_id = data.get('parent_id')
+        parent_id = validated_data.get('parent_id')
         
         if parent_id:
             logger.debug(f"Looking for parent with ID: {parent_id}")
@@ -53,30 +58,18 @@ def create_goal():
             if not parent:
                 return jsonify({"error": f"Parent not found: {parent_id}"}), 404
         
-        # Validate goal type
-        valid_types = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-                       'ImmediateGoal', 'MicroGoal', 'NanoGoal']
-        goal_type = data.get('type')
-        if goal_type not in valid_types:
-            return jsonify({"error": f"Invalid goal type: {goal_type}"}), 400
-        
-        # Parse deadline if provided
+        # Parse deadline if provided (already validated by schema)
         deadline = None
-        if data.get('deadline'):
-            try:
-                d_str = data['deadline']
-                if 'T' in d_str: d_str = d_str.split('T')[0]
-                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
-            except ValueError:
-                return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
+        if validated_data.get('deadline'):
+            deadline = parse_date_string(validated_data['deadline'])
         
-        # Create the goal
+        # Create the goal (type already validated by schema)
         new_goal = Goal(
-            type=goal_type,
-            name=data.get('name'),
-            description=data.get('description', ''),
+            type=validated_data['type'],
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
             deadline=deadline,
-            completed=data.get('completed', False),
+            completed=False,
             parent_id=parent_id
         )
         
@@ -89,8 +82,8 @@ def create_goal():
             new_goal.root_id = current.id
         
         # Handle targets if provided
-        if 'targets' in data and data['targets']:
-            new_goal.targets = json.dumps(data['targets'])
+        if validated_data.get('targets'):
+            new_goal.targets = json.dumps(validated_data['targets'])
         
         db_session.add(new_goal)
         db_session.commit()
@@ -104,7 +97,7 @@ def create_goal():
         
     except Exception as e:
         db_session.rollback()
-        print(f"ERROR: {str(e)}")
+        logger.exception("Error creating goal")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -330,25 +323,17 @@ def get_all_fractals():
 
 
 @goals_bp.route('/fractals', methods=['POST'])
-def create_fractal():
+@validate_request(FractalCreateSchema)
+def create_fractal(validated_data):
     """Create a new fractal (root goal)."""
-    data = request.get_json()
-    
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate allowed types for root goals
-        goal_type = data.get('type', 'UltimateGoal')
-        valid_root_types = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal']
-        
-        if goal_type not in valid_root_types:
-             return jsonify({"error": f"Invalid root goal type. Must be one of: {', '.join(valid_root_types)}"}), 400
-
-        # Create root goal (UltimateGoal with no parent)
+        # Create root goal (type already validated by schema)
         new_fractal = Goal(
-            type=goal_type,
-            name=data.get('name'),
-            description=data.get('description', ''),
+            type=validated_data.get('type', 'UltimateGoal'),
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
             parent_id=None  # Root goal has no parent
         )
         
@@ -360,6 +345,7 @@ def create_fractal():
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("Error creating fractal")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -462,7 +448,8 @@ def get_active_goals_for_selection(root_id):
 
 
 @goals_bp.route('/<root_id>/goals', methods=['POST'])
-def create_fractal_goal(root_id):
+@validate_request(GoalCreateSchema)
+def create_fractal_goal(root_id, validated_data):
     """Create a new goal within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -471,41 +458,26 @@ def create_fractal_goal(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        data = request.get_json()
-        
-        # Validate required fields
-        if not data.get('name'):
-            return jsonify({"error": "Goal name is required"}), 400
-        
-        if not data.get('type'):
-            return jsonify({"error": "Goal type is required"}), 400
-        
-        # Parse deadline if provided
+        # Parse deadline if provided (already validated by schema)
         deadline = None
-        if data.get('deadline'):
-            try:
-                d_str = data['deadline']
-                if 'T' in d_str:
-                    d_str = d_str.split('T')[0]
-                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
-            except ValueError:
-                return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
+        if validated_data.get('deadline'):
+            deadline = parse_date_string(validated_data['deadline'])
         
-        # Create new goal
+        # Create new goal (type already validated by schema)
         new_goal = Goal(
             id=str(uuid.uuid4()),
-            name=data['name'],
-            description=data.get('description', ''),
-            type=data['type'],
-            parent_id=data.get('parent_id'),
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
+            type=validated_data['type'],
+            parent_id=validated_data.get('parent_id'),
             deadline=deadline,
             completed=False,
             root_id=root_id  # Set root_id for performance
         )
         
         # Handle targets if provided
-        if 'targets' in data and data['targets']:
-            new_goal.targets = json.dumps(data['targets'])
+        if validated_data.get('targets'):
+            new_goal.targets = json.dumps(validated_data['targets'])
         
         db_session.add(new_goal)
         db_session.commit()
@@ -515,6 +487,7 @@ def create_fractal_goal(root_id):
         
     except Exception as e:
         db_session.rollback()
+        logger.exception("Error creating fractal goal")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()

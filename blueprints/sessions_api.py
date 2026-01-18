@@ -15,6 +15,13 @@ from models import (
     validate_root_goal, get_all_sessions, get_sessions_for_root,
     get_immediate_goals_for_session, get_session_by_id
 )
+from validators import (
+    validate_request,
+    SessionCreateSchema, SessionUpdateSchema,
+    SessionGoalAssociationSchema,
+    ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
+    ActivityMetricsUpdateSchema, ActivityReorderSchema
+)
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')

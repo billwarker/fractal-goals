@@ -351,6 +351,22 @@ Links ProgramDays to multiple SessionTemplates (many-to-many).
 
 ## Backend API Structure
 
+### Request Validation (`/validators.py`)
+Pydantic-based validation for all API endpoints.
+
+**Features:**
+- `@validate_request(SchemaClass)` decorator for automatic request validation
+- String sanitization (whitespace normalization, null byte removal)
+- Structured error responses with field-level details
+- Maximum length enforcement to prevent abuse
+
+**Key Schemas:**
+- `GoalCreateSchema`, `GoalUpdateSchema` - Goal CRUD validation
+- `FractalCreateSchema` - Root goal creation validation
+- `SessionCreateSchema`, `SessionUpdateSchema` - Session validation
+- `NoteCreateSchema`, `NoteUpdateSchema` - Note validation
+- `ProgramCreateSchema`, `ProgramBlockSchema` - Program validation
+
 ### Blueprints (in `/blueprints/`)
 
 #### `goals_api.py`
@@ -764,6 +780,20 @@ Fractal selection/home page.
 - `goals_dev.db` - Development database
 - `goals_test.db` - Testing database
 - `goals.db` - Main database used by all environments (development, testing, production)
+
+### Python Dependencies
+
+- **`requirements.txt`** - Production dependencies (Flask, SQLAlchemy, etc.) with pinned versions
+- **`requirements-test.txt`** - Testing dependencies (pytest, coverage, etc.)
+
+**Installation:**
+```bash
+# Production dependencies
+pip install -r requirements.txt
+
+# Add testing dependencies for development
+pip install -r requirements-test.txt
+```
 
 ---
 

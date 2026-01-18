@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import logging
 import models
 from models import (
     get_session,
@@ -6,12 +7,17 @@ from models import (
     validate_root_goal
 )
 from sqlalchemy import func
+from validators import (
+    validate_request,
+    ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
+    ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
+    ActivityGoalsSetSchema, GroupReorderSchema
+)
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
-
-# Global engine removed
-# engine = get_engine()
 
 # ============================================================================
 # ============================================================================
@@ -34,7 +40,8 @@ def get_activity_groups(root_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activity-groups', methods=['POST'])
-def create_activity_group(root_id):
+@validate_request(ActivityGroupCreateSchema)
+def create_activity_group(root_id, validated_data):
     """Create a new activity group."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -43,18 +50,14 @@ def create_activity_group(root_id):
         if not root:
              return jsonify({"error": "Fractal not found"}), 404
         
-        data = request.get_json()
-        if not data.get('name'):
-            return jsonify({"error": "Name is required"}), 400
-        
         # Calculate order
         max_order = session.query(func.max(ActivityGroup.sort_order)).filter_by(root_id=root_id).scalar()
         new_order = (max_order or 0) + 1
 
         new_group = ActivityGroup(
             root_id=root_id,
-            name=data['name'],
-            description=data.get('description', ''),
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
             sort_order=new_order
         )
         session.add(new_group)
@@ -62,12 +65,14 @@ def create_activity_group(root_id):
         return jsonify(new_group.to_dict()), 201
     except Exception as e:
         session.rollback()
+        logger.exception("Error creating activity group")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 @activities_bp.route('/<root_id>/activity-groups/<group_id>', methods=['PUT'])
-def update_activity_group(root_id, group_id):
+@validate_request(ActivityGroupUpdateSchema)
+def update_activity_group(root_id, group_id, validated_data):
     """Update an activity group."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -76,16 +81,16 @@ def update_activity_group(root_id, group_id):
         if not group:
             return jsonify({"error": "Group not found"}), 404
         
-        data = request.get_json()
-        if 'name' in data:
-            group.name = data['name']
-        if 'description' in data:
-            group.description = data['description']
+        if 'name' in validated_data:
+            group.name = validated_data['name']
+        if 'description' in validated_data:
+            group.description = validated_data['description']
             
         session.commit()
         return jsonify(group.to_dict())
     except Exception as e:
         session.rollback()
+        logger.exception("Error updating activity group")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
@@ -115,17 +120,14 @@ def delete_activity_group(root_id, group_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activity-groups/reorder', methods=['PUT'])
-def reorder_activity_groups(root_id):
+@validate_request(GroupReorderSchema)
+def reorder_activity_groups(root_id, validated_data):
     """Reorder activity groups."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        data = request.get_json()
-        group_ids = data.get('group_ids', [])
-        
-        if not group_ids:
-             return jsonify({"error": "No group_ids provided"}), 400
-             
+        group_ids = validated_data['group_ids']  # Already validated
+              
         # Update each group
         for idx, group_id in enumerate(group_ids):
             group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
@@ -136,6 +138,7 @@ def reorder_activity_groups(root_id):
         return jsonify({"message": "Groups reordered"})
     except Exception as e:
         session.rollback()
+        logger.exception("Error reordering activity groups")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import json
 import uuid
+import logging
 from datetime import datetime, timedelta
 import models
 from models import (
@@ -8,12 +9,15 @@ from models import (
     Program, ProgramBlock, ProgramDay, Goal, SessionTemplate,
     validate_root_goal
 )
+from validators import (
+    validate_request,
+    ProgramCreateSchema, ProgramUpdateSchema, ProgramDayCreateSchema
+)
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
 programs_bp = Blueprint('programs', __name__, url_prefix='/api')
-
-# Global engine removed
-# engine = get_engine()
 
 # Helper to sync nested structure (Shadow Write)
 def sync_program_structure(session, program, schedule_list):
@@ -107,7 +111,8 @@ def get_program(root_id, program_id):
 
 
 @programs_bp.route('/<root_id>/programs', methods=['POST'])
-def create_program(root_id):
+@validate_request(ProgramCreateSchema)
+def create_program(root_id, validated_data):
     """Create a new training program."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -116,36 +121,24 @@ def create_program(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        data = request.get_json()
-        
-        # Validate required fields
-        if not data.get('name'):
-            return jsonify({"error": "Program name is required"}), 400
-        
-        if not data.get('start_date'):
-            return jsonify({"error": "Start date is required"}), 400
-            
-        if not data.get('end_date'):
-            return jsonify({"error": "End date is required"}), 400
-        
-        # Parse dates
+        # Parse dates (already validated to exist by schema)
         try:
-            start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
-            end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+            start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
+            end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
         except:
             return jsonify({"error": "Invalid date format"}), 400
         
         # Create new program
-        schedule_list = data.get('weeklySchedule', [])
+        schedule_list = validated_data.get('weeklySchedule', [])
         
         new_program = Program(
             id=str(uuid.uuid4()),
             root_id=root_id,
-            name=data['name'],
-            description=data.get('description', ''),
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
             start_date=start_date,
             end_date=end_date,
-            goal_ids=json.dumps(data.get('selectedGoals', [])),
+            goal_ids=json.dumps(validated_data.get('selectedGoals', [])),
             weekly_schedule=json.dumps(schedule_list)
         )
         
@@ -160,15 +153,15 @@ def create_program(root_id):
         
     except Exception as e:
         session.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error creating program")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['PUT'])
-def update_program(root_id, program_id):
+@validate_request(ProgramUpdateSchema)
+def update_program(root_id, program_id, validated_data):
     """Update a training program."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -181,36 +174,34 @@ def update_program(root_id, program_id):
         if not program:
             return jsonify({"error": "Program not found"}), 404
         
-        data = request.get_json()
-        
         # Update fields
-        if 'name' in data:
-            program.name = data['name']
-        if 'description' in data:
-            program.description = data['description']
-        if 'start_date' in data:
+        if 'name' in validated_data:
+            program.name = validated_data['name']
+        if 'description' in validated_data:
+            program.description = validated_data['description']
+        if 'start_date' in validated_data:
             try:
-                program.start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
+                program.start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
             except:
                 return jsonify({"error": "Invalid start_date format"}), 400
-        if 'end_date' in data:
+        if 'end_date' in validated_data:
             try:
-                program.end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+                program.end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
             except:
                 return jsonify({"error": "Invalid end_date format"}), 400
-        if 'selectedGoals' in data:
-            program.goal_ids = json.dumps(data['selectedGoals'])
+        if 'selectedGoals' in validated_data:
+            program.goal_ids = json.dumps(validated_data['selectedGoals'])
         
         # Sync Schedule
-        if 'weeklySchedule' in data:
-            schedule_list = data['weeklySchedule']
+        if 'weeklySchedule' in validated_data:
+            schedule_list = validated_data['weeklySchedule']
             # Update Legacy JSON
             program.weekly_schedule = json.dumps(schedule_list)
             # Update New Tables
             sync_program_structure(session, program, schedule_list)
             
-        if 'is_active' in data:
-            program.is_active = data['is_active']
+        if 'is_active' in validated_data:
+            program.is_active = validated_data['is_active']
         
         session.commit()
         
@@ -218,8 +209,7 @@ def update_program(root_id, program_id):
         
     except Exception as e:
         session.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error updating program")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()

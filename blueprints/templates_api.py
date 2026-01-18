@@ -1,18 +1,22 @@
 from flask import Blueprint, request, jsonify
 import json
 import uuid
+import logging
 import models
 from models import (
     get_session,
     SessionTemplate,
     validate_root_goal
 )
+from validators import (
+    validate_request,
+    SessionTemplateCreateSchema, SessionTemplateUpdateSchema
+)
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
-
-# Global engine removed
-# engine = get_engine()
 
 # ============================================================================
 # SESSION TEMPLATE ENDPOINTS (Fractal-Scoped)
@@ -57,7 +61,8 @@ def get_session_template(root_id, template_id):
 
 
 @templates_bp.route('/<root_id>/session-templates', methods=['POST'])
-def create_session_template(root_id):
+@validate_request(SessionTemplateCreateSchema)
+def create_session_template(root_id, validated_data):
     """Create a new session template."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -66,22 +71,16 @@ def create_session_template(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        data = request.get_json()
-        
-        # Validate required fields
-        if not data.get('name'):
-            return jsonify({"error": "Template name is required"}), 400
-        
-        if not data.get('template_data'):
-            return jsonify({"error": "Template data is required"}), 400
+        # template_data is optional now - validation ensures name is present
+        template_data = validated_data.get('template_data')
         
         # Create new template
         new_template = SessionTemplate(
             id=str(uuid.uuid4()),
-            name=data['name'],
-            description=data.get('description', ''),
+            name=validated_data['name'],  # Already sanitized
+            description=validated_data.get('description', ''),
             root_id=root_id,
-            template_data=json.dumps(data['template_data'])
+            template_data=json.dumps(template_data) if template_data else None
         )
         
         session.add(new_template)
@@ -91,13 +90,15 @@ def create_session_template(root_id):
         
     except Exception as e:
         session.rollback()
+        logger.exception("Error creating session template")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['PUT'])
-def update_session_template(root_id, template_id):
+@validate_request(SessionTemplateUpdateSchema)
+def update_session_template(root_id, template_id, validated_data):
     """Update a session template."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -110,15 +111,13 @@ def update_session_template(root_id, template_id):
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
-        data = request.get_json()
-        
         # Update fields
-        if 'name' in data:
-            template.name = data['name']
-        if 'description' in data:
-            template.description = data['description']
-        if 'template_data' in data:
-            template.template_data = json.dumps(data['template_data'])
+        if 'name' in validated_data:
+            template.name = validated_data['name']
+        if 'description' in validated_data:
+            template.description = validated_data['description']
+        if 'template_data' in validated_data:
+            template.template_data = json.dumps(validated_data['template_data'])
         
         session.commit()
         
@@ -126,6 +125,7 @@ def update_session_template(root_id, template_id):
         
     except Exception as e:
         session.rollback()
+        logger.exception("Error updating session template")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
@@ -152,6 +152,7 @@ def delete_session_template(root_id, template_id):
         
     except Exception as e:
         session.rollback()
+        logger.exception("Error deleting session template")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
