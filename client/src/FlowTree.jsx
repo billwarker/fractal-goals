@@ -93,35 +93,54 @@ const CustomNode = ({ data }) => {
                     width: '30px',
                     height: '30px',
                     borderRadius: '50%',
-                    background: fillColor,
-                    border: 'none',
+                    background: isSmartGoal ? 'transparent' : fillColor,
+                    border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
                     boxShadow: isCompleted
                         ? '0 0 10px rgba(255, 215, 0, 0.6)'
                         : '0 2px 4px rgba(0,0,0,0.3)',
                     flexShrink: 0,
                     zIndex: 2,
                     position: 'relative', // Handles are positioned relative to this circle
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                 }}
                 onClick={data.onClick}
             >
-                {/* SMART Ring - outer glow for goals meeting all SMART criteria */}
+                {/* SMART Goal Structure: 3 layers (Outer Ring, Middle Ring, Core) */}
                 {isSmartGoal && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '50%',
-                            border: `3px solid ${smartRingColor}`,
-                            left: '50%',
-                            top: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            zIndex: -1,
-                            pointerEvents: 'none',
-                        }}
-                        title="SMART Goal"
-                    />
+                    <>
+                        {/* Middle Ring */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                border: `2.5px solid ${fillColor}`,
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                        {/* Inner Core */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                width: '14px',
+                                height: '14px',
+                                borderRadius: '50%',
+                                background: fillColor,
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                    </>
                 )}
+
                 {/* Target Handle - centered on circle */}
                 <Handle
                     type="target"
@@ -484,6 +503,23 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
         }
     }, [layoutedNodes.length, rfInstance]);
 
+    // Re-center with fade transition when sidebar toggles or selected node changes
+    useEffect(() => {
+        if (rfInstance) {
+            // Fade out first
+            setIsVisible(false);
+
+            // Wait for fade-out, then fit view, then fade back in
+            const timer = setTimeout(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                // Fade back in after fitView animation completes
+                setTimeout(() => setIsVisible(true), 220);
+            }, 220); // Wait for fade-out transition (200ms) + small buffer
+
+            return () => clearTimeout(timer);
+        }
+    }, [sidebarOpen, selectedNodeId, rfInstance]);
+
     return (
         <div style={{
             width: '100%',
@@ -509,7 +545,6 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
                 }}
                 proOptions={{ hideAttribution: true }}
             >
-                <Background color="#333" gap={20} />
             </ReactFlow>
         </div>
     );

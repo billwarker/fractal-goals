@@ -227,6 +227,7 @@ function Selection() { // No props needed anymore
                 onConfirm={handleConfirmDelete}
                 title="Delete Fractal Tree?"
                 message={`Are you sure you want to delete "${fractalToDelete?.name}"? This action cannot be undone.`}
+                requireMatchingText="delete"
             />
         </div>
     );

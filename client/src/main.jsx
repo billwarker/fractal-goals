@@ -11,18 +11,22 @@ import { GoalsProvider } from './contexts/GoalsContext.jsx'
 
 import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
 
+import { DebugProvider } from './contexts/DebugContext.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <TimezoneProvider>
-        <ActivitiesProvider>
-          <SessionsProvider>
-            <GoalsProvider>
-              <AppRouter />
-            </GoalsProvider>
-          </SessionsProvider>
-        </ActivitiesProvider>
-      </TimezoneProvider>
+      <DebugProvider>
+        <TimezoneProvider>
+          <ActivitiesProvider>
+            <SessionsProvider>
+              <GoalsProvider>
+                <AppRouter />
+              </GoalsProvider>
+            </SessionsProvider>
+          </ActivitiesProvider>
+        </TimezoneProvider>
+      </DebugProvider>
     </BrowserRouter>
   </StrictMode>,
 )

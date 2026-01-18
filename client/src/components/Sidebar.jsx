@@ -36,49 +36,41 @@ const Sidebar = ({
     // Default View (No Node Selected)
     if (!selectedNode) {
         return (
-            <div className="details-window">
-                <div className="window-content">
-                    <div className="inspector-empty-state">
-                        <h2 className="inspector-title">Inspector</h2>
-                        <p>Select a Goal in the graph to view details.</p>
-                        {selectedRootId ? (
-                            <button
-                                className="session-btn w-100 mt-20"
-                                onClick={onAddSession}
-                            >
-                                + Create New Session
-                            </button>
-                        ) : (
-                            <p className="select-hint">Select a Fractal Tree from the main view first.</p>
-                        )}
-                    </div>
-                </div>
+            <div className="inspector-empty-state" style={{ padding: '20px' }}>
+                <h2 className="inspector-title">Inspector</h2>
+                <p>Select a Goal in the graph to view details.</p>
+                {selectedRootId ? (
+                    <button
+                        className="session-btn w-100 mt-20"
+                        onClick={onAddSession}
+                    >
+                        + Create New Session
+                    </button>
+                ) : (
+                    <p className="select-hint">Select a Fractal Tree from the main view first.</p>
+                )}
             </div>
         );
     }
 
     // Goal View - Use GoalDetailModal in Panel Mode
     return (
-        <div className="details-window">
-            <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                <GoalDetailModal
-                    isOpen={true}
-                    onClose={onClose}
-                    goal={selectedNode}
-                    onUpdate={handleGoalUpdate}
-                    activityDefinitions={activityDefinitions}
-                    onToggleCompletion={onToggleCompletion}
-                    onAddChild={onAddChild}
-                    onDelete={onDelete}
-                    sessions={sessions}
-                    rootId={selectedRootId}
-                    treeData={treeData}
-                    displayMode="panel"
-                    programs={programs}
-                    activityGroups={activityGroups}
-                />
-            </div>
-        </div>
+        <GoalDetailModal
+            isOpen={true}
+            onClose={onClose}
+            goal={selectedNode}
+            onUpdate={handleGoalUpdate}
+            activityDefinitions={activityDefinitions}
+            onToggleCompletion={onToggleCompletion}
+            onAddChild={onAddChild}
+            onDelete={onDelete}
+            sessions={sessions}
+            rootId={selectedRootId}
+            treeData={treeData}
+            displayMode="panel"
+            programs={programs}
+            activityGroups={activityGroups}
+        />
     );
 };
 

@@ -16,25 +16,11 @@ const FractalView = ({
     const flowTreeRef = React.useRef();
 
     return (
-        <>
-            <div className="metrics-overlay">
-                <div className="metric-item">
-                    {metrics.totalGoals} goals (<span className="metric-completed">{metrics.goalCompletionPercentage}% completed</span>)
-                </div>
-                <div className="metric-item">
-                    {metrics.totalDeadlines} deadlines (<span className="metric-missed">{metrics.deadlineMissedPercentage}% missed</span>)
-                </div>
-                <div className="metric-item">
-                    {metrics.totalTargets} targets (<span className="metric-completed">{metrics.targetCompletionPercentage}% completed</span>)
-                </div>
-            </div>
-
-            <FlowTree
-                ref={flowTreeRef}
-                treeData={treeData}
-                {...props}
-            />
-        </>
+        <FlowTree
+            ref={flowTreeRef}
+            treeData={treeData}
+            {...props}
+        />
     );
 };
 

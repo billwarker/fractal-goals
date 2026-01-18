@@ -458,7 +458,7 @@ Serves static pages (minimal usage, mostly SPA).
 
 - **`main.jsx`** - Application entry point
 - **`AppRouter.jsx`** - Route configuration and navigation
-- **`FlowTree.jsx`** - ReactFlow-based goal tree visualization
+- **`FlowTree.jsx`** - ReactFlow-based goal tree visualization. Custom nodes with circular design, cosmic color coding, and 3-layer "bullseye" (outer ring, middle ring, core) for SMART goals.
 - **`App.css`** - Global styles
 - **`index.css`** - Base styles
 
@@ -610,15 +610,25 @@ Fractal selection/home page.
 - **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
 - **`GoalDetailModal.jsx`** - Unified goal viewing/editing/creating component with dual display modes (modal/panel):
   - **Mode support:** 'view', 'edit', or 'create' mode via `mode` prop
+  - **Refactored Architecture:** Complex logic extracted into focused sub-components (`TargetManager`, `ActivityAssociator`, `GoalSessionList`).
   - View/Edit goal name, description, deadline
   - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
   - **Associated/Targeting Programs display**
-  - **Associated Activities (SMART Achievable):** Shows count of activities linked to goal, with "+ Add" button to associate more via `SelectActivitiesModal`
-  - Inline target builder (add/edit/delete targets)
+  - **Associated Activities (SMART Achievable):** Managed via `ActivityAssociator`. Shows count of activities linked to goal.
+    - Activity Selector: Card-based group selection + individual activity selection.
+    - **Constraint:** Activities cannot be removed if used by existing targets.
+  - **Inline target builder:** Managed via `TargetManager`. Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode.
   - Completion confirmation flow with program/target summary
-  - Display completed_at date for finished goals
-  - Practice session relationships (children for ShortTermGoals, parent for ImmediateGoals)
-  - **Action buttons layout:** 2x2 grid above description (Mark Complete | Add Child, Edit Goal | Delete Goal)
+  - **SMART Indicator:** Real-time feedback based on current editing state.
+  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates.
+  - Practice session relationships: Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
+  - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button.
+  - **Contextual Styling:** Parent goal references and question marks highlighted in parent goal color.
+
+**Sub-components (in `/client/src/components/goalDetail/`):**
+- `TargetManager.jsx` - Manages target list, deletion, and inline target creation/editing.
+- `ActivityAssociator.jsx` - Manages activity associations and the activity selector UI.
+- `GoalSessionList.jsx` - Displays associated sessions contextually based on goal type.
 - **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
 - **`FractalView.jsx`** - Wrapper for fractal visualization
 - **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
@@ -637,12 +647,12 @@ Fractal selection/home page.
 - **`SessionCreationModal.jsx`** - Modal for creating sessions
 - **`TemplateSelectionModal.jsx`** - Modal for selecting templates
 - **`AlertModal.jsx`** - Reusable alert/notification modal
-- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal
+- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal. Supports `requireMatchingText` to enforce typing a specific string to enable the delete button.
 - **`ProgramBuilder.jsx`** - Modal for creating/editing programs
 - **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
 - **`ProgramDayModal.jsx`** - Modal for creating/editing program days
 - **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
-- **`DeleteProgramModal.jsx`** - Modal for confirming program deletion with session count warning
+- **DeleteProgramModal.jsx** - Modal for confirming program deletion with session count warning. Supports `requireMatchingText` to enforce typing a specific string.
 - **`DayViewModal.jsx`** - Detailed view of a calendar day (schedule + goal deadlines)
 - **`PracticeSessionModal.jsx`** - Modal for creating/editing practice sessions
 - **`GroupBuilderModal.jsx`** - Modal for creating/editing activity groups

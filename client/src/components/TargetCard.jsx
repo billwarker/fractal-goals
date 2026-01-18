@@ -4,7 +4,7 @@ import React from 'react';
  * TargetCard Component
  * Displays an activity target with metrics and completion status
  */
-function TargetCard({ target, activityDefinitions, onEdit, onDelete, isCompleted, isEditMode = false }) {
+function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, isCompleted, isEditMode = false }) {
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
@@ -46,25 +46,37 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, isCompleted
     }
 
     return (
-        <div style={{
-            padding: '12px',
-            background: '#2a2a2a',
-            border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
-            borderLeft: `4px solid ${isCompleted ? '#4caf50' : '#ff9800'}`,
-            borderRadius: '6px',
-            marginBottom: '10px'
-        }}>
+        <div
+            onClick={onClick}
+            style={{
+                padding: '12px',
+                background: '#2a2a2a',
+                border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
+                borderLeft: `4px solid ${isCompleted ? '#4caf50' : '#ff9800'}`,
+                borderRadius: '6px',
+                marginBottom: '10px',
+                cursor: onClick ? 'pointer' : 'default',
+                transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+                if (onClick) e.currentTarget.style.backgroundColor = '#333';
+            }}
+            onMouseLeave={(e) => {
+                if (onClick) e.currentTarget.style.backgroundColor = '#2a2a2a';
+            }}
+        >
             {/* Header with name and completion status */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 marginBottom: '8px'
             }}>
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    flex: 1
                 }}>
                     <span style={{
                         fontSize: '16px',
@@ -92,39 +104,68 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, isCompleted
                     </div>
                 </div>
 
-                {/* Action buttons - only show in edit mode */}
-                {isEditMode && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Action buttons - only show in edit mode */}
+                    {isEditMode && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                                onClick={onEdit}
+                                style={{
+                                    padding: '4px 8px',
+                                    background: 'transparent',
+                                    border: '1px solid #666',
+                                    borderRadius: '3px',
+                                    color: '#ccc',
+                                    cursor: 'pointer',
+                                    fontSize: '11px'
+                                }}
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={onDelete}
+                                style={{
+                                    padding: '4px 8px',
+                                    background: 'transparent',
+                                    border: '1px solid #f44336',
+                                    borderRadius: '3px',
+                                    color: '#f44336',
+                                    cursor: 'pointer',
+                                    fontSize: '11px'
+                                }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    )}
+
+                    {/* X Button for direct delete (if not in edit mode or supplemental) */}
+                    {onDelete && !isEditMode && (
                         <button
-                            onClick={onEdit}
-                            style={{
-                                padding: '4px 8px',
-                                background: 'transparent',
-                                border: '1px solid #666',
-                                borderRadius: '3px',
-                                color: '#ccc',
-                                cursor: 'pointer',
-                                fontSize: '11px'
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete();
                             }}
-                        >
-                            Edit
-                        </button>
-                        <button
-                            onClick={onDelete}
                             style={{
-                                padding: '4px 8px',
                                 background: 'transparent',
-                                border: '1px solid #f44336',
-                                borderRadius: '3px',
-                                color: '#f44336',
+                                border: 'none',
+                                color: '#f44336', // Red color for delete
+                                fontSize: '16px',
+                                fontWeight: 'bold',
                                 cursor: 'pointer',
-                                fontSize: '11px'
+                                padding: '0 4px',
+                                lineHeight: '1',
+                                opacity: 0.7,
+                                transition: 'opacity 0.2s'
                             }}
+                            onMouseEnter={(e) => e.target.style.opacity = '1'}
+                            onMouseLeave={(e) => e.target.style.opacity = '0.7'}
+                            title="Delete Target"
                         >
-                            Delete
+                            ×
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Target metrics */}

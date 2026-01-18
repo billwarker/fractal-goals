@@ -173,6 +173,17 @@ def create_activity(root_id):
         if not data.get('name'):
             return jsonify({"error": "Name is required"}), 400
         
+        # Check for existing activity with same name (case-insensitive)
+        normalized_name = data['name'].strip()
+        existing_activity = session.query(ActivityDefinition).filter(
+            ActivityDefinition.root_id == root_id,
+            func.lower(ActivityDefinition.name) == normalized_name.lower()
+        ).first()
+
+        if existing_activity:
+            # If it exists, return it instead of creating a duplicate
+            return jsonify(existing_activity.to_dict()), 200
+        
         # Create Activity
         new_activity = ActivityDefinition(
             root_id=root_id,

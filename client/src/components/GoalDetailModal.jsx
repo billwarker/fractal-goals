@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getChildType, getTypeDisplayName, calculateGoalAge } from '../utils/goalHelpers';
-import TargetCard from './TargetCard';
 import SMARTIndicator from './SMARTIndicator';
-import SelectActivitiesModal from './modals/SelectActivitiesModal';
 import { fractalApi } from '../utils/api';
+import TargetManager from './goalDetail/TargetManager';
+import ActivityAssociator from './goalDetail/ActivityAssociator';
+import GoalSessionList from './goalDetail/GoalSessionList';
 
 /**
  * GoalDetailModal Component
@@ -60,21 +61,13 @@ function GoalDetailModal({
 
     // Target editing state
     const [targets, setTargets] = useState([]);
+    const [targetToEdit, setTargetToEdit] = useState(null);
 
-    // View state: 'goal' (main view), 'target-add', 'target-edit', 'complete-confirm', 'uncomplete-confirm'
+    // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator'
     const [viewState, setViewState] = useState('goal');
-    const [editingTarget, setEditingTarget] = useState(null);
-
-
-    // Target form state (for inline target builder)
-    const [selectedActivityId, setSelectedActivityId] = useState('');
-    const [targetName, setTargetName] = useState('');
-    const [targetDescription, setTargetDescription] = useState('');
-    const [metricValues, setMetricValues] = useState({});
 
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
-    const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     // Initialize form state from goal - use specific dependencies for completion state
@@ -143,52 +136,6 @@ function GoalDetailModal({
         fetchAssociatedActivities();
     }, [rootId, depGoalId, mode]);
 
-    // Handler for adding activities from the modal
-    const handleAddActivities = async (activityIds) => {
-        if (!rootId || !depGoalId || activityIds.length === 0) {
-            setIsActivityModalOpen(false);
-            return;
-        }
-
-        try {
-            // Combine existing IDs with new IDs
-            const existingIds = associatedActivities.map(a => a.id);
-            const allIds = [...new Set([...existingIds, ...activityIds])];
-
-            // For each new activity, we need to add the goal to its associations
-            for (const activityId of activityIds) {
-                const activity = activityDefinitions.find(a => a.id === activityId);
-                if (activity) {
-                    // Get current goals for this activity and add our goal
-                    const currentGoals = activity.goal_ids || [];
-                    const newGoalIds = [...new Set([...currentGoals, depGoalId])];
-                    await fractalApi.setActivityGoals(rootId, activityId, newGoalIds);
-                }
-            }
-
-            // Refresh the associations
-            const response = await fractalApi.getGoalActivities(rootId, depGoalId);
-            setAssociatedActivities(response.data || []);
-        } catch (error) {
-            console.error('Error adding activity associations:', error);
-        }
-
-        setIsActivityModalOpen(false);
-    };
-
-    // Handler for removing an activity association
-    const handleRemoveActivity = async (activityId) => {
-        if (!rootId || !depGoalId) return;
-
-        try {
-            await fractalApi.removeActivityGoal(rootId, activityId, depGoalId);
-            // Update local state
-            setAssociatedActivities(prev => prev.filter(a => a.id !== activityId));
-        } catch (error) {
-            console.error('Error removing activity association:', error);
-        }
-    };
-
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
     // Allow rendering without goal in create mode
@@ -249,85 +196,6 @@ function GoalDetailModal({
         setIsEditing(false);
     };
 
-    // Target builder handlers
-    const handleOpenAddTarget = () => {
-        setEditingTarget(null);
-        setSelectedActivityId('');
-        setTargetName('');
-        setTargetDescription('');
-        setMetricValues({});
-        setViewState('target-add');
-    };
-
-    const handleOpenEditTarget = (target) => {
-        setEditingTarget(target);
-        setSelectedActivityId(target.activity_id || '');
-        setTargetName(target.name || '');
-        setTargetDescription(target.description || '');
-        // Convert metrics array to object
-        const metricsObj = {};
-        target.metrics?.forEach(m => {
-            metricsObj[m.metric_id] = m.value;
-        });
-        setMetricValues(metricsObj);
-        setViewState('target-edit');
-    };
-
-    const handleDeleteTarget = (targetId) => {
-        setTargets(prev => prev.filter(t => t.id !== targetId));
-    };
-
-    const handleActivityChange = (activityId) => {
-        setSelectedActivityId(activityId);
-        setMetricValues({});
-        const activity = activityDefinitions.find(a => a.id === activityId);
-        if (activity && !targetName) {
-            setTargetName(activity.name);
-        }
-    };
-
-    const handleMetricChange = (metricId, value) => {
-        setMetricValues(prev => ({
-            ...prev,
-            [metricId]: value
-        }));
-    };
-
-    const handleSaveTarget = () => {
-        if (!selectedActivityId) {
-            alert('Please select an activity');
-            return;
-        }
-
-        const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
-        const metrics = Object.entries(metricValues).map(([metric_id, value]) => ({
-            metric_id,
-            value: parseFloat(value) || 0
-        }));
-
-        const target = {
-            id: editingTarget?.id || crypto.randomUUID(),
-            activity_id: selectedActivityId,
-            name: targetName || selectedActivity?.name || 'Unnamed Target',
-            description: targetDescription,
-            metrics
-        };
-
-        if (editingTarget) {
-            setTargets(prev => prev.map(t => t.id === target.id ? target : t));
-        } else {
-            setTargets(prev => [...prev, target]);
-        }
-
-        setViewState('goal');
-        setEditingTarget(null);
-    };
-
-    const handleCancelTargetEdit = () => {
-        setViewState('goal');
-        setEditingTarget(null);
-    };
-
     // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
     const goalType = mode === 'create'
         ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
@@ -342,39 +210,16 @@ function GoalDetailModal({
     const isShortTermGoal = goalType === 'ShortTermGoal';
     const isImmediateGoal = goalType === 'ImmediateGoal';
 
-    // For STGs: Find sessions that have this goal in their short_term_goals array OR parent_ids
-    const childSessions = (isShortTermGoal && mode !== 'create')
-        ? sessions.filter(session => {
-            if (!session) return false;
-            // Check new format: short_term_goals array
-            const shortTermGoals = session.short_term_goals || [];
-            if (shortTermGoals.some(stg => stg?.id === goalId)) return true;
-
-            // Check legacy format: attributes.parent_ids
-            const parentIds = session.attributes?.parent_ids || [];
-            return parentIds.includes(goalId);
-        })
-        : [];
-
-    // For IGs: Find sessions that have this goal in their immediate_goals array OR goal_ids
-    const associatedSessions = (isImmediateGoal && mode !== 'create')
-        ? sessions.filter(session => {
-            if (!session) return false;
-            // Check new format: immediate_goals array
-            const immediateGoals = session.immediate_goals || [];
-            if (immediateGoals.some(ig => ig?.id === goalId)) return true;
-
-            // Check legacy format: attributes.goal_ids
-            const goalIds = session.attributes?.goal_ids || [];
-            return goalIds.includes(goalId);
-        })
-        : [];
-
     // Get activities with metrics for target builder
+    // First, filter by associated activities, then by having metrics
+    const associatedActivityIds = associatedActivities.map(a => a.id);
     const activitiesWithMetrics = activityDefinitions.filter(a =>
         a.has_metrics && a.metric_definitions && a.metric_definitions.length > 0
     );
-    const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
+    // For targets: only activities that are BOTH associated AND have metrics
+    const activitiesForTargets = activitiesWithMetrics.filter(a =>
+        associatedActivityIds.includes(a.id)
+    );
 
     // Find parent goal name and type for SMART relevance question
     const findParentGoalInfo = () => {
@@ -415,202 +260,6 @@ function GoalDetailModal({
     const parentGoalInfo = findParentGoalInfo();
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
-
-    // ============ TARGET BUILDER VIEW ============
-    const renderTargetBuilder = () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #444'
-            }}>
-                <button
-                    onClick={handleCancelTargetEdit}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#888',
-                        fontSize: '18px',
-                        cursor: 'pointer',
-                        padding: '0 4px'
-                    }}
-                >
-                    ←
-                </button>
-                <h3 style={{ margin: 0, fontSize: '16px', color: 'white' }}>
-                    {editingTarget ? 'Edit Target' : 'Add Target'}
-                </h3>
-            </div>
-
-            {/* Activity Selector */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                    Activity *
-                </label>
-                <select
-                    value={selectedActivityId}
-                    onChange={(e) => handleActivityChange(e.target.value)}
-                    style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: '#2a2a2a',
-                        border: '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '13px'
-                    }}
-                >
-                    <option value="">Select an activity...</option>
-                    {activitiesWithMetrics.map(activity => (
-                        <option key={activity.id} value={activity.id}>
-                            {activity.name}
-                        </option>
-                    ))}
-                </select>
-                {activitiesWithMetrics.length === 0 && (
-                    <div style={{ fontSize: '11px', color: '#f44336', marginTop: '4px' }}>
-                        No activities with metrics found. Create one first.
-                    </div>
-                )}
-            </div>
-
-            {/* Target Name */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                    Target Name
-                </label>
-                <input
-                    type="text"
-                    value={targetName}
-                    onChange={(e) => setTargetName(e.target.value)}
-                    placeholder={selectedActivity?.name || 'Enter target name...'}
-                    style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: '#2a2a2a',
-                        border: '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '13px'
-                    }}
-                />
-            </div>
-
-            {/* Target Description */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                    Description
-                </label>
-                <textarea
-                    value={targetDescription}
-                    onChange={(e) => setTargetDescription(e.target.value)}
-                    placeholder="Optional description..."
-                    rows={2}
-                    style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: '#2a2a2a',
-                        border: '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '13px',
-                        resize: 'vertical'
-                    }}
-                />
-            </div>
-
-            {/* Metric Values */}
-            {selectedActivity && selectedActivity.metric_definitions?.length > 0 && (
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
-                        Target Metrics
-                    </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {selectedActivity.metric_definitions.map(metric => (
-                            <div key={metric.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '10px',
-                                background: '#2a2a2a',
-                                borderRadius: '4px',
-                                border: '1px solid #444'
-                            }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '13px', color: 'white', fontWeight: '500' }}>
-                                        {metric.name}
-                                    </div>
-                                    {metric.description && (
-                                        <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
-                                            {metric.description}
-                                        </div>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <input
-                                        type="number"
-                                        value={metricValues[metric.id] || ''}
-                                        onChange={(e) => handleMetricChange(metric.id, e.target.value)}
-                                        placeholder="0"
-                                        style={{
-                                            width: '70px',
-                                            padding: '6px',
-                                            background: '#1e1e1e',
-                                            border: '1px solid #555',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontSize: '13px',
-                                            textAlign: 'right'
-                                        }}
-                                    />
-                                    <span style={{ fontSize: '12px', color: '#888', minWidth: '40px' }}>
-                                        {metric.unit}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                <button
-                    onClick={handleCancelTargetEdit}
-                    style={{
-                        padding: '8px 14px',
-                        background: 'transparent',
-                        border: '1px solid #666',
-                        borderRadius: '4px',
-                        color: '#ccc',
-                        cursor: 'pointer',
-                        fontSize: '13px'
-                    }}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={handleSaveTarget}
-                    disabled={!selectedActivityId}
-                    style={{
-                        padding: '8px 14px',
-                        background: selectedActivityId ? '#4caf50' : '#333',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: selectedActivityId ? 'white' : '#666',
-                        cursor: selectedActivityId ? 'pointer' : 'not-allowed',
-                        fontSize: '13px',
-                        fontWeight: 600
-                    }}
-                >
-                    {editingTarget ? 'Update Target' : 'Add Target'}
-                </button>
-            </div>
-        </div>
-    );
 
     // ============ COMPLETION CONFIRMATION VIEW ============
     const renderCompletionConfirm = () => {
@@ -1017,129 +666,125 @@ function GoalDetailModal({
     };
 
     // ============ GOAL CONTENT (VIEW/EDIT) ============
-    const renderGoalContent = () => (
-        <>
-            {/* Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingBottom: '16px',
-                marginBottom: '16px',
-                borderBottom: `2px solid ${goalColor}`
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {mode === 'create' && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            + Create
-                        </span>
-                    )}
-                    <div style={{
-                        padding: '5px 12px',
-                        background: goalColor,
-                        color: textColor,
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                    }}>
-                        {getTypeDisplayName(goalType)}
+    const renderGoalContent = () => {
+        // Construct a goal object with current local state for SMART status calculation
+        // This ensures the indicators update immediately as user edits fields (adds targets, activities, etc.)
+        const goalForSmart = {
+            ...goal,
+            attributes: {
+                ...goal?.attributes,
+                description: description,
+                targets: Array.isArray(targets) ? targets : [],
+                associated_activity_ids: associatedActivities ? associatedActivities.map(a => a.id) : [],
+                deadline: deadline,
+                relevance_statement: relevanceStatement,
+                // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
+                smart_status: undefined,
+                is_smart: undefined
+            },
+            // Also override top-level props if they exist there (the helper checks both)
+            description: description,
+            targets: Array.isArray(targets) ? targets : [],
+            deadline: deadline,
+            relevance_statement: relevanceStatement
+        };
+
+        return (
+            <>
+                {/* Header */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingBottom: '16px',
+                    marginBottom: '16px',
+                    borderBottom: `2px solid ${goalColor}`
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {mode === 'create' && (
+                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                                + Create
+                            </span>
+                        )}
+                        <div style={{
+                            padding: '5px 12px',
+                            background: goalColor,
+                            color: textColor,
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                        }}>
+                            {getTypeDisplayName(goalType)}
+                        </div>
+                        {mode !== 'create' && (
+                            <SMARTIndicator goal={goalForSmart} goalType={goalType} />
+                        )}
+                        {mode === 'create' && parentGoal && (
+                            <span style={{ color: '#888', fontSize: '12px' }}>
+                                under "{parentGoal.name}"
+                            </span>
+                        )}
+                        {mode !== 'create' && isCompleted && (
+                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                                ✓ Completed
+                            </span>
+                        )}
                     </div>
-                    {mode !== 'create' && (
-                        <SMARTIndicator goal={goal} goalType={goalType} />
-                    )}
-                    {mode === 'create' && parentGoal && (
-                        <span style={{ color: '#888', fontSize: '12px' }}>
-                            under "{parentGoal.name}"
-                        </span>
-                    )}
-                    {mode !== 'create' && isCompleted && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            ✓ Completed
-                        </span>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#888',
+                                fontSize: '22px',
+                                cursor: 'pointer',
+                                padding: '0 4px',
+                                lineHeight: 1
+                            }}
+                        >
+                            ×
+                        </button>
                     )}
                 </div>
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '22px',
-                            cursor: 'pointer',
-                            padding: '0 4px',
-                            lineHeight: 1
-                        }}
-                    >
-                        ×
-                    </button>
-                )}
-            </div>
 
-            {isEditing ? (
-                /* ============ EDIT MODE ============ */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                            Name:
-                        </label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '8px',
-                                background: '#2a2a2a',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '15px',
-                                fontWeight: 'bold'
-                            }}
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                            Description:
-                        </label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={3}
-                            style={{
-                                width: '100%',
-                                padding: '8px',
-                                background: '#2a2a2a',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '13px',
-                                resize: 'vertical'
-                            }}
-                        />
-                    </div>
-
-                    {/* Relevance Statement - SMART "R" Criterion */}
-                    {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
+                {isEditing ? (
+                    /* ============ EDIT MODE ============ */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                Relevance (SMART):
+                                Name:
                             </label>
-                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
-                                How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
-                            </div>
-                            <textarea
-                                value={relevanceStatement}
-                                onChange={(e) => setRelevanceStatement(e.target.value)}
-                                rows={2}
-                                placeholder="Explain how this goal contributes to your higher-level objective..."
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 style={{
                                     width: '100%',
                                     padding: '8px',
                                     background: '#2a2a2a',
-                                    border: relevanceStatement?.trim() ? '1px solid #4caf50' : '1px solid #555',
+                                    border: '1px solid #555',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '15px',
+                                    fontWeight: 'bold'
+                                }}
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                Description:
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={3}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    background: '#2a2a2a',
+                                    border: '1px solid #555',
                                     borderRadius: '4px',
                                     color: 'white',
                                     fontSize: '13px',
@@ -1147,466 +792,400 @@ function GoalDetailModal({
                                 }}
                             />
                         </div>
-                    )}
 
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                            Deadline:
-                        </label>
-                        <input
-                            type="date"
-                            value={deadline}
-                            onChange={(e) => setDeadline(e.target.value)}
-                            style={{
-                                padding: '8px',
-                                background: '#2a2a2a',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '13px'
-                            }}
-                        />
-                    </div>
-
-                    {/* Targets Section - Edit Mode */}
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <label style={{ fontSize: '12px', color: '#aaa' }}>Targets:</label>
-                            {activitiesWithMetrics.length > 0 && (
-                                <button
-                                    onClick={handleOpenAddTarget}
-                                    style={{
-                                        background: '#4caf50',
-                                        border: 'none',
-                                        color: 'white',
-                                        fontSize: '11px',
-                                        padding: '4px 10px',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    + Add Target
-                                </button>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.length === 0 ? (
-                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    {activitiesWithMetrics.length === 0
-                                        ? 'No activities with metrics available'
-                                        : 'No targets defined'}
+                        {/* Relevance Statement - SMART "R" Criterion */}
+                        {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                    Relevance (SMART):
+                                </label>
+                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
+                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
                                 </div>
-                            ) : (
-                                targets.map(target => (
-                                    <TargetCard
-                                        key={target.id}
-                                        target={target}
-                                        activityDefinitions={activityDefinitions}
-                                        onEdit={() => handleOpenEditTarget(target)}
-                                        onDelete={() => handleDeleteTarget(target.id)}
-                                        isCompleted={false}
-                                        isEditMode={true}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Edit Actions */}
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                        <button
-                            onClick={handleCancel}
-                            style={{
-                                padding: '8px 14px',
-                                background: 'transparent',
-                                border: '1px solid #666',
-                                borderRadius: '4px',
-                                color: '#ccc',
-                                cursor: 'pointer',
-                                fontSize: '13px'
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            style={{
-                                padding: '8px 14px',
-                                background: goalColor,
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: textColor,
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600
-                            }}
-                        >
-                            {mode === 'create' ? 'Create' : 'Save'}
-                        </button>
-                    </div>
-                </div>
-            ) : (
-                /* ============ VIEW MODE ============ */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: goalColor }}>
-                        {goal.name}
-                    </div>
-
-                    {/* Action Buttons - 2x2 Grid */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '6px'
-                    }}>
-                        {onToggleCompletion && (
-                            <button
-                                onClick={() => {
-                                    if (isCompleted) {
-                                        setViewState('uncomplete-confirm');
-                                    } else {
-                                        setViewState('complete-confirm');
-                                    }
-                                }}
-                                style={{
-                                    padding: '8px 10px',
-                                    background: isCompleted ? '#4caf50' : 'transparent',
-                                    border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
-                                    borderRadius: '4px',
-                                    color: isCompleted ? 'white' : '#ccc',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: isCompleted ? 'bold' : 'normal'
-                                }}
-                            >
-                                {isCompleted ? '✓ Completed' : 'Mark Complete'}
-                            </button>
+                                <textarea
+                                    value={relevanceStatement}
+                                    onChange={(e) => setRelevanceStatement(e.target.value)}
+                                    rows={2}
+                                    placeholder="Explain how this goal contributes to your higher-level objective..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        background: '#2a2a2a',
+                                        border: relevanceStatement?.trim() ? '1px solid #4caf50' : '1px solid #555',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '13px',
+                                        resize: 'vertical'
+                                    }}
+                                />
+                            </div>
                         )}
 
-                        {onAddChild && childType && (
-                            <button
-                                onClick={() => {
-                                    if (displayMode === 'modal' && onClose) onClose();
-                                    onAddChild(goal);
-                                }}
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                Deadline:
+                            </label>
+                            <input
+                                type="date"
+                                value={deadline}
+                                onChange={(e) => setDeadline(e.target.value)}
                                 style={{
-                                    padding: '8px 10px',
+                                    padding: '8px',
+                                    background: '#2a2a2a',
+                                    border: '1px solid #555',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '13px'
+                                }}
+                            />
+                        </div>
+
+                        {/* Targets Section - Edit Mode */}
+                        {mode === 'create' && (
+                            <TargetManager
+                                targets={targets}
+                                setTargets={setTargets}
+                                activityDefinitions={activityDefinitions}
+                                associatedActivities={associatedActivities}
+                                goalId={null}
+                                rootId={rootId}
+                                isEditing={true}
+                            />
+                        )}
+
+                        {/* Edit Actions */}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
+                            <button
+                                onClick={handleCancel}
+                                style={{
+                                    padding: '8px 14px',
                                     background: 'transparent',
                                     border: '1px solid #666',
                                     borderRadius: '4px',
                                     color: '#ccc',
                                     cursor: 'pointer',
-                                    fontSize: '12px'
+                                    fontSize: '13px'
                                 }}
                             >
-                                + Add {childType}
+                                Cancel
                             </button>
-                        )}
-
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            style={{
-                                padding: '8px 10px',
-                                background: goalColor,
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: textColor,
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: 600
-                            }}
-                        >
-                            Edit Goal
-                        </button>
-
-                        {onDelete && (
                             <button
-                                onClick={() => {
-                                    if (displayMode === 'modal' && onClose) onClose();
-                                    onDelete(goal);
-                                }}
+                                onClick={handleSave}
                                 style={{
-                                    padding: '8px 10px',
-                                    background: 'transparent',
-                                    border: '1px solid #d32f2f',
+                                    padding: '8px 14px',
+                                    background: goalColor,
+                                    border: 'none',
                                     borderRadius: '4px',
-                                    color: '#d32f2f',
+                                    color: textColor,
                                     cursor: 'pointer',
-                                    fontSize: '12px'
+                                    fontSize: '13px',
+                                    fontWeight: 600
                                 }}
                             >
-                                Delete Goal
-                            </button>
-                        )}
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#888' }}>
-                        {goal.attributes?.created_at && (
-                            <div style={{ marginBottom: '4px' }}>
-                                Created: {new Date(goal.attributes.created_at).toLocaleDateString()}
-                                {' '}({calculateGoalAge(goal.attributes.created_at)})
-                            </div>
-                        )}
-                        {(goal.attributes?.deadline || goal.deadline) && (
-                            <div style={{ color: '#ff9800', marginBottom: '4px' }}>
-                                📅 Deadline: {new Date(goal.attributes?.deadline || goal.deadline).toLocaleDateString()}
-                            </div>
-                        )}
-                        {isCompleted && localCompletedAt && (
-                            <div style={{ color: '#4caf50' }}>
-                                ✓ Completed: {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                            Description:
-                        </label>
-                        <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                            {goal.attributes?.description || goal.description ||
-                                <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
-                        </div>
-                    </div>
-
-                    {/* Relevance Statement - View Mode */}
-                    {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
-                                How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span>?
-                            </label>
-                            <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                {goal.attributes?.relevance_statement || relevanceStatement}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Associated Programs */}
-                    {programs && (() => {
-                        const associatedPrograms = programs.filter(p => {
-                            // Check directly on program
-                            const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
-                            // Check on blocks
-                            const blockLevel = p.blocks && p.blocks.some(b => b.goal_ids && b.goal_ids.includes(goalId));
-                            return programLevel || blockLevel;
-                        });
-
-                        if (associatedPrograms.length === 0) return null;
-
-                        return (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                    Associated Programs:
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {associatedPrograms.map(prog => (
-                                        <div
-                                            key={prog.id}
-                                            onClick={() => {
-                                                if (displayMode === 'modal' && onClose) onClose();
-                                                navigate(`/${rootId}/programs/${prog.id}`);
-                                            }}
-                                            style={{
-                                                padding: '8px 10px',
-                                                background: '#153d5a',
-                                                border: '1px solid #1e5a85',
-                                                borderRadius: '4px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            <span style={{ fontSize: '14px' }}>📁</span>
-                                            <span style={{ fontSize: '13px', color: 'white' }}>{prog.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Associated Activities Section - View Mode (Count Only) */}
-                    {mode !== 'create' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label style={{ fontSize: '12px', color: '#aaa' }}>
-                                Associated Activities ({isLoadingActivities ? '...' : associatedActivities.length})
-                            </label>
-                            <button
-                                onClick={() => setIsActivityModalOpen(true)}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid #4caf50',
-                                    color: '#4caf50',
-                                    fontSize: '10px',
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                + Add
+                                {mode === 'create' ? 'Create' : 'Save'}
                             </button>
                         </div>
-                    )}
+                    </div>
+                ) : (
+                    /* ============ VIEW MODE ============ */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: goalColor }}>
+                            {goal.name}
+                        </div>
 
-                    {/* Targets Section - View Mode */}
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <label style={{ fontSize: '12px', color: '#aaa' }}>
-                                Targets ({targets.length}):
-                            </label>
-                            {activitiesWithMetrics.length > 0 && (
+                        {/* Action Buttons - 2x2 Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '6px'
+                        }}>
+                            {onToggleCompletion && (
                                 <button
-                                    onClick={handleOpenAddTarget}
+                                    onClick={() => {
+                                        if (isCompleted) {
+                                            setViewState('uncomplete-confirm');
+                                        } else {
+                                            setViewState('complete-confirm');
+                                        }
+                                    }}
                                     style={{
-                                        background: 'transparent',
-                                        border: '1px solid #4caf50',
-                                        color: '#4caf50',
-                                        fontSize: '10px',
-                                        padding: '2px 8px',
+                                        padding: '8px 10px',
+                                        background: isCompleted ? '#4caf50' : 'transparent',
+                                        border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
                                         borderRadius: '4px',
-                                        cursor: 'pointer'
+                                        color: isCompleted ? 'white' : '#ccc',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        fontWeight: isCompleted ? 'bold' : 'normal'
                                     }}
                                 >
-                                    + Add
+                                    {isCompleted ? '✓ Completed' : 'Mark Complete'}
+                                </button>
+                            )}
+
+                            {onAddChild && childType && (
+                                <button
+                                    onClick={() => {
+                                        if (displayMode === 'modal' && onClose) onClose();
+                                        onAddChild(goal);
+                                    }}
+                                    style={{
+                                        padding: '8px 10px',
+                                        background: 'transparent',
+                                        border: `1px solid ${getGoalColor(childType)}`,
+                                        borderRadius: '4px',
+                                        color: getGoalColor(childType),
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    + Add {childType}
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                style={{
+                                    padding: '8px 10px',
+                                    background: goalColor,
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    color: textColor,
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Edit Goal
+                            </button>
+
+                            {onDelete && (
+                                <button
+                                    onClick={() => {
+                                        if (displayMode === 'modal' && onClose) onClose();
+                                        onDelete(goal);
+                                    }}
+                                    style={{
+                                        padding: '8px 10px',
+                                        background: 'transparent',
+                                        border: '1px solid #d32f2f',
+                                        borderRadius: '4px',
+                                        color: '#d32f2f',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    Delete Goal
                                 </button>
                             )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.length === 0 ? (
-                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    No targets defined
+
+                        <div style={{ fontSize: '12px', color: '#888', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+                            {goal.attributes?.created_at && (
+                                <div>
+                                    Created: {new Date(goal.attributes.created_at).toLocaleDateString()}
+                                    {' '}({calculateGoalAge(goal.attributes.created_at)})
                                 </div>
-                            ) : (
-                                targets.map(target => (
-                                    <TargetCard
-                                        key={target.id}
-                                        target={target}
-                                        activityDefinitions={activityDefinitions}
-                                        isCompleted={isCompleted}
-                                        isEditMode={false}
-                                    />
-                                ))
+                            )}
+                            {(goal.attributes?.deadline || goal.deadline) && (
+                                <div style={{ color: '#ff9800' }}>
+                                    📅 Deadline: {new Date(goal.attributes?.deadline || goal.deadline).toLocaleDateString()}
+                                </div>
+                            )}
+                            {isCompleted && localCompletedAt && (
+                                <div style={{ color: '#4caf50' }}>
+                                    ✓ Completed: {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
                             )}
                         </div>
+
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                Description
+                            </label>
+                            <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                {goal.attributes?.description || goal.description ||
+                                    <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
+                            </div>
+                        </div>
+
+                        {/* Relevance Statement - View Mode */}
+                        {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?
+                                </label>
+                                <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                    {goal.attributes?.relevance_statement || relevanceStatement}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Associated Programs */}
+                        {programs && (() => {
+                            const associatedPrograms = programs.filter(p => {
+                                // Check directly on program
+                                const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
+                                // Check on blocks
+                                const blockLevel = p.blocks && p.blocks.some(b => b.goal_ids && b.goal_ids.includes(goalId));
+                                return programLevel || blockLevel;
+                            });
+
+                            if (associatedPrograms.length === 0) return null;
+
+                            return (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                                        Associated Programs:
+                                    </label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {associatedPrograms.map(prog => (
+                                            <div
+                                                key={prog.id}
+                                                onClick={() => {
+                                                    if (displayMode === 'modal' && onClose) onClose();
+                                                    navigate(`/${rootId}/programs/${prog.id}`);
+                                                }}
+                                                style={{
+                                                    padding: '8px 10px',
+                                                    background: '#153d5a',
+                                                    border: '1px solid #1e5a85',
+                                                    borderRadius: '4px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '14px' }}>📁</span>
+                                                <span style={{ fontSize: '13px', color: 'white' }}>{prog.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Associated Activities Section - View Mode */}
+                        {mode !== 'create' && (
+                            <ActivityAssociator
+                                associatedActivities={associatedActivities}
+                                setAssociatedActivities={setAssociatedActivities}
+                                activityDefinitions={activityDefinitions}
+                                activityGroups={activityGroups}
+                                rootId={rootId}
+                                goalId={goalId}
+                                isEditing={true}
+                                targets={targets}
+                                viewMode="list"
+                                onOpenSelector={() => setViewState('activity-associator')}
+                            />
+                        )}
+
+                        {/* Targets Section - View Mode */}
+                        <TargetManager
+                            targets={targets}
+                            setTargets={setTargets}
+                            activityDefinitions={activityDefinitions}
+                            associatedActivities={associatedActivities}
+                            goalId={goalId}
+                            rootId={rootId}
+                            isEditing={true}
+                            viewMode="list"
+                            onOpenBuilder={(target) => {
+                                setTargetToEdit(target || null);
+                                setViewState('target-manager');
+                            }}
+                            onSave={(newTargets) => {
+                                // Persist changes immediately when in View mode
+                                // We use current local state for other fields to prevent overwriting with stale data
+                                // although View mode generally doesn't have stale form data.
+                                if (onUpdate && goalId) {
+                                    onUpdate(goalId, {
+                                        name,
+                                        description,
+                                        deadline,
+                                        relevance_statement: relevanceStatement,
+                                        targets: newTargets
+                                    });
+                                }
+                            }}
+                        />
+
+                        {/* Sessions List */}
+                        <GoalSessionList
+                            goalType={goalType}
+                            sessions={sessions}
+                            goalId={goalId}
+                            rootId={rootId}
+                            onClose={onClose}
+                        />
+
                     </div>
-
-                    {/* Sessions - For ShortTermGoals */}
-                    {isShortTermGoal && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                Sessions ({childSessions.length}):
-                            </label>
-                            {childSessions.length === 0 ? (
-                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    No sessions yet
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {childSessions.slice(0, 5).map(session => (
-                                        <div
-                                            key={session.id}
-                                            onClick={() => {
-                                                if (displayMode === 'modal' && onClose) onClose();
-                                                navigate(`/${rootId}/session/${session.id}`);
-                                            }}
-                                            style={{
-                                                padding: '8px 10px',
-                                                background: '#2a2a2a',
-                                                border: '1px solid #444',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            <span style={{ color: 'white' }}>{session.name}</span>
-                                            {session.attributes?.created_at && (
-                                                <span style={{ fontSize: '11px', color: '#888' }}>
-                                                    {new Date(session.attributes.created_at).toLocaleDateString()}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {childSessions.length > 5 && (
-                                        <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
-                                            ... and {childSessions.length - 5} more
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Associated Sessions - For ImmediateGoals */}
-                    {isImmediateGoal && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                                Associated Sessions ({associatedSessions.length}):
-                            </label>
-                            {associatedSessions.length === 0 ? (
-                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                                    No associated sessions yet
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {associatedSessions.slice(0, 5).map(session => (
-                                        <div
-                                            key={session.id}
-                                            onClick={() => {
-                                                if (displayMode === 'modal' && onClose) onClose();
-                                                navigate(`/${rootId}/session/${session.id}`);
-                                            }}
-                                            style={{
-                                                padding: '8px 10px',
-                                                background: '#2a2a2a',
-                                                border: '1px solid #9c27b0',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            <span style={{ color: 'white' }}>{session.name}</span>
-                                            {session.attributes?.created_at && (
-                                                <span style={{ fontSize: '11px', color: '#888' }}>
-                                                    {new Date(session.attributes.created_at).toLocaleDateString()}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {associatedSessions.length > 5 && (
-                                        <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
-                                            ... and {associatedSessions.length - 5} more
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                </div>
-            )}
-        </>
-    );
+                )}
+            </>
+        );
+    };
 
     // ============ DETERMINE WHICH CONTENT TO RENDER ============
     let content;
-    if (viewState === 'target-add' || viewState === 'target-edit') {
-        content = renderTargetBuilder();
-    } else if (viewState === 'complete-confirm') {
+    if (viewState === 'complete-confirm') {
         content = renderCompletionConfirm();
     } else if (viewState === 'uncomplete-confirm') {
         content = renderUncompletionConfirm();
+    } else if (viewState === 'target-manager') {
+        content = (
+            <TargetManager
+                targets={targets}
+                setTargets={setTargets}
+                activityDefinitions={activityDefinitions}
+                associatedActivities={associatedActivities}
+                goalId={goalId}
+                rootId={rootId}
+                isEditing={true}
+                viewMode="builder"
+                initialTarget={targetToEdit}
+                onCloseBuilder={() => {
+                    setTargetToEdit(null);
+                    setViewState('goal');
+                }}
+                onSave={(newTargets) => {
+                    if (onUpdate && goalId) {
+                        onUpdate(goalId, {
+                            name,
+                            description,
+                            deadline,
+                            relevance_statement: relevanceStatement,
+                            targets: newTargets
+                        });
+                    }
+                    setViewState('goal');
+                }}
+            />
+        );
+    } else if (viewState === 'activity-associator') {
+        content = (
+            <ActivityAssociator
+                associatedActivities={associatedActivities}
+                setAssociatedActivities={setAssociatedActivities}
+                activityDefinitions={activityDefinitions}
+                activityGroups={activityGroups}
+                rootId={rootId}
+                goalId={goalId}
+                isEditing={true}
+                targets={targets}
+                viewMode="selector"
+                onCloseSelector={() => setViewState('goal')}
+            />
+        );
     } else {
         content = renderGoalContent();
     }
 
     // ============ RENDER ============
+
+
     if (displayMode === 'panel') {
         return (
             <div style={{
@@ -1614,7 +1193,6 @@ function GoalDetailModal({
                 flexDirection: 'column',
                 flex: 1,
                 minHeight: 0,
-                maxHeight: 'calc(100vh - 200px)',
                 overflow: 'hidden'
             }}>
                 <div style={{
@@ -1627,14 +1205,6 @@ function GoalDetailModal({
                 }}>
                     {content}
                 </div>
-                <SelectActivitiesModal
-                    isOpen={isActivityModalOpen}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
-                    onClose={() => setIsActivityModalOpen(false)}
-                    onConfirm={handleAddActivities}
-                />
             </div>
         );
     }
@@ -1675,14 +1245,8 @@ function GoalDetailModal({
                     {content}
                 </div>
             </div>
-            <SelectActivitiesModal
-                isOpen={isActivityModalOpen}
-                activityDefinitions={activityDefinitions}
-                activityGroups={activityGroups}
-                alreadyAssociatedActivityIds={associatedActivities.map(a => a.id)}
-                onClose={() => setIsActivityModalOpen(false)}
-                onConfirm={handleAddActivities}
-            />
+            {/* Confirmation Modal for Target Deletion */}
+
         </>
     );
 }

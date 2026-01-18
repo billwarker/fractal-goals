@@ -451,6 +451,7 @@ function Programs() {
                 onConfirm={confirmDeleteProgram}
                 programName={programToDelete?.name || ''}
                 sessionCount={deleteSessionCount}
+                requireMatchingText="delete"
             />
         </div>
     );
