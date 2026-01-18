@@ -10,6 +10,8 @@ import { fractalApi } from '../../utils/api';
 const ActivityAssociator = ({
     associatedActivities,
     setAssociatedActivities,
+    associatedActivityGroups = [], // New prop for group associations
+    setAssociatedActivityGroups,   // New prop for setter
     activityDefinitions,
     activityGroups,
     setActivityGroups,  // To update groups after creation
@@ -33,6 +35,46 @@ const ActivityAssociator = ({
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
+    const [isUpdatingGroupLink, setIsUpdatingGroupLink] = useState(false);
+
+    const handleToggleGroupAssociation = async (groupId, isLinked) => {
+        if (!groupId || groupId === 'ungrouped' || isUpdatingGroupLink) return;
+
+        setIsUpdatingGroupLink(true);
+        try {
+            if (isLinked) {
+                // Unlink
+                await fractalApi.unlinkGoalActivityGroup(rootId, goalId, groupId);
+                if (setAssociatedActivityGroups) {
+                    setAssociatedActivityGroups(prev => prev.filter(g => g.id !== groupId));
+                }
+            } else {
+                // Link
+                await fractalApi.linkGoalActivityGroup(rootId, goalId, groupId);
+                if (setAssociatedActivityGroups) {
+                    const group = activityGroups.find(g => g.id === groupId);
+                    if (group) {
+                        setAssociatedActivityGroups(prev => [...prev, { id: group.id, name: group.name }]);
+
+                        // Also automatically select all activities in the group for visual consistency?
+                        // Actually, if a group is linked, all its activities are implicitly associated.
+                        // The backend returns them in getGoalActivities now.
+                        // But we might want to refresh activity list too?
+                        // For now, let's just rely on the group link indicator.
+
+                        // Optional: Refresh activities to show them as associated immediately
+                        const response = await fractalApi.getGoalActivities(rootId, goalId);
+                        if (setAssociatedActivities) setAssociatedActivities(response.data || []);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error toggling group association:', error);
+            alert('Failed to update group association.');
+        } finally {
+            setIsUpdatingGroupLink(false);
+        }
+    };
 
     // Derived state for selector
     const alreadyAssociatedIds = associatedActivities.map(a => a.id);
@@ -178,11 +220,49 @@ const ActivityAssociator = ({
                     >
                         ←
                     </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white', flex: 1 }}>
-                        {activitySelectorGroupId === null
-                            ? 'Select Activity Group'
-                            : activityGroups.find(g => g.id === activitySelectorGroupId)?.name || 'Activities'}
-                    </h3>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px', color: 'white' }}>
+                            {activitySelectorGroupId === null
+                                ? 'Select Activity Group'
+                                : activityGroups.find(g => g.id === activitySelectorGroupId)?.name || 'Activities'}
+                        </h3>
+                        {/* Include Entire Group Toggle */}
+                        {activitySelectorGroupId !== null && activitySelectorGroupId !== 'ungrouped' && (() => {
+                            const isGroupLinked = associatedActivityGroups.some(g => g.id === activitySelectorGroupId);
+                            return (
+                                <div
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleGroupAssociation(activitySelectorGroupId, isGroupLinked);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '4px 8px',
+                                        background: isGroupLinked ? '#2a4a2a' : 'transparent',
+                                        border: `1px solid ${isGroupLinked ? '#4caf50' : '#444'}`,
+                                        borderRadius: '4px',
+                                        cursor: isUpdatingGroupLink ? 'wait' : 'pointer',
+                                        marginLeft: '12px'
+                                    }}
+                                >
+                                    <div style={{
+                                        width: '14px', height: '14px', borderRadius: '3px',
+                                        border: `1px solid ${isGroupLinked ? '#4caf50' : '#666'}`,
+                                        background: isGroupLinked ? '#4caf50' : 'transparent',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: 'black', fontSize: '10px'
+                                    }}>
+                                        {isGroupLinked && '✓'}
+                                    </div>
+                                    <span style={{ fontSize: '11px', color: isGroupLinked ? '#4caf50' : '#888' }}>
+                                        Include Entire Group
+                                    </span>
+                                </div>
+                            );
+                        })()}
+                    </div>
                     <button onClick={handleCancelSelector} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px' }}>×</button>
                 </div>
 
@@ -268,56 +348,7 @@ const ActivityAssociator = ({
                             })}
                         </div>
 
-                        {/* Everything in this group checkbox */}
-                        {(() => {
-                            const activitiesInGroup = activitySelectorGroupId === 'ungrouped'
-                                ? ungroupedActivities
-                                : groupedActivities[activitySelectorGroupId] || [];
-                            const selectableActivities = activitiesInGroup.filter(a => !alreadyAssociatedIds.includes(a.id));
-                            const allSelectableSelected = selectableActivities.length > 0 &&
-                                selectableActivities.every(a => tempSelectedActivities.includes(a.id));
 
-                            if (selectableActivities.length === 0) return null;
-
-                            return (
-                                <div
-                                    onClick={() => {
-                                        if (allSelectableSelected) {
-                                            // Deselect all in this group
-                                            const idsToRemove = selectableActivities.map(a => a.id);
-                                            setTempSelectedActivities(prev => prev.filter(id => !idsToRemove.includes(id)));
-                                        } else {
-                                            // Select all in this group
-                                            const idsToAdd = selectableActivities.map(a => a.id);
-                                            setTempSelectedActivities(prev => [...new Set([...prev, ...idsToAdd])]);
-                                        }
-                                    }}
-                                    style={{
-                                        marginTop: '8px',
-                                        padding: '10px 12px',
-                                        background: allSelectableSelected ? '#2a4a2a' : '#252525',
-                                        border: `1px solid ${allSelectableSelected ? '#4caf50' : '#555'}`,
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px'
-                                    }}
-                                >
-                                    <div style={{
-                                        width: '18px', height: '18px', borderRadius: '4px',
-                                        border: `1px solid ${allSelectableSelected ? '#4caf50' : '#666'}`,
-                                        background: allSelectableSelected ? '#4caf50' : 'transparent',
-                                        color: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
-                                    }}>
-                                        {allSelectableSelected && '✓'}
-                                    </div>
-                                    <div style={{ fontSize: '13px', color: allSelectableSelected ? '#4caf50' : '#aaa', fontWeight: 'bold' }}>
-                                        Everything in this group ({selectableActivities.length})
-                                    </div>
-                                </div>
-                            );
-                        })()}
                     </div>
                 )}
 

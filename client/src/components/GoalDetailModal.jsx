@@ -68,6 +68,7 @@ function GoalDetailModal({
 
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
+    const [associatedActivityGroups, setAssociatedActivityGroups] = useState([]); // Array of {id, name}
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     // Inline activity builder form state
@@ -140,16 +141,25 @@ function GoalDetailModal({
         const fetchAssociatedActivities = async () => {
             if (mode === 'create' || !rootId || !depGoalId) {
                 setAssociatedActivities([]);
+                setAssociatedActivityGroups([]);
                 return;
             }
 
             setIsLoadingActivities(true);
             try {
-                const response = await fractalApi.getGoalActivities(rootId, depGoalId);
-                setAssociatedActivities(response.data || []);
+                // Fetch both individual activities and linked groups
+                const [activitiesResponse, groupsResponse] = await Promise.all([
+                    fractalApi.getGoalActivities(rootId, depGoalId),
+                    fractalApi.getGoalActivityGroups(rootId, depGoalId)
+                ]);
+
+                setAssociatedActivities(activitiesResponse.data || []);
+                setAssociatedActivityGroups(groupsResponse.data || []);
             } catch (error) {
-                console.error('Error fetching associated activities:', error);
-                setAssociatedActivities([]);
+                console.error('Error fetching associations:', error);
+                // Fallback to empty if failed, but don't wipe existing if partial failure strictly
+                setAssociatedActivities([]); // or keep previous
+                setAssociatedActivityGroups([]);
             } finally {
                 setIsLoadingActivities(false);
             }
@@ -873,12 +883,16 @@ function GoalDetailModal({
                         <ActivityAssociator
                             associatedActivities={associatedActivities}
                             setAssociatedActivities={setAssociatedActivities}
+                            associatedActivityGroups={associatedActivityGroups}
+                            setAssociatedActivityGroups={setAssociatedActivityGroups}
                             activityDefinitions={activityDefinitions}
                             activityGroups={activityGroups}
+                            setActivityGroups={setActivityGroups}
                             rootId={rootId}
                             goalId={goalId}
                             isEditing={true}
                             targets={targets}
+                            goalName={name}
                             viewMode="list"
                             onOpenSelector={() => setViewState('activity-associator')}
                         />
@@ -1117,12 +1131,16 @@ function GoalDetailModal({
                         <ActivityAssociator
                             associatedActivities={associatedActivities}
                             setAssociatedActivities={setAssociatedActivities}
+                            associatedActivityGroups={associatedActivityGroups}
+                            setAssociatedActivityGroups={setAssociatedActivityGroups}
                             activityDefinitions={activityDefinitions}
                             activityGroups={activityGroups}
+                            setActivityGroups={setActivityGroups}
                             rootId={rootId}
                             goalId={goalId}
                             isEditing={false}
                             targets={targets}
+                            goalName={name}
                             viewMode="list"
                             onOpenSelector={() => setViewState('activity-associator')}
                         />
@@ -1195,6 +1213,8 @@ function GoalDetailModal({
             <ActivityAssociator
                 associatedActivities={associatedActivities}
                 setAssociatedActivities={setAssociatedActivities}
+                associatedActivityGroups={associatedActivityGroups}
+                setAssociatedActivityGroups={setAssociatedActivityGroups}
                 activityDefinitions={activityDefinitions}
                 activityGroups={activityGroups}
                 setActivityGroups={setActivityGroups}

@@ -314,6 +314,32 @@ export const fractalApi = {
     getGoalActivities: (rootId, goalId) =>
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
 
+    /**
+     * Get all activity groups linked to a goal (entire group inclusion)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     */
+    getGoalActivityGroups: (rootId, goalId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
+
+    /**
+     * Link an activity group to a goal (includes all current and future activities in the group)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     * @param {string} groupId - ID of the activity group
+     */
+    linkGoalActivityGroup: (rootId, goalId, groupId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
+
+    /**
+     * Unlink an activity group from a goal
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     * @param {string} groupId - ID of the activity group
+     */
+    unlinkGoalActivityGroup: (rootId, goalId, groupId) =>
+        axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
+
     // ========== Activity Instance Time Tracking ==========
 
     /**

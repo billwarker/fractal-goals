@@ -504,7 +504,39 @@ def remove_activity_goal(root_id, activity_id, goal_id):
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/activities', methods=['GET'])
 def get_goal_activities(root_id, goal_id):
-    """Get all activities associated with a goal."""
+    """Get all activities associated with a goal (including those from linked groups)."""
+    from models import Goal, ActivityGroup
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = session.query(Goal).filter_by(id=goal_id).first()
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+        
+        # Get directly associated activities
+        activities_set = {}
+        for a in goal.associated_activities:
+            activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id}
+        
+        # Get activities from linked groups
+        for group in goal.associated_activity_groups:
+            for a in group.activities:
+                if a.id not in activities_set:
+                    activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id, "from_linked_group": True}
+        
+        return jsonify(list(activities_set.values()))
+    finally:
+        session.close()
+
+
+# ============================================================================
+# GOAL-ACTIVITY-GROUP ASSOCIATION ENDPOINTS (for "include entire group")
+# ============================================================================
+
+@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups', methods=['GET'])
+def get_goal_activity_groups(root_id, goal_id):
+    """Get all activity groups linked to a goal."""
     from models import Goal
     
     engine = models.get_engine()
@@ -514,8 +546,82 @@ def get_goal_activities(root_id, goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        activities = [{"id": a.id, "name": a.name, "description": a.description} for a in goal.associated_activities]
-        return jsonify(activities)
+        groups = [{"id": g.id, "name": g.name} for g in goal.associated_activity_groups]
+        return jsonify(groups)
     finally:
         session.close()
 
+
+@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['POST'])
+def link_goal_activity_group(root_id, goal_id, group_id):
+    """Link an entire activity group to a goal (includes all current and future activities)."""
+    from models import Goal, ActivityGroup, goal_activity_group_associations
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        goal = session.query(Goal).filter_by(id=goal_id).first()
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+        
+        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+        if not group:
+            return jsonify({"error": "Activity group not found"}), 404
+        
+        # Check if already linked
+        from sqlalchemy import select
+        existing = session.execute(
+            select(goal_activity_group_associations).where(
+                goal_activity_group_associations.c.goal_id == goal_id,
+                goal_activity_group_associations.c.activity_group_id == group_id
+            )
+        ).first()
+        
+        if existing:
+            return jsonify({"message": "Group already linked"}), 200
+        
+        # Create the link
+        session.execute(
+            goal_activity_group_associations.insert().values(
+                goal_id=goal_id,
+                activity_group_id=group_id
+            )
+        )
+        
+        session.commit()
+        return jsonify({"message": "Group linked successfully"}), 201
+        
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['DELETE'])
+def unlink_goal_activity_group(root_id, goal_id, group_id):
+    """Unlink an activity group from a goal."""
+    from models import goal_activity_group_associations
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        # Remove the link
+        result = session.execute(
+            goal_activity_group_associations.delete().where(
+                goal_activity_group_associations.c.goal_id == goal_id,
+                goal_activity_group_associations.c.activity_group_id == group_id
+            )
+        )
+        
+        if result.rowcount == 0:
+            return jsonify({"error": "Link not found"}), 404
+        
+        session.commit()
+        return jsonify({"message": "Group unlinked successfully"}), 200
+        
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()

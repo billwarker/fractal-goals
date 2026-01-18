@@ -45,6 +45,15 @@ activity_goal_associations = Table(
     Column('created_at', DateTime, default=utc_now)
 )
 
+# Junction table for linking Activity GROUPS to Goals
+# When a group is linked, ALL activities in that group (including future ones) are considered associated
+goal_activity_group_associations = Table(
+    'goal_activity_group_associations', Base.metadata,
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('activity_group_id', String, ForeignKey('activity_groups.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, default=utc_now)
+)
+
 class Goal(Base):
     """
     Represents all nodes in the fractal goal tree.
@@ -117,14 +126,27 @@ class Goal(Base):
         back_populates="associated_goals",
         viewonly=True
     )
+    
+    # Activity Groups associated with this goal (includes ALL activities in group, including future ones)
+    associated_activity_groups = relationship(
+        "ActivityGroup",
+        secondary=goal_activity_group_associations,
+        back_populates="associated_goals",
+        viewonly=True
+    )
 
     def calculate_smart_status(self):
         """Calculate SMART criteria status for this goal."""
         targets = json.loads(self.targets) if self.targets else []
+        
+        # Achievable: has associated activities OR has associated activity groups
+        has_activities = len(self.associated_activities) > 0 if self.associated_activities else False
+        has_groups = len(self.associated_activity_groups) > 0 if self.associated_activity_groups else False
+        
         return {
             "specific": bool(self.description and self.description.strip()),
             "measurable": len(targets) > 0,
-            "achievable": len(self.associated_activities) > 0 if self.associated_activities else False,
+            "achievable": has_activities or has_groups,
             "relevant": bool(self.relevance_statement and self.relevance_statement.strip()),
             "time_bound": self.deadline is not None
         }
@@ -159,6 +181,7 @@ class Goal(Base):
                 "is_smart": all(smart_status.values()),
                 "smart_status": smart_status,
                 "associated_activity_ids": [a.id for a in self.associated_activities] if self.associated_activities else [],
+                "associated_activity_group_ids": [g.id for g in self.associated_activity_groups] if self.associated_activity_groups else [],
             },
             "children": []
         }
@@ -422,6 +445,14 @@ class ActivityGroup(Base):
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     sort_order = Column(Integer, default=0)
+    
+    # Goals that have "include entire group" enabled for this group
+    associated_goals = relationship(
+        "Goal",
+        secondary=goal_activity_group_associations,
+        back_populates="associated_activity_groups",
+        viewonly=True
+    )
 
     def to_dict(self):
         return {
@@ -430,7 +461,8 @@ class ActivityGroup(Base):
             "name": self.name,
             "description": self.description,
             "sort_order": self.sort_order,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "associated_goal_ids": [g.id for g in self.associated_goals] if self.associated_goals else []
         }
 
 
