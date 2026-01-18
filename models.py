@@ -794,13 +794,17 @@ class ProgramDay(Base):
 
 
 # Database Helper Functions
-def get_engine(db_path=None):
-    """Get SQLAlchemy engine with environment-based database path."""
-    if db_path is None:
+def get_engine(db_url=None):
+    """
+    Get SQLAlchemy engine with environment-based database configuration.
+    
+    Supports both SQLite (development) and PostgreSQL (production).
+    """
+    if db_url is None:
         # Import here to avoid circular dependency
         from config import config
-        db_path = f"sqlite:///{config.get_db_path()}"
-    return create_engine(db_path, echo=False)
+        db_url = config.get_database_url()
+    return create_engine(db_url, echo=False)
 
 def init_db(engine):
     Base.metadata.create_all(engine)

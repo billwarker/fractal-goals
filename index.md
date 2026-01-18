@@ -12,9 +12,10 @@
 **Fractal Goals** is a hierarchical goal tracking and practice session management system. It uses a fractal pattern where each goal can have children, creating a tree structure from ultimate life goals down to nano-level tasks. The system includes practice session tracking with customizable activities, metrics, timers, and reusable templates.
 
 **Tech Stack:**
-- **Backend:** Flask + SQLAlchemy + SQLite (port 8001)
+- **Backend:** Flask + SQLAlchemy + Pydantic validation (port 8001)
 - **Frontend:** React 19.2.0 + Vite + React Router + ReactFlow (port 5173)
-- **Database:** SQLite with Single Table Inheritance pattern
+- **Database:** SQLite (development) / PostgreSQL (production) with Alembic migrations
+- **Migrations:** Alembic for database schema versioning
 
 ---
 
@@ -100,6 +101,47 @@ Goals can be evaluated against SMART criteria with visual indicators:
 - `goals.relevance_statement` - Stores the user's explanation of goal relevance
 - `goals.is_smart` - Boolean flag computed when goal is saved
 - `activity_goal_associations` - Junction table linking activities to goals (for "A" criterion)
+
+### 9. Database & Migrations
+
+**Database Support:**
+- **Development:** PostgreSQL via Docker (preferred) or SQLite
+- **Production:** PostgreSQL (Cloud instance like Supabase, Neon, or RDS)
+
+**Local PostgreSQL Setup:**
+1. Ensure Docker Desktop is running.
+2. The infrastructure is defined in `docker-compose.yml`.
+3. Start the database:
+   ```bash
+   docker compose up -d
+   ```
+4. Connectivity: `DATABASE_URL=postgresql://fractal:fractal_dev_password@localhost:5432/fractal_goals`
+
+**Alembic Migrations:**
+Located in `/migrations/` directory. Use the helper script:
+
+```bash
+# Initialize/Stamp database
+python db_migrate.py init
+
+# Apply pending migrations
+python db_migrate.py upgrade
+
+# Create new migration
+python db_migrate.py create "Add feature"
+```
+
+**Data Migration (SQLite -> PostgreSQL):**
+Use the custom migration script to transfer existing SQLite data to a new PostgreSQL instance:
+```bash
+python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
+```
+
+**Key Files:**
+- `docker-compose.yml` - Local database infrastructure
+- `db_migrate.py` - Migration helper
+- `migrate_sqlite_to_postgres.py` - Data transfer tool
+- `alembic.ini` & `migrations/` - Schema versioning
 
 ---
 

@@ -1,0 +1,39 @@
+# Docker Compose for Local Development Database
+# 
+# Usage:
+#   Start: docker compose up -d
+#   Stop:  docker compose down
+#   Logs:  docker compose logs -f postgres
+#
+# The PostgreSQL data is persisted in a Docker volume, so it survives restarts.
+# 
+# When migrating to cloud (e.g., Supabase, Neon, AWS RDS):
+#   1. Export data using the backup script
+#   2. Update DATABASE_URL in .env.production
+#   3. Run migrations on the new database
+#   4. Import data to the new database
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fractal-goals-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fractal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fractal_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-fractal_goals}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Mount init scripts
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fractal} -d ${POSTGRES_DB:-fractal_goals}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: fractal_goals_postgres_data

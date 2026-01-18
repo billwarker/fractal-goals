@@ -61,11 +61,20 @@ app.register_blueprint(pages_bp)
 @app.route('/health')
 def health_check():
     """Health check endpoint."""
+    db_url = config.get_database_url()
+    # Mask password
+    if '@' in db_url:
+        parts = db_url.split('@')
+        db_display = f"{parts[0].rsplit(':', 1)[0]}:***@{parts[1]}"
+    else:
+        db_display = db_url
+        
     return {
         "status": "healthy",
         "message": "Fractal Goals Flask Server",
         "environment": config.ENV,
-        "database": config.DATABASE_PATH
+        "database_type": "PostgreSQL" if config.is_postgres() else "SQLite",
+        "database_url": db_display
     }
 
 

@@ -1,6 +1,8 @@
 """
 Configuration module for Fractal Goals application.
 Loads environment-specific settings from .env files.
+
+Supports both SQLite (development) and PostgreSQL (production).
 """
 
 import os
@@ -40,9 +42,10 @@ class Config:
     HOST = os.getenv('FLASK_HOST', '0.0.0.0')
     PORT = int(os.getenv('FLASK_PORT', '8001'))
     
-    # Database
+    # Database Configuration
+    # Priority: DATABASE_URL (full connection string) > DATABASE_PATH (SQLite file)
+    DATABASE_URL = os.getenv('DATABASE_URL', None)
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'goals.db')
-    DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
     
     # CORS
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')
@@ -55,8 +58,44 @@ class Config:
     VITE_API_URL = os.getenv('VITE_API_URL', 'http://localhost:8001/api')
     
     @classmethod
+    def get_database_url(cls):
+        """
+        Get the database connection URL.
+        
+        If DATABASE_URL is set, use it directly (supports PostgreSQL, MySQL, etc.)
+        Otherwise, construct a SQLite URL from DATABASE_PATH.
+        
+        Returns:
+            str: SQLAlchemy-compatible database URL
+        """
+        if cls.DATABASE_URL:
+            # Production: Use provided DATABASE_URL
+            # Handle Heroku-style postgres:// URLs
+            url = cls.DATABASE_URL
+            if url.startswith('postgres://'):
+                url = url.replace('postgres://', 'postgresql://', 1)
+            return url
+        else:
+            # Development: Use SQLite
+            db_path = cls.get_db_path()
+            return f"sqlite:///{db_path}"
+    
+    @classmethod
+    def is_postgres(cls):
+        """Check if the database is PostgreSQL."""
+        url = cls.get_database_url()
+        return url.startswith('postgresql://') or url.startswith('postgres://')
+    
+    @classmethod
+    def is_sqlite(cls):
+        """Check if the database is SQLite."""
+        return cls.get_database_url().startswith('sqlite://')
+    
+    @classmethod
     def get_db_path(cls):
-        """Get the absolute path to the database file."""
+        """Get the absolute path to the SQLite database file."""
+        if cls.DATABASE_URL:
+            return None  # Not applicable for non-SQLite databases
         if os.path.isabs(cls.DATABASE_PATH):
             return cls.DATABASE_PATH
         return str(BASE_DIR / cls.DATABASE_PATH)
@@ -74,13 +113,24 @@ class Config:
     @classmethod
     def print_config(cls):
         """Print current configuration (for debugging)."""
+        db_url = cls.get_database_url()
+        # Mask password in database URL for security
+        if '@' in db_url:
+            # Format: postgresql://user:password@host:port/db
+            parts = db_url.split('@')
+            prefix = parts[0].rsplit(':', 1)[0]  # Remove password
+            db_display = f"{prefix}:***@{parts[1]}"
+        else:
+            db_display = db_url
+        
         print("\n" + "="*50)
         print(f"FRACTAL GOALS - {cls.ENV.upper()} ENVIRONMENT")
         print("="*50)
         print(f"Debug Mode:     {cls.DEBUG}")
         print(f"Host:           {cls.HOST}")
         print(f"Port:           {cls.PORT}")
-        print(f"Database:       {cls.get_db_path()}")
+        print(f"Database:       {db_display}")
+        print(f"Database Type:  {'PostgreSQL' if cls.is_postgres() else 'SQLite'}")
         print(f"Log File:       {cls.get_log_path()}")
         print(f"Log Level:      {cls.LOG_LEVEL}")
         print(f"CORS Origins:   {', '.join(cls.CORS_ORIGINS)}")

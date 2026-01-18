@@ -20,6 +20,22 @@ echo ""
 # Create logs directory if it doesn't exist
 mkdir -p "$PROJECT_ROOT/logs"
 
+# Check if Docker PostgreSQL should be started (if DATABASE_URL contains localhost:5432)
+if [ -f "$PROJECT_ROOT/.env.$ENV" ]; then
+    source "$PROJECT_ROOT/.env.$ENV"
+    if [[ "$DATABASE_URL" == *"localhost:5432"* ]]; then
+        echo "Checking Docker PostgreSQL..."
+        if docker compose -f "$PROJECT_ROOT/docker-compose.yml" ps --quiet 2>/dev/null | grep -q .; then
+            echo "✓ PostgreSQL container already running"
+        else
+            echo "Starting PostgreSQL container..."
+            docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d
+            sleep 3  # Wait for PostgreSQL to be ready
+            echo "✓ PostgreSQL container started"
+        fi
+    fi
+fi
+
 # Start Flask backend in background
 echo "Starting Flask backend..."
 cd "$PROJECT_ROOT"
