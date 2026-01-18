@@ -49,7 +49,7 @@ function GoalDetailModal({
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
     // Normalize activityGroups to always be an array (handles null case)
     const activityGroups = Array.isArray(activityGroupsRaw) ? activityGroupsRaw : [];
-    const [isEditing, setIsEditing] = useState(false);
+    const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState('');
