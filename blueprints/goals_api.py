@@ -746,6 +746,18 @@ def get_goal_analytics(root_id):
                 created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
                 goal_age_days = (now - created).days
             
+            # Build session durations by date for timeline chart
+            session_durations_by_date = []
+            for s in sessions_for_goal:
+                if s['session_start']:
+                    session_durations_by_date.append({
+                        'date': s['session_start'],
+                        'duration_seconds': s['duration_seconds'],
+                        'session_name': s['session_name']
+                    })
+            # Sort by date
+            session_durations_by_date.sort(key=lambda x: x['date'])
+            
             goals_data.append({
                 'id': goal.id,
                 'name': goal.name,
@@ -759,7 +771,8 @@ def get_goal_analytics(root_id):
                 'age_days': goal_age_days,
                 'total_duration_seconds': total_duration,
                 'session_count': session_count,
-                'activity_breakdown': list(activity_breakdown.values())
+                'activity_breakdown': list(activity_breakdown.values()),
+                'session_durations_by_date': session_durations_by_date
             })
         
         return jsonify({

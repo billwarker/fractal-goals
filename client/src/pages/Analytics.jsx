@@ -4,6 +4,8 @@ import { fractalApi } from '../utils/api';
 import { useActivities } from '../contexts/ActivitiesContext';
 import ScatterPlot from '../components/analytics/ScatterPlot';
 import LineGraph from '../components/analytics/LineGraph';
+import { Bar, Line } from 'react-chartjs-2';
+import '../components/analytics/ChartJSWrapper'; // Registers Chart.js components
 import '../App.css';
 
 /**
@@ -23,6 +25,8 @@ function Analytics() {
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [goalTypeFilter, setGoalTypeFilter] = useState('all'); // 'all', 'ShortTermGoal', 'ImmediateGoal', etc.
     const [goalStatusFilter, setGoalStatusFilter] = useState('all'); // 'all', 'completed', 'active'
+    const [selectedGoalChart, setSelectedGoalChart] = useState('duration'); // 'duration' or 'activity'
+    const [goalSortBy, setGoalSortBy] = useState('sessions'); // 'sessions', 'duration', 'recent', 'oldest', 'name'
 
     // Activities tab state
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -119,10 +123,39 @@ function Analytics() {
 
             return true;
         }).sort((a, b) => {
-            // Sort by session count (descending), then by name
-            if (b.session_count !== a.session_count) return b.session_count - a.session_count;
-            return a.name.localeCompare(b.name);
+            switch (goalSortBy) {
+                case 'sessions':
+                    if (b.session_count !== a.session_count) return b.session_count - a.session_count;
+                    return a.name.localeCompare(b.name);
+                case 'duration':
+                    if (b.total_duration_seconds !== a.total_duration_seconds) return b.total_duration_seconds - a.total_duration_seconds;
+                    return a.name.localeCompare(b.name);
+                case 'recent':
+                    const aRecent = a.created_at ? new Date(a.created_at) : new Date(0);
+                    const bRecent = b.created_at ? new Date(b.created_at) : new Date(0);
+                    return bRecent - aRecent;
+                case 'oldest':
+                    const aOld = a.created_at ? new Date(a.created_at) : new Date(0);
+                    const bOld = b.created_at ? new Date(b.created_at) : new Date(0);
+                    return aOld - bOld;
+                case 'name':
+                    return a.name.localeCompare(b.name);
+                default:
+                    return 0;
+            }
         });
+    };
+
+    // Get sort description for display
+    const getSortDescription = () => {
+        switch (goalSortBy) {
+            case 'sessions': return 'Sorted by session count';
+            case 'duration': return 'Sorted by total duration';
+            case 'recent': return 'Sorted by most recent';
+            case 'oldest': return 'Sorted by oldest first';
+            case 'name': return 'Sorted by name';
+            default: return '';
+        }
     };
 
     // Goal type colors
@@ -176,6 +209,129 @@ function Analytics() {
                 const filteredGoals = getFilteredGoals();
                 const summary = goalAnalytics?.summary || {};
 
+                // Prepare activity breakdown bar chart data
+                const getActivityChartData = () => {
+                    if (!selectedGoal?.activity_breakdown?.length) {
+                        return { labels: [], datasets: [] };
+                    }
+
+                    const sortedActivities = [...selectedGoal.activity_breakdown]
+                        .sort((a, b) => b.instance_count - a.instance_count);
+
+                    return {
+                        labels: sortedActivities.map(a => a.activity_name),
+                        datasets: [{
+                            label: 'Instances',
+                            data: sortedActivities.map(a => a.instance_count),
+                            backgroundColor: '#2196f3',
+                            borderColor: '#1976d2',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    };
+                };
+
+                // Prepare duration over time line chart data
+                const getDurationChartData = () => {
+                    if (!selectedGoal?.session_durations_by_date?.length) {
+                        return { labels: [], datasets: [] };
+                    }
+
+                    return {
+                        labels: selectedGoal.session_durations_by_date.map(s => new Date(s.date)),
+                        datasets: [{
+                            label: 'Duration (minutes)',
+                            data: selectedGoal.session_durations_by_date.map(s => Math.round(s.duration_seconds / 60)),
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    };
+                };
+
+                const activityChartOptions = {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#ccc',
+                            padding: 12,
+                            callbacks: {
+                                label: (ctx) => `${ctx.raw} instance${ctx.raw !== 1 ? 's' : ''}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { color: '#888', stepSize: 1 },
+                            grid: { color: '#333' }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#ccc',
+                                font: { size: 11 }
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                };
+
+                const durationChartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#ccc',
+                            padding: 12,
+                            callbacks: {
+                                title: (ctx) => {
+                                    const date = new Date(ctx[0].label);
+                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                },
+                                label: (ctx) => {
+                                    const minutes = ctx.raw;
+                                    if (minutes >= 60) {
+                                        return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+                                    }
+                                    return `${minutes}m`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                displayFormats: { day: 'MMM d' }
+                            },
+                            ticks: { color: '#888' },
+                            grid: { color: '#333' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Duration (min)',
+                                color: '#888'
+                            },
+                            ticks: { color: '#888' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                };
+
                 return (
                     <div style={{
                         display: 'flex',
@@ -183,7 +339,7 @@ function Analytics() {
                         height: 'calc(100vh - 180px)',
                         minHeight: '600px'
                     }}>
-                        {/* Main Content Area */}
+                        {/* Main Content Area (Left) */}
                         <div style={{
                             flex: 1,
                             display: 'flex',
@@ -266,166 +422,189 @@ function Analytics() {
                                 </div>
                             </div>
 
-                            {/* Goal Detail View */}
+                            {/* Goal Detail Content */}
                             {selectedGoal ? (
                                 <div style={{
                                     flex: 1,
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
-                                    padding: '24px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '20px',
                                     overflow: 'auto'
                                 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-                                        <div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#fff' }}>
-                                                    {selectedGoal.name}
-                                                </h2>
+                                    {/* Goal Header */}
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#fff' }}>
+                                                {selectedGoal.name}
+                                            </h2>
+                                            <span style={{
+                                                padding: '4px 10px',
+                                                background: goalTypeColors[selectedGoal.type] || '#666',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: 500,
+                                                color: 'white'
+                                            }}>
+                                                {selectedGoal.type.replace('Goal', '')}
+                                            </span>
+                                            {selectedGoal.completed && (
                                                 <span style={{
-                                                    padding: '4px 8px',
-                                                    background: goalTypeColors[selectedGoal.type] || '#666',
+                                                    padding: '4px 10px',
+                                                    background: '#4caf50',
                                                     borderRadius: '4px',
                                                     fontSize: '11px',
                                                     fontWeight: 500,
                                                     color: 'white'
                                                 }}>
-                                                    {selectedGoal.type.replace('Goal', '')}
+                                                    ✓ Completed
                                                 </span>
-                                                {selectedGoal.completed && (
-                                                    <span style={{
-                                                        padding: '4px 8px',
-                                                        background: '#4caf50',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 500,
-                                                        color: 'white'
-                                                    }}>
-                                                        ✓ Completed
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {selectedGoal.description && (
-                                                <p style={{ margin: 0, fontSize: '13px', color: '#888' }}>
-                                                    {selectedGoal.description}
-                                                </p>
                                             )}
                                         </div>
-                                        <button
-                                            onClick={() => setSelectedGoal(null)}
-                                            style={{
-                                                background: '#333',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '8px 12px',
-                                                color: '#888',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            ← Back to List
-                                        </button>
                                     </div>
 
-                                    {/* Goal Stats */}
+                                    {/* Goal Stats Row */}
                                     <div style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(3, 1fr)',
-                                        gap: '16px',
-                                        marginBottom: '24px'
+                                        gap: '16px'
                                     }}>
                                         <div style={{
-                                            background: '#252525',
-                                            padding: '16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #333'
+                                            background: '#1e1e1e',
+                                            border: '1px solid #333',
+                                            borderRadius: '8px',
+                                            padding: '20px'
                                         }}>
-                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#2196f3' }}>
+                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196f3' }}>
                                                 {formatDuration(selectedGoal.total_duration_seconds || 0)}
                                             </div>
-                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
                                                 Total Time Spent
                                             </div>
                                         </div>
 
                                         <div style={{
-                                            background: '#252525',
-                                            padding: '16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #333'
+                                            background: '#1e1e1e',
+                                            border: '1px solid #333',
+                                            borderRadius: '8px',
+                                            padding: '20px'
                                         }}>
-                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#4caf50' }}>
+                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4caf50' }}>
                                                 {selectedGoal.session_count || 0}
                                             </div>
-                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
                                                 Sessions
                                             </div>
                                         </div>
 
                                         <div style={{
-                                            background: '#252525',
-                                            padding: '16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #333'
+                                            background: '#1e1e1e',
+                                            border: '1px solid #333',
+                                            borderRadius: '8px',
+                                            padding: '20px'
                                         }}>
-                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ff9800' }}>
+                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ff9800' }}>
                                                 {selectedGoal.age_days || 0}d
                                             </div>
-                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
-                                                Age
+                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                Goal Age
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Activity Breakdown */}
-                                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ccc', marginBottom: '12px' }}>
-                                        Activity Breakdown
-                                    </h3>
-                                    {selectedGoal.activity_breakdown?.length > 0 ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {selectedGoal.activity_breakdown
-                                                .sort((a, b) => b.instance_count - a.instance_count)
-                                                .map(activity => (
-                                                    <div
-                                                        key={activity.activity_id}
-                                                        style={{
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            padding: '12px 16px',
-                                                            background: '#252525',
-                                                            border: '1px solid #333',
-                                                            borderRadius: '6px'
-                                                        }}
-                                                    >
-                                                        <div style={{ fontSize: '13px', fontWeight: 500, color: '#ccc' }}>
-                                                            {activity.activity_name}
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                                            <span style={{ fontSize: '12px', color: '#888' }}>
-                                                                {activity.instance_count} instance{activity.instance_count !== 1 ? 's' : ''}
-                                                            </span>
-                                                            {activity.total_duration_seconds > 0 && (
-                                                                <span style={{ fontSize: '12px', color: '#2196f3' }}>
-                                                                    {formatDuration(activity.total_duration_seconds)}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    ) : (
+                                    {/* Chart Section with Toggle */}
+                                    <div style={{
+                                        flex: 1,
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px',
+                                        padding: '20px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        minHeight: '350px'
+                                    }}>
+                                        {/* Chart Toggle */}
                                         <div style={{
-                                            padding: '20px',
-                                            textAlign: 'center',
-                                            color: '#666',
-                                            fontSize: '13px',
-                                            background: '#252525',
-                                            borderRadius: '6px'
+                                            display: 'flex',
+                                            gap: '8px',
+                                            marginBottom: '16px'
                                         }}>
-                                            No activities recorded for this goal
+                                            <button
+                                                onClick={() => setSelectedGoalChart('duration')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: selectedGoalChart === 'duration' ? '#2196f3' : '#333',
+                                                    border: `1px solid ${selectedGoalChart === 'duration' ? '#1976d2' : '#444'}`,
+                                                    borderRadius: '4px',
+                                                    color: selectedGoalChart === 'duration' ? 'white' : '#888',
+                                                    fontSize: '12px',
+                                                    fontWeight: 500,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                📈 Duration Over Time
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedGoalChart('activity')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: selectedGoalChart === 'activity' ? '#2196f3' : '#333',
+                                                    border: `1px solid ${selectedGoalChart === 'activity' ? '#1976d2' : '#444'}`,
+                                                    borderRadius: '4px',
+                                                    color: selectedGoalChart === 'activity' ? 'white' : '#888',
+                                                    fontSize: '12px',
+                                                    fontWeight: 500,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                📊 Activity Breakdown
+                                            </button>
                                         </div>
-                                    )}
+
+                                        {/* Chart Content */}
+                                        <div style={{ flex: 1, position: 'relative' }}>
+                                            {selectedGoalChart === 'duration' ? (
+                                                selectedGoal.session_durations_by_date?.length > 0 ? (
+                                                    <Line data={getDurationChartData()} options={durationChartOptions} />
+                                                ) : (
+                                                    <div style={{
+                                                        height: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: '#666',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        No session data available for this goal
+                                                    </div>
+                                                )
+                                            ) : (
+                                                selectedGoal.activity_breakdown?.length > 0 ? (
+                                                    <Bar data={getActivityChartData()} options={activityChartOptions} />
+                                                ) : (
+                                                    <div style={{
+                                                        height: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: '#666',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        No activities recorded for this goal
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{
@@ -433,24 +612,24 @@ function Analytics() {
                                     background: '#1e1e1e',
                                     border: '1px solid #333',
                                     borderRadius: '8px',
-                                    padding: '40px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    flexDirection: 'column'
+                                    flexDirection: 'column',
+                                    padding: '40px'
                                 }}>
-                                    <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>🎯</div>
-                                    <h3 style={{ fontSize: '16px', fontWeight: 400, color: '#888', margin: 0 }}>
-                                        Select a goal to view details
+                                    <div style={{ fontSize: '64px', marginBottom: '20px', opacity: 0.5 }}>🎯</div>
+                                    <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#888', margin: 0 }}>
+                                        Select a goal to view analytics
                                     </h3>
-                                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px' }}>
-                                        Click on any goal in the list to see time spent, sessions, and activity breakdown
+                                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', textAlign: 'center', maxWidth: '400px' }}>
+                                        Choose a goal from the panel on the right to see time spent, session history, and activity breakdown
                                     </p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Goal Selector Side Pane */}
+                        {/* Goals Panel (Right) */}
                         <div style={{
                             width: '340px',
                             background: '#1e1e1e',
@@ -460,20 +639,76 @@ function Analytics() {
                             flexDirection: 'column',
                             overflow: 'hidden'
                         }}>
+                            {/* Panel Header with Filters */}
                             <div style={{
                                 padding: '16px',
                                 borderBottom: '1px solid #333',
                                 background: '#252525'
                             }}>
-                                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#ccc', marginBottom: '12px' }}>
+                                <h3 style={{
+                                    margin: 0,
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#ccc'
+                                }}>
                                     Goals
                                 </h3>
+                                <p style={{
+                                    margin: '4px 0 12px 0',
+                                    fontSize: '11px',
+                                    color: '#666'
+                                }}>
+                                    {getSortDescription()}
+                                </p>
 
-                                {/* Filters */}
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {/* Filter & Sort Controls */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <select
+                                            value={goalTypeFilter}
+                                            onChange={(e) => setGoalTypeFilter(e.target.value)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px 10px',
+                                                background: '#333',
+                                                border: '1px solid #444',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                fontSize: '11px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value="all">All Types</option>
+                                            <option value="UltimateGoal">Ultimate</option>
+                                            <option value="LongTermGoal">Long Term</option>
+                                            <option value="MidTermGoal">Mid Term</option>
+                                            <option value="ShortTermGoal">Short Term</option>
+                                            <option value="ImmediateGoal">Immediate</option>
+                                        </select>
+
+                                        <select
+                                            value={goalStatusFilter}
+                                            onChange={(e) => setGoalStatusFilter(e.target.value)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px 10px',
+                                                background: '#333',
+                                                border: '1px solid #444',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                fontSize: '11px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value="all">All Status</option>
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                    </div>
+
                                     <select
-                                        value={goalTypeFilter}
-                                        onChange={(e) => setGoalTypeFilter(e.target.value)}
+                                        value={goalSortBy}
+                                        onChange={(e) => setGoalSortBy(e.target.value)}
                                         style={{
                                             padding: '6px 10px',
                                             background: '#333',
@@ -481,38 +716,19 @@ function Analytics() {
                                             borderRadius: '4px',
                                             color: 'white',
                                             fontSize: '11px',
-                                            cursor: 'pointer',
-                                            flex: 1
+                                            cursor: 'pointer'
                                         }}
                                     >
-                                        <option value="all">All Types</option>
-                                        <option value="ShortTermGoal">Short Term</option>
-                                        <option value="ImmediateGoal">Immediate</option>
-                                        <option value="MidTermGoal">Mid Term</option>
-                                        <option value="LongTermGoal">Long Term</option>
-                                    </select>
-
-                                    <select
-                                        value={goalStatusFilter}
-                                        onChange={(e) => setGoalStatusFilter(e.target.value)}
-                                        style={{
-                                            padding: '6px 10px',
-                                            background: '#333',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontSize: '11px',
-                                            cursor: 'pointer',
-                                            flex: 1
-                                        }}
-                                    >
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="completed">Completed</option>
+                                        <option value="sessions">Sort by Sessions</option>
+                                        <option value="duration">Sort by Duration</option>
+                                        <option value="recent">Sort by Most Recent</option>
+                                        <option value="oldest">Sort by Oldest</option>
+                                        <option value="name">Sort by Name</option>
                                     </select>
                                 </div>
                             </div>
 
+                            {/* Goals List */}
                             <div style={{
                                 flex: 1,
                                 overflowY: 'auto',
@@ -551,7 +767,7 @@ function Analytics() {
                                                         display: 'flex',
                                                         justifyContent: 'space-between',
                                                         alignItems: 'flex-start',
-                                                        marginBottom: '6px'
+                                                        marginBottom: '4px'
                                                     }}>
                                                         <div style={{
                                                             fontSize: '13px',
@@ -572,14 +788,12 @@ function Analytics() {
                                                         )}
                                                     </div>
                                                     <div style={{
-                                                        display: 'flex',
-                                                        gap: '12px',
                                                         fontSize: '11px',
-                                                        color: isSelected ? 'rgba(255,255,255,0.7)' : '#888'
+                                                        color: isSelected ? 'rgba(255,255,255,0.7)' : '#666'
                                                     }}>
-                                                        <span>{goal.session_count} session{goal.session_count !== 1 ? 's' : ''}</span>
+                                                        {goal.session_count} session{goal.session_count !== 1 ? 's' : ''}
                                                         {goal.total_duration_seconds > 0 && (
-                                                            <span>{formatDuration(goal.total_duration_seconds)}</span>
+                                                            <span> • {formatDuration(goal.total_duration_seconds)}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1003,9 +1217,9 @@ function Analytics() {
                 paddingBottom: '40px'
             }}>
                 <div style={{
-                    maxWidth: activeTab === 'activities' ? '100%' : '1200px',
+                    maxWidth: (activeTab === 'activities' || activeTab === 'goals') ? '100%' : '1200px',
                     margin: '0 auto',
-                    height: activeTab === 'activities' ? '100%' : 'auto'
+                    height: (activeTab === 'activities' || activeTab === 'goals') ? '100%' : 'auto'
                 }}>
                     {renderTabContent()}
                 </div>
