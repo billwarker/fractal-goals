@@ -750,65 +750,111 @@ function GoalDetailModal({
                 {/* Header */}
                 <div style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    flexDirection: 'column',
+                    gap: '12px',
                     paddingBottom: '16px',
                     marginBottom: '16px',
                     borderBottom: `2px solid ${goalColor}`
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        {mode === 'create' && (
-                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                + Create
-                            </span>
-                        )}
-                        <div style={{
-                            padding: '5px 12px',
-                            background: goalColor,
-                            color: textColor,
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                        }}>
-                            {getTypeDisplayName(goalType)}
+                    {/* Top Row: Name and Close Button */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: goalColor, lineHeight: '1.2' }}>
+                            {mode === 'create' ? (name || 'New Goal') : (name || goal.name)}
                         </div>
-                        {mode !== 'create' && (
-                            <SMARTIndicator goal={goalForSmart} goalType={goalType} />
-                        )}
-                        {mode === 'create' && parentGoal && (
-                            <span style={{ color: '#888', fontSize: '12px' }}>
-                                under "{parentGoal.name}"
-                            </span>
-                        )}
-                        {mode !== 'create' && isCompleted && (
-                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                ✓ Completed
-                            </span>
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#888',
+                                    fontSize: '24px',
+                                    cursor: 'pointer',
+                                    padding: '0',
+                                    lineHeight: 1,
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                            >
+                                ×
+                            </button>
                         )}
                     </div>
-                    {onClose && (
-                        <button
-                            onClick={onClose}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#888',
-                                fontSize: '22px',
-                                cursor: 'pointer',
-                                padding: '0 4px',
-                                lineHeight: 1
-                            }}
-                        >
-                            ×
-                        </button>
-                    )}
+
+                    {/* Second Row: Badges and Status */}
+                    {/* Second Row: Badges and Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+
+                        {/* Group 1: Status Badges */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {mode === 'create' && (
+                                <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                                    + Create
+                                </span>
+                            )}
+                            <div style={{
+                                padding: '4px 10px',
+                                background: goalColor,
+                                color: textColor,
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                            }}>
+                                {getTypeDisplayName(goalType)}
+                            </div>
+                            {mode !== 'create' && (
+                                <SMARTIndicator goal={goalForSmart} goalType={goalType} />
+                            )}
+                            {mode === 'create' && parentGoal && (
+                                <span style={{ color: '#888', fontSize: '12px' }}>
+                                    under "{parentGoal.name}"
+                                </span>
+                            )}
+                            {mode !== 'create' && isCompleted && (
+                                <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                                    ✓ Completed
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Divider - only show if we have dates and we're not in create mode */}
+                        {mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline) && (
+                            <div style={{ width: '1px', height: '16px', background: '#444' }} />
+                        )}
+
+                        {/* Group 2: Dates */}
+                        {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                {goal?.attributes?.created_at && (
+                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
+                                        <span style={{ color: '#ccc', fontWeight: '500' }}>
+                                            {new Date(goal.attributes.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                )}
+                                {(deadline || goal?.attributes?.deadline) && (
+                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
+                                        <span style={{ color: '#ccc', fontWeight: '500' }}>
+                                            {deadline
+                                                ? new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                                                : (goal?.attributes?.deadline ? new Date(goal.attributes.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'None')
+                                            }
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
                                 Name:
                             </label>
                             <input
@@ -829,7 +875,7 @@ function GoalDetailModal({
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
                                 Description:
                             </label>
                             <textarea
@@ -852,7 +898,7 @@ function GoalDetailModal({
                         {/* Relevance Statement - SMART "R" Criterion */}
                         {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
                                     Relevance (SMART):
                                 </label>
                                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
@@ -878,7 +924,7 @@ function GoalDetailModal({
                         )}
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
                                 Deadline:
                             </label>
                             <input
@@ -903,7 +949,7 @@ function GoalDetailModal({
                             borderRadius: '6px',
                             marginBottom: '10px'
                         }}>
-                            <label style={{ display: 'block', marginBottom: '10px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                            <label style={{ display: 'block', marginBottom: '10px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                                 How is progress measured? (Select all that apply)
                             </label>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
@@ -1008,6 +1054,7 @@ function GoalDetailModal({
                                 onOpenSelector={() => setViewState('activity-associator')}
                                 completedViaChildren={completedViaChildren}
                                 isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
+                                headerColor={goalColor}
                             />
                         )}
 
@@ -1026,6 +1073,7 @@ function GoalDetailModal({
                                     setTargetToEdit(target || null);
                                     setViewState('target-manager');
                                 }}
+                                headerColor={goalColor}
                             />
                         )}
 
@@ -1065,9 +1113,6 @@ function GoalDetailModal({
                 ) : (
                     /* ============ VIEW MODE ============ */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: goalColor }}>
-                            {goal.name}
-                        </div>
 
                         {/* Action Buttons - 2x2 Grid */}
                         <div style={{
@@ -1166,28 +1211,8 @@ function GoalDetailModal({
                             )}
                         </div>
 
-                        <div style={{ fontSize: '12px', color: '#888', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-                            {goal.attributes?.created_at && (
-                                <div>
-                                    Created: {new Date(goal.attributes.created_at).toLocaleDateString()}
-                                    {' '}({calculateGoalAge(goal.attributes.created_at)})
-                                </div>
-                            )}
-                            {(goal.attributes?.deadline || goal.deadline) && (
-                                <div style={{ color: '#ff9800' }}>
-                                    📅 Deadline: {new Date(goal.attributes?.deadline || goal.deadline).toLocaleDateString()}
-                                </div>
-                            )}
-                            {isCompleted && localCompletedAt && (
-                                <div style={{ color: '#4caf50' }}>
-                                    ✓ Completed: {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            )}
-                        </div>
-
-
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                                 Description
                             </label>
                             <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
@@ -1199,7 +1224,7 @@ function GoalDetailModal({
                         {/* Relevance Statement - View Mode */}
                         {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                                     How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?
                                 </label>
                                 <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
@@ -1222,7 +1247,7 @@ function GoalDetailModal({
 
                             return (
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: goalColor }}>
                                         Associated Programs:
                                     </label>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1272,6 +1297,7 @@ function GoalDetailModal({
                                 onOpenSelector={() => setViewState('activity-associator')}
                                 completedViaChildren={completedViaChildren}
                                 isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
+                                headerColor={goalColor}
                             />
                         )}
 
@@ -1286,6 +1312,7 @@ function GoalDetailModal({
                                 rootId={rootId}
                                 isEditing={false}
                                 viewMode="list"
+                                headerColor={goalColor}
                             />
                         )}
 
@@ -1297,7 +1324,7 @@ function GoalDetailModal({
 
                             return (
                                 <div style={{ borderTop: '1px solid #333', paddingTop: '14px', marginTop: '4px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                                         Associated {getTypeDisplayName(childType)}s
                                     </label>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1342,6 +1369,7 @@ function GoalDetailModal({
                             goalId={goalId}
                             rootId={rootId}
                             onClose={onClose}
+                            headerColor={goalColor}
                         />
 
                     </div>

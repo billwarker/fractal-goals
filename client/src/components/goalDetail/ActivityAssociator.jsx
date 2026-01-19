@@ -26,7 +26,8 @@ const ActivityAssociator = ({
     onCloseSelector,
     onCreateActivity,  // Callback to open ActivityBuilder for creating new activity
     completedViaChildren = false,
-    isAboveShortTermGoal = false
+    isAboveShortTermGoal = false,
+    headerColor // New prop for header color
 }) => {
     // Internal view state prioritized by props if available
     const [viewState, setViewState] = useState('list');
@@ -506,7 +507,7 @@ const ActivityAssociator = ({
                 {associatedActivities.length > 0 && (
                     <>
                         <div style={{ borderTop: '1px solid #444', marginTop: '4px', paddingTop: '14px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
                                 Associated Activities ({associatedActivities.length})
                             </label>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -569,7 +570,7 @@ const ActivityAssociator = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
                     Associated Activities
                 </label>
                 {isEditing && (

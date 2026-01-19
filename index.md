@@ -687,10 +687,12 @@ Fractal selection/home page.
   - **Inline target builder:** Managed via `TargetManager`. Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode.
   - Completion confirmation flow with program/target summary
   - **SMART Indicator:** Real-time feedback based on current editing state.
-  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates.
-  - Practice session relationships: Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
-  - **Action buttons layout:** Grid layout above description with context-aware "Add Child" button.
-  - **Contextual Styling:** Parent goal references and question marks highlighted in parent goal color.
+  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates in the header.
+  - **Practice session relationships:** Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
+  - **Action buttons layout:** 2x2 Grid layout (Complete, Add Child, Edit, Delete) for better ergonomics.
+  - **Contextual Styling:** 
+    - Goal Name, Date Labels, and Section Headers (Activities, Targets, Sessions) are colored with the goal's cosmic color.
+    - Parent goal references highlighted in parent goal color.
   - **Completion Choices:** For higher-level goals, choose between tracking activities or delegating to child goals.
   - **Associated Children:** View list of child goals directly in the modal.
 

@@ -19,7 +19,8 @@ const TargetManager = ({
     viewMode = 'list', // 'list' | 'builder'
     onOpenBuilder, // (target?) => void
     onCloseBuilder,
-    initialTarget = null // Target to edit if opening in builder mode
+    initialTarget = null, // Target to edit if opening in builder mode
+    headerColor // New prop for header color
 }) => {
     // Internal view state: 'list' | 'add' | 'edit' (still used for internal builder state)
     // BUT we prioritize props if provided for view switching
@@ -472,7 +473,7 @@ const TargetManager = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {renderDeleteConfirm()}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
                     Targets ({targets.length})
                 </label>
                 {isEditing && (
