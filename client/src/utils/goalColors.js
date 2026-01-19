@@ -5,7 +5,7 @@
 
 export const GOAL_COLORS = {
     'UltimateGoal': '#E9F0FF',      // Stellar Frost - Bright cosmic white/blue
-    'LongTermGoal': '#0B3C5D',      // Abyss Navy - True navy, distinguishable from mid-term blue
+    'LongTermGoal': '#5C6AC4',      // Soft Indigo
     'MidTermGoal': '#3A86FF',       // Signal Blue - Bright, saturated blue
     'ShortTermGoal': '#2EC4B6',     // Astro Teal - Green-leaning teal
     'Session': '#FF9F1C',           // Thruster Orange - Warm, high-energy
@@ -18,7 +18,7 @@ export const GOAL_COLORS = {
 
 export const GOAL_COLOR_NAMES = {
     'UltimateGoal': 'Stellar Frost',
-    'LongTermGoal': 'Abyss Navy',
+    'LongTermGoal': 'Soft Indigo',
     'MidTermGoal': 'Signal Blue',
     'ShortTermGoal': 'Astro Teal',
     'Session': 'Thruster Orange',

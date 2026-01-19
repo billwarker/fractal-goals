@@ -854,8 +854,8 @@ function GoalDetailModal({
                     /* ============ EDIT MODE ============ */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
-                                Name:
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                Name
                             </label>
                             <input
                                 type="text"
@@ -875,8 +875,8 @@ function GoalDetailModal({
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
-                                Description:
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                Description
                             </label>
                             <textarea
                                 value={description}
@@ -898,8 +898,8 @@ function GoalDetailModal({
                         {/* Relevance Statement - SMART "R" Criterion */}
                         {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
-                                    Relevance (SMART):
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                    Relevance (SMART)
                                 </label>
                                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
                                     How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
@@ -924,8 +924,8 @@ function GoalDetailModal({
                         )}
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor }}>
-                                Deadline:
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                Deadline
                             </label>
                             <input
                                 type="date"
@@ -1247,8 +1247,8 @@ function GoalDetailModal({
 
                             return (
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: goalColor }}>
-                                        Associated Programs:
+                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                        Associated Programs
                                     </label>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {associatedPrograms.map(prog => (
