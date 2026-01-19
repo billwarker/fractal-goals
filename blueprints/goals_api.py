@@ -615,3 +615,167 @@ def update_fractal_goal(root_id, goal_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/analytics', methods=['GET'])
+def get_goal_analytics(root_id):
+    """
+    Get goal analytics data for the fractal.
+    
+    Returns:
+    - High-level statistics (completed count, avg age, avg time to completion, avg duration)
+    - Per-goal analytics with session associations
+    """
+    from sqlalchemy import func, and_
+    from models import session_goals, ActivityInstance
+    
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Get all goals for this fractal (excluding the root itself)
+        all_goals = db_session.query(Goal).filter(
+            Goal.root_id == root_id,
+            Goal.deleted_at == None
+        ).all()
+        
+        # Calculate high-level statistics
+        now = datetime.now(timezone.utc)
+        
+        # Goals completed
+        completed_goals = [g for g in all_goals if g.completed]
+        total_completed = len(completed_goals)
+        
+        # Average goal age (days since creation for all goals)
+        goal_ages = []
+        for g in all_goals:
+            if g.created_at:
+                age_days = (now - g.created_at.replace(tzinfo=timezone.utc) if g.created_at.tzinfo is None else now - g.created_at).days
+                goal_ages.append(age_days)
+        avg_goal_age = sum(goal_ages) / len(goal_ages) if goal_ages else 0
+        
+        # Average time to completion (for completed goals with completed_at timestamp)
+        completion_times = []
+        for g in completed_goals:
+            if g.completed_at and g.created_at:
+                created = g.created_at.replace(tzinfo=timezone.utc) if g.created_at.tzinfo is None else g.created_at
+                completed = g.completed_at.replace(tzinfo=timezone.utc) if g.completed_at.tzinfo is None else g.completed_at
+                days_to_complete = (completed - created).days
+                completion_times.append(days_to_complete)
+        avg_time_to_completion = sum(completion_times) / len(completion_times) if completion_times else 0
+        
+        # Get all sessions for this fractal
+        all_sessions = db_session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).all()
+        
+        # Build goal -> sessions mapping
+        goal_session_map = {}  # goal_id -> list of session data
+        for session in all_sessions:
+            session_duration = session.total_duration_seconds or 0
+            if session_duration == 0 and session.session_start and session.session_end:
+                start = session.session_start.replace(tzinfo=timezone.utc) if session.session_start.tzinfo is None else session.session_start
+                end = session.session_end.replace(tzinfo=timezone.utc) if session.session_end.tzinfo is None else session.session_end
+                session_duration = (end - start).total_seconds()
+            
+            # Get associated goals via relationship
+            for goal in session.goals:
+                if goal.id not in goal_session_map:
+                    goal_session_map[goal.id] = []
+                goal_session_map[goal.id].append({
+                    'session_id': session.id,
+                    'session_name': session.name,
+                    'duration_seconds': session_duration,
+                    'completed': session.completed,
+                    'session_start': session.session_start.isoformat() if session.session_start else None
+                })
+        
+        # Calculate avg duration towards completed goals
+        total_duration_completed = 0
+        completed_goals_with_sessions = 0
+        for g in completed_goals:
+            if g.id in goal_session_map:
+                goal_duration = sum(s['duration_seconds'] for s in goal_session_map[g.id])
+                if goal_duration > 0:
+                    total_duration_completed += goal_duration
+                    completed_goals_with_sessions += 1
+        
+        avg_duration_to_completion = total_duration_completed / completed_goals_with_sessions if completed_goals_with_sessions > 0 else 0
+        
+        # Build per-goal analytics (for ShortTermGoals and ImmediateGoals which have sessions)
+        goals_data = []
+        for goal in all_goals:
+            sessions_for_goal = goal_session_map.get(goal.id, [])
+            total_duration = sum(s['duration_seconds'] for s in sessions_for_goal)
+            session_count = len(sessions_for_goal)
+            
+            # Get activity breakdowns for this goal's sessions
+            activity_breakdown = {}
+            session_ids = [s['session_id'] for s in sessions_for_goal]
+            
+            if session_ids:
+                # Get all activity instances for these sessions
+                activity_instances = db_session.query(ActivityInstance).filter(
+                    ActivityInstance.session_id.in_(session_ids),
+                    ActivityInstance.deleted_at == None
+                ).all()
+                
+                for ai in activity_instances:
+                    activity_name = ai.definition.name if ai.definition else 'Unknown'
+                    activity_id = ai.activity_definition_id
+                    
+                    if activity_id not in activity_breakdown:
+                        activity_breakdown[activity_id] = {
+                            'activity_id': activity_id,
+                            'activity_name': activity_name,
+                            'instance_count': 0,
+                            'total_duration_seconds': 0
+                        }
+                    
+                    activity_breakdown[activity_id]['instance_count'] += 1
+                    if ai.duration_seconds:
+                        activity_breakdown[activity_id]['total_duration_seconds'] += ai.duration_seconds
+            
+            # Goal age
+            goal_age_days = 0
+            if goal.created_at:
+                created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
+                goal_age_days = (now - created).days
+            
+            goals_data.append({
+                'id': goal.id,
+                'name': goal.name,
+                'type': goal.type,
+                'description': goal.description,
+                'completed': goal.completed,
+                'completed_at': goal.completed_at.isoformat() if goal.completed_at else None,
+                'created_at': goal.created_at.isoformat() if goal.created_at else None,
+                'deadline': goal.deadline.isoformat() if goal.deadline else None,
+                'parent_id': goal.parent_id,
+                'age_days': goal_age_days,
+                'total_duration_seconds': total_duration,
+                'session_count': session_count,
+                'activity_breakdown': list(activity_breakdown.values())
+            })
+        
+        return jsonify({
+            'summary': {
+                'total_goals': len(all_goals),
+                'completed_goals': total_completed,
+                'completion_rate': (total_completed / len(all_goals) * 100) if all_goals else 0,
+                'avg_goal_age_days': round(avg_goal_age, 1),
+                'avg_time_to_completion_days': round(avg_time_to_completion, 1),
+                'avg_duration_to_completion_seconds': round(avg_duration_to_completion, 0)
+            },
+            'goals': goals_data
+        })
+        
+    except Exception as e:
+        logger.exception("Error fetching goal analytics")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()

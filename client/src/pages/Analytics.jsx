@@ -18,6 +18,12 @@ function Analytics() {
     const [sessions, setSessions] = useState([]);
     const [activeTab, setActiveTab] = useState('goals'); // 'goals', 'sessions', or 'activities'
 
+    // Goal analytics state
+    const [goalAnalytics, setGoalAnalytics] = useState(null);
+    const [selectedGoal, setSelectedGoal] = useState(null);
+    const [goalTypeFilter, setGoalTypeFilter] = useState('all'); // 'all', 'ShortTermGoal', 'ImmediateGoal', etc.
+    const [goalStatusFilter, setGoalStatusFilter] = useState('all'); // 'all', 'completed', 'active'
+
     // Activities tab state
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [activityInstances, setActivityInstances] = useState({});
@@ -42,11 +48,15 @@ function Analytics() {
 
     const fetchData = async () => {
         try {
-            // Fetch sessions and activities for analytics
-            const sessionsRes = await fractalApi.getSessions(rootId);
+            // Fetch sessions, activities, and goal analytics
+            const [sessionsRes, goalAnalyticsRes] = await Promise.all([
+                fractalApi.getSessions(rootId),
+                fractalApi.getGoalAnalytics(rootId)
+            ]);
             await fetchActivities(rootId); // Use context method
 
             setSessions(sessionsRes.data);
+            setGoalAnalytics(goalAnalyticsRes.data);
 
             // Build activity instances map from sessions
             const instancesMap = {};
@@ -82,6 +92,48 @@ function Analytics() {
             console.error("Failed to fetch analytics data", err);
             setLoading(false);
         }
+    };
+
+    // Helper function to format duration
+    const formatDuration = (seconds) => {
+        if (!seconds || seconds === 0) return '0m';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+    };
+
+    // Filter goals based on type and status
+    const getFilteredGoals = () => {
+        if (!goalAnalytics?.goals) return [];
+
+        return goalAnalytics.goals.filter(goal => {
+            // Type filter
+            if (goalTypeFilter !== 'all' && goal.type !== goalTypeFilter) return false;
+
+            // Status filter
+            if (goalStatusFilter === 'completed' && !goal.completed) return false;
+            if (goalStatusFilter === 'active' && goal.completed) return false;
+
+            return true;
+        }).sort((a, b) => {
+            // Sort by session count (descending), then by name
+            if (b.session_count !== a.session_count) return b.session_count - a.session_count;
+            return a.name.localeCompare(b.name);
+        });
+    };
+
+    // Goal type colors
+    const goalTypeColors = {
+        'UltimateGoal': '#9c27b0',
+        'LongTermGoal': '#673ab7',
+        'MidTermGoal': '#3f51b5',
+        'ShortTermGoal': '#2196f3',
+        'ImmediateGoal': '#00bcd4',
+        'MicroGoal': '#009688',
+        'NanoGoal': '#4caf50'
     };
 
     // Get activities sorted by last instantiated
@@ -121,21 +173,422 @@ function Analytics() {
     const renderTabContent = () => {
         switch (activeTab) {
             case 'goals':
+                const filteredGoals = getFilteredGoals();
+                const summary = goalAnalytics?.summary || {};
+
                 return (
                     <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '40px',
-                        textAlign: 'center'
+                        display: 'flex',
+                        gap: '20px',
+                        height: 'calc(100vh - 180px)',
+                        minHeight: '600px'
                     }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-                        <h2 style={{ fontSize: '24px', fontWeight: 400, color: '#ccc', marginBottom: '12px' }}>
-                            Goals Analytics
-                        </h2>
-                        <p style={{ fontSize: '14px', color: '#888', maxWidth: '500px', margin: '0 auto' }}>
-                            Track goal completion rates, progress over time, and target achievement statistics.
-                        </p>
+                        {/* Main Content Area */}
+                        <div style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '20px',
+                            overflow: 'hidden'
+                        }}>
+                            {/* High-Level Stats Cards */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(4, 1fr)',
+                                gap: '16px'
+                            }}>
+                                <div style={{
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '20px'
+                                }}>
+                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#4caf50', marginBottom: '8px' }}>
+                                        {summary.completed_goals || 0}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Goals Completed
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                        {summary.completion_rate?.toFixed(1) || 0}% completion rate
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '20px'
+                                }}>
+                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2196f3', marginBottom: '8px' }}>
+                                        {summary.avg_goal_age_days || 0}d
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Avg Goal Age
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                        Days since creation
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '20px'
+                                }}>
+                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#ff9800', marginBottom: '8px' }}>
+                                        {summary.avg_time_to_completion_days || 0}d
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Avg Time to Complete
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                        Days from creation to completion
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '20px'
+                                }}>
+                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#9c27b0', marginBottom: '8px' }}>
+                                        {formatDuration(summary.avg_duration_to_completion_seconds || 0)}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Avg Duration Invested
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                        Time spent per completed goal
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Goal Detail View */}
+                            {selectedGoal ? (
+                                <div style={{
+                                    flex: 1,
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '24px',
+                                    overflow: 'auto'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#fff' }}>
+                                                    {selectedGoal.name}
+                                                </h2>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    background: goalTypeColors[selectedGoal.type] || '#666',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 500,
+                                                    color: 'white'
+                                                }}>
+                                                    {selectedGoal.type.replace('Goal', '')}
+                                                </span>
+                                                {selectedGoal.completed && (
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        background: '#4caf50',
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 500,
+                                                        color: 'white'
+                                                    }}>
+                                                        ✓ Completed
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {selectedGoal.description && (
+                                                <p style={{ margin: 0, fontSize: '13px', color: '#888' }}>
+                                                    {selectedGoal.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => setSelectedGoal(null)}
+                                            style={{
+                                                background: '#333',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '8px 12px',
+                                                color: '#888',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            ← Back to List
+                                        </button>
+                                    </div>
+
+                                    {/* Goal Stats */}
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(3, 1fr)',
+                                        gap: '16px',
+                                        marginBottom: '24px'
+                                    }}>
+                                        <div style={{
+                                            background: '#252525',
+                                            padding: '16px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #333'
+                                        }}>
+                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#2196f3' }}>
+                                                {formatDuration(selectedGoal.total_duration_seconds || 0)}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                                Total Time Spent
+                                            </div>
+                                        </div>
+
+                                        <div style={{
+                                            background: '#252525',
+                                            padding: '16px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #333'
+                                        }}>
+                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#4caf50' }}>
+                                                {selectedGoal.session_count || 0}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                                Sessions
+                                            </div>
+                                        </div>
+
+                                        <div style={{
+                                            background: '#252525',
+                                            padding: '16px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #333'
+                                        }}>
+                                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ff9800' }}>
+                                                {selectedGoal.age_days || 0}d
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                                                Age
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Activity Breakdown */}
+                                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ccc', marginBottom: '12px' }}>
+                                        Activity Breakdown
+                                    </h3>
+                                    {selectedGoal.activity_breakdown?.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {selectedGoal.activity_breakdown
+                                                .sort((a, b) => b.instance_count - a.instance_count)
+                                                .map(activity => (
+                                                    <div
+                                                        key={activity.activity_id}
+                                                        style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            padding: '12px 16px',
+                                                            background: '#252525',
+                                                            border: '1px solid #333',
+                                                            borderRadius: '6px'
+                                                        }}
+                                                    >
+                                                        <div style={{ fontSize: '13px', fontWeight: 500, color: '#ccc' }}>
+                                                            {activity.activity_name}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '12px', color: '#888' }}>
+                                                                {activity.instance_count} instance{activity.instance_count !== 1 ? 's' : ''}
+                                                            </span>
+                                                            {activity.total_duration_seconds > 0 && (
+                                                                <span style={{ fontSize: '12px', color: '#2196f3' }}>
+                                                                    {formatDuration(activity.total_duration_seconds)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            padding: '20px',
+                                            textAlign: 'center',
+                                            color: '#666',
+                                            fontSize: '13px',
+                                            background: '#252525',
+                                            borderRadius: '6px'
+                                        }}>
+                                            No activities recorded for this goal
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div style={{
+                                    flex: 1,
+                                    background: '#1e1e1e',
+                                    border: '1px solid #333',
+                                    borderRadius: '8px',
+                                    padding: '40px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'column'
+                                }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>🎯</div>
+                                    <h3 style={{ fontSize: '16px', fontWeight: 400, color: '#888', margin: 0 }}>
+                                        Select a goal to view details
+                                    </h3>
+                                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px' }}>
+                                        Click on any goal in the list to see time spent, sessions, and activity breakdown
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Goal Selector Side Pane */}
+                        <div style={{
+                            width: '340px',
+                            background: '#1e1e1e',
+                            border: '1px solid #333',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{
+                                padding: '16px',
+                                borderBottom: '1px solid #333',
+                                background: '#252525'
+                            }}>
+                                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#ccc', marginBottom: '12px' }}>
+                                    Goals
+                                </h3>
+
+                                {/* Filters */}
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <select
+                                        value={goalTypeFilter}
+                                        onChange={(e) => setGoalTypeFilter(e.target.value)}
+                                        style={{
+                                            padding: '6px 10px',
+                                            background: '#333',
+                                            border: '1px solid #444',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            fontSize: '11px',
+                                            cursor: 'pointer',
+                                            flex: 1
+                                        }}
+                                    >
+                                        <option value="all">All Types</option>
+                                        <option value="ShortTermGoal">Short Term</option>
+                                        <option value="ImmediateGoal">Immediate</option>
+                                        <option value="MidTermGoal">Mid Term</option>
+                                        <option value="LongTermGoal">Long Term</option>
+                                    </select>
+
+                                    <select
+                                        value={goalStatusFilter}
+                                        onChange={(e) => setGoalStatusFilter(e.target.value)}
+                                        style={{
+                                            padding: '6px 10px',
+                                            background: '#333',
+                                            border: '1px solid #444',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            fontSize: '11px',
+                                            cursor: 'pointer',
+                                            flex: 1
+                                        }}
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                padding: '12px'
+                            }}>
+                                {filteredGoals.length === 0 ? (
+                                    <div style={{
+                                        textAlign: 'center',
+                                        padding: '20px',
+                                        color: '#666',
+                                        fontSize: '13px'
+                                    }}>
+                                        No goals match the current filters
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {filteredGoals.map(goal => {
+                                            const isSelected = selectedGoal?.id === goal.id;
+                                            const typeColor = goalTypeColors[goal.type] || '#666';
+
+                                            return (
+                                                <div
+                                                    key={goal.id}
+                                                    onClick={() => setSelectedGoal(goal)}
+                                                    style={{
+                                                        padding: '12px',
+                                                        background: isSelected ? '#2196f3' : '#252525',
+                                                        border: `1px solid ${isSelected ? '#1976d2' : '#333'}`,
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        borderLeft: `3px solid ${typeColor}`
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'flex-start',
+                                                        marginBottom: '6px'
+                                                    }}>
+                                                        <div style={{
+                                                            fontSize: '13px',
+                                                            fontWeight: 600,
+                                                            color: isSelected ? 'white' : '#ccc',
+                                                            flex: 1,
+                                                            marginRight: '8px'
+                                                        }}>
+                                                            {goal.name}
+                                                        </div>
+                                                        {goal.completed && (
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                color: isSelected ? 'rgba(255,255,255,0.8)' : '#4caf50'
+                                                            }}>
+                                                                ✓
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        gap: '12px',
+                                                        fontSize: '11px',
+                                                        color: isSelected ? 'rgba(255,255,255,0.7)' : '#888'
+                                                    }}>
+                                                        <span>{goal.session_count} session{goal.session_count !== 1 ? 's' : ''}</span>
+                                                        {goal.total_duration_seconds > 0 && (
+                                                            <span>{formatDuration(goal.total_duration_seconds)}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 );
 

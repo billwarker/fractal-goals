@@ -90,6 +90,12 @@ export const fractalApi = {
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/complete`, { completed }),
 
     /**
+     * Get goal analytics data for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
+
+    /**
      * Get all practice sessions for a fractal
      * @param {string} rootId - ID of the fractal
      */
