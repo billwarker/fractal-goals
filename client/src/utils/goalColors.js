@@ -1,33 +1,107 @@
 /**
  * Cosmic Color Palette for Goal Types
  * Centralized color definitions for consistent theming across the app
+ * Includes primary colors (for main elements) and secondary colors (for SMART ring fills)
  */
 
-export const GOAL_COLORS = {
-    'UltimateGoal': '#E9F0FF',      // Stellar Frost - Bright cosmic white/blue
-    'LongTermGoal': '#5C6AC4',      // Soft Indigo
-    'MidTermGoal': '#3A86FF',       // Signal Blue - Bright, saturated blue
-    'ShortTermGoal': '#2EC4B6',     // Astro Teal - Green-leaning teal
-    'Session': '#FF9F1C',           // Thruster Orange - Warm, high-energy
-    'PracticeSession': '#FF9F1C',   // Thruster Orange (legacy alias)
-    'ImmediateGoal': '#E63946',     // Pulse Red - High-urgency, unmistakable
-    'MicroGoal': '#A8DADC',         // Placeholder - adjust as needed
-    'NanoGoal': '#E0E0E0',          // Placeholder - adjust as needed
-    'CompletedGoal': '#FFD700'      // Achievement Gold - bright gold for completed goals
+export const GOAL_COLOR_SYSTEM = {
+    UltimateGoal: {
+        primary: '#E9F0FF',
+        primaryName: 'Stellar Frost',
+        secondary: '#7A1E3A',
+        secondaryName: 'Crimson Nebula',
+        contrastRatio: 8.86
+    },
+
+    LongTermGoal: {
+        primary: '#5C6AC4',
+        primaryName: 'Soft Indigo',
+        secondary: '#FFB703',
+        secondaryName: 'Solar Amber',
+        contrastRatio: 2.79
+    },
+
+    MidTermGoal: {
+        primary: '#3A86FF',
+        primaryName: 'Signal Blue',
+        secondary: '#FF6B35',
+        secondaryName: 'Plasma Orange',
+        contrastRatio: 1.23
+    },
+
+    ShortTermGoal: {
+        primary: '#2EC4B6',
+        primaryName: 'Astro Teal',
+        secondary: '#8D1B3D',
+        secondaryName: 'Cosmic Magenta',
+        contrastRatio: 4.11
+    },
+
+    Session: {
+        primary: '#FF9F1C',
+        primaryName: 'Thruster Orange',
+        secondary: '#1D3557',
+        secondaryName: 'Deep Orbit Navy',
+        contrastRatio: 6.02
+    },
+
+    PracticeSession: {
+        primary: '#FF9F1C',
+        primaryName: 'Thruster Orange',
+        secondary: '#1D3557',
+        secondaryName: 'Deep Orbit Navy',
+        contrastRatio: 6.02
+    },
+
+    ImmediateGoal: {
+        primary: '#E63946',
+        primaryName: 'Pulse Red',
+        secondary: '#1D4ED8',
+        secondaryName: 'Ion Blue',
+        contrastRatio: 1.61
+    },
+
+    MicroGoal: {
+        primary: '#A8DADC',
+        primaryName: 'Drift Teal',
+        secondary: '#6D28D9',
+        secondaryName: 'Electric Violet',
+        contrastRatio: 4.64
+    },
+
+    NanoGoal: {
+        primary: '#E0E0E0',
+        primaryName: 'Cosmic Dust',
+        secondary: '#7C2D12',
+        secondaryName: 'Rust Nova',
+        contrastRatio: 7.1
+    },
+
+    CompletedGoal: {
+        primary: '#FFD700',
+        primaryName: 'Achievement Gold',
+        secondary: '#4C1D95',
+        secondaryName: 'Royal Void Violet',
+        contrastRatio: 7.81
+    }
 };
 
-export const GOAL_COLOR_NAMES = {
-    'UltimateGoal': 'Stellar Frost',
-    'LongTermGoal': 'Soft Indigo',
-    'MidTermGoal': 'Signal Blue',
-    'ShortTermGoal': 'Astro Teal',
-    'Session': 'Thruster Orange',
-    'PracticeSession': 'Thruster Orange',
-    'ImmediateGoal': 'Pulse Red',
-    'MicroGoal': 'Cosmic Cyan',
-    'NanoGoal': 'Stellar Silver',
-    'CompletedGoal': 'Achievement Gold'
-};
+// Backward compatibility exports
+export const GOAL_COLORS = Object.fromEntries(
+    Object.entries(GOAL_COLOR_SYSTEM).map(([key, value]) => [key, value.primary])
+);
+
+export const GOAL_COLOR_NAMES = Object.fromEntries(
+    Object.entries(GOAL_COLOR_SYSTEM).map(([key, value]) => [key, value.primaryName])
+);
+
+export const GOAL_SECONDARY_COLORS = Object.fromEntries(
+    Object.entries(GOAL_COLOR_SYSTEM).map(([key, value]) => [key, value.secondary])
+);
+
+export const GOAL_SECONDARY_COLOR_NAMES = Object.fromEntries(
+    Object.entries(GOAL_COLOR_SYSTEM).map(([key, value]) => [key, value.secondaryName])
+);
 
 /**
  * Get the color for a given goal type
@@ -45,6 +119,24 @@ export function getGoalColor(goalType) {
  */
 export function getGoalColorName(goalType) {
     return GOAL_COLOR_NAMES[goalType] || 'Unknown';
+}
+
+/**
+ * Get the secondary color for a given goal type (used for SMART ring fills)
+ * @param {string} goalType - The type of goal
+ * @returns {string} Hex color code
+ */
+export function getGoalSecondaryColor(goalType) {
+    return GOAL_SECONDARY_COLORS[goalType] || '#1a1a1a'; // Fallback to dark
+}
+
+/**
+ * Get the cosmic name for a goal type's secondary color
+ * @param {string} goalType - The type of goal
+ * @returns {string} Cosmic color name
+ */
+export function getGoalSecondaryColorName(goalType) {
+    return GOAL_SECONDARY_COLOR_NAMES[goalType] || 'Unknown';
 }
 
 /**

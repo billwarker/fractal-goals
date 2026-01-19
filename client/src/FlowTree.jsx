@@ -9,7 +9,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import './FlowTree.css';
 import dagre from 'dagre';
-import { getGoalColor, GOAL_COLORS } from './utils/goalColors';
+import { getGoalColor, getGoalSecondaryColor, GOAL_COLORS } from './utils/goalColors';
 import { isSMART } from './utils/smartHelpers';
 
 // Custom node component matching the tree style
@@ -78,6 +78,11 @@ const CustomNode = ({ data }) => {
     // Get the cosmic color for SMART ring (gold if completed, otherwise goal level color)
     const smartRingColor = isCompleted ? completedGold : getGoalColor(data.type);
 
+    // Get secondary color for SMART ring fill (the space between rings)
+    const smartRingFillColor = isCompleted
+        ? getGoalSecondaryColor('CompletedGoal')
+        : getGoalSecondaryColor(data.type);
+
     return (
         <div
             style={{
@@ -93,7 +98,7 @@ const CustomNode = ({ data }) => {
                     width: '30px',
                     height: '30px',
                     borderRadius: '50%',
-                    background: isSmartGoal ? 'transparent' : fillColor,
+                    background: isSmartGoal ? smartRingFillColor : fillColor,
                     border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
                     boxShadow: isCompleted
                         ? '0 0 10px rgba(255, 215, 0, 0.6)'
@@ -110,13 +115,14 @@ const CustomNode = ({ data }) => {
                 {/* SMART Goal Structure: 3 layers (Outer Ring, Middle Ring, Core) */}
                 {isSmartGoal && (
                     <>
-                        {/* Middle Ring */}
+                        {/* Middle Ring - with secondary color fill */}
                         <div
                             style={{
                                 position: 'absolute',
                                 width: '20px',
                                 height: '20px',
                                 borderRadius: '50%',
+                                background: smartRingFillColor,
                                 border: `2.5px solid ${fillColor}`,
                                 top: '50%',
                                 left: '50%',
