@@ -38,7 +38,9 @@ function ProfileWindow({
     updateWindowState,
     onAnnotationsClick,
     sourceWindowState,
-    updateSourceWindowState
+    updateSourceWindowState,
+    highlightedAnnotationId,
+    setHighlightedAnnotationId
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
@@ -672,6 +674,7 @@ function ProfileWindow({
                                 rootId={rootId}
                                 annotationMode={isAnnotating}
                                 onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
+                                highlightedAnnotationId={highlightedAnnotationId}
                             >
                                 <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -686,6 +689,7 @@ function ProfileWindow({
                                 rootId={rootId}
                                 annotationMode={isAnnotating}
                                 onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
+                                highlightedAnnotationId={highlightedAnnotationId}
                             >
                                 <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -840,6 +844,7 @@ function ProfileWindow({
                                 rootId={rootId}
                                 annotationMode={isAnnotating}
                                 onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
+                                highlightedAnnotationId={highlightedAnnotationId}
                             >
                                 <WeeklyBarChart sessions={sessions} weeks={12} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -876,6 +881,7 @@ function ProfileWindow({
                                 context={{ activity_id: selectedActivity?.id }}
                                 annotationMode={isAnnotating}
                                 onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
+                                highlightedAnnotationId={highlightedAnnotationId}
                             >
                                 <ScatterPlot
                                     selectedActivity={selectedActivity}
@@ -898,6 +904,7 @@ function ProfileWindow({
                                 context={{ activity_id: selectedActivity?.id }}
                                 annotationMode={isAnnotating}
                                 onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
+                                highlightedAnnotationId={highlightedAnnotationId}
                             >
                                 <LineGraph
                                     selectedActivity={selectedActivity}
@@ -939,6 +946,8 @@ function ProfileWindow({
                         context={sourceContext}
                         isAnnotating={sourceWindowState?.isAnnotating}
                         onToggleAnnotationMode={() => updateSourceWindowState && updateSourceWindowState({ isAnnotating: !sourceWindowState?.isAnnotating })}
+                        highlightedAnnotationId={highlightedAnnotationId}
+                        onHighlight={setHighlightedAnnotationId}
                     />
                 </div>
             );

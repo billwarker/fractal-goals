@@ -9,7 +9,7 @@ import { fractalApi } from '../../utils/api';
  * @param {string} props.visualizationType - Type of visualization (scatter, line, timeline, etc.)
  * @param {object} props.context - Additional context (e.g., activity_id)
  */
-function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating, onToggleAnnotationMode }) {
+function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating, onToggleAnnotationMode, highlightedAnnotationId, onHighlight }) {
     const [annotations, setAnnotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -62,7 +62,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
         };
 
         loadAnnotations();
-    }, [rootId, visualizationType, contextKey, context]);
+    }, [rootId, visualizationType, contextKey]);
 
     const handleDeleteAnnotation = async (annotationId) => {
         try {
@@ -301,6 +301,8 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                                 <AnnotationCard
                                     annotation={annotation}
                                     onDelete={handleDeleteAnnotation}
+                                    isHighlighted={highlightedAnnotationId === annotation.id}
+                                    onClick={() => onHighlight && onHighlight(annotation.id)}
                                 />
                             </div>
                         ))}
@@ -314,7 +316,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
 /**
  * AnnotationCard - Individual annotation display
  */
-function AnnotationCard({ annotation, onDelete }) {
+function AnnotationCard({ annotation, onDelete, isHighlighted, onClick }) {
     const [isHovered, setIsHovered] = useState(false);
 
     const formatDate = (dateString) => {
@@ -330,18 +332,23 @@ function AnnotationCard({ annotation, onDelete }) {
 
     return (
         <div
+            onClick={onClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
-                background: '#252525',
-                border: '1px solid #333',
+                background: isHighlighted ? 'rgba(33, 150, 243, 0.1)' : '#252525',
+                border: isHighlighted ? '1px solid #2196f3' : '1px solid #333',
                 borderRadius: '6px',
                 padding: '12px 14px',
                 position: 'relative',
                 transition: 'all 0.2s ease',
-                ...(isHovered && {
+                cursor: 'pointer',
+                ...(isHovered && !isHighlighted && {
                     borderColor: '#444',
                     background: '#2a2a2a'
+                }),
+                ...(isHighlighted && {
+                    boxShadow: '0 0 0 1px rgba(33, 150, 243, 0.1)'
                 })
             }}
         >

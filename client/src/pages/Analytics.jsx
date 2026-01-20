@@ -37,6 +37,9 @@ function Analytics() {
     const [goalAnalytics, setGoalAnalytics] = useState(null);
     const [activityInstances, setActivityInstances] = useState({});
 
+    // Shared state for annotation highlighting across windows
+    const [highlightedAnnotationId, setHighlightedAnnotationId] = useState(null);
+
     // Window state - each window has its own state object stored here
     // This ensures closing one window doesn't affect the other's state
     const [windowStates, setWindowStates] = useState({
@@ -270,6 +273,8 @@ function Analytics() {
                         updateWindowState={createWindowStateUpdater(visibleWindows[0])}
                         onAnnotationsClick={handleAnnotationsClick}
                         sourceWindowState={windowStates['window-2']} // In single mode, this might be stale but that's fine
+                        highlightedAnnotationId={highlightedAnnotationId}
+                        setHighlightedAnnotationId={setHighlightedAnnotationId}
                     />
                 ) : (
                     // Two windows with resizer
@@ -291,6 +296,8 @@ function Analytics() {
                                 onAnnotationsClick={handleAnnotationsClick}
                                 sourceWindowState={windowStates[visibleWindows[1]]}
                                 updateSourceWindowState={createWindowStateUpdater(visibleWindows[1])}
+                                highlightedAnnotationId={highlightedAnnotationId}
+                                setHighlightedAnnotationId={setHighlightedAnnotationId}
                             />
                         </div>
 
@@ -356,6 +363,8 @@ function Analytics() {
                                 onAnnotationsClick={handleAnnotationsClick}
                                 sourceWindowState={windowStates[visibleWindows[0]]}
                                 updateSourceWindowState={createWindowStateUpdater(visibleWindows[0])}
+                                highlightedAnnotationId={highlightedAnnotationId}
+                                setHighlightedAnnotationId={setHighlightedAnnotationId}
                             />
                         </div>
                     </>

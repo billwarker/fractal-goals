@@ -20,7 +20,8 @@ function AnnotatedChartWrapper({
     context = {},
     chartType = 'scatter', // 'scatter', 'cartesian'
     annotationMode = false,
-    onSetAnnotationMode
+    onSetAnnotationMode,
+    highlightedAnnotationId
 }) {
     const containerRef = useRef(null);
 
@@ -104,6 +105,107 @@ function AnnotatedChartWrapper({
         window.addEventListener('annotation-update', handleUpdate);
         return () => window.removeEventListener('annotation-update', handleUpdate);
     }, [loadAnnotations]);
+
+    // Effect to highlight points when an annotation is selected from the list
+    // Effect to highlight points when an annotation is selected from the list
+    useEffect(() => {
+        if (!chartRef?.current) return;
+        const chart = chartRef.current;
+
+        // If no highlight, clear active elements
+        if (!highlightedAnnotationId) {
+            chart.setActiveElements([]);
+            chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update();
+            return;
+        }
+
+        // Find the annotation
+        const annotation = annotations.find(a => a.id === highlightedAnnotationId);
+
+        if (annotation?.selected_points) {
+            const pointsToHighlight = [];
+
+            annotation.selected_points.forEach(pt => {
+                // Skip placeholder area selections
+                if (pt.type === 'area_selection') return;
+
+                let match = null;
+
+                // Strategy 1: Explicit Index
+                if (typeof pt.datasetIndex !== 'undefined' && typeof pt.index !== 'undefined') {
+                    // Start by checking if the index is valid
+                    const dataset = chart.data.datasets[pt.datasetIndex];
+                    if (dataset && dataset.data[pt.index]) {
+                        match = { datasetIndex: pt.datasetIndex, index: pt.index };
+                    }
+                }
+
+                // Strategy 2: Value/Label Matching (Fallback)
+                if (!match) {
+                    const targetVal = pt.value || pt;
+                    const targetX = targetVal.x;
+                    const targetY = targetVal.y;
+
+                    if (targetX !== undefined && targetY !== undefined) {
+                        // Search all datasets
+                        chart.data.datasets.forEach((dataset, dIdx) => {
+                            if (match) return; // Stop if already found
+
+                            // Filter by dataset label if available to reduce false positives
+                            if (pt.datasetLabel && dataset.label !== pt.datasetLabel) return;
+
+                            // Skip hidden datasets
+                            if (chart.isDatasetVisible && chart.isDatasetVisible(dIdx) === false) return;
+
+                            dataset.data.forEach((p, pIdx) => {
+                                if (match) return;
+
+                                const pX = p.x;
+                                const pY = p.y;
+
+                                // Check X Match: Handle String, Number, and Date equality
+                                let xMatch = String(pX) === String(targetX);
+
+                                // If X is a Date object (LineGraph), compare timestamps with saved ISO string
+                                if (!xMatch && pX instanceof Date) {
+                                    const targetDate = new Date(targetX);
+                                    if (!isNaN(targetDate.getTime())) {
+                                        xMatch = pX.getTime() === targetDate.getTime();
+                                    }
+                                }
+
+                                // Check Y Match: Handle Number epsilon or loose string equality
+                                let yMatch = false;
+                                if (typeof pY === 'number' && typeof targetY === 'number') {
+                                    yMatch = Math.abs(pY - targetY) < 0.0001;
+                                } else {
+                                    yMatch = String(pY) === String(targetY);
+                                }
+
+                                if (xMatch && yMatch) {
+                                    match = { datasetIndex: dIdx, index: pIdx };
+                                }
+                            });
+                        });
+                    }
+                }
+
+                if (match) {
+                    pointsToHighlight.push(match);
+                } else {
+                    console.warn('Highlight: Could not find matching point for', pt);
+                }
+            });
+
+            if (pointsToHighlight.length > 0) {
+                console.log('Highlighting found points:', pointsToHighlight.length);
+                chart.setActiveElements(pointsToHighlight);
+                chart.tooltip.setActiveElements(pointsToHighlight, { x: 0, y: 0 }); // Show tooltip
+                chart.update();
+            }
+        }
+    }, [highlightedAnnotationId, annotations, chartRef]);
 
     // Generic logic to find points in bounds for Chart.js
     const getPointsInSelection = (chart, bounds) => {
@@ -254,43 +356,7 @@ function AnnotatedChartWrapper({
         >
 
 
-            {/* Existing Annotations List (Overlay) */}
-            {!annotationMode && annotations.length > 0 && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '10px',
-                    left: '10px',
-                    zIndex: 10,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '4px',
-                    maxWidth: '80%'
-                }}>
-                    {annotations.map((ann, i) => (
-                        <button
-                            key={ann.id}
-                            onClick={() => setViewingAnnotation(ann)}
-                            style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '50%',
-                                background: '#ff9800',
-                                border: '2px solid #f57c00',
-                                color: 'white',
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                            title={ann.content}
-                        >
-                            {i + 1}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {/* Existing Annotations List Removed - Handled by Side Panel */}
 
             {/* Selection Box */}
             {isSelecting && selectionStart && selectionEnd && (
