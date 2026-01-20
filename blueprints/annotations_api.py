@@ -41,10 +41,42 @@ def get_annotations(root_id):
             query = query.filter(VisualizationAnnotation.visualization_type == viz_type)
         
         viz_context = request.args.get('visualization_context')
-        if viz_context:
-            query = query.filter(VisualizationAnnotation.visualization_context == viz_context)
+        should_filter_context = False
+        target_context = {}
         
+        if viz_context:
+            try:
+                target_context = json.loads(viz_context)
+                if target_context and len(target_context) > 0:
+                    should_filter_context = True
+            except json.JSONDecodeError:
+                pass
+        
+        # Get all annotations for this viz type
         annotations = query.order_by(VisualizationAnnotation.created_at.desc()).all()
+        
+        # Filter in Python if needed
+        if should_filter_context:
+            filtered_annotations = []
+            for ann in annotations:
+                if not ann.visualization_context:
+                    continue
+                try:
+                    # Parse stored context
+                    stored = json.loads(ann.visualization_context) if isinstance(ann.visualization_context, str) else ann.visualization_context
+                    
+                    # Check if stored context contains target context
+                    # This implements the @> (contains) logic in Python
+                    match = True
+                    for key, value in target_context.items():
+                        if stored.get(key) != value:
+                            match = False
+                            break
+                    if match:
+                        filtered_annotations.append(ann)
+                except:
+                    continue
+            annotations = filtered_annotations
         
         return jsonify({
             "data": [a.to_dict() for a in annotations]

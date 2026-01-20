@@ -18,7 +18,15 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
 
     useEffect(() => {
         const loadAnnotations = async () => {
-            if (!rootId || !visualizationType) {
+            if (!rootId) {
+                console.log('AnnotationsList: No rootId provided');
+                setAnnotations([]);
+                setLoading(false);
+                return;
+            }
+
+            if (!visualizationType) {
+                console.log('AnnotationsList: No visualizationType provided');
                 setAnnotations([]);
                 setLoading(false);
                 return;
@@ -28,6 +36,8 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 setLoading(true);
                 setError(null);
 
+                console.log('AnnotationsList: Loading annotations', { rootId, visualizationType, context });
+
                 // Fetch annotations for this visualization type and context
                 const response = await fractalApi.getAnnotations(
                     rootId,
@@ -35,10 +45,16 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                     context
                 );
 
-                setAnnotations(response.data.data || []);
+                console.log('AnnotationsList: Loaded', response.data?.data?.length || 0, 'annotations');
+                setAnnotations(response.data?.data || []);
             } catch (err) {
                 console.error('Failed to load annotations:', err);
-                setError('Failed to load annotations');
+                // Show more informative error
+                const errorMessage = err.response?.data?.error
+                    || err.response?.statusText
+                    || err.message
+                    || 'Failed to load annotations';
+                setError(errorMessage);
                 setAnnotations([]);
             } finally {
                 setLoading(false);
@@ -69,7 +85,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                     try {
                         setLoading(true);
                         const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
-                        setAnnotations(response.data.data || []);
+                        setAnnotations(response.data?.data || []);
                     } catch (err) {
                         console.error(err);
                     } finally {
@@ -82,6 +98,10 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
         window.addEventListener('annotation-update', handleUpdate);
         return () => window.removeEventListener('annotation-update', handleUpdate);
     }, [rootId, visualizationType, JSON.stringify(context)]);
+
+    // Check if visualization type requires specific context
+    const requiresActivityContext = visualizationType === 'scatter' || visualizationType === 'line';
+    const hasActivityContext = context?.activity_id;
 
     if (!visualizationType) {
         return (
@@ -99,6 +119,27 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
             }}>
                 <div style={{ fontSize: '32px', opacity: 0.5 }}>📝</div>
                 <div>Select a visualization in the left window to view its annotations</div>
+            </div>
+        );
+    }
+
+    // Activity visualizations require an activity to be selected
+    if (requiresActivityContext && !hasActivityContext) {
+        return (
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666',
+                fontSize: '14px',
+                flexDirection: 'column',
+                gap: '12px',
+                padding: '20px',
+                textAlign: 'center'
+            }}>
+                <div style={{ fontSize: '32px', opacity: 0.5 }}>📊</div>
+                <div>Select an activity in the left window to view activity-specific annotations</div>
             </div>
         );
     }
@@ -125,10 +166,17 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexDirection: 'column',
                 color: '#ff6b6b',
-                fontSize: '14px'
+                fontSize: '14px',
+                gap: '8px',
+                padding: '20px',
+                textAlign: 'center'
             }}>
-                {error}
+                <div>{error}</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>
+                    Check that the backend server is running
+                </div>
             </div>
         );
     }
@@ -362,7 +410,11 @@ function getVisualizationName(type) {
         timeline: 'Completion Timeline',
         distribution: 'Time Distribution',
         bar: 'Weekly Bar Chart',
-        heatmap: 'Activity Heatmap'
+        heatmap: 'Activity Heatmap',
+        goalDetail: 'Goal Detail View',
+        goalStats: 'Goal Summary Stats',
+        sessionStats: 'Session Summary Stats',
+        streaks: 'Streak Timeline'
     };
     return names[type] || type;
 }

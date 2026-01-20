@@ -40,7 +40,9 @@ function AnnotatedChartWrapper({
     const loadAnnotations = useCallback(async () => {
         try {
             const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
-            setAnnotations(response.data || []);
+            // API returns { data: [...] } structure
+            const annotationsArray = response.data?.data || response.data || [];
+            setAnnotations(Array.isArray(annotationsArray) ? annotationsArray : []);
         } catch (err) {
             console.error('Failed to load annotations:', err);
         }
@@ -52,32 +54,47 @@ function AnnotatedChartWrapper({
         }
     }, [rootId, loadAnnotations]);
 
+    // Helper to reset selection state
+    const resetSelection = () => {
+        setSelectionStart(null);
+        setSelectionEnd(null);
+        setSelectedPoints([]);
+    };
+
     // Save annotation
     const saveAnnotation = async (content) => {
+        console.log('Saving annotation:', { content, selectedPoints, selectionStart, selectionEnd });
+
         try {
+            // Build selection bounds if we have them
+            const selectionBounds = (selectionStart && selectionEnd) ? {
+                x1: Math.min(selectionStart.x, selectionEnd.x),
+                y1: Math.min(selectionStart.y, selectionEnd.y),
+                x2: Math.max(selectionStart.x, selectionEnd.x),
+                y2: Math.max(selectionStart.y, selectionEnd.y)
+            } : null;
+
             const response = await fractalApi.createAnnotation(rootId, {
                 visualization_type: visualizationType,
                 visualization_context: context,
-                selected_points: selectedPoints,
-                selection_bounds: {
-                    x1: Math.min(selectionStart.x, selectionEnd.x),
-                    y1: Math.min(selectionStart.y, selectionEnd.y),
-                    x2: Math.max(selectionStart.x, selectionEnd.x),
-                    y2: Math.max(selectionStart.y, selectionEnd.y)
-                },
+                selected_points: selectedPoints.length > 0 ? selectedPoints : [{ type: 'area_selection' }],
+                selection_bounds: selectionBounds,
                 content
             });
 
-            const data = response.data;
-            setAnnotations(prev => [data, ...prev]);
+            console.log('Annotation saved successfully:', response.data);
+
+            const data = response.data?.data || response.data;
+            setAnnotations(prev => [data, ...(Array.isArray(prev) ? prev : [])]);
             setShowModal(false);
-            setSelectedPoints([]);
+            resetSelection();
             if (onSetAnnotationMode) onSetAnnotationMode(false);
 
             // Dispatch event to notify other components
             window.dispatchEvent(new CustomEvent('annotation-update'));
         } catch (err) {
             console.error('Failed to save annotation:', err);
+            alert('Failed to save annotation: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -130,6 +147,8 @@ function AnnotatedChartWrapper({
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        console.log('Annotation drag started at:', { x, y });
+
         setIsSelecting(true);
         setSelectionStart({ x, y });
         setSelectionEnd({ x, y });
@@ -146,17 +165,21 @@ function AnnotatedChartWrapper({
 
         if (chartRef && chartRef.current) {
             const chart = chartRef.current;
-            const bounds = {
-                x1: Math.min(selectionStart.x, x),
-                y1: Math.min(selectionStart.y, y),
-                x2: Math.max(selectionStart.x, x),
-                y2: Math.max(selectionStart.y, y)
-            };
 
-            // Adjust bounds to be relative to chart area if needed?
-            // Chart.js elements have x/y relative to canvas.
-            // Our mouse coordinates are relative to the container.
-            // Assuming the chart canvas fills the container.
+            // Get the chart's canvas offset within our container
+            const chartCanvas = chart.canvas;
+            const canvasRect = chartCanvas.getBoundingClientRect();
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const offsetX = canvasRect.left - containerRect.left;
+            const offsetY = canvasRect.top - containerRect.top;
+
+            // Adjust bounds to be relative to the canvas
+            const bounds = {
+                x1: Math.min(selectionStart.x, x) - offsetX,
+                y1: Math.min(selectionStart.y, y) - offsetY,
+                x2: Math.max(selectionStart.x, x) - offsetX,
+                y2: Math.max(selectionStart.y, y) - offsetY
+            };
 
             const points = getPointsInSelection(chart, bounds);
             setSelectedPoints(points);
@@ -167,13 +190,26 @@ function AnnotatedChartWrapper({
         if (!isSelecting) return;
         setIsSelecting(false);
 
-        if (selectedPoints.length > 0) {
+        // Calculate selection size
+        const selectionWidth = Math.abs((selectionEnd?.x || 0) - (selectionStart?.x || 0));
+        const selectionHeight = Math.abs((selectionEnd?.y || 0) - (selectionStart?.y || 0));
+        const hasValidSelection = selectionWidth > 10 && selectionHeight > 10;
+
+        console.log('Annotation drag ended:', {
+            selectedPoints: selectedPoints.length,
+            selectionWidth,
+            selectionHeight,
+            hasValidSelection
+        });
+
+        // Show modal if we have points OR if we have a valid selection area
+        if (selectedPoints.length > 0 || hasValidSelection) {
             setShowModal(true);
         }
 
-        setSelectionStart(null);
-        setSelectionEnd(null);
-    }, [isSelecting, selectedPoints]);
+        // Keep the selection bounds for saving, don't reset to null yet
+        // Only reset after modal closes
+    }, [isSelecting, selectedPoints, selectionStart, selectionEnd]);
 
     useEffect(() => {
         if (isSelecting) {
@@ -310,7 +346,7 @@ function AnnotatedChartWrapper({
                 isOpen={showModal}
                 onClose={() => {
                     setShowModal(false);
-                    setSelectedPoints([]);
+                    resetSelection();
                 }}
                 onSave={saveAnnotation}
                 selectedPoints={selectedPoints}

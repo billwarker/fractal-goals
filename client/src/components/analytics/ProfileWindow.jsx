@@ -129,9 +129,13 @@ function ProfileWindow({
         } else if (cat === 'goals') {
             if (viz === 'completionTimeline') return 'timeline';
             if (viz === 'timeDistribution') return 'distribution';
+            if (viz === 'goalDetail') return 'goalDetail';
+            if (viz === 'stats') return 'goalStats';
         } else if (cat === 'sessions') {
             if (viz === 'weeklyChart') return 'bar';
             if (viz === 'heatmap') return 'heatmap';
+            if (viz === 'streaks') return 'streaks';
+            if (viz === 'stats') return 'sessionStats';
         }
 
         return null;
@@ -146,6 +150,11 @@ function ProfileWindow({
         // Add activity_id for activity visualizations
         if (state.selectedCategory === 'activities' && state.selectedActivity?.id) {
             context.activity_id = state.selectedActivity.id;
+        }
+
+        // Add goal_id for goal detail visualization
+        if (state.selectedCategory === 'goals' && state.selectedVisualization === 'goalDetail' && state.selectedGoal?.id) {
+            context.goal_id = state.selectedGoal.id;
         }
 
         // Add time_range for heatmap
@@ -913,6 +922,14 @@ function ProfileWindow({
             // Get visualization type and context from source window
             const sourceVizType = getVisualizationType(sourceWindowState);
             const sourceContext = getVisualizationContext(sourceWindowState);
+
+            // Debug logging
+            console.log('ProfileWindow Annotations View:', {
+                sourceWindowState,
+                sourceVizType,
+                sourceContext,
+                rootId
+            });
 
             return (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

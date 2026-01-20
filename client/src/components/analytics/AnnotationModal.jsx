@@ -56,7 +56,14 @@ function AnnotationModal({
 
     // Format selected points for display
     const formatSelectedPoints = () => {
-        if (selectedPoints.length === 0) return 'No points selected';
+        if (selectedPoints.length === 0) {
+            return 'Chart area selected';
+        }
+
+        // Check for area selection marker
+        if (selectedPoints.length === 1 && selectedPoints[0].type === 'area_selection') {
+            return 'Chart area selected';
+        }
 
         if (visualizationType === 'heatmap') {
             // For heatmap, points are date strings
