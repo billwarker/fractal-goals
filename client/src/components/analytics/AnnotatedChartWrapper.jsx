@@ -18,12 +18,13 @@ function AnnotatedChartWrapper({
     visualizationType,
     rootId,
     context = {},
-    chartType = 'scatter' // 'scatter', 'cartesian'
+    chartType = 'scatter', // 'scatter', 'cartesian'
+    annotationMode = false,
+    onSetAnnotationMode
 }) {
     const containerRef = useRef(null);
 
     // Annotation state
-    const [annotationMode, setAnnotationMode] = useState(false);
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectionStart, setSelectionStart] = useState(null);
     const [selectionEnd, setSelectionEnd] = useState(null);
@@ -71,11 +72,21 @@ function AnnotatedChartWrapper({
             setAnnotations(prev => [data, ...prev]);
             setShowModal(false);
             setSelectedPoints([]);
-            setAnnotationMode(false);
+            if (onSetAnnotationMode) onSetAnnotationMode(false);
+
+            // Dispatch event to notify other components
+            window.dispatchEvent(new CustomEvent('annotation-update'));
         } catch (err) {
             console.error('Failed to save annotation:', err);
         }
     };
+
+    // Listen for external updates
+    useEffect(() => {
+        const handleUpdate = () => loadAnnotations();
+        window.addEventListener('annotation-update', handleUpdate);
+        return () => window.removeEventListener('annotation-update', handleUpdate);
+    }, [loadAnnotations]);
 
     // Generic logic to find points in bounds for Chart.js
     const getPointsInSelection = (chart, bounds) => {
@@ -205,39 +216,7 @@ function AnnotatedChartWrapper({
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
         >
-            {/* Toolbar overlay */}
-            <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                zIndex: 10,
-                display: 'flex',
-                gap: '8px'
-            }}>
-                <button
-                    onClick={() => {
-                        setAnnotationMode(!annotationMode);
-                        setSelectedPoints([]);
-                    }}
-                    style={{
-                        padding: '6px 12px',
-                        background: annotationMode ? '#2196f3' : 'rgba(50, 50, 50, 0.8)',
-                        border: annotationMode ? '2px solid #1976d2' : '1px solid #555',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                    }}
-                >
-                    <span>✏️</span>
-                    <span>{annotationMode ? 'Done' : 'Annotate'}</span>
-                </button>
-            </div>
+
 
             {/* Existing Annotations List (Overlay) */}
             {!annotationMode && annotations.length > 0 && (
@@ -322,7 +301,7 @@ function AnnotatedChartWrapper({
             )}
 
             {/* The actual chart */}
-            <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+            <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0 }}>
                 {children}
             </div>
 

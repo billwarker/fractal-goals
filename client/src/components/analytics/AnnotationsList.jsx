@@ -9,7 +9,7 @@ import { fractalApi } from '../../utils/api';
  * @param {string} props.visualizationType - Type of visualization (scatter, line, timeline, etc.)
  * @param {object} props.context - Additional context (e.g., activity_id)
  */
-function AnnotationsList({ rootId, visualizationType, context = {} }) {
+function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating, onToggleAnnotationMode }) {
     const [annotations, setAnnotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -35,7 +35,7 @@ function AnnotationsList({ rootId, visualizationType, context = {} }) {
                     context
                 );
 
-                setAnnotations(response.data || []);
+                setAnnotations(response.data.data || []);
             } catch (err) {
                 console.error('Failed to load annotations:', err);
                 setError('Failed to load annotations');
@@ -52,10 +52,36 @@ function AnnotationsList({ rootId, visualizationType, context = {} }) {
         try {
             await fractalApi.deleteAnnotation(rootId, annotationId);
             setAnnotations(prev => prev.filter(a => a.id !== annotationId));
+
+            // Dispatch event to notify other components
+            window.dispatchEvent(new CustomEvent('annotation-update'));
         } catch (err) {
             console.error('Failed to delete annotation:', err);
         }
     };
+
+    // Listen for external updates
+    useEffect(() => {
+        const handleUpdate = () => {
+            // Reload annotations
+            if (rootId && visualizationType) {
+                const load = async () => {
+                    try {
+                        setLoading(true);
+                        const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
+                        setAnnotations(response.data.data || []);
+                    } catch (err) {
+                        console.error(err);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                load();
+            }
+        };
+        window.addEventListener('annotation-update', handleUpdate);
+        return () => window.removeEventListener('annotation-update', handleUpdate);
+    }, [rootId, visualizationType, JSON.stringify(context)]);
 
     if (!visualizationType) {
         return (
@@ -107,29 +133,6 @@ function AnnotationsList({ rootId, visualizationType, context = {} }) {
         );
     }
 
-    if (annotations.length === 0) {
-        return (
-            <div style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#666',
-                fontSize: '14px',
-                flexDirection: 'column',
-                gap: '12px',
-                padding: '20px',
-                textAlign: 'center'
-            }}>
-                <div style={{ fontSize: '32px', opacity: 0.5 }}>📝</div>
-                <div>No annotations for this visualization</div>
-                <div style={{ fontSize: '12px', color: '#555' }}>
-                    Click on the chart in the left window to add annotations
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div style={{
             flex: 1,
@@ -141,45 +144,120 @@ function AnnotationsList({ rootId, visualizationType, context = {} }) {
             <div style={{
                 padding: '16px 20px',
                 borderBottom: '1px solid #333',
-                background: '#252525'
+                background: '#252525',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
             }}>
-                <h3 style={{
-                    margin: 0,
-                    color: '#ccc',
-                    fontSize: '15px',
-                    fontWeight: 600
-                }}>
-                    Annotations ({annotations.length})
-                </h3>
-                <div style={{
-                    fontSize: '12px',
-                    color: '#666',
-                    marginTop: '4px'
-                }}>
-                    {getVisualizationName(visualizationType)}
-                    {context.activity_id && ' - Activity View'}
+                <div>
+                    <h3 style={{
+                        margin: 0,
+                        color: '#ccc',
+                        fontSize: '15px',
+                        fontWeight: 600
+                    }}>
+                        Annotations ({annotations.length})
+                    </h3>
+                    <div style={{
+                        fontSize: '12px',
+                        color: '#666',
+                        marginTop: '4px'
+                    }}>
+                        {getVisualizationName(visualizationType)}
+                        {context.activity_id && ' - Activity View'}
+                    </div>
                 </div>
+
+                {onToggleAnnotationMode && (
+                    <button
+                        onClick={onToggleAnnotationMode}
+                        style={{
+                            padding: '6px 12px',
+                            background: isAnnotating ? '#2196f3' : 'rgba(50, 50, 50, 0.4)',
+                            border: isAnnotating ? '1px solid #1976d2' : '1px solid #444',
+                            borderRadius: '4px',
+                            color: isAnnotating ? 'white' : '#aaa',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <span>✏️</span>
+                        <span>{isAnnotating ? 'Done' : 'Annotate'}</span>
+                    </button>
+                )}
             </div>
 
-            {/* Annotations List */}
+            {/* Content Area */}
             <div style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '12px'
             }}>
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                }}>
-                    {annotations.map(annotation => (
-                        <AnnotationCard
-                            key={annotation.id}
-                            annotation={annotation}
-                            onDelete={handleDeleteAnnotation}
-                        />
-                    ))}
-                </div>
+                {annotations.length === 0 ? (
+                    <div style={{
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#666',
+                        fontSize: '14px',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        padding: '20px',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: '32px', opacity: 0.5 }}>📝</div>
+                        <div>No annotations for this visualization</div>
+                        <div style={{ fontSize: '12px', color: '#555' }}>
+                            Click "Annotate" above or drag on the chart to add notes
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        paddingLeft: '16px',
+                        position: 'relative'
+                    }}>
+                        {/* Vertical Line */}
+                        <div style={{
+                            position: 'absolute',
+                            left: '0',
+                            top: '0',
+                            bottom: '0',
+                            width: '2px',
+                            background: '#333',
+                            marginLeft: '8px'
+                        }} />
+
+                        {annotations.map(annotation => (
+                            <div key={annotation.id} style={{ position: 'relative', marginBottom: '16px', paddingLeft: '24px' }}>
+                                {/* Timeline Dot */}
+                                <div style={{
+                                    position: 'absolute',
+                                    left: '4px',
+                                    top: '16px',
+                                    width: '10px',
+                                    height: '10px',
+                                    borderRadius: '50%',
+                                    background: '#2196f3',
+                                    border: '2px solid #1e1e1e', // Match bg
+                                    zIndex: 2
+                                }} />
+
+                                <AnnotationCard
+                                    annotation={annotation}
+                                    onDelete={handleDeleteAnnotation}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -255,7 +333,7 @@ function AnnotationCard({ annotation, onDelete }) {
                 marginBottom: '8px',
                 paddingRight: '60px'
             }}>
-                {annotation.text}
+                {annotation.content}
             </div>
 
             {/* Metadata */}
@@ -266,11 +344,8 @@ function AnnotationCard({ annotation, onDelete }) {
                 color: '#666'
             }}>
                 <span>{formatDate(annotation.created_at)}</span>
-                {annotation.x_value !== undefined && (
-                    <span>• X: {annotation.x_value}</span>
-                )}
-                {annotation.y_value !== undefined && (
-                    <span>• Y: {annotation.y_value}</span>
+                {annotation.selected_points && annotation.selected_points.length > 0 && (
+                    <span>• {annotation.selected_points.length} point{annotation.selected_points.length !== 1 ? 's' : ''}</span>
                 )}
             </div>
         </div>

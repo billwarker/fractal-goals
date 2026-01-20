@@ -37,7 +37,8 @@ function ProfileWindow({
     windowState,
     updateWindowState,
     onAnnotationsClick,
-    sourceWindowState
+    sourceWindowState,
+    updateSourceWindowState
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
@@ -53,7 +54,8 @@ function ProfileWindow({
         selectedSplit,
         selectedGoal,
         selectedGoalChart,
-        heatmapMonths
+        heatmapMonths,
+        isAnnotating // New state for annotation mode
     } = windowState;
 
     // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
@@ -74,10 +76,22 @@ function ProfileWindow({
                 selectedCategory: category,
                 selectedVisualization: null,
                 selectedActivity: null,
-                selectedGoal: null
+                selectedGoal: null,
+                isAnnotating: false
             });
         }
     };
+
+    // ... (rest of file until AnnotatedChartWrapper usages)
+
+    // We need to use multi_replace or specific target replacement for the AnnotatedChartWrapper usages.
+    // Since there are multiple usages (completionTimeline, timeDistribution, weeklyChart, scatterPlot, lineGraph),
+    // I will use a clever trick: I will replace the AnnotatedChartWrapper component usages.
+
+    // But first, let's just make sure I updated the props deconstruction at the top correctly.
+    // The simplified instruction above is not enough for the full file.
+    // I will split this into two tool calls. One for the top, one for the bottom.
+
 
     // Define available visualizations for each category
     const visualizations = {
@@ -96,7 +110,8 @@ function ProfileWindow({
         activities: [
             { id: 'scatterPlot', name: 'Scatter Plot', icon: '⚡' },
             { id: 'lineGraph', name: 'Line Graph', icon: '📈' }
-        ]
+        ],
+        annotations: []
     };
 
     // Helper to extract visualization type from window state
@@ -358,6 +373,7 @@ function ProfileWindow({
         if (!selectedCategory) return null;
 
         const categoryVis = visualizations[selectedCategory];
+        if (!categoryVis || categoryVis.length === 0) return null;
 
         return (
             <div style={{
@@ -591,7 +607,7 @@ function ProfileWindow({
             );
         }
 
-        if (!selectedVisualization) {
+        if (!selectedVisualization && selectedCategory !== 'annotations') {
             return (
                 <div style={{
                     flex: 1,
@@ -645,6 +661,8 @@ function ProfileWindow({
                                 chartRef={chartRef}
                                 visualizationType="timeline"
                                 rootId={rootId}
+                                annotationMode={isAnnotating}
+                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
                             >
                                 <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -657,6 +675,8 @@ function ProfileWindow({
                                 chartRef={chartRef}
                                 visualizationType="distribution"
                                 rootId={rootId}
+                                annotationMode={isAnnotating}
+                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
                             >
                                 <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -809,6 +829,8 @@ function ProfileWindow({
                                 chartRef={chartRef}
                                 visualizationType="bar"
                                 rootId={rootId}
+                                annotationMode={isAnnotating}
+                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
                             >
                                 <WeeklyBarChart sessions={sessions} weeks={12} chartRef={chartRef} />
                             </AnnotatedChartWrapper>
@@ -843,6 +865,8 @@ function ProfileWindow({
                                 visualizationType="scatter"
                                 rootId={rootId}
                                 context={{ activity_id: selectedActivity?.id }}
+                                annotationMode={isAnnotating}
+                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
                             >
                                 <ScatterPlot
                                     selectedActivity={selectedActivity}
@@ -863,6 +887,8 @@ function ProfileWindow({
                                 visualizationType="line"
                                 rootId={rootId}
                                 context={{ activity_id: selectedActivity?.id }}
+                                annotationMode={isAnnotating}
+                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
                             >
                                 <LineGraph
                                     selectedActivity={selectedActivity}
@@ -894,6 +920,8 @@ function ProfileWindow({
                         rootId={rootId}
                         visualizationType={sourceVizType}
                         context={sourceContext}
+                        isAnnotating={sourceWindowState?.isAnnotating}
+                        onToggleAnnotationMode={() => updateSourceWindowState && updateSourceWindowState({ isAnnotating: !sourceWindowState?.isAnnotating })}
                     />
                 </div>
             );

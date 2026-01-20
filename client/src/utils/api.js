@@ -560,7 +560,7 @@ export const fractalApi = {
         const params = new URLSearchParams();
         params.append('visualization_type', visualizationType);
         params.append('visualization_context', JSON.stringify(context));
-        return axios.get(`${API_BASE}/${rootId}/annotations?${params.toString()}`);
+        return axios.get(`${API_BASE}/roots/${rootId}/annotations?${params.toString()}`);
     },
 
     /**
@@ -569,7 +569,7 @@ export const fractalApi = {
      * @param {Object} data - {visualization_type, visualization_context, content, selected_points, x_value, y_value}
      */
     createAnnotation: (rootId, data) =>
-        axios.post(`${API_BASE}/${rootId}/annotations`, data),
+        axios.post(`${API_BASE}/roots/${rootId}/annotations`, data),
 
     /**
      * Delete an annotation
@@ -577,7 +577,7 @@ export const fractalApi = {
      * @param {string} annotationId - ID of the annotation
      */
     deleteAnnotation: (rootId, annotationId) =>
-        axios.delete(`${API_BASE}/${rootId}/annotations/${annotationId}`),
+        axios.delete(`${API_BASE}/roots/${rootId}/annotations/${annotationId}`),
 };
 
 /**

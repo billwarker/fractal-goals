@@ -290,6 +290,7 @@ function Analytics() {
                                 updateWindowState={createWindowStateUpdater(visibleWindows[0])}
                                 onAnnotationsClick={handleAnnotationsClick}
                                 sourceWindowState={windowStates[visibleWindows[1]]}
+                                updateSourceWindowState={createWindowStateUpdater(visibleWindows[1])}
                             />
                         </div>
 
@@ -354,6 +355,7 @@ function Analytics() {
                                 updateWindowState={createWindowStateUpdater(visibleWindows[1])}
                                 onAnnotationsClick={handleAnnotationsClick}
                                 sourceWindowState={windowStates[visibleWindows[0]]}
+                                updateSourceWindowState={createWindowStateUpdater(visibleWindows[0])}
                             />
                         </div>
                     </>

@@ -211,7 +211,9 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
             padding: '20px',
             height: '100%',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            boxSizing: 'border-box',
+            minHeight: 0
         }}>
             <div style={{
                 display: 'flex',
@@ -285,7 +287,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1, minHeight: '200px' }}>
+            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                 <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
 
