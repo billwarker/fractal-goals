@@ -758,6 +758,21 @@ def get_goal_analytics(root_id):
             # Sort by date
             session_durations_by_date.sort(key=lambda x: x['date'])
             
+            # Build activity durations by date (activity instance level)
+            activity_durations_by_date = []
+            if session_ids:
+                for ai in activity_instances:
+                    # Get the session date for this activity instance
+                    session = next((s for s in sessions_for_goal if s['session_id'] == ai.session_id), None)
+                    if session and session['session_start'] and ai.duration_seconds:
+                        activity_durations_by_date.append({
+                            'date': session['session_start'],
+                            'duration_seconds': ai.duration_seconds,
+                            'activity_name': ai.definition.name if ai.definition else 'Unknown'
+                        })
+            # Sort by date
+            activity_durations_by_date.sort(key=lambda x: x['date'])
+            
             goals_data.append({
                 'id': goal.id,
                 'name': goal.name,
@@ -772,7 +787,8 @@ def get_goal_analytics(root_id):
                 'total_duration_seconds': total_duration,
                 'session_count': session_count,
                 'activity_breakdown': list(activity_breakdown.values()),
-                'session_durations_by_date': session_durations_by_date
+                'session_durations_by_date': session_durations_by_date,
+                'activity_durations_by_date': activity_durations_by_date
             })
         
         return jsonify({

@@ -313,7 +313,7 @@ function LineGraph({
             pointHoverBackgroundColor: lineColorY1,
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2,
-            fill: true,
+            fill: false,
             tension: 0.1,
             yAxisID: 'y'
         }

@@ -9,7 +9,8 @@ import {
     Title,
     Tooltip,
     Legend,
-    TimeScale
+    TimeScale,
+    Filler
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 
@@ -23,7 +24,8 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    TimeScale
+    TimeScale,
+    Filler
 );
 
 /**

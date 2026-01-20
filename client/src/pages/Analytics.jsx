@@ -4,6 +4,9 @@ import { fractalApi } from '../utils/api';
 import { useActivities } from '../contexts/ActivitiesContext';
 import ScatterPlot from '../components/analytics/ScatterPlot';
 import LineGraph from '../components/analytics/LineGraph';
+import GoalCompletionTimeline from '../components/analytics/GoalCompletionTimeline';
+import GoalTimeDistribution from '../components/analytics/GoalTimeDistribution';
+import { GOAL_COLOR_SYSTEM } from '../utils/goalColors';
 import { Bar, Line } from 'react-chartjs-2';
 import '../components/analytics/ChartJSWrapper'; // Registers Chart.js components
 import '../App.css';
@@ -26,6 +29,7 @@ function Analytics() {
     const [goalTypeFilter, setGoalTypeFilter] = useState('all'); // 'all', 'ShortTermGoal', 'ImmediateGoal', etc.
     const [goalStatusFilter, setGoalStatusFilter] = useState('all'); // 'all', 'completed', 'active'
     const [selectedGoalChart, setSelectedGoalChart] = useState('duration'); // 'duration' or 'activity'
+    const [selectedOverviewChart, setSelectedOverviewChart] = useState('timeline'); // 'timeline' or 'timeDistribution'
     const [goalSortBy, setGoalSortBy] = useState('sessions'); // 'sessions', 'duration', 'recent', 'oldest', 'name'
 
     // Activities tab state
@@ -158,15 +162,9 @@ function Analytics() {
         }
     };
 
-    // Goal type colors
-    const goalTypeColors = {
-        'UltimateGoal': '#9c27b0',
-        'LongTermGoal': '#673ab7',
-        'MidTermGoal': '#3f51b5',
-        'ShortTermGoal': '#2196f3',
-        'ImmediateGoal': '#00bcd4',
-        'MicroGoal': '#009688',
-        'NanoGoal': '#4caf50'
+    // Goal type colors - use cosmic color system
+    const getGoalTypeColor = (type) => {
+        return GOAL_COLOR_SYSTEM[type]?.primary || '#666';
     };
 
     // Get activities sorted by last instantiated
@@ -347,80 +345,148 @@ function Analytics() {
                             gap: '20px',
                             overflow: 'hidden'
                         }}>
-                            {/* High-Level Stats Cards */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(4, 1fr)',
-                                gap: '16px'
-                            }}>
+                            {/* High-Level Stats Cards - Only show in multi-goal overview mode */}
+                            {!selectedGoal && (
                                 <div style={{
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
-                                    padding: '20px'
+                                    display: 'flex',
+                                    gap: '8px',
+                                    flexWrap: 'nowrap'
                                 }}>
-                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#4caf50', marginBottom: '8px' }}>
-                                        {summary.completed_goals || 0}
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        flex: '1 1 0',
+                                        minWidth: 0
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#4caf50' }}>
+                                            {summary.completed_goals || 0}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                Completed
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: '#666' }}>
+                                                {summary.completion_rate?.toFixed(1) || 0}% rate
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Goals Completed
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                                        {summary.completion_rate?.toFixed(1) || 0}% completion rate
-                                    </div>
-                                </div>
 
-                                <div style={{
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
-                                    padding: '20px'
-                                }}>
-                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2196f3', marginBottom: '8px' }}>
-                                        {summary.avg_goal_age_days || 0}d
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        flex: '1 1 0',
+                                        minWidth: 0
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#2196f3' }}>
+                                            {summary.avg_goal_age_days || 0}d
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                Avg Age
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: '#666' }}>
+                                                Days old
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Avg Goal Age
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                                        Days since creation
-                                    </div>
-                                </div>
 
-                                <div style={{
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
-                                    padding: '20px'
-                                }}>
-                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#ff9800', marginBottom: '8px' }}>
-                                        {summary.avg_time_to_completion_days || 0}d
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        flex: '1 1 0',
+                                        minWidth: 0
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#ff9800' }}>
+                                            {summary.avg_time_to_completion_days || 0}d
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                Avg to Complete
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: '#666' }}>
+                                                Days
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Avg Time to Complete
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                                        Days from creation to completion
-                                    </div>
-                                </div>
 
-                                <div style={{
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
-                                    padding: '20px'
-                                }}>
-                                    <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#9c27b0', marginBottom: '8px' }}>
-                                        {formatDuration(summary.avg_duration_to_completion_seconds || 0)}
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        flex: '1 1 0',
+                                        minWidth: 0
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#9c27b0' }}>
+                                            {formatDuration(summary.avg_duration_to_completion_seconds || 0)}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                Avg Time
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: '#666' }}>
+                                                Per goal
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Avg Duration Invested
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                                        Time spent per completed goal
+
+                                    {/* Days Since Last Completion */}
+                                    <div style={{
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '6px',
+                                        padding: '10px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        flex: '1 1 0',
+                                        minWidth: 0
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#e91e63' }}>
+                                            {(() => {
+                                                // Find the most recent completion date
+                                                const completedGoals = (goalAnalytics?.goals || [])
+                                                    .filter(g => g.completed && g.completed_at);
+                                                if (completedGoals.length === 0) return '—';
+
+                                                const mostRecent = completedGoals.reduce((latest, goal) => {
+                                                    const date = new Date(goal.completed_at);
+                                                    return date > latest ? date : latest;
+                                                }, new Date(0));
+
+                                                const daysSince = Math.floor((new Date() - mostRecent) / (1000 * 60 * 60 * 24));
+                                                return `${daysSince}d`;
+                                            })()}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                Since Last
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: '#666' }}>
+                                                Completion
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Goal Detail Content */}
                             {selectedGoal ? (
@@ -442,12 +508,38 @@ function Analytics() {
                                         justifyContent: 'space-between'
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <button
+                                                onClick={() => setSelectedGoal(null)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#333',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '4px',
+                                                    color: '#ccc',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.background = '#444';
+                                                    e.target.style.borderColor = '#555';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.background = '#333';
+                                                    e.target.style.borderColor = '#444';
+                                                }}
+                                            >
+                                                ← Overview
+                                            </button>
                                             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#fff' }}>
                                                 {selectedGoal.name}
                                             </h2>
                                             <span style={{
                                                 padding: '4px 10px',
-                                                background: goalTypeColors[selectedGoal.type] || '#666',
+                                                background: getGoalTypeColor(selectedGoal.type),
                                                 borderRadius: '4px',
                                                 fontSize: '11px',
                                                 fontWeight: 500,
@@ -470,36 +562,46 @@ function Analytics() {
                                         </div>
                                     </div>
 
-                                    {/* Goal Stats Row */}
+                                    {/* Goal Stats Row - Compact */}
                                     <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(3, 1fr)',
-                                        gap: '16px'
+                                        display: 'flex',
+                                        gap: '12px',
+                                        flexWrap: 'wrap'
                                     }}>
                                         <div style={{
                                             background: '#1e1e1e',
                                             border: '1px solid #333',
-                                            borderRadius: '8px',
-                                            padding: '20px'
+                                            borderRadius: '6px',
+                                            padding: '12px 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            flex: '1 1 auto',
+                                            minWidth: '140px'
                                         }}>
-                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196f3' }}>
+                                            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#2196f3' }}>
                                                 {formatDuration(selectedGoal.total_duration_seconds || 0)}
                                             </div>
-                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                                                Total Time Spent
+                                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                Total Time
                                             </div>
                                         </div>
 
                                         <div style={{
                                             background: '#1e1e1e',
                                             border: '1px solid #333',
-                                            borderRadius: '8px',
-                                            padding: '20px'
+                                            borderRadius: '6px',
+                                            padding: '12px 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            flex: '1 1 auto',
+                                            minWidth: '140px'
                                         }}>
-                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4caf50' }}>
+                                            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#4caf50' }}>
                                                 {selectedGoal.session_count || 0}
                                             </div>
-                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                                 Sessions
                                             </div>
                                         </div>
@@ -507,13 +609,18 @@ function Analytics() {
                                         <div style={{
                                             background: '#1e1e1e',
                                             border: '1px solid #333',
-                                            borderRadius: '8px',
-                                            padding: '20px'
+                                            borderRadius: '6px',
+                                            padding: '12px 16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            flex: '1 1 auto',
+                                            minWidth: '140px'
                                         }}>
-                                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ff9800' }}>
+                                            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#ff9800' }}>
                                                 {selectedGoal.age_days || 0}d
                                             </div>
-                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                                 Goal Age
                                             </div>
                                         </div>
@@ -607,24 +714,100 @@ function Analytics() {
                                     </div>
                                 </div>
                             ) : (
+                                /* Multi-Goal Overview (default view) */
                                 <div style={{
                                     flex: 1,
-                                    background: '#1e1e1e',
-                                    border: '1px solid #333',
-                                    borderRadius: '8px',
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
                                     flexDirection: 'column',
-                                    padding: '40px'
+                                    gap: '16px',
+                                    overflow: 'auto'
                                 }}>
-                                    <div style={{ fontSize: '64px', marginBottom: '20px', opacity: 0.5 }}>🎯</div>
-                                    <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#888', margin: 0 }}>
-                                        Select a goal to view analytics
-                                    </h3>
-                                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', textAlign: 'center', maxWidth: '400px' }}>
-                                        Choose a goal from the panel on the right to see time spent, session history, and activity breakdown
-                                    </p>
+                                    {/* Overview Header with Chart Toggle */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        flexWrap: 'wrap',
+                                        gap: '12px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                            <h2 style={{
+                                                margin: 0,
+                                                fontSize: '18px',
+                                                fontWeight: 600,
+                                                color: '#ccc'
+                                            }}>
+                                                Goals Overview
+                                            </h2>
+
+                                            {/* Chart Toggle Buttons */}
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '4px',
+                                                background: '#252525',
+                                                borderRadius: '6px',
+                                                padding: '3px'
+                                            }}>
+                                                <button
+                                                    onClick={() => setSelectedOverviewChart('timeline')}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: selectedOverviewChart === 'timeline' ? '#333' : 'transparent',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        color: selectedOverviewChart === 'timeline' ? '#fff' : '#888',
+                                                        fontSize: '12px',
+                                                        fontWeight: 500,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                >
+                                                    Completion Timeline
+                                                </button>
+                                                <button
+                                                    onClick={() => setSelectedOverviewChart('timeDistribution')}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: selectedOverviewChart === 'timeDistribution' ? '#333' : 'transparent',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        color: selectedOverviewChart === 'timeDistribution' ? '#fff' : '#888',
+                                                        fontSize: '12px',
+                                                        fontWeight: 500,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                >
+                                                    Time Distribution
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <span style={{
+                                            fontSize: '12px',
+                                            color: '#666'
+                                        }}>
+                                            Select a goal from the panel to view detailed analytics
+                                        </span>
+                                    </div>
+
+                                    {/* Single Chart Container */}
+                                    <div style={{
+                                        flex: 1,
+                                        background: '#1e1e1e',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px',
+                                        padding: '20px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        minHeight: '400px'
+                                    }}>
+                                        {selectedOverviewChart === 'timeline' ? (
+                                            <GoalCompletionTimeline goals={goalAnalytics?.goals || []} />
+                                        ) : (
+                                            <GoalTimeDistribution goals={goalAnalytics?.goals || []} />
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -747,7 +930,7 @@ function Analytics() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {filteredGoals.map(goal => {
                                             const isSelected = selectedGoal?.id === goal.id;
-                                            const typeColor = goalTypeColors[goal.type] || '#666';
+                                            const typeColor = getGoalTypeColor(goal.type);
 
                                             return (
                                                 <div
@@ -1146,7 +1329,7 @@ function Analytics() {
         }}>
             {/* Page Header */}
             <div style={{
-                padding: '80px 40px 20px 40px',
+                padding: '80px 40px 12px 40px',
                 background: 'var(--bg-color)',
                 borderBottom: '1px solid #333',
                 zIndex: 10
@@ -1213,8 +1396,7 @@ function Analytics() {
             <div style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '40px',
-                paddingBottom: '40px'
+                padding: '20px 40px 40px 40px'
             }}>
                 <div style={{
                     maxWidth: (activeTab === 'activities' || activeTab === 'goals') ? '100%' : '1200px',
