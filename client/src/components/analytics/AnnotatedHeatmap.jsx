@@ -1,7 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import AnnotationModal from './AnnotationModal';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { fractalApi } from '../../utils/api';
 
 /**
  * AnnotatedHeatmap - ActivityHeatmap with annotation support.
@@ -100,14 +97,9 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
     // Define loadAnnotations first so it can be used in useEffect
     const loadAnnotations = useCallback(async () => {
         try {
-            const contextParam = encodeURIComponent(JSON.stringify({ time_range: months }));
-            const response = await fetch(
-                `${API_BASE}/api/roots/${rootId}/annotations?visualization_type=heatmap&visualization_context=${contextParam}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                setAnnotations(data.data || []);
-            }
+            const context = { time_range: months };
+            const response = await fractalApi.getAnnotations(rootId, 'heatmap', context);
+            setAnnotations(response.data || []);
         } catch (err) {
             console.error('Failed to load annotations:', err);
         }
@@ -122,24 +114,18 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
 
     const saveAnnotation = async (content) => {
         try {
-            const response = await fetch(`${API_BASE}/api/roots/${rootId}/annotations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    visualization_type: 'heatmap',
-                    visualization_context: { time_range: months },
-                    selected_points: selectedDates,
-                    content
-                })
+            const response = await fractalApi.createAnnotation(rootId, {
+                visualization_type: 'heatmap',
+                visualization_context: { time_range: months },
+                selected_points: selectedDates,
+                content
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                setAnnotations(prev => [data.data, ...prev]);
-                setShowModal(false);
-                setSelectedDates([]);
-                setAnnotationMode(false);
-            }
+            const data = response.data;
+            setAnnotations(prev => [data, ...prev]);
+            setShowModal(false);
+            setSelectedDates([]);
+            setAnnotationMode(false);
         } catch (err) {
             console.error('Failed to save annotation:', err);
         }

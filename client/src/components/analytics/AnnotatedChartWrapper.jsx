@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import AnnotationModal from './AnnotationModal';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { fractalApi } from '../../utils/api';
 
 /**
  * AnnotatedChartWrapper - Wraps Chart.js visualizations with annotation support.
@@ -39,14 +38,8 @@ function AnnotatedChartWrapper({
     // Load existing annotations
     const loadAnnotations = useCallback(async () => {
         try {
-            const contextParam = encodeURIComponent(contextStr);
-            const response = await fetch(
-                `${API_BASE}/api/roots/${rootId}/annotations?visualization_type=${visualizationType}&visualization_context=${contextParam}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                setAnnotations(data.data || []);
-            }
+            const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
+            setAnnotations(response.data || []);
         } catch (err) {
             console.error('Failed to load annotations:', err);
         }
@@ -61,30 +54,24 @@ function AnnotatedChartWrapper({
     // Save annotation
     const saveAnnotation = async (content) => {
         try {
-            const response = await fetch(`${API_BASE}/api/roots/${rootId}/annotations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    visualization_type: visualizationType,
-                    visualization_context: context,
-                    selected_points: selectedPoints,
-                    selection_bounds: {
-                        x1: Math.min(selectionStart.x, selectionEnd.x),
-                        y1: Math.min(selectionStart.y, selectionEnd.y),
-                        x2: Math.max(selectionStart.x, selectionEnd.x),
-                        y2: Math.max(selectionStart.y, selectionEnd.y)
-                    },
-                    content
-                })
+            const response = await fractalApi.createAnnotation(rootId, {
+                visualization_type: visualizationType,
+                visualization_context: context,
+                selected_points: selectedPoints,
+                selection_bounds: {
+                    x1: Math.min(selectionStart.x, selectionEnd.x),
+                    y1: Math.min(selectionStart.y, selectionEnd.y),
+                    x2: Math.max(selectionStart.x, selectionEnd.x),
+                    y2: Math.max(selectionStart.y, selectionEnd.y)
+                },
+                content
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                setAnnotations(prev => [data.data, ...prev]);
-                setShowModal(false);
-                setSelectedPoints([]);
-                setAnnotationMode(false);
-            }
+            const data = response.data;
+            setAnnotations(prev => [data, ...prev]);
+            setShowModal(false);
+            setSelectedPoints([]);
+            setAnnotationMode(false);
         } catch (err) {
             console.error('Failed to save annotation:', err);
         }

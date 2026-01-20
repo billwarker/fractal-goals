@@ -8,6 +8,7 @@ import AnnotatedHeatmap from './AnnotatedHeatmap';
 import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
+import AnnotationsList from './AnnotationsList';
 import { Bar, Line } from 'react-chartjs-2';
 import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
 
@@ -23,6 +24,8 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * @param {object} props.data - All analytics data (sessions, goalAnalytics, activities, activityInstances)
  * @param {object} props.windowState - Controlled state for this window (from parent)
  * @param {function} props.updateWindowState - Callback to update window state
+ * @param {function} props.onAnnotationsClick - Callback when annotations category is clicked
+ * @param {object} props.sourceWindowState - State from the source window (for annotations view)
  */
 function ProfileWindow({
     windowId: _windowId, // eslint-disable-line no-unused-vars
@@ -32,7 +35,9 @@ function ProfileWindow({
     onClose,
     data,
     windowState,
-    updateWindowState
+    updateWindowState,
+    onAnnotationsClick,
+    sourceWindowState
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
@@ -92,6 +97,48 @@ function ProfileWindow({
             { id: 'scatterPlot', name: 'Scatter Plot', icon: '⚡' },
             { id: 'lineGraph', name: 'Line Graph', icon: '📈' }
         ]
+    };
+
+    // Helper to extract visualization type from window state
+    const getVisualizationType = (state) => {
+        if (!state || !state.selectedCategory || !state.selectedVisualization) {
+            return null;
+        }
+
+        const { selectedCategory: cat, selectedVisualization: viz } = state;
+
+        // Map category + visualization to visualization type used by annotations
+        if (cat === 'activities') {
+            if (viz === 'scatterPlot') return 'scatter';
+            if (viz === 'lineGraph') return 'line';
+        } else if (cat === 'goals') {
+            if (viz === 'completionTimeline') return 'timeline';
+            if (viz === 'timeDistribution') return 'distribution';
+        } else if (cat === 'sessions') {
+            if (viz === 'weeklyChart') return 'bar';
+            if (viz === 'heatmap') return 'heatmap';
+        }
+
+        return null;
+    };
+
+    // Helper to extract context from window state
+    const getVisualizationContext = (state) => {
+        if (!state) return {};
+
+        const context = {};
+
+        // Add activity_id for activity visualizations
+        if (state.selectedCategory === 'activities' && state.selectedActivity?.id) {
+            context.activity_id = state.selectedActivity.id;
+        }
+
+        // Add time_range for heatmap
+        if (state.selectedCategory === 'sessions' && state.selectedVisualization === 'heatmap') {
+            context.time_range = state.heatmapMonths || 12;
+        }
+
+        return context;
     };
 
     // Get goal type color
@@ -217,10 +264,16 @@ function ProfileWindow({
             borderBottom: '1px solid #333',
             background: '#252525'
         }}>
-            {['goals', 'sessions', 'activities'].map(category => (
+            {['goals', 'sessions', 'activities', 'annotations'].map(category => (
                 <button
                     key={category}
-                    onClick={() => handleCategoryChange(category)}
+                    onClick={() => {
+                        if (category === 'annotations' && onAnnotationsClick) {
+                            onAnnotationsClick();
+                        } else {
+                            handleCategoryChange(category);
+                        }
+                    }}
                     style={{
                         flex: 1,
                         padding: '10px 16px',
@@ -827,6 +880,23 @@ function ProfileWindow({
                         </div>
                     );
             }
+        }
+
+        // Annotations view
+        if (selectedCategory === 'annotations') {
+            // Get visualization type and context from source window
+            const sourceVizType = getVisualizationType(sourceWindowState);
+            const sourceContext = getVisualizationContext(sourceWindowState);
+
+            return (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <AnnotationsList
+                        rootId={rootId}
+                        visualizationType={sourceVizType}
+                        context={sourceContext}
+                    />
+                </div>
+            );
         }
 
         return null;

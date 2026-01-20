@@ -199,6 +199,24 @@ function Analytics() {
         }
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
+    // Handle annotations click - forces split view and sets right window to annotations
+    const handleAnnotationsClick = () => {
+        // Ensure we have two windows
+        if (visibleWindows.length === 1) {
+            setVisibleWindows(['window-1', 'window-2']);
+            setSplitPosition(50);
+        }
+
+        // Set window-2 (the right window) to annotations
+        setWindowStates(prev => ({
+            ...prev,
+            ['window-2']: {
+                ...prev['window-2'],
+                selectedCategory: 'annotations'
+            }
+        }));
+    };
+
     // Shared data for all windows
     const sharedData = {
         sessions,
@@ -250,6 +268,8 @@ function Analytics() {
                         data={sharedData}
                         windowState={windowStates[visibleWindows[0]]}
                         updateWindowState={createWindowStateUpdater(visibleWindows[0])}
+                        onAnnotationsClick={handleAnnotationsClick}
+                        sourceWindowState={windowStates['window-2']} // In single mode, this might be stale but that's fine
                     />
                 ) : (
                     // Two windows with resizer
@@ -268,6 +288,8 @@ function Analytics() {
                                 data={sharedData}
                                 windowState={windowStates[visibleWindows[0]]}
                                 updateWindowState={createWindowStateUpdater(visibleWindows[0])}
+                                onAnnotationsClick={handleAnnotationsClick}
+                                sourceWindowState={windowStates[visibleWindows[1]]}
                             />
                         </div>
 
@@ -330,6 +352,8 @@ function Analytics() {
                                 data={sharedData}
                                 windowState={windowStates[visibleWindows[1]]}
                                 updateWindowState={createWindowStateUpdater(visibleWindows[1])}
+                                onAnnotationsClick={handleAnnotationsClick}
+                                sourceWindowState={windowStates[visibleWindows[0]]}
                             />
                         </div>
                     </>
