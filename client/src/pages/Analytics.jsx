@@ -49,7 +49,8 @@ function Analytics() {
             setsHandling: 'top',
             selectedSplit: 'all',
             selectedGoal: null,
-            selectedGoalChart: 'duration'
+            selectedGoalChart: 'duration',
+            heatmapMonths: 12 // Time range for activity heatmap
         },
         'window-2': {
             selectedCategory: null,
@@ -60,7 +61,8 @@ function Analytics() {
             setsHandling: 'top',
             selectedSplit: 'all',
             selectedGoal: null,
-            selectedGoalChart: 'duration'
+            selectedGoalChart: 'duration',
+            heatmapMonths: 12 // Time range for activity heatmap
         }
     });
 
@@ -203,7 +205,8 @@ function Analytics() {
         goalAnalytics,
         activities,
         activityInstances,
-        formatDuration
+        formatDuration,
+        rootId
     };
 
     if (loading || activitiesLoading) {

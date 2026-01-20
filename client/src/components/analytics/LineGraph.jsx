@@ -17,7 +17,8 @@ function LineGraph({
     selectedMetricY2 = null,
     setSelectedMetricY2 = null,
     setsHandling = 'top',
-    selectedSplit = 'all'
+    selectedSplit = 'all',
+    chartRef
 }) {
     console.log('LineGraph called', { selectedActivity, selectedMetric, selectedMetricY2, selectedSplit });
 
@@ -603,7 +604,7 @@ function LineGraph({
 
             {/* Chart */}
             <div style={{ flex: 1, minHeight: 0 }}>
-                <Line data={chartData} options={options} />
+                <Line ref={chartRef} data={chartData} options={options} />
             </div>
         </div>
     );

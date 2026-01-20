@@ -9,7 +9,7 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * The y-axis shows cumulative count of completed goals.
  * The x-axis shows the timeline based on completion dates.
  */
-function GoalCompletionTimeline({ goals }) {
+function GoalCompletionTimeline({ goals, chartRef }) {
     // Goal types in hierarchy order from PARENT (bottom of stack) to CHILD (top of stack)
     // This ensures parent goals form the base of the stacked area chart
     const goalTypesHierarchy = [
@@ -276,7 +276,7 @@ function GoalCompletionTimeline({ goals }) {
 
     return (
         <div style={{ width: '100%', height: '100%' }}>
-            <Line data={chartData} options={chartOptions} />
+            <Line ref={chartRef} data={chartData} options={chartOptions} />
         </div>
     );
 }

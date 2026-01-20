@@ -9,7 +9,7 @@ import { chartDefaults, createChartOptions } from './ChartJSWrapper';
  * Requires at least 2 metrics to be meaningful
  * Supports split filtering for split-enabled activities
  */
-function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all' }) {
+function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all', chartRef }) {
     const [xMetric, setXMetric] = useState(null);
     const [yMetric, setYMetric] = useState(null);
 
@@ -396,7 +396,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
             {/* Chart */}
             <div style={{ flex: 1, minHeight: 0 }}>
-                <Scatter data={chartData} options={options} />
+                <Scatter ref={chartRef} data={chartData} options={options} />
             </div>
         </div>
     );

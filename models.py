@@ -701,6 +701,56 @@ class Note(Base):
         }
 
 
+class VisualizationAnnotation(Base):
+    """
+    Annotations for analytics visualizations.
+    
+    Allows users to select data points on visualizations (heatmaps, charts, etc.)
+    and add notes/insights about the selected data patterns.
+    
+    visualization_type: The type of visualization ('heatmap', 'scatter', 'line', 'bar', etc.)
+    visualization_context: JSON object with viz-specific params (e.g., activity_id, time_range, metric_id)
+    selected_points: JSON array of selected data point identifiers (format depends on viz type)
+    """
+    __tablename__ = 'visualization_annotations'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    # Visualization identification
+    visualization_type = Column(String, nullable=False)  # 'heatmap', 'scatter', 'line', 'bar', 'timeline', etc.
+    visualization_context = Column(Text, nullable=True)  # JSON: {"activity_id": "...", "time_range": 12, ...}
+    
+    # Selected data points (format varies by visualization type)
+    # Heatmap: ["2024-01-15", "2024-01-16", ...]
+    # Scatter/Line: [{"x": "2024-01-15", "y": 45}, ...]
+    # Bar: [{"label": "Week 1", "value": 5}, ...]
+    selected_points = Column(Text, nullable=False)  # JSON array
+    
+    # Selection bounds (optional, for visual reconstruction)
+    selection_bounds = Column(Text, nullable=True)  # JSON: {"x1": 0, "y1": 0, "x2": 100, "y2": 100}
+    
+    # The annotation content
+    content = Column(Text, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "visualization_type": self.visualization_type,
+            "visualization_context": json.loads(self.visualization_context) if self.visualization_context else None,
+            "selected_points": json.loads(self.selected_points) if self.selected_points else [],
+            "selection_bounds": json.loads(self.selection_bounds) if self.selection_bounds else None,
+            "content": self.content,
+            "created_at": format_utc(self.created_at),
+            "updated_at": format_utc(self.updated_at)
+        }
+
 class SessionTemplate(Base):
     __tablename__ = 'session_templates'
     

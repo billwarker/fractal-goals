@@ -111,7 +111,8 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
         return '#39d353';
     };
 
-    const cellSize = 12;
+    // Dynamically calculate cell size based on available width
+    const cellSize = 14;
     const cellGap = 3;
     const dayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
@@ -124,8 +125,8 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
         });
     };
 
-    // Calculate total sessions and streak info
-    const totalSessions = sessions.length;
+    // Calculate total sessions and streak info (within the time range)
+    const totalSessions = dailyData.reduce((sum, d) => sum + d.count, 0);
     const activeDays = dailyData.filter(d => d.count > 0).length;
 
     return (

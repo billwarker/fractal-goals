@@ -7,7 +7,7 @@ import { Bar } from 'react-chartjs-2';
  * @param {Array} sessions - Array of session objects with session_start dates
  * @param {number} weeks - Number of weeks to display (default: 12)
  */
-function WeeklyBarChart({ sessions = [], weeks = 12 }) {
+function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
     // Process sessions into weekly counts
     const { weeklyData, averagePerWeek, maxSessions, trend } = useMemo(() => {
         const today = new Date();
@@ -286,7 +286,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12 }) {
 
             {/* Chart */}
             <div style={{ flex: 1, minHeight: '200px' }}>
-                <Bar data={chartData} options={chartOptions} />
+                <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
 
             {/* Average line legend */}

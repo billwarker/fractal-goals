@@ -12,7 +12,7 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * - Option to roll-up child goal time to parent goals
  * - Option to measure by activity duration vs session duration
  */
-function GoalTimeDistribution({ goals }) {
+function GoalTimeDistribution({ goals, chartRef }) {
     // Roll-up toggle: when true, child goal time is aggregated to parents
     const [rollUpEnabled, setRollUpEnabled] = useState(false);
     // Duration mode: 'activity' = activity instance duration, 'session' = full session duration
@@ -379,7 +379,7 @@ function GoalTimeDistribution({ goals }) {
 
             {/* Chart */}
             <div style={{ flex: 1, minHeight: 0 }}>
-                <Bar data={chartData} options={chartOptions} />
+                <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
         </div>
     );

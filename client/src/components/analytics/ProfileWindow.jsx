@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ScatterPlot from './ScatterPlot';
 import LineGraph from './LineGraph';
 import GoalCompletionTimeline from './GoalCompletionTimeline';
 import GoalTimeDistribution from './GoalTimeDistribution';
 import ActivityHeatmap from './ActivityHeatmap';
+import AnnotatedHeatmap from './AnnotatedHeatmap';
+import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
 import { Bar, Line } from 'react-chartjs-2';
@@ -32,7 +34,8 @@ function ProfileWindow({
     windowState,
     updateWindowState
 }) {
-    const { sessions, goalAnalytics, activities, activityInstances, formatDuration } = data;
+    const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
+    const chartRef = useRef(null);
 
     // Extract state from controlled windowState prop
     const {
@@ -44,7 +47,8 @@ function ProfileWindow({
         setsHandling,
         selectedSplit,
         selectedGoal,
-        selectedGoalChart
+        selectedGoalChart,
+        heatmapMonths
     } = windowState;
 
     // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
@@ -56,6 +60,7 @@ function ProfileWindow({
     const setSelectedSplit = (value) => updateWindowState({ selectedSplit: value });
     const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
     const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
+    const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -583,13 +588,25 @@ function ProfileWindow({
                 case 'completionTimeline':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                            <GoalCompletionTimeline goals={goalAnalytics?.goals || []} />
+                            <AnnotatedChartWrapper
+                                chartRef={chartRef}
+                                visualizationType="timeline"
+                                rootId={rootId}
+                            >
+                                <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
+                            </AnnotatedChartWrapper>
                         </div>
                     );
                 case 'timeDistribution':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                            <GoalTimeDistribution goals={goalAnalytics?.goals || []} />
+                            <AnnotatedChartWrapper
+                                chartRef={chartRef}
+                                visualizationType="distribution"
+                                rootId={rootId}
+                            >
+                                <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
+                            </AnnotatedChartWrapper>
                         </div>
                     );
                 case 'goalDetail':
@@ -675,12 +692,57 @@ function ProfileWindow({
                             </div>
                         </div>
                     );
-                case 'heatmap':
+                case 'heatmap': {
+                    const timeRangeOptions = [
+                        { value: 12, label: '1 Year' },
+                        { value: 6, label: '6 Months' },
+                        { value: 3, label: '3 Months' },
+                        { value: 1, label: '1 Month' }
+                    ];
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <ActivityHeatmap sessions={sessions} months={12} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '16px' }}>
+                            {/* Time range selector */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '8px',
+                                padding: '12px 16px',
+                                marginBottom: '16px',
+                                background: '#252525',
+                                borderRadius: '8px',
+                                alignItems: 'center'
+                            }}>
+                                <span style={{ color: '#888', fontSize: '12px', marginRight: '8px' }}>
+                                    Time Range:
+                                </span>
+                                {timeRangeOptions.map(option => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => setHeatmapMonths(option.value)}
+                                        style={{
+                                            padding: '6px 14px',
+                                            background: heatmapMonths === option.value ? '#2196f3' : '#333',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            color: heatmapMonths === option.value ? 'white' : '#888',
+                                            fontSize: '12px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Annotated Heatmap with selection support */}
+                            <AnnotatedHeatmap
+                                sessions={sessions}
+                                months={heatmapMonths || 12}
+                                rootId={rootId}
+                            />
                         </div>
                     );
+                }
                 case 'streaks':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -690,7 +752,13 @@ function ProfileWindow({
                 case 'weeklyChart':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <WeeklyBarChart sessions={sessions} weeks={12} />
+                            <AnnotatedChartWrapper
+                                chartRef={chartRef}
+                                visualizationType="bar"
+                                rootId={rootId}
+                            >
+                                <WeeklyBarChart sessions={sessions} weeks={12} chartRef={chartRef} />
+                            </AnnotatedChartWrapper>
                         </div>
                     );
             }
@@ -717,29 +785,45 @@ function ProfileWindow({
                 case 'scatterPlot':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <ScatterPlot
-                                selectedActivity={selectedActivity}
-                                activityInstances={activityInstances}
-                                activities={activities}
-                                setsHandling={setsHandling}
-                                selectedSplit={selectedSplit}
-                            />
+                            <AnnotatedChartWrapper
+                                chartRef={chartRef}
+                                visualizationType="scatter"
+                                rootId={rootId}
+                                context={{ activity_id: selectedActivity?.id }}
+                            >
+                                <ScatterPlot
+                                    selectedActivity={selectedActivity}
+                                    activityInstances={activityInstances}
+                                    activities={activities}
+                                    setsHandling={setsHandling}
+                                    selectedSplit={selectedSplit}
+                                    chartRef={chartRef}
+                                />
+                            </AnnotatedChartWrapper>
                         </div>
                     );
                 case 'lineGraph':
                     return (
                         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <LineGraph
-                                selectedActivity={selectedActivity}
-                                activityInstances={activityInstances}
-                                activities={activities}
-                                selectedMetric={selectedMetric}
-                                setSelectedMetric={setSelectedMetric}
-                                selectedMetricY2={selectedMetricY2}
-                                setSelectedMetricY2={setSelectedMetricY2}
-                                setsHandling={setsHandling}
-                                selectedSplit={selectedSplit}
-                            />
+                            <AnnotatedChartWrapper
+                                chartRef={chartRef}
+                                visualizationType="line"
+                                rootId={rootId}
+                                context={{ activity_id: selectedActivity?.id }}
+                            >
+                                <LineGraph
+                                    selectedActivity={selectedActivity}
+                                    activityInstances={activityInstances}
+                                    activities={activities}
+                                    selectedMetric={selectedMetric}
+                                    setSelectedMetric={setSelectedMetric}
+                                    selectedMetricY2={selectedMetricY2}
+                                    setSelectedMetricY2={setSelectedMetricY2}
+                                    setsHandling={setsHandling}
+                                    selectedSplit={selectedSplit}
+                                    chartRef={chartRef}
+                                />
+                            </AnnotatedChartWrapper>
                         </div>
                     );
             }

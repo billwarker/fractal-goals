@@ -148,7 +148,14 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
 - `db_migrate.py` - Migration helper
 - `migrate_sqlite_to_postgres.py` - Data transfer tool
 - `alembic.ini` & `migrations/` - Schema versioning
+### 10. Visualization Annotations
+- **Universal Annotation System:** Allows users to annotate specific data points on any analytical visualization (heatmap, scatter plot, line graph, etc.).
+- **Drag-to-Select Interface:** Users can drag to select a range of data points (cells in heatmap, region in charts) to annotate.
+- **Visual Feedback:** Selection is highlighted, and annotated regions are marked with interactive indicators.
+- **Persistence:** Annotations are stored in the database linked to the visualization type, context (e.g., specific activity), and selected data points.
+- **Interactive Modals:** Annotation Modal for creating notes, and view modal for reading existing annotations.
 
+---
 ---
 
 ## Database Schema
@@ -341,6 +348,20 @@ Timestamped notes attached to sessions, activity instances, or sets.
 - Belongs to ActivityInstance (optional)
 - Belongs to ActivityDefinition (optional)
 
+#### `visualization_annotations`
+Stores annotations on data visualizations.
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `root_id` (String, FK to goals.id)
+- `visualization_type` (String) - 'heatmap', 'scatter', 'line', etc.
+- `visualization_context` (Text/JSON) - Identifiers for context (e.g. activity_id)
+- `selected_points` (Text/JSON) - List of data points selected
+- `selection_bounds` (Text/JSON) - Coordinates of selection box
+- `content` (Text)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+
 #### `session_templates`
 Reusable session templates.
 
@@ -513,6 +534,15 @@ Manages timestamped notes for sessions, activities, and sets.
 - `POST /api/<root_id>/notes` - Create note
 - `PUT /api/<root_id>/notes/<note_id>` - Update note
 - `DELETE /api/<root_id>/notes/<note_id>` - Soft delete note
+
+#### `annotations_api.py`
+Manages visualization annotations.
+
+**Key Endpoints:**
+- `GET /api/roots/<root_id>/annotations` - Get annotations (can filter by type/context)
+- `POST /api/roots/<root_id>/annotations` - Create annotation
+- `PUT /api/roots/<root_id>/annotations/<annotation_id>` - Update annotation
+- `DELETE /api/roots/<root_id>/annotations/<annotation_id>` - Delete annotation
 
 #### `pages.py`
 Serves static pages (minimal usage, mostly SPA).
@@ -730,7 +760,17 @@ Fractal selection/home page.
 
 #### Analytics Components (in `/client/src/components/analytics/`)
 
-- Analytics-specific visualization components
+- **`AnnotatedHeatmap.jsx`** - GitHub-style heatmap with drag-to-select annotation support
+- **`AnnotatedChartWrapper.jsx`** - Wrapper for Chart.js charts adding annotation functionality
+- **`AnnotationModal.jsx`** - Modal for adding notes to selected data points
+- **`ProfileWindow.jsx`** - Main container for analytics visualizations
+- **`ActivityHeatmap.jsx`** - Core heatmap component
+- **`ScatterPlot.jsx`** - Scatter plot for metric correlations
+- **`LineGraph.jsx`** - Line graph for metric trends
+- **`WeeklyBarChart.jsx`** - Bar chart for weekly session counts
+- **`GoalCompletionTimeline.jsx`** - Stacked area chart for goal completions
+- **`GoalTimeDistribution.jsx`** - Stacked bar chart for time tracking
+- **`StreakTimeline.jsx`** - Visual timeline of activity streaks
 
 #### Session Detail Components (in `/client/src/components/sessionDetail/`)
 
