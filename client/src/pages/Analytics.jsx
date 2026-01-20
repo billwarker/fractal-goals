@@ -6,6 +6,9 @@ import ScatterPlot from '../components/analytics/ScatterPlot';
 import LineGraph from '../components/analytics/LineGraph';
 import GoalCompletionTimeline from '../components/analytics/GoalCompletionTimeline';
 import GoalTimeDistribution from '../components/analytics/GoalTimeDistribution';
+import ActivityHeatmap from '../components/analytics/ActivityHeatmap';
+import StreakTimeline from '../components/analytics/StreakTimeline';
+import WeeklyBarChart from '../components/analytics/WeeklyBarChart';
 import { GOAL_COLOR_SYSTEM } from '../utils/goalColors';
 import { Bar, Line } from 'react-chartjs-2';
 import '../components/analytics/ChartJSWrapper'; // Registers Chart.js components
@@ -990,71 +993,135 @@ function Analytics() {
                 );
 
             case 'sessions':
+                const completedSessions = sessions.filter(s => s.completed);
+                const totalDuration = sessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0);
+                const avgDuration = sessions.length > 0 ? totalDuration / sessions.length : 0;
+
                 return (
                     <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '40px',
-                        textAlign: 'center'
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        height: 'calc(100vh - 180px)',
+                        minHeight: '600px'
                     }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
-                        <h2 style={{ fontSize: '24px', fontWeight: 400, color: '#ccc', marginBottom: '12px' }}>
-                            Sessions Analytics
-                        </h2>
-                        <p style={{ fontSize: '14px', color: '#888', maxWidth: '500px', margin: '0 auto' }}>
-                            View session frequency, duration trends, and completion patterns over time.
-                        </p>
-
-                        {/* Quick Stats */}
+                        {/* Top Stats Row */}
                         <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: '20px',
-                            marginTop: '40px',
-                            maxWidth: '800px',
-                            margin: '40px auto 0'
+                            display: 'flex',
+                            gap: '12px',
+                            flexWrap: 'wrap'
                         }}>
                             <div style={{
-                                background: '#252525',
-                                padding: '20px',
+                                flex: '1 1 150px',
+                                background: '#1e1e1e',
+                                border: '1px solid #333',
                                 borderRadius: '6px',
-                                border: '1px solid #333'
+                                padding: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
                             }}>
-                                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196f3' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#2196f3' }}>
                                     {sessions.length}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
-                                    Total Sessions
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Total Sessions
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#666' }}>
+                                        All time
+                                    </div>
                                 </div>
                             </div>
 
                             <div style={{
-                                background: '#252525',
-                                padding: '20px',
+                                flex: '1 1 150px',
+                                background: '#1e1e1e',
+                                border: '1px solid #333',
                                 borderRadius: '6px',
-                                border: '1px solid #333'
+                                padding: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
                             }}>
-                                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4caf50' }}>
-                                    {sessions.filter(s => s.attributes?.completed).length}
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#4caf50' }}>
+                                    {completedSessions.length}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
-                                    Completed
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Completed
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#666' }}>
+                                        {sessions.length > 0 ? Math.round((completedSessions.length / sessions.length) * 100) : 0}% rate
+                                    </div>
                                 </div>
                             </div>
 
                             <div style={{
-                                background: '#252525',
-                                padding: '20px',
+                                flex: '1 1 150px',
+                                background: '#1e1e1e',
+                                border: '1px solid #333',
                                 borderRadius: '6px',
-                                border: '1px solid #333'
+                                padding: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
                             }}>
-                                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ff9800' }}>
-                                    {sessions.filter(s => !s.attributes?.completed).length}
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ff9800' }}>
+                                    {formatDuration(totalDuration)}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
-                                    In Progress
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Total Time
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#666' }}>
+                                        Practiced
+                                    </div>
                                 </div>
+                            </div>
+
+                            <div style={{
+                                flex: '1 1 150px',
+                                background: '#1e1e1e',
+                                border: '1px solid #333',
+                                borderRadius: '6px',
+                                padding: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                            }}>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#9c27b0' }}>
+                                    {formatDuration(avgDuration)}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Avg Duration
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#666' }}>
+                                        Per session
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Activity Heatmap - Full Width */}
+                        <ActivityHeatmap sessions={sessions} months={12} />
+
+                        {/* Bottom Row: Streak Timeline + Weekly Chart */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '20px',
+                            flex: 1,
+                            minHeight: '300px'
+                        }}>
+                            {/* Streak Timeline - Left */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <StreakTimeline sessions={sessions} />
+                            </div>
+
+                            {/* Weekly Bar Chart - Right */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <WeeklyBarChart sessions={sessions} weeks={12} />
                             </div>
                         </div>
                     </div>
@@ -1399,9 +1466,9 @@ function Analytics() {
                 padding: '20px 40px 40px 40px'
             }}>
                 <div style={{
-                    maxWidth: (activeTab === 'activities' || activeTab === 'goals') ? '100%' : '1200px',
+                    maxWidth: (activeTab === 'activities' || activeTab === 'goals' || activeTab === 'sessions') ? '100%' : '1200px',
                     margin: '0 auto',
-                    height: (activeTab === 'activities' || activeTab === 'goals') ? '100%' : 'auto'
+                    height: (activeTab === 'activities' || activeTab === 'goals' || activeTab === 'sessions') ? '100%' : 'auto'
                 }}>
                     {renderTabContent()}
                 </div>
