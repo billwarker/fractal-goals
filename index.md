@@ -160,6 +160,18 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
 - `db_migrate.py` - Migration helper
 - `migrate_sqlite_to_postgres.py` - Data transfer tool
 - `alembic.ini` & `migrations/` - Schema versioning
+
+**Performance Optimizations:**
+- **Connection Pooling:** `get_engine()` uses a singleton pattern with `QueuePool` for PostgreSQL (pool_size=10, max_overflow=20, pool_pre_ping=True)
+- **Database Indexes:** Migration `b8e4a72f9d31` adds indexes on frequently queried columns:
+  - `sessions`: root_id, deleted_at, created_at, completed, (root_id, deleted_at)
+  - `goals`: root_id, deleted_at, parent_id, type, (root_id, type)
+  - `activity_instances`: session_id, deleted_at, activity_definition_id
+  - `activity_definitions`, `activity_groups`, `programs`, `session_templates`: root_id
+- **Scoped Sessions:** `get_scoped_session()` provides thread-local sessions with automatic cleanup via Flask's `teardown_appcontext`
+- **Batched Analytics:** Analytics endpoint uses 3 batch queries instead of N+1 pattern
+- **Eager Loading:** Session endpoints use `joinedload()` for goals, notes, activity_instances, and program_day
+
 ### 10. Visualization Annotations
 - **Universal Annotation System:** Allows users to annotate specific data points on any analytical visualization (heatmap, scatter plot, line graph, etc.).
 - **Drag-to-Select Interface:** Users can drag to select a range of data points (cells in heatmap, region in charts) to annotate.

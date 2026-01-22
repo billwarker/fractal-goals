@@ -672,9 +672,12 @@ def get_goal_analytics(root_id):
     Returns:
     - High-level statistics (completed count, avg age, avg time to completion, avg duration)
     - Per-goal analytics with session associations
+    
+    Optimized to use batched queries and avoid N+1 query patterns.
     """
     from sqlalchemy import func, and_
-    from models import session_goals, ActivityInstance
+    from sqlalchemy.orm import joinedload
+    from models import session_goals, ActivityInstance, ActivityDefinition
     
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -683,11 +686,14 @@ def get_goal_analytics(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        # Get all goals for this fractal (excluding the root itself)
+        # === BATCH QUERY 1: Get all goals for this fractal ===
         all_goals = db_session.query(Goal).filter(
             Goal.root_id == root_id,
             Goal.deleted_at == None
         ).all()
+        
+        goal_ids = [g.id for g in all_goals]
+        goal_map = {g.id: g for g in all_goals}
         
         # Calculate high-level statistics
         now = datetime.now(timezone.utc)
@@ -700,7 +706,8 @@ def get_goal_analytics(root_id):
         goal_ages = []
         for g in all_goals:
             if g.created_at:
-                age_days = (now - g.created_at.replace(tzinfo=timezone.utc) if g.created_at.tzinfo is None else now - g.created_at).days
+                created = g.created_at.replace(tzinfo=timezone.utc) if g.created_at.tzinfo is None else g.created_at
+                age_days = (now - created).days
                 goal_ages.append(age_days)
         avg_goal_age = sum(goal_ages) / len(goal_ages) if goal_ages else 0
         
@@ -714,22 +721,26 @@ def get_goal_analytics(root_id):
                 completion_times.append(days_to_complete)
         avg_time_to_completion = sum(completion_times) / len(completion_times) if completion_times else 0
         
-        # Get all sessions for this fractal
-        all_sessions = db_session.query(Session).filter(
+        # === BATCH QUERY 2: Get all sessions with goals eagerly loaded ===
+        all_sessions = db_session.query(Session).options(
+            joinedload(Session.goals)
+        ).filter(
             Session.root_id == root_id,
             Session.deleted_at == None
         ).all()
         
-        # Build goal -> sessions mapping
+        session_map = {s.id: s for s in all_sessions}
+        
+        # Build goal -> sessions mapping using the batch-loaded data
         goal_session_map = {}  # goal_id -> list of session data
         for session in all_sessions:
             session_duration = session.total_duration_seconds or 0
             if session_duration == 0 and session.session_start and session.session_end:
                 start = session.session_start.replace(tzinfo=timezone.utc) if session.session_start.tzinfo is None else session.session_start
                 end = session.session_end.replace(tzinfo=timezone.utc) if session.session_end.tzinfo is None else session.session_end
-                session_duration = (end - start).total_seconds()
+                session_duration = int((end - start).total_seconds())
             
-            # Get associated goals via relationship
+            # Goals already eagerly loaded
             for goal in session.goals:
                 if goal.id not in goal_session_map:
                     goal_session_map[goal.id] = []
@@ -740,6 +751,21 @@ def get_goal_analytics(root_id):
                     'completed': session.completed,
                     'session_start': session.session_start.isoformat() if session.session_start else None
                 })
+        
+        # === BATCH QUERY 3: Get ALL activity instances for this fractal in one query ===
+        all_activity_instances = db_session.query(ActivityInstance).options(
+            joinedload(ActivityInstance.definition)
+        ).filter(
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at == None
+        ).all()
+        
+        # Group activity instances by session_id for fast lookup
+        session_activity_map = {}  # session_id -> list of ActivityInstance
+        for ai in all_activity_instances:
+            if ai.session_id not in session_activity_map:
+                session_activity_map[ai.session_id] = []
+            session_activity_map[ai.session_id].append(ai)
         
         # Calculate avg duration towards completed goals
         total_duration_completed = 0
@@ -760,32 +786,30 @@ def get_goal_analytics(root_id):
             total_duration = sum(s['duration_seconds'] for s in sessions_for_goal)
             session_count = len(sessions_for_goal)
             
-            # Get activity breakdowns for this goal's sessions
+            # Get activity breakdowns using pre-fetched data (no additional queries!)
             activity_breakdown = {}
             session_ids = [s['session_id'] for s in sessions_for_goal]
             
-            if session_ids:
-                # Get all activity instances for these sessions
-                activity_instances = db_session.query(ActivityInstance).filter(
-                    ActivityInstance.session_id.in_(session_ids),
-                    ActivityInstance.deleted_at == None
-                ).all()
+            # Collect activity instances from the pre-fetched map
+            goal_activity_instances = []
+            for sid in session_ids:
+                goal_activity_instances.extend(session_activity_map.get(sid, []))
+            
+            for ai in goal_activity_instances:
+                activity_name = ai.definition.name if ai.definition else 'Unknown'
+                activity_id = ai.activity_definition_id
                 
-                for ai in activity_instances:
-                    activity_name = ai.definition.name if ai.definition else 'Unknown'
-                    activity_id = ai.activity_definition_id
-                    
-                    if activity_id not in activity_breakdown:
-                        activity_breakdown[activity_id] = {
-                            'activity_id': activity_id,
-                            'activity_name': activity_name,
-                            'instance_count': 0,
-                            'total_duration_seconds': 0
-                        }
-                    
-                    activity_breakdown[activity_id]['instance_count'] += 1
-                    if ai.duration_seconds:
-                        activity_breakdown[activity_id]['total_duration_seconds'] += ai.duration_seconds
+                if activity_id not in activity_breakdown:
+                    activity_breakdown[activity_id] = {
+                        'activity_id': activity_id,
+                        'activity_name': activity_name,
+                        'instance_count': 0,
+                        'total_duration_seconds': 0
+                    }
+                
+                activity_breakdown[activity_id]['instance_count'] += 1
+                if ai.duration_seconds:
+                    activity_breakdown[activity_id]['total_duration_seconds'] += ai.duration_seconds
             
             # Goal age
             goal_age_days = 0
@@ -807,16 +831,15 @@ def get_goal_analytics(root_id):
             
             # Build activity durations by date (activity instance level)
             activity_durations_by_date = []
-            if session_ids:
-                for ai in activity_instances:
-                    # Get the session date for this activity instance
-                    session = next((s for s in sessions_for_goal if s['session_id'] == ai.session_id), None)
-                    if session and session['session_start'] and ai.duration_seconds:
-                        activity_durations_by_date.append({
-                            'date': session['session_start'],
-                            'duration_seconds': ai.duration_seconds,
-                            'activity_name': ai.definition.name if ai.definition else 'Unknown'
-                        })
+            for ai in goal_activity_instances:
+                # Get the session date for this activity instance
+                session = next((s for s in sessions_for_goal if s['session_id'] == ai.session_id), None)
+                if session and session['session_start'] and ai.duration_seconds:
+                    activity_durations_by_date.append({
+                        'date': session['session_start'],
+                        'duration_seconds': ai.duration_seconds,
+                        'activity_name': ai.definition.name if ai.definition else 'Unknown'
+                    })
             # Sort by date
             activity_durations_by_date.sort(key=lambda x: x['date'])
             

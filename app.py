@@ -64,6 +64,17 @@ app.register_blueprint(pages_bp)
 init_services()
 logger.info("Services initialized (event bus, completion handlers)")
 
+# Initialize database engine on startup (creates connection pool)
+from models import get_engine, remove_session
+get_engine()
+logger.info("Database engine initialized with connection pooling")
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    """Clean up database session at the end of each request."""
+    remove_session()
+
+
 
 @app.route('/health')
 def health_check():

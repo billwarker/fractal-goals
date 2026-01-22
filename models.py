@@ -1,6 +1,7 @@
 
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Table, CheckConstraint, Float, Text
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
+from sqlalchemy.pool import QueuePool, NullPool
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref, scoped_session
 from datetime import datetime, timezone
 import uuid
 import json
@@ -889,22 +890,97 @@ class ProgramDay(Base):
 
 
 # Database Helper Functions
+
+# Singleton engine for connection pooling
+_cached_engine = None
+
 def get_engine(db_url=None):
     """
     Get SQLAlchemy engine with environment-based database configuration.
     
-    Supports both SQLite (development) and PostgreSQL (production).
+    Uses a singleton pattern to reuse the engine across requests.
+    For PostgreSQL, configures connection pooling with QueuePool.
     """
+    global _cached_engine
+    
+    # Return cached engine if available and no custom URL specified
+    if _cached_engine is not None and db_url is None:
+        return _cached_engine
+    
     if db_url is None:
         # Import here to avoid circular dependency
         from config import config
         db_url = config.get_database_url()
-    return create_engine(db_url, echo=False)
+    
+    # Create new engine with appropriate pooling
+    from config import config
+    
+    if config.is_postgres():
+        # PostgreSQL: Use QueuePool with connection pooling
+        engine = create_engine(
+            db_url,
+            echo=False,
+            poolclass=QueuePool,
+            pool_size=10,           # Number of persistent connections
+            max_overflow=20,        # Additional connections when pool is exhausted
+            pool_pre_ping=True,     # Verify connection health before use
+            pool_recycle=3600,      # Recycle connections after 1 hour
+            pool_timeout=30,        # Timeout for getting connection from pool
+        )
+    else:
+        # SQLite: Use NullPool (no pooling needed for file-based DB)
+        engine = create_engine(db_url, echo=False, poolclass=NullPool)
+    
+    # Cache the engine if using default URL
+    if db_url == config.get_database_url():
+        _cached_engine = engine
+    
+    return engine
+
+def reset_engine():
+    """Reset the cached engine. Useful for testing or reconfiguration."""
+    global _cached_engine
+    if _cached_engine is not None:
+        _cached_engine.dispose()
+        _cached_engine = None
 
 def init_db(engine):
     Base.metadata.create_all(engine)
 
+# Scoped session factory for Flask request lifecycle
+_session_factory = None
+
+def get_scoped_session():
+    """
+    Get a thread-local scoped session.
+    
+    This session is automatically scoped to the current thread/request.
+    Use remove_session() at the end of each request to clean up.
+    """
+    global _session_factory
+    if _session_factory is None:
+        engine = get_engine()
+        session_factory = sessionmaker(bind=engine)
+        _session_factory = scoped_session(session_factory)
+    return _session_factory()
+
+def remove_session():
+    """
+    Remove the current scoped session.
+    
+    Should be called at the end of each request (via Flask teardown).
+    """
+    global _session_factory
+    if _session_factory is not None:
+        _session_factory.remove()
+
 def get_session(engine):
+    """
+    Create a new session bound to the given engine.
+    
+    DEPRECATED: Prefer get_scoped_session() for Flask request handling.
+    This function is kept for backward compatibility.
+    """
     DBSession = sessionmaker(bind=engine)
     return DBSession()
 

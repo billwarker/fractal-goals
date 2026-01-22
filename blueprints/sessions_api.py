@@ -48,7 +48,14 @@ def get_all_sessions_endpoint():
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        sessions = get_all_sessions(db_session)
+        # Use eager loading to avoid N+1 queries during serialization
+        sessions = db_session.query(Session).options(
+            joinedload(Session.goals),
+            joinedload(Session.notes_list),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)
+        ).filter(Session.deleted_at == None).order_by(Session.created_at.desc()).all()
         result = [s.to_dict() for s in sessions]
         return jsonify(result)
     finally:
@@ -65,11 +72,13 @@ def get_fractal_sessions(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        # Get sessions filtered by root_id, sorted by date (newest first)
-        # Eager load notes and activity instances with their notes for accurate count
+        # Comprehensive eager loading for all relationships accessed in to_dict()
         sessions = db_session.query(Session).options(
+            joinedload(Session.goals),
             joinedload(Session.notes_list),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list)
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)
         ).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
         result = [s.to_dict() for s in sessions]
         return jsonify(result)
@@ -337,7 +346,16 @@ def get_session_endpoint(root_id, session_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        session = get_session_by_id(db_session, session_id)
+        # Use eager loading for all relationships accessed in to_dict()
+        session = db_session.query(Session).options(
+            joinedload(Session.goals),
+            joinedload(Session.notes_list),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.metric_values),
+            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)
+        ).filter(Session.id == session_id, Session.deleted_at == None).first()
+        
         if not session:
             return jsonify({"error": "Session not found"}), 404
         return jsonify(session.to_dict())
