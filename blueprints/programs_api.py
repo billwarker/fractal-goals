@@ -13,6 +13,7 @@ from validators import (
     validate_request,
     ProgramCreateSchema, ProgramUpdateSchema, ProgramDayCreateSchema
 )
+from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,13 @@ def create_program(root_id, validated_data):
         
         session.commit()
         
+        # Emit program created event
+        event_bus.emit(Event(Events.PROGRAM_CREATED, {
+            'program_id': new_program.id,
+            'program_name': new_program.name,
+            'root_id': root_id
+        }, source='programs_api.create_program'))
+        
         return jsonify(new_program.to_dict()), 201
         
     except Exception as e:
@@ -205,6 +213,14 @@ def update_program(root_id, program_id, validated_data):
         
         session.commit()
         
+        # Emit program updated event
+        event_bus.emit(Event(Events.PROGRAM_UPDATED, {
+            'program_id': program.id,
+            'program_name': program.name,
+            'root_id': root_id,
+            'updated_fields': list(validated_data.keys())
+        }, source='programs_api.update_program'))
+        
         return jsonify(program.to_dict())
         
     except Exception as e:
@@ -236,8 +252,16 @@ def delete_program(root_id, program_id):
             for day in block.days:
                 affected_sessions_count += len([s for s in day.completed_sessions if not s.deleted_at])
         
+        program_name = program.name
         session.delete(program)
         session.commit()
+        
+        # Emit program deleted event
+        event_bus.emit(Event(Events.PROGRAM_DELETED, {
+            'program_id': program_id,
+            'program_name': program_name,
+            'root_id': root_id
+        }, source='programs_api.delete_program'))
         
         return jsonify({
             "message": "Program deleted successfully",

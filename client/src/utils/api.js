@@ -90,6 +90,16 @@ export const fractalApi = {
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/complete`, { completed }),
 
     /**
+     * Evaluate goal targets against a session's activity instances
+     * Called when a session is completed to check and persist target achievements
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     * @param {string} sessionId - ID of the session to evaluate against
+     */
+    evaluateGoalTargets: (rootId, goalId, sessionId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/evaluate-targets`, { session_id: sessionId }),
+
+    /**
      * Get goal analytics data for a fractal
      * @param {string} rootId - ID of the fractal
      */

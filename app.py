@@ -18,6 +18,7 @@ from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
 from blueprints.annotations_api import annotations_bp
 from blueprints.pages import pages_bp
+from services import init_services
 
 # Print configuration on startup
 config.print_config()
@@ -58,6 +59,10 @@ app.register_blueprint(programs_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(annotations_bp)
 app.register_blueprint(pages_bp)
+
+# Initialize services (event bus, completion handlers, etc.)
+init_services()
+logger.info("Services initialized (event bus, completion handlers)")
 
 
 @app.route('/health')

@@ -101,6 +101,18 @@ Goals can be evaluated against SMART criteria with visual indicators:
   - **Completed via Children:** Completion is derived from child goal status (for goals above `ShortTermGoal`).
   - **Manual Completion:** Allow users to manually toggle completion status in the modal.
   - **Dynamic Completion Status:** When manual completion is disabled, the "Mark Complete" button becomes a status badge showing the automatic criteria (e.g., "Complete via Children").
+  - **Automatic Target-Based Completion:** When all targets on a goal are achieved, the goal is automatically marked as complete via the event system.
+- **Event-Driven Target Completion Flow:**
+  1. User marks session as complete → `SESSION_COMPLETED` event emitted
+  2. `handle_session_completed` handler evaluates targets for all linked goals
+  3. For each target met, `TARGET_ACHIEVED` event emitted, target marked `completed=true`
+  4. If ALL targets on a goal are complete → goal auto-completes, `GOAL_COMPLETED` emitted
+  5. `handle_goal_completed` updates parent goals (if `completed_via_children`) and program progress
+  6. Frontend refetches goals to display completion results
+- **Real-Time Target Achievement Tracking:**
+  - During a session, targets are evaluated in real-time against activity instances using the `useTargetAchievements` hook
+  - Toast notifications show "🎯 Target achieved: [name]" when metrics meet target thresholds
+  - On session completion, backend event system persists target completion with `completed_at` and `completed_session_id`
 - **Associated Children View:** `GoalDetailModal` displays a list of child goals at the level below for better context.
 
 **Database Tables:**
@@ -154,6 +166,45 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
 - **Visual Feedback:** Selection is highlighted, and annotated regions are marked with interactive indicators.
 - **Persistence:** Annotations are stored in the database linked to the visualization type, context (e.g., specific activity), and selected data points.
 - **Interactive Modals:** Annotation Modal for creating notes, and view modal for reading existing annotations.
+
+### 11. Event-Driven Architecture (services/)
+Backend event system for decoupled, cascading updates:
+
+**Event Bus (`services/events.py`):**
+- Pub/sub pattern with wildcard support (`goal.*`, `*`)
+- Events emitted from API endpoints after successful operations
+
+**Standard Event Types:**
+| Category | Events |
+|----------|--------|
+| Session | `SESSION_CREATED`, `SESSION_UPDATED`, `SESSION_COMPLETED`, `SESSION_DELETED` |
+| Goal | `GOAL_CREATED`, `GOAL_UPDATED`, `GOAL_COMPLETED`, `GOAL_UNCOMPLETED`, `GOAL_DELETED` |
+| Target | `TARGET_ACHIEVED`, `TARGET_CREATED`, `TARGET_DELETED` |
+| Activity | `ACTIVITY_INSTANCE_CREATED`, `ACTIVITY_INSTANCE_DELETED`, `ACTIVITY_METRICS_UPDATED` |
+| Program | `PROGRAM_CREATED`, `PROGRAM_UPDATED`, `PROGRAM_DELETED`, `PROGRAM_COMPLETED` |
+
+**Completion Handlers (`services/completion_handlers.py`):**
+- `@event_bus.on(Events.SESSION_COMPLETED)`: Evaluates targets for linked goals
+- `@event_bus.on(Events.GOAL_COMPLETED)`: Updates parent goals (`completed_via_children`) and program progress
+- Auto-completion cascade: Session → Targets → Goal → Parent Goal → Program
+
+**API Endpoints Emitting Events:**
+- `blueprints/goals_api.py`: Goal CRUD + completion toggle
+- `blueprints/sessions_api.py`: Session CRUD + activity instance operations
+- `blueprints/programs_api.py`: Program CRUD
+
+**Usage:**
+```python
+from services import event_bus, Event, Events
+
+# Emit when session is completed
+event_bus.emit(Event(Events.SESSION_COMPLETED, {
+    'session_id': session.id,
+    'root_id': root_id
+}, source='my_module.my_function'))
+```
+
+**Initialization:** `init_services()` called in `app.py` on startup.
 
 ---
 ---
@@ -455,6 +506,7 @@ Manages goal hierarchy and CRUD operations.
 - `PATCH /api/goals/<goal_id>/complete` - Toggle goal completion
 - `POST /api/goals/<goal_id>/targets` - Add target to goal
 - `DELETE /api/goals/<goal_id>/targets/<target_id>` - Remove target
+- `POST /api/<root_id>/goals/<goal_id>/evaluate-targets` - Evaluate and persist target completion for a session
 
 #### `sessions_api.py`
 Manages practice sessions.
@@ -791,6 +843,7 @@ Fractal selection/home page.
 - **`useSessionNotes.js`** - Session notes CRUD with `notes`, `previousNotes` (activity-specific), and `previousSessionNotes` (last 3 sessions)
 - **`useActivityHistory.js`** - Fetch previous activity instances for history panel
 - **`useAutoSave.js`** - Reusable debounced auto-save with status tracking
+- **`useTargetAchievements.js`** - Real-time target achievement detection during sessions (client-side only, no persistence until session completion)
 
 ### Contexts (in `/client/src/contexts/`)
 

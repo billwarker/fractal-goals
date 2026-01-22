@@ -22,6 +22,7 @@ from validators import (
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
+from services import event_bus, Event, Events
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
@@ -210,6 +211,14 @@ def create_fractal_session(root_id):
         
         # Refresh to load the goals relationship
         db_session.refresh(new_session)
+        
+        # Emit session created event
+        event_bus.emit(Event(Events.SESSION_CREATED, {
+            'session_id': new_session.id,
+            'session_name': new_session.name,
+            'root_id': root_id,
+            'goal_ids': [g.id for g in new_session.goals]
+        }, source='sessions_api.create_session'))
 
         # Return the created session
         result = new_session.to_dict()
@@ -261,6 +270,8 @@ def update_session(root_id, session_id):
             session.completed = data['completed']
             if data['completed']:
                 session.completed_at = datetime.now(timezone.utc)
+                # Emit session completed event - triggers target evaluation cascade
+                # Note: We emit after commit below to ensure DB state is consistent
         
         # Update session analytics fields
         if 'session_start' in data:
@@ -290,6 +301,23 @@ def update_session(root_id, session_id):
                 session.attributes = json.dumps(data['session_data'])
         
         db_session.commit()
+        
+        # Emit session completed event AFTER commit to ensure consistent state
+        # This triggers the cascade: target evaluation → goal completion → program updates
+        if data.get('completed') and session.completed:
+            try:
+                event_bus.emit(Event(
+                    Events.SESSION_COMPLETED,
+                    {
+                        'session_id': session.id,
+                        'root_id': root_id
+                    },
+                    source='sessions_api.update_session'
+                ))
+                logger.info(f"Emitted SESSION_COMPLETED event for session {session.id}")
+            except Exception as event_error:
+                # Don't fail the request if event handling fails
+                logger.error(f"Error emitting SESSION_COMPLETED event: {event_error}")
         
         # Return updated session
         result = session.to_dict()
@@ -339,8 +367,16 @@ def delete_session_endpoint(root_id, session_id):
             return jsonify({"error": "Session not found"}), 404
         
         # Soft Delete
+        session_name = session.name
         session.deleted_at = datetime.now(timezone.utc)
         db_session.commit()
+        
+        # Emit session deleted event
+        event_bus.emit(Event(Events.SESSION_DELETED, {
+            'session_id': session_id,
+            'session_name': session_name,
+            'root_id': root_id
+        }, source='sessions_api.delete_session'))
         
         return jsonify({"message": "Session deleted successfully"})
         
@@ -436,6 +472,14 @@ def add_activity_to_session(root_id, session_id):
         db_session.add(instance)
         db_session.commit()
         
+        # Emit activity instance created event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_CREATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': activity_definition_id,
+            'session_id': session_id,
+            'root_id': root_id
+        }, source='sessions_api.add_activity_to_session'))
+        
         return jsonify(instance.to_dict()), 201
         
     except Exception as e:
@@ -521,8 +565,17 @@ def remove_activity_from_session(root_id, session_id, instance_id):
         if not instance:
             return jsonify({"error": "Activity instance not found"}), 404
         
+        activity_definition_id = instance.activity_definition_id
         db_session.delete(instance)
         db_session.commit()
+        
+        # Emit activity instance deleted event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_DELETED, {
+            'instance_id': instance_id,
+            'activity_definition_id': activity_definition_id,
+            'session_id': session_id,
+            'root_id': root_id
+        }, source='sessions_api.remove_activity_from_session'))
         
         return jsonify({"message": "Activity instance deleted successfully"})
         
@@ -597,6 +650,15 @@ def update_activity_metrics(root_id, session_id, instance_id):
                 continue
         
         db_session.commit()
+        
+        # Emit activity metrics updated event
+        event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
+            'instance_id': instance_id,
+            'activity_definition_id': instance.activity_definition_id,
+            'session_id': session_id,
+            'root_id': root_id,
+            'metrics_count': len(metrics)
+        }, source='sessions_api.update_activity_metrics'))
         
         return jsonify(instance.to_dict())
         

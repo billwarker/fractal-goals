@@ -675,17 +675,19 @@ const ProgramDetail = () => {
         // Only show goals that are attached to this program AND have a deadline
         if (goal.deadline && attachedGoalIds.has(goal.id)) {
             const goalType = goal.attributes?.type || goal.type;
+            const isCompleted = goal.completed || goal.attributes?.completed;
+
             calendarEvents.push({
                 id: `goal-${goal.id}`,
-                title: `🎯 ${goal.name}`,
+                title: isCompleted ? `✅ ${goal.name}` : `🎯 ${goal.name}`,
                 start: goal.deadline, // The deadline is the date
                 allDay: true,
-                backgroundColor: getGoalColor(goalType),
-                borderColor: getGoalColor(goalType),
-                textColor: getGoalTextColor(goalType),
+                backgroundColor: isCompleted ? '#2e7d32' : getGoalColor(goalType),
+                borderColor: isCompleted ? '#4caf50' : getGoalColor(goalType),
+                textColor: isCompleted ? 'white' : getGoalTextColor(goalType),
                 extendedProps: { type: 'goal', ...goal },
                 // Use classNames for styling
-                classNames: ['clickable-goal-event']
+                classNames: isCompleted ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event']
             });
         }
     });
@@ -786,14 +788,51 @@ const ProgramDetail = () => {
                             ) : programGoals.map(goal => {
                                 const goalType = goal.type || goal.attributes?.type;
                                 const color = getGoalColor(goalType);
+                                const isCompleted = goal.completed || goal.attributes?.completed;
 
                                 return (
-                                    <div key={goal.id} style={{ background: '#252525', borderLeft: `3px solid ${color}`, padding: '10px', borderRadius: '0 4px 4px 0' }}>
-                                        <div style={{ color: color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+                                    <div
+                                        key={goal.id}
+                                        style={{
+                                            background: isCompleted ? '#1a2e1a' : '#252525',
+                                            borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
+                                            padding: '10px',
+                                            borderRadius: '0 4px 4px 0',
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {isCompleted && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '8px',
+                                                right: '8px',
+                                                background: '#4caf50',
+                                                borderRadius: '50%',
+                                                width: '18px',
+                                                height: '18px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '10px'
+                                            }}>✓</div>
+                                        )}
+                                        <div style={{ color: isCompleted ? '#4caf50' : color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
                                             {goalType?.replace(/([A-Z])/g, ' $1').trim()}
                                         </div>
-                                        <div style={{ color: 'white', fontSize: '13px', fontWeight: 400 }}>{goal.name}</div>
-                                        {goal.deadline && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Deadline: {formatDate(goal.deadline)}</div>}
+                                        <div style={{
+                                            color: isCompleted ? '#8bc34a' : 'white',
+                                            fontSize: '13px',
+                                            fontWeight: 400,
+                                            textDecoration: isCompleted ? 'line-through' : 'none',
+                                            opacity: isCompleted ? 0.9 : 1
+                                        }}>
+                                            {goal.name}
+                                        </div>
+                                        {goal.deadline && (
+                                            <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
+                                                {isCompleted ? 'Completed' : 'Deadline'}: {formatDate(goal.deadline)}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -895,13 +934,17 @@ const ProgramDetail = () => {
                                                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                                     {blockAttachedGoals.map(g => {
                                                         const goalColor = getGoalColor(g.type);
+                                                        const isCompleted = g.completed || g.attributes?.completed;
                                                         return (
                                                             <div key={g.id} style={{
-                                                                background: '#2a2a2a',
-                                                                border: `1.5px solid ${goalColor}`,
-                                                                color: goalColor,
-                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6
+                                                                background: isCompleted ? '#1a2e1a' : '#2a2a2a',
+                                                                border: `1.5px solid ${isCompleted ? '#4caf50' : goalColor}`,
+                                                                color: isCompleted ? '#4caf50' : goalColor,
+                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                                                                textDecoration: isCompleted ? 'line-through' : 'none',
+                                                                opacity: isCompleted ? 0.85 : 1
                                                             }}>
+                                                                {isCompleted && <span>✓</span>}
                                                                 <span>{g.name}</span>
                                                                 {g.deadline && <span style={{ opacity: 0.7, fontSize: 10 }}>{formatDate(g.deadline, 'MMM D')}</span>}
                                                             </div>

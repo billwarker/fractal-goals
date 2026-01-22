@@ -19,6 +19,7 @@ from validators import (
     FractalCreateSchema,
     parse_date_string
 )
+from services import event_bus, Event, Events
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -92,6 +93,15 @@ def create_goal(validated_data):
         
         logger.debug(f"Created goal {new_goal.id}")
         
+        # Emit goal created event
+        event_bus.emit(Event(Events.GOAL_CREATED, {
+            'goal_id': new_goal.id,
+            'goal_name': new_goal.name,
+            'goal_type': new_goal.type,
+            'parent_id': new_goal.parent_id,
+            'root_id': new_goal.root_id
+        }, source='goals_api.create_goal'))
+        
         # Return the goal with its tree
         result = build_goal_tree(db_session, new_goal)
         return jsonify(result), 201
@@ -115,9 +125,20 @@ def delete_goal_endpoint(goal_id: str):
         goal = get_goal_by_id(db_session, goal_id)
         if goal:
             is_root = goal.parent_id is None
+            goal_name = goal.name
+            root_id = goal.root_id
             db_session.delete(goal)
             db_session.commit()
             logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")
+            
+            # Emit goal deleted event
+            event_bus.emit(Event(Events.GOAL_DELETED, {
+                'goal_id': goal_id,
+                'goal_name': goal_name,
+                'root_id': root_id,
+                'was_root': is_root
+            }, source='goals_api.delete_goal'))
+            
             return jsonify({"status": "success", "message": f"{'Root g' if is_root else 'G'}oal deleted"})
         
         # Not found
@@ -181,6 +202,15 @@ def update_goal_endpoint(goal_id: str):
                 goal.completed_via_children = data['completed_via_children']
             db_session.commit()
             logger.debug(f"Committed changes. Goal targets after commit: {goal.targets}")
+            
+            # Emit goal updated event
+            event_bus.emit(Event(Events.GOAL_UPDATED, {
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'root_id': goal.root_id,
+                'updated_fields': list(data.keys())
+            }, source='goals_api.update_goal'))
+            
             return jsonify(goal.to_dict(include_children=False))
         
         return jsonify({"error": "Goal not found"}), 404
@@ -272,6 +302,23 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                 
             db_session.commit()
             db_session.refresh(goal)
+            
+            # Emit completion event
+            if goal.completed:
+                event_bus.emit(Event(Events.GOAL_COMPLETED, {
+                    'goal_id': goal.id,
+                    'goal_name': goal.name,
+                    'root_id': goal.root_id,
+                    'auto_completed': False,
+                    'reason': 'manual'
+                }, source='goals_api.update_completion'))
+            else:
+                event_bus.emit(Event(Events.GOAL_UNCOMPLETED, {
+                    'goal_id': goal.id,
+                    'goal_name': goal.name,
+                    'root_id': goal.root_id
+                }, source='goals_api.update_completion'))
+            
             result = build_goal_tree(db_session, goal)
             return jsonify(result)
         
@@ -808,3 +855,204 @@ def get_goal_analytics(root_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
+
+# ============================================================================
+# TARGET EVALUATION ENDPOINTS
+# ============================================================================
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/evaluate-targets', methods=['POST'])
+def evaluate_goal_targets(root_id, goal_id):
+    """
+    Evaluate targets for a goal against a session's activity instances.
+    
+    This is called when a session is completed. It:
+    1. Fetches the session's activity instances with their metrics
+    2. Evaluates each target against the activity instances
+    3. Persists target completion status (completed, completed_at, completed_session_id)
+    4. Auto-completes the goal if ALL targets are met
+    
+    Request body:
+    {
+        "session_id": "uuid of the session"
+    }
+    
+    Returns:
+    {
+        "goal": {...},  // Updated goal data
+        "targets_evaluated": int,
+        "targets_completed": int,
+        "newly_completed_targets": [...],  // Targets that were just completed
+        "goal_completed": bool  // Whether the goal was auto-completed
+    }
+    """
+    from models import ActivityInstance
+    
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        # Validate root goal exists
+        root = validate_root_goal(db_session, root_id)
+        if not root:
+            return jsonify({"error": "Fractal not found"}), 404
+        
+        # Get the goal
+        goal = get_goal_by_id(db_session, goal_id)
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+        
+        # Get request data
+        data = request.get_json() or {}
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            return jsonify({"error": "session_id is required"}), 400
+        
+        # Get session
+        session = get_session_by_id(db_session, session_id)
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+        
+        # Parse existing targets
+        targets = json.loads(goal.targets) if goal.targets else []
+        if not targets:
+            return jsonify({
+                "goal": goal.to_dict(include_children=False),
+                "targets_evaluated": 0,
+                "targets_completed": 0,
+                "newly_completed_targets": [],
+                "goal_completed": False
+            })
+        
+        # Get all activity instances for this session with their metrics
+        activity_instances = db_session.query(ActivityInstance).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.deleted_at == None
+        ).all()
+        
+        # Build a map of activity_id -> list of instance data with metrics
+        instances_by_activity = {}
+        for inst in activity_instances:
+            activity_id = inst.activity_definition_id
+            if activity_id not in instances_by_activity:
+                instances_by_activity[activity_id] = []
+            
+            # Get metrics for this instance (both flat metrics and sets)
+            inst_dict = inst.to_dict()
+            instances_by_activity[activity_id].append(inst_dict)
+        
+        # Evaluate each target
+        newly_completed_targets = []
+        now = datetime.now(timezone.utc)
+        
+        for target in targets:
+            # Skip already completed targets
+            if target.get('completed'):
+                continue
+            
+            activity_id = target.get('activity_id')
+            target_metrics = target.get('metrics', [])
+            
+            if not activity_id or not target_metrics:
+                continue
+            
+            # Check if any instance satisfies this target
+            instances = instances_by_activity.get(activity_id, [])
+            target_achieved = False
+            
+            for inst in instances:
+                # Check sets first (for set-based activities)
+                sets = inst.get('sets', [])
+                if sets:
+                    for s in sets:
+                        set_metrics = s.get('metrics', [])
+                        if _check_metrics_meet_target(target_metrics, set_metrics):
+                            target_achieved = True
+                            break
+                    if target_achieved:
+                        break
+                
+                # Check flat metrics (for non-set activities)
+                inst_metrics = inst.get('metrics', [])
+                if inst_metrics and _check_metrics_meet_target(target_metrics, inst_metrics):
+                    target_achieved = True
+                    break
+            
+            if target_achieved:
+                target['completed'] = True
+                target['completed_at'] = now.isoformat()
+                target['completed_session_id'] = session_id
+                newly_completed_targets.append(target)
+        
+        # Count completed targets
+        targets_completed = sum(1 for t in targets if t.get('completed'))
+        targets_total = len(targets)
+        
+        # Persist updated targets
+        goal.targets = json.dumps(targets)
+        
+        # Auto-complete the goal if ALL targets are met
+        goal_was_completed = False
+        if targets_completed == targets_total and targets_total > 0:
+            if not goal.completed:
+                goal.completed = True
+                goal.completed_at = now
+                goal_was_completed = True
+                logger.info(f"Auto-completing goal {goal_id} - all {targets_total} targets met")
+        
+        db_session.commit()
+        db_session.refresh(goal)
+        
+        return jsonify({
+            "goal": goal.to_dict(include_children=False),
+            "targets_evaluated": targets_total,
+            "targets_completed": targets_completed,
+            "newly_completed_targets": newly_completed_targets,
+            "goal_completed": goal_was_completed
+        })
+        
+    except Exception as e:
+        db_session.rollback()
+        logger.exception("Error evaluating targets")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+def _check_metrics_meet_target(target_metrics, actual_metrics):
+    """
+    Check if actual metrics meet or exceed all target metrics.
+    
+    Args:
+        target_metrics: List of {metric_id, value} from the target
+        actual_metrics: List of {metric_id, value} from the activity instance or set
+    
+    Returns:
+        bool: True if all target metrics are met or exceeded
+    """
+    if not target_metrics:
+        return False
+    
+    # Build a map of actual metric values by metric_id
+    actual_map = {}
+    for m in actual_metrics:
+        metric_id = m.get('metric_id') or m.get('metric_definition_id')
+        if metric_id and m.get('value') is not None:
+            actual_map[metric_id] = float(m['value'])
+    
+    # Check all target metrics are met
+    for tm in target_metrics:
+        metric_id = tm.get('metric_id')
+        target_value = tm.get('value')
+        
+        if not metric_id or target_value is None:
+            continue
+        
+        actual_value = actual_map.get(metric_id)
+        if actual_value is None:
+            return False  # Missing metric
+        
+        if actual_value < float(target_value):
+            return False  # Below target
+    
+    return True

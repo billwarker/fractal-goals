@@ -11,6 +11,7 @@ import GoalDetailModal from '../components/GoalDetailModal';
 import SessionInfoPanel from '../components/sessionDetail/SessionInfoPanel';
 import { SessionSidePane } from '../components/sessionDetail'; // Keep this for now, as it's used in the side pane
 import useSessionNotes from '../hooks/useSessionNotes';
+import useTargetAchievements from '../hooks/useTargetAchievements';
 import './SessionDetail.css'; // New CSS import
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors'; // Keep both for now, getGoalColor is used in SessionSidePane
 import '../App.css';
@@ -148,6 +149,19 @@ function SessionDetail() {
         refreshNotes
     } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
 
+    // Real-time target achievement tracking
+    // This provides immediate feedback when targets are hit during a session
+    const allGoalsForTargets = [...parentGoals, ...(session?.immediate_goals || [])];
+    const {
+        targetAchievements,
+        achievedTargetIds,
+    } = useTargetAchievements(activityInstances, allGoalsForTargets);
+
+    // Track which targets we've already shown notifications for
+    const [notifiedTargetIds, setNotifiedTargetIds] = useState(new Set());
+    // Toast notification state
+    const [toastMessage, setToastMessage] = useState(null);
+
     // Local state for editing session datetime fields
     const [localSessionStart, setLocalSessionStart] = useState('');
     const [localSessionEnd, setLocalSessionEnd] = useState('');
@@ -242,6 +256,39 @@ function SessionDetail() {
 
         return () => clearTimeout(timeoutId);
     }, [sessionData, loading, rootId, sessionId]);
+
+    // Detect new target achievements and show toast notification
+    useEffect(() => {
+        if (!achievedTargetIds || achievedTargetIds.size === 0) return;
+
+        // Find newly achieved targets (achieved but not yet notified)
+        const newlyAchieved = [];
+        for (const targetId of achievedTargetIds) {
+            if (!notifiedTargetIds.has(targetId)) {
+                const status = targetAchievements.get(targetId);
+                // Only notify for targets achieved THIS session (not previously completed)
+                if (status && !status.wasAlreadyCompleted) {
+                    newlyAchieved.push(status);
+                }
+            }
+        }
+
+        if (newlyAchieved.length > 0) {
+            // Show toast for the new achievement(s)
+            const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
+            setToastMessage(`🎯 Target achieved: ${names}`);
+
+            // Add to notified set
+            setNotifiedTargetIds(prev => {
+                const newSet = new Set(prev);
+                newlyAchieved.forEach(s => newSet.add(s.target.id));
+                return newSet;
+            });
+
+            // Auto-dismiss toast after 4 seconds
+            setTimeout(() => setToastMessage(null), 4000);
+        }
+    }, [achievedTargetIds, notifiedTargetIds, targetAchievements]);
 
     useEffect(() => {
         if (!rootId || !sessionId) {
@@ -667,13 +714,89 @@ function SessionDetail() {
                 }
             }
 
+            // Mark session complete - this triggers backend EVENT SYSTEM:
+            // SESSION_COMPLETED → evaluate targets → auto-complete goals if all targets met
             const res = await fractalApi.updateSession(rootId, sessionId, { completed: newCompleted });
-            // Update the full session object from the response
             setSession(res.data);
+
+            // If we just completed the session, fetch updated goals to show completion results
+            if (newCompleted) {
+                // Give the backend a moment to process the event cascade
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Refetch goals to see any auto-completion updates
+                const allGoals = [...parentGoals, ...(session.immediate_goals || [])];
+                let totalNewlyCompleted = 0;
+                const goalsAutoCompleted = [];
+
+                for (const goal of allGoals) {
+                    const goalId = goal.id || goal.attributes?.id;
+                    try {
+                        // Fetch the updated goal to see if it was auto-completed
+                        const updatedGoalRes = await fractalApi.getGoal(rootId, goalId);
+                        const updatedGoal = updatedGoalRes.data;
+
+                        // Check if goal was newly completed (wasn't before, is now)
+                        const wasCompleted = goal.completed || goal.attributes?.completed;
+                        const isNowCompleted = updatedGoal.completed || updatedGoal.attributes?.completed;
+
+                        if (!wasCompleted && isNowCompleted) {
+                            goalsAutoCompleted.push({ goalId, goalName: updatedGoal.name });
+                        }
+
+                        // Count newly completed targets by comparing
+                        const oldTargets = parseGoalTargets(goal);
+                        const newTargets = parseGoalTargets(updatedGoal);
+
+                        for (const newT of newTargets) {
+                            const oldT = oldTargets.find(t => t.id === newT.id);
+                            if (newT.completed && (!oldT || !oldT.completed)) {
+                                totalNewlyCompleted++;
+                            }
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching updated goal ${goalId}:`, err);
+                    }
+                }
+
+                // Show summary if any targets were completed
+                if (totalNewlyCompleted > 0 || goalsAutoCompleted.length > 0) {
+                    let message = '🎯 Session Completed!\n\n';
+
+                    if (totalNewlyCompleted > 0) {
+                        message += `✓ ${totalNewlyCompleted} target${totalNewlyCompleted > 1 ? 's' : ''} achieved!\n`;
+                    }
+
+                    if (goalsAutoCompleted.length > 0) {
+                        message += `\n🏆 Auto-completed goal${goalsAutoCompleted.length > 1 ? 's' : ''}:\n`;
+                        message += goalsAutoCompleted.map(r => `  • ${r.goalName}`).join('\n');
+                    }
+
+                    console.log(message);
+                    setTimeout(() => alert(message), 100);
+                }
+
+                // Refresh session to get updated goal data
+                fetchSession();
+            }
         } catch (err) {
             console.error('Error toggling completion:', err);
             alert('Error updating completion status: ' + (err.response?.data?.error || err.message));
         }
+    };
+
+    // Helper to parse targets from a goal
+    const parseGoalTargets = (goal) => {
+        let targets = [];
+        const raw = goal.attributes?.targets || goal.targets;
+        if (raw) {
+            try {
+                targets = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch (e) {
+                targets = [];
+            }
+        }
+        return Array.isArray(targets) ? targets : [];
     };
 
     const handleOpenActivityBuilder = (sectionIndex) => {
@@ -822,61 +945,54 @@ function SessionDetail() {
 
                     {/* Minimal Header */}
 
-
-                    {/* Achieved Targets */}
-                    {(() => {
-                        const achievedTargets = getAchievedTargetsForSession(session, parentGoals);
-                        if (achievedTargets.length === 0) return null;
-                        return (
-                            <div style={{
-                                marginBottom: '24px',
-                                background: '#111',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                border: '1px solid #222'
-                            }}>
+                    {/* Toast Notification for Target Achievements */}
+                    {toastMessage && (
+                        <div style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'linear-gradient(135deg, #1b4d1b 0%, #2d5a2d 100%)',
+                            border: '2px solid #4caf50',
+                            borderRadius: '12px',
+                            padding: '16px 24px',
+                            boxShadow: '0 8px 32px rgba(76, 175, 80, 0.3)',
+                            zIndex: 9999,
+                            animation: 'slideDown 0.3s ease-out',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                        }}>
+                            <span style={{ fontSize: '24px' }}>🎯</span>
+                            <div>
                                 <div style={{
-                                    fontSize: '12px',
-                                    color: '#888',
-                                    marginBottom: '8px',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
+                                    fontSize: '14px',
+                                    fontWeight: 'bold',
+                                    color: '#4caf50',
+                                    marginBottom: '2px'
                                 }}>
-                                    Achieved Targets
+                                    Target Achieved!
                                 </div>
-                                <div style={{
-                                    display: 'flex',
-                                    flexWrap: 'nowrap',
-                                    gap: '8px',
-                                    overflowX: 'auto',
-                                    padding: '4px 0'
-                                }}>
-                                    {achievedTargets.map((achieved, index) => (
-                                        <div
-                                            key={index}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                padding: '4px 10px',
-                                                background: 'rgba(76, 175, 80, 0.1)',
-                                                border: '1px solid rgba(76, 175, 80, 0.3)',
-                                                borderRadius: '20px',
-                                                color: '#4caf50',
-                                                fontSize: '12px',
-                                                whiteSpace: 'nowrap'
-                                            }}
-                                            title={`Achieved by: ${achieved.goalName}`}
-                                        >
-                                            <span>✓</span>
-                                            <span>{achieved.target.name || 'Target'}</span>
-                                            <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
-                                        </div>
-                                    ))}
+                                <div style={{ fontSize: '13px', color: '#a5d6a7' }}>
+                                    {toastMessage.replace('🎯 Target achieved: ', '')}
                                 </div>
                             </div>
-                        );
-                    })()}
+                            <button
+                                onClick={() => setToastMessage(null)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#81c784',
+                                    fontSize: '18px',
+                                    cursor: 'pointer',
+                                    padding: '0 4px',
+                                    marginLeft: '8px'
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
 
                     {/* Sections List */}
                     <div className="session-sections-list">
