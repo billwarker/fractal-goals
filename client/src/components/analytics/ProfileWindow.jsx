@@ -44,9 +44,30 @@ function ProfileWindow({
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
+    const containerRef = useRef(null);
 
     // Local state for split dropdown
     const [showSplitMenu, setShowSplitMenu] = useState(false);
+
+    // Track container width for responsive styling
+    const [isNarrow, setIsNarrow] = useState(false);
+    const [isVeryNarrow, setIsVeryNarrow] = useState(false);
+
+    // Use ResizeObserver to detect width changes
+    React.useEffect(() => {
+        if (!containerRef.current) return;
+
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                setIsNarrow(width < 400);
+                setIsVeryNarrow(width < 280);
+            }
+        });
+
+        resizeObserver.observe(containerRef.current);
+        return () => resizeObserver.disconnect();
+    }, []);
 
     // Extract state from controlled windowState prop
     const {
@@ -284,14 +305,23 @@ function ProfileWindow({
         }
     };
 
+    // Category icons for compact mode
+    const categoryIcons = {
+        goals: '🎯',
+        sessions: '⏱️',
+        activities: '🏋️',
+        annotations: '📝'
+    };
+
     // Render the category selector buttons
     const renderCategorySelector = () => (
         <div style={{
             display: 'flex',
-            gap: '4px',
-            padding: '12px 16px',
+            gap: isNarrow ? '2px' : '4px',
+            padding: isNarrow ? '8px 8px' : '12px 16px',
             borderBottom: '1px solid #333',
-            background: '#252525'
+            background: '#252525',
+            flexWrap: isVeryNarrow ? 'wrap' : 'nowrap'
         }}>
             {['goals', 'sessions', 'activities', 'annotations'].map(category => (
                 <button
@@ -303,43 +333,66 @@ function ProfileWindow({
                             handleCategoryChange(category);
                         }
                     }}
+                    title={category.charAt(0).toUpperCase() + category.slice(1)}
                     style={{
-                        flex: 1,
-                        padding: '10px 16px',
+                        flex: isVeryNarrow ? '1 1 45%' : 1,
+                        padding: isVeryNarrow ? '6px 4px' : (isNarrow ? '8px 8px' : '10px 16px'),
                         background: selectedCategory === category ? '#2196f3' : '#333',
                         border: 'none',
                         borderRadius: '6px',
                         color: selectedCategory === category ? 'white' : '#888',
-                        fontSize: '13px',
+                        fontSize: isVeryNarrow ? '11px' : (isNarrow ? '11px' : '13px'),
                         fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        textTransform: 'capitalize'
+                        textTransform: 'capitalize',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        minWidth: 0
                     }}
                 >
-                    {category}
+                    {isVeryNarrow ? (
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            <span>{categoryIcons[category]}</span>
+                            <span style={{ fontSize: '10px' }}>{category.slice(0, 4)}</span>
+                        </span>
+                    ) : isNarrow ? (
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            <span>{categoryIcons[category]}</span>
+                            <span>{category.slice(0, 5)}</span>
+                        </span>
+                    ) : (
+                        category
+                    )}
                 </button>
             ))}
 
             {/* Split/Close buttons */}
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', position: 'relative' }}>
+            <div style={{
+                display: 'flex',
+                gap: '4px',
+                marginLeft: isVeryNarrow ? '0' : 'auto',
+                position: 'relative',
+                ...(isVeryNarrow && { width: '100%', marginTop: '4px', justifyContent: 'flex-end' })
+            }}>
                 {canSplit && (
                     <div style={{ position: 'relative' }}>
                         <button
                             onClick={() => setShowSplitMenu(!showSplitMenu)}
                             title="Split profile window"
                             style={{
-                                padding: '8px 12px',
+                                padding: isNarrow ? '6px 8px' : '8px 12px',
                                 background: showSplitMenu ? '#444' : '#333',
                                 border: '1px solid #444',
                                 borderRadius: '6px',
                                 color: '#888',
-                                fontSize: '14px',
+                                fontSize: isNarrow ? '12px' : '14px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '6px'
+                                gap: '4px'
                             }}
                             onMouseEnter={(e) => {
                                 if (!showSplitMenu) {
@@ -354,7 +407,7 @@ function ProfileWindow({
                                 }
                             }}
                         >
-                            ⊞ Split ▾
+                            {isNarrow ? '⊞▾' : '⊞ Split ▾'}
                         </button>
 
                         {/* Split dropdown menu */}
@@ -1037,16 +1090,19 @@ function ProfileWindow({
     };
 
     return (
-        <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#1a1a1a',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            minWidth: 0
-        }}>
+        <div
+            ref={containerRef}
+            style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                background: '#1a1a1a',
+                border: '1px solid #333',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                minWidth: 0
+            }}
+        >
             {renderCategorySelector()}
             {renderVisualizationOptions()}
             {renderActivitySelector()}

@@ -111,8 +111,8 @@ function LayoutNode({
             percentage = (y / rect.height) * 100;
         }
 
-        // Clamp between 20% and 80%
-        const clampedPercentage = Math.min(80, Math.max(20, percentage));
+        // Clamp between 25% and 75% to ensure minimum profile window size
+        const clampedPercentage = Math.min(75, Math.max(25, percentage));
         onUpdatePosition(path, clampedPercentage);
     }, [isDragging, node.direction, onUpdatePosition, path]);
 
