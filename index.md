@@ -170,7 +170,11 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - `activity_definitions`, `activity_groups`, `programs`, `session_templates`: root_id
 - **Scoped Sessions:** `get_scoped_session()` provides thread-local sessions with automatic cleanup via Flask's `teardown_appcontext`
 - **Batched Analytics:** Analytics endpoint uses 3 batch queries instead of N+1 pattern
-- **Eager Loading:** Session endpoints use `joinedload()` for goals, notes, activity_instances, and program_day
+- **Eager Loading:** Session endpoints use `selectinload()` for goals, notes, activity_instances (avoids Cartesian product)
+- **Pagination:** Sessions list API returns paginated results (default: 10 per page, max: 50)
+  - API: `GET /<root_id>/sessions?limit=10&offset=0` → `{sessions: [...], pagination: {limit, offset, total, has_more}}`
+  - Frontend: Sessions page has "Load More" button to fetch additional sessions
+  - Notes image_data excluded from list view (only loaded in detail view) to reduce response size
 
 ### 10. Visualization Annotations
 - **Universal Annotation System:** Allows users to annotate specific data points on any analytical visualization (heatmap, scatter plot, line graph, etc.).

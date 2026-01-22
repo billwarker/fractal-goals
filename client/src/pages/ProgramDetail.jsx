@@ -108,8 +108,10 @@ const ProgramDetail = () => {
 
     const fetchSessions = async () => {
         try {
-            const res = await fractalApi.getSessions(rootId);
-            setSessions(res.data);
+            const res = await fractalApi.getSessions(rootId, { limit: 50 });
+            // Handle paginated response format
+            const sessionsData = res.data.sessions || res.data;
+            setSessions(sessionsData);
         } catch (err) {
             console.error('Failed to fetch sessions:', err);
         }

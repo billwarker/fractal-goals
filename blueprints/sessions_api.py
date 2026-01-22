@@ -65,7 +65,17 @@ def get_all_sessions_endpoint():
 
 @sessions_bp.route('/<root_id>/sessions', methods=['GET'])
 def get_fractal_sessions(root_id):
-    """Get all sessions for a specific fractal."""
+    """
+    Get sessions for a specific fractal with pagination support.
+    
+    Query parameters:
+    - limit: Number of sessions to return (default: 10, max: 50)
+    - offset: Number of sessions to skip (default: 0)
+    
+    Returns:
+    - sessions: Array of session objects
+    - pagination: {limit, offset, total, has_more}
+    """
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
@@ -73,17 +83,38 @@ def get_fractal_sessions(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
+        # Parse pagination parameters
+        limit = min(int(request.args.get('limit', 10)), 50)  # Max 50 per request
+        offset = int(request.args.get('offset', 0))
+        
+        # Get total count for pagination info
+        base_query = db_session.query(Session).filter(
+            Session.root_id == root_id, 
+            Session.deleted_at == None
+        )
+        total_count = base_query.count()
+        
         # Use selectinload (not joinedload) to avoid Cartesian product with multiple collections
-        sessions = db_session.query(Session).options(
+        sessions = base_query.options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
             joinedload(Session.program_day)  # One-to-one, safe to joinedload
-        ).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
+        ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
+        
         # Don't include image data in list view for performance (prevents multi-MB responses)
         result = [s.to_dict(include_image_data=False) for s in sessions]
-        return jsonify(result)
+        
+        return jsonify({
+            "sessions": result,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": total_count,
+                "has_more": offset + len(result) < total_count
+            }
+        })
         
     finally:
         db_session.close()

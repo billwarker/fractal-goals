@@ -106,10 +106,17 @@ export const fractalApi = {
     getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
 
     /**
-     * Get all practice sessions for a fractal
+     * Get all practice sessions for a fractal with pagination
      * @param {string} rootId - ID of the fractal
+     * @param {Object} options - {limit, offset} pagination options
      */
-    getSessions: (rootId) => axios.get(`${API_BASE}/${rootId}/sessions`),
+    getSessions: (rootId, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.limit) params.append('limit', options.limit);
+        if (options.offset) params.append('offset', options.offset);
+        const queryString = params.toString();
+        return axios.get(`${API_BASE}/${rootId}/sessions${queryString ? '?' + queryString : ''}`);
+    },
 
     /**
      * Create a new practice session within a fractal

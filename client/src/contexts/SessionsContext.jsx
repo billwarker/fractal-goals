@@ -16,8 +16,10 @@ export function SessionsProvider({ children }) {
         try {
             setLoading(true);
             setError(null);
-            const res = await fractalApi.getSessions(rootId);
-            setSessions(res.data);
+            const res = await fractalApi.getSessions(rootId, { limit: 50 });
+            // Handle paginated response format
+            const sessionsData = res.data.sessions || res.data;
+            setSessions(sessionsData);
         } catch (err) {
             console.error('Failed to fetch sessions:', err);
             setError('Failed to load sessions');

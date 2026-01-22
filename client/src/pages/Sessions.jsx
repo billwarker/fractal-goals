@@ -26,9 +26,14 @@ function Sessions() {
     const [activities, setActivities] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
-    // Sorting state
     const [sortBy, setSortBy] = useState('start_date'); // 'start_date' | 'last_modified'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+
+    // Pagination state
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [totalSessions, setTotalSessions] = useState(0);
+    const SESSIONS_PER_PAGE = 10;
 
     useEffect(() => {
         if (!rootId) {
@@ -82,14 +87,18 @@ function Sessions() {
     // Filter logic removed from header effect
 
 
-    const fetchSessions = async () => {
+    const fetchSessions = async (reset = true) => {
         try {
-            const res = await fractalApi.getSessions(rootId);
-            setSessions(res.data);
+            const res = await fractalApi.getSessions(rootId, { limit: SESSIONS_PER_PAGE, offset: 0 });
+            const { sessions: sessionsData, pagination } = res.data;
+
+            setSessions(sessionsData);
+            setHasMore(pagination.has_more);
+            setTotalSessions(pagination.total);
 
             // Fetch parent goals for all sessions
             const allParentIds = new Set();
-            res.data.forEach(session => {
+            sessionsData.forEach(session => {
                 if (session.attributes?.parent_ids) {
                     session.attributes.parent_ids.forEach(id => allParentIds.add(id));
                 }
@@ -113,6 +122,53 @@ function Sessions() {
             if (err.response?.status === 404) {
                 navigate('/');
             }
+        }
+    };
+
+    const loadMoreSessions = async () => {
+        if (loadingMore || !hasMore) return;
+
+        setLoadingMore(true);
+        try {
+            const res = await fractalApi.getSessions(rootId, {
+                limit: SESSIONS_PER_PAGE,
+                offset: sessions.length
+            });
+            const { sessions: newSessions, pagination } = res.data;
+
+            // Append new sessions to existing
+            setSessions(prev => [...prev, ...newSessions]);
+            setHasMore(pagination.has_more);
+
+            // Fetch parent goals for new sessions only
+            const allParentIds = new Set();
+            newSessions.forEach(session => {
+                if (session.attributes?.parent_ids) {
+                    session.attributes.parent_ids.forEach(id => {
+                        // Only fetch if not already in parentGoals
+                        if (!parentGoals[id]) {
+                            allParentIds.add(id);
+                        }
+                    });
+                }
+            });
+
+            if (allParentIds.size > 0) {
+                const newGoalsMap = { ...parentGoals };
+                for (const goalId of allParentIds) {
+                    try {
+                        const goalRes = await fractalApi.getGoal(rootId, goalId);
+                        newGoalsMap[goalId] = goalRes.data;
+                    } catch (err) {
+                        console.error(`Failed to fetch goal ${goalId}`, err);
+                    }
+                }
+                setParentGoals(newGoalsMap);
+            }
+        } catch (err) {
+            console.error("Failed to load more sessions", err);
+        } finally {
+            setLoadingMore(false);
         }
     };
 
@@ -946,6 +1002,59 @@ function Sessions() {
                                     </div>
                                 );
                             })}
+
+                            {/* Load More Button */}
+                            {hasMore && (
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '20px',
+                                    marginTop: '10px'
+                                }}>
+                                    <span style={{ fontSize: '13px', color: '#888' }}>
+                                        Showing {sessions.length} of {totalSessions} sessions
+                                    </span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            loadMoreSessions();
+                                        }}
+                                        disabled={loadingMore}
+                                        style={{
+                                            padding: '10px 24px',
+                                            background: loadingMore ? '#333' : '#2196f3',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            color: 'white',
+                                            cursor: loadingMore ? 'not-allowed' : 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        {loadingMore ? (
+                                            <>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    width: '16px',
+                                                    height: '16px',
+                                                    border: '2px solid #666',
+                                                    borderTopColor: 'white',
+                                                    borderRadius: '50%',
+                                                    animation: 'spin 1s linear infinite'
+                                                }} />
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            `Load ${Math.min(SESSIONS_PER_PAGE, totalSessions - sessions.length)} More Sessions`
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

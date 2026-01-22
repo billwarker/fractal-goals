@@ -157,6 +157,7 @@ function SessionNotesSidebar({
                                     <div className="note-content">
                                         {note.content}
                                     </div>
+                                    {/* Show image if image_data is present (detail view) */}
                                     {note.image_data && (
                                         <div
                                             className="note-image"
@@ -170,6 +171,25 @@ function SessionNotesSidebar({
                                                 src={note.image_data}
                                                 alt="Note attachment"
                                             />
+                                        </div>
+                                    )}
+                                    {/* Show image indicator if has_image but no image_data (list view) */}
+                                    {note.has_image && !note.image_data && (
+                                        <div
+                                            className="note-image-indicator"
+                                            style={{
+                                                marginTop: '8px',
+                                                padding: '6px 10px',
+                                                background: '#333',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                color: '#888',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            📷 Image attached
                                         </div>
                                     )}
                                 </div>

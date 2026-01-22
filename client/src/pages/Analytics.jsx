@@ -98,20 +98,23 @@ function Analytics() {
 
         const loadData = async () => {
             try {
+                // Load sessions with higher limit for analytics (we need more data for charts)
                 const [sessionsRes, goalAnalyticsRes] = await Promise.all([
-                    fractalApi.getSessions(rootId),
+                    fractalApi.getSessions(rootId, { limit: 50 }),
                     fractalApi.getGoalAnalytics(rootId)
                 ]);
                 await fetchActivities(rootId);
 
                 if (!isMounted) return;
 
-                setSessions(sessionsRes.data);
+                // Handle paginated response format
+                const sessionsData = sessionsRes.data.sessions || sessionsRes.data;
+                setSessions(sessionsData);
                 setGoalAnalytics(goalAnalyticsRes.data);
 
                 // Build activity instances map from sessions
                 const instancesMap = {};
-                sessionsRes.data.forEach(session => {
+                sessionsData.forEach(session => {
                     const sessionData = session.attributes?.session_data;
                     if (sessionData?.sections) {
                         sessionData.sections.forEach(section => {

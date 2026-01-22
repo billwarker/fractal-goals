@@ -324,8 +324,10 @@ function SessionDetail() {
 
     const fetchSession = async () => {
         try {
-            const res = await fractalApi.getSessions(rootId);
-            const foundSession = res.data.find(s => s.id === sessionId);
+            const res = await fractalApi.getSessions(rootId, { limit: 50 });
+            // Handle paginated response format
+            const sessionsData = res.data.sessions || res.data;
+            const foundSession = sessionsData.find(s => s.id === sessionId);
 
             if (!foundSession) {
                 alert('Session not found');
