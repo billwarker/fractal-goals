@@ -8,7 +8,7 @@ import traceback
 logger = logging.getLogger(__name__)
 import models
 from sqlalchemy import text
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
@@ -48,15 +48,16 @@ def get_all_sessions_endpoint():
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Use eager loading to avoid N+1 queries during serialization
+        # Use selectinload (not joinedload) to avoid Cartesian product with multiple collections
         sessions = db_session.query(Session).options(
-            joinedload(Session.goals),
-            joinedload(Session.notes_list),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)
+            selectinload(Session.goals),
+            selectinload(Session.notes_list),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)  # One-to-one, safe to joinedload
         ).filter(Session.deleted_at == None).order_by(Session.created_at.desc()).all()
-        result = [s.to_dict() for s in sessions]
+        # Don't include image data in list view for performance (prevents multi-MB responses)
+        result = [s.to_dict(include_image_data=False) for s in sessions]
         return jsonify(result)
     finally:
         db_session.close()
@@ -72,15 +73,16 @@ def get_fractal_sessions(root_id):
         if not root:
             return jsonify({"error": "Fractal not found"}), 404
         
-        # Comprehensive eager loading for all relationships accessed in to_dict()
+        # Use selectinload (not joinedload) to avoid Cartesian product with multiple collections
         sessions = db_session.query(Session).options(
-            joinedload(Session.goals),
-            joinedload(Session.notes_list),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)
+            selectinload(Session.goals),
+            selectinload(Session.notes_list),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)  # One-to-one, safe to joinedload
         ).filter(Session.root_id == root_id, Session.deleted_at == None).order_by(Session.created_at.desc()).all()
-        result = [s.to_dict() for s in sessions]
+        # Don't include image data in list view for performance (prevents multi-MB responses)
+        result = [s.to_dict(include_image_data=False) for s in sessions]
         return jsonify(result)
         
     finally:
@@ -346,19 +348,20 @@ def get_session_endpoint(root_id, session_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Use eager loading for all relationships accessed in to_dict()
+        # Use selectinload for collections to avoid Cartesian product
         session = db_session.query(Session).options(
-            joinedload(Session.goals),
-            joinedload(Session.notes_list),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.definition),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.metric_values),
-            joinedload(Session.activity_instances).joinedload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)
+            selectinload(Session.goals),
+            selectinload(Session.notes_list),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
+            joinedload(Session.program_day)  # One-to-one, safe to joinedload
         ).filter(Session.id == session_id, Session.deleted_at == None).first()
         
         if not session:
             return jsonify({"error": "Session not found"}), 404
-        return jsonify(session.to_dict())
+        # Include full image data for single session detail view
+        return jsonify(session.to_dict(include_image_data=True))
     finally:
         db_session.close()
 

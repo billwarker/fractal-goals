@@ -323,9 +323,15 @@ class Session(Base):
             "day_date": day.date.isoformat() if day.date else None
         }
     
-    def to_dict(self):
-        """Convert session to dictionary format compatible with frontend."""
+    def to_dict(self, include_image_data=False):
+        """
+        Convert session to dictionary format compatible with frontend.
         
+        Args:
+            include_image_data: If True, include full image data in notes.
+                               If False (default), notes only include has_image flag.
+                               This prevents multi-MB responses on list endpoints.
+        """
 
 
         result = {
@@ -436,8 +442,8 @@ class Session(Base):
                         if n.deleted_at is None:
                             all_notes[n.id] = n
         
-        # Convert to dict list
-        notes_data = [n.to_dict() for n in all_notes.values()]
+        # Convert to dict list (pass include_image parameter to avoid bloated responses)
+        notes_data = [n.to_dict(include_image=include_image_data) for n in all_notes.values()]
         
         # Sort by creation time (descending)
         notes_data.sort(key=lambda x: x['created_at'], reverse=True)
@@ -685,8 +691,16 @@ class Note(Base):
     activity_instance = relationship("ActivityInstance", backref="notes_list")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_image=False):
+        """
+        Convert note to dictionary.
+        
+        Args:
+            include_image: If True, include the full image_data. 
+                          If False (default), only include has_image flag.
+                          This is important for performance on list endpoints.
+        """
+        result = {
             "id": self.id,
             "root_id": self.root_id,
             "context_type": self.context_type,
@@ -696,10 +710,15 @@ class Note(Base):
             "activity_definition_id": self.activity_definition_id,
             "set_index": self.set_index,
             "content": self.content,
-            "image_data": self.image_data,
+            "has_image": self.image_data is not None and len(self.image_data) > 0,
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at)
         }
+        
+        if include_image:
+            result["image_data"] = self.image_data
+        
+        return result
 
 
 class VisualizationAnnotation(Base):
