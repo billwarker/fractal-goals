@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import ScatterPlot from './ScatterPlot';
 import LineGraph from './LineGraph';
 import GoalCompletionTimeline from './GoalCompletionTimeline';
@@ -28,9 +28,9 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * @param {object} props.sourceWindowState - State from the source window (for annotations view)
  */
 function ProfileWindow({
-    windowId: _windowId, // eslint-disable-line no-unused-vars
+    windowId,
     canSplit = false,
-    onSplit,
+    onSplit, // Now accepts: onSplit(direction) where direction is 'vertical' or 'horizontal'
     canClose = false,
     onClose,
     data,
@@ -44,6 +44,9 @@ function ProfileWindow({
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
+
+    // Local state for split dropdown
+    const [showSplitMenu, setShowSplitMenu] = useState(false);
 
     // Extract state from controlled windowState prop
     const {
@@ -319,35 +322,112 @@ function ProfileWindow({
             ))}
 
             {/* Split/Close buttons */}
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', position: 'relative' }}>
                 {canSplit && (
-                    <button
-                        onClick={onSplit}
-                        title="Split window"
-                        style={{
-                            padding: '8px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
-                            borderRadius: '6px',
-                            color: '#888',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.background = '#444';
-                            e.target.style.borderColor = '#555';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.background = '#333';
-                            e.target.style.borderColor = '#444';
-                        }}
-                    >
-                        ⊞ Split
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setShowSplitMenu(!showSplitMenu)}
+                            title="Split profile window"
+                            style={{
+                                padding: '8px 12px',
+                                background: showSplitMenu ? '#444' : '#333',
+                                border: '1px solid #444',
+                                borderRadius: '6px',
+                                color: '#888',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!showSplitMenu) {
+                                    e.currentTarget.style.background = '#444';
+                                    e.currentTarget.style.borderColor = '#555';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!showSplitMenu) {
+                                    e.currentTarget.style.background = '#333';
+                                    e.currentTarget.style.borderColor = '#444';
+                                }
+                            }}
+                        >
+                            ⊞ Split ▾
+                        </button>
+
+                        {/* Split dropdown menu */}
+                        {showSplitMenu && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    marginTop: '4px',
+                                    background: '#2a2a2a',
+                                    border: '1px solid #444',
+                                    borderRadius: '6px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                    zIndex: 100,
+                                    minWidth: '160px',
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                <button
+                                    onClick={() => {
+                                        onSplit('vertical');
+                                        setShowSplitMenu(false);
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ccc',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <span style={{ fontSize: '16px' }}>◫</span>
+                                    Split Vertical
+                                    <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto' }}>Side by side</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onSplit('horizontal');
+                                        setShowSplitMenu(false);
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        borderTop: '1px solid #333',
+                                        color: '#ccc',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <span style={{ fontSize: '16px' }}>⬓</span>
+                                    Split Horizontal
+                                    <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto' }}>Stacked</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
                 {canClose && (
                     <button

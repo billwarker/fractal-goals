@@ -1,8 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useActivities } from '../contexts/ActivitiesContext';
 import ProfileWindow from '../components/analytics/ProfileWindow';
+import ProfileWindowLayout, {
+    countWindows,
+    getWindowIds,
+    splitWindow,
+    removeWindow,
+    setSplitPositionForWindow
+} from '../components/analytics/ProfileWindowLayout';
 import '../components/analytics/ChartJSWrapper'; // Registers Chart.js components
 import '../App.css';
 
@@ -17,15 +24,33 @@ const formatDuration = (seconds) => {
     return `${minutes}m`;
 };
 
+// Default state for a new profile window
+const getDefaultWindowState = () => ({
+    selectedCategory: null,
+    selectedVisualization: null,
+    selectedActivity: null,
+    selectedMetric: null,
+    selectedMetricY2: null,
+    setsHandling: 'top',
+    selectedSplit: 'all',
+    selectedGoal: null,
+    selectedGoalChart: 'duration',
+    heatmapMonths: 12
+});
+
+// Generate new window ID
+let windowIdCounter = 1;
+const generateWindowId = () => `window-${++windowIdCounter}`;
+
 /**
  * Analytics Page - Redesigned with Profile Windows
  * 
  * Features:
- * - One or two profile windows for viewing different visualizations side by side
+ * - Up to 4 profile windows with vertical/horizontal splits
  * - Each window can independently select category (goals, sessions, activities)
  * - Each window can independently select visualization type
- * - Resizable divider between windows when split
- * - Maximum 2 windows at a time
+ * - Resizable dividers between windows
+ * - Nested splits supported (split vertically then horizontally, or vice versa)
  */
 function Analytics() {
     const { rootId } = useParams();
@@ -40,42 +65,18 @@ function Analytics() {
     // Shared state for annotation highlighting across windows
     const [highlightedAnnotationId, setHighlightedAnnotationId] = useState(null);
 
-    // Window state - each window has its own state object stored here
-    // This ensures closing one window doesn't affect the other's state
+    // Layout tree structure - supports nested splits
+    // { type: 'window', id: 'window-1' } for single window
+    // { type: 'split', direction: 'vertical'|'horizontal', position: 50, first: {...}, second: {...} } for splits
+    const [layout, setLayout] = useState({ type: 'window', id: 'window-1' });
+
+    // Window state - each window has its own state object
     const [windowStates, setWindowStates] = useState({
-        'window-1': {
-            selectedCategory: null,
-            selectedVisualization: null,
-            selectedActivity: null,
-            selectedMetric: null,
-            selectedMetricY2: null,
-            setsHandling: 'top',
-            selectedSplit: 'all',
-            selectedGoal: null,
-            selectedGoalChart: 'duration',
-            heatmapMonths: 12 // Time range for activity heatmap
-        },
-        'window-2': {
-            selectedCategory: null,
-            selectedVisualization: null,
-            selectedActivity: null,
-            selectedMetric: null,
-            selectedMetricY2: null,
-            setsHandling: 'top',
-            selectedSplit: 'all',
-            selectedGoal: null,
-            selectedGoalChart: 'duration',
-            heatmapMonths: 12 // Time range for activity heatmap
-        }
+        'window-1': getDefaultWindowState()
     });
 
-    // Track which windows are visible
-    const [visibleWindows, setVisibleWindows] = useState(['window-1']);
-
-    // Resizer state
-    const [splitPosition, setSplitPosition] = useState(50); // Percentage for first window
-    const [isDragging, setIsDragging] = useState(false);
-    const containerRef = useRef(null);
+    // Max 4 profile windows
+    const MAX_WINDOWS = 4;
 
     // Create a state updater function for a specific window
     const createWindowStateUpdater = (windowId) => (updates) => {
@@ -155,73 +156,55 @@ function Analytics() {
         };
     }, [rootId, navigate, fetchActivities]);
 
-    // Handle split window
-    const handleSplit = () => {
-        if (visibleWindows.length < 2) {
-            setVisibleWindows([...visibleWindows, 'window-2']);
-            setSplitPosition(50);
-        }
-    };
-
-    // Handle close window
-    const handleCloseWindow = (windowId) => {
-        if (visibleWindows.length > 1) {
-            setVisibleWindows(visibleWindows.filter(id => id !== windowId));
-            setSplitPosition(50);
-        }
-    };
-
-    // Drag handlers for resizer
-    const handleMouseDown = useCallback((e) => {
-        e.preventDefault();
-        setIsDragging(true);
-    }, []);
-
-    const handleMouseMove = useCallback((e) => {
-        if (!isDragging || !containerRef.current) return;
-
-        const container = containerRef.current;
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const percentage = (x / rect.width) * 100;
-
-        // Clamp between 20% and 80%
-        const clampedPercentage = Math.min(80, Math.max(20, percentage));
-        setSplitPosition(clampedPercentage);
-    }, [isDragging]);
-
-    const handleMouseUp = useCallback(() => {
-        setIsDragging(false);
-    }, []);
-
-    useEffect(() => {
-        if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-            return () => {
-                window.removeEventListener('mousemove', handleMouseMove);
-                window.removeEventListener('mouseup', handleMouseUp);
-            };
-        }
-    }, [isDragging, handleMouseMove, handleMouseUp]);
-
-    // Handle annotations click - forces split view and sets right window to annotations
-    const handleAnnotationsClick = () => {
-        // Ensure we have two windows
-        if (visibleWindows.length === 1) {
-            setVisibleWindows(['window-1', 'window-2']);
-            setSplitPosition(50);
+    // Handle split - splits a window in the given direction
+    const handleSplit = useCallback((windowId, direction) => {
+        const currentCount = countWindows(layout);
+        if (currentCount >= MAX_WINDOWS) {
+            alert(`Maximum of ${MAX_WINDOWS} profile windows reached`);
+            return;
         }
 
-        // Set window-2 (the right window) to annotations
+        const newWindowId = generateWindowId();
+
+        // Update layout tree
+        setLayout(prev => splitWindow(prev, windowId, direction, newWindowId));
+
+        // Initialize new window state
         setWindowStates(prev => ({
             ...prev,
-            ['window-2']: {
-                ...prev['window-2'],
+            [newWindowId]: getDefaultWindowState()
+        }));
+    }, [layout]);
+
+    // Handle close window
+    const handleCloseWindow = useCallback((windowId) => {
+        const currentCount = countWindows(layout);
+        if (currentCount <= 1) return; // Can't close last window
+
+        // Update layout tree
+        setLayout(prev => removeWindow(prev, windowId));
+
+        // Clean up window state
+        setWindowStates(prev => {
+            const { [windowId]: removed, ...rest } = prev;
+            return rest;
+        });
+    }, [layout]);
+
+    // Handle annotations click - makes the clicked window the annotations view and shrinks it
+    const handleAnnotationsClick = useCallback((windowId) => {
+        // Update the window state to show annotations
+        setWindowStates(prev => ({
+            ...prev,
+            [windowId]: {
+                ...prev[windowId],
                 selectedCategory: 'annotations'
             }
         }));
-    };
+
+        // Shrink the annotations window to 25%
+        setLayout(prev => setSplitPositionForWindow(prev, windowId, 25, true));
+    }, []);
 
     // Shared data for all windows
     const sharedData = {
@@ -232,6 +215,36 @@ function Analytics() {
         formatDuration,
         rootId
     };
+
+    // Render a single profile window
+    const renderWindow = useCallback((windowId, path) => {
+        const windowCount = countWindows(layout);
+        const windowIds = getWindowIds(layout);
+        const canSplit = windowCount < MAX_WINDOWS;
+        const canClose = windowCount > 1;
+
+        // Find a sibling window for sourceWindowState (for annotations)
+        const otherWindowId = windowIds.find(id => id !== windowId) || windowId;
+
+        return (
+            <ProfileWindow
+                key={windowId}
+                windowId={windowId}
+                canSplit={canSplit}
+                onSplit={(direction) => handleSplit(windowId, direction)}
+                canClose={canClose}
+                onClose={() => handleCloseWindow(windowId)}
+                data={sharedData}
+                windowState={windowStates[windowId] || getDefaultWindowState()}
+                updateWindowState={createWindowStateUpdater(windowId)}
+                onAnnotationsClick={() => handleAnnotationsClick(windowId)}
+                sourceWindowState={windowStates[otherWindowId] || getDefaultWindowState()}
+                updateSourceWindowState={createWindowStateUpdater(otherWindowId)}
+                highlightedAnnotationId={highlightedAnnotationId}
+                setHighlightedAnnotationId={setHighlightedAnnotationId}
+            />
+        );
+    }, [layout, windowStates, sharedData, handleSplit, handleCloseWindow, handleAnnotationsClick, highlightedAnnotationId]);
 
     if (loading || activitiesLoading) {
         return (
@@ -252,126 +265,19 @@ function Analytics() {
         }}>
             {/* Content Area with Profile Windows */}
             <div
-                ref={containerRef}
                 style={{
                     flex: 1,
                     display: 'flex',
                     padding: '80px 20px 20px 20px', // Top padding for nav bar
-                    gap: visibleWindows.length > 1 ? '0' : '0',
                     overflow: 'hidden',
-                    position: 'relative',
-                    cursor: isDragging ? 'col-resize' : 'default'
+                    position: 'relative'
                 }}
             >
-                {visibleWindows.length === 1 ? (
-                    // Single window
-                    <ProfileWindow
-                        key={visibleWindows[0]}
-                        windowId={visibleWindows[0]}
-                        canSplit={true}
-                        onSplit={handleSplit}
-                        canClose={false}
-                        data={sharedData}
-                        windowState={windowStates[visibleWindows[0]]}
-                        updateWindowState={createWindowStateUpdater(visibleWindows[0])}
-                        onAnnotationsClick={handleAnnotationsClick}
-                        sourceWindowState={windowStates['window-2']} // In single mode, this might be stale but that's fine
-                        highlightedAnnotationId={highlightedAnnotationId}
-                        setHighlightedAnnotationId={setHighlightedAnnotationId}
-                    />
-                ) : (
-                    // Two windows with resizer
-                    <>
-                        <div style={{
-                            width: `calc(${splitPosition}% - 4px)`,
-                            minWidth: 0,
-                            display: 'flex'
-                        }}>
-                            <ProfileWindow
-                                key={visibleWindows[0]}
-                                windowId={visibleWindows[0]}
-                                canSplit={false}
-                                canClose={true}
-                                onClose={() => handleCloseWindow(visibleWindows[0])}
-                                data={sharedData}
-                                windowState={windowStates[visibleWindows[0]]}
-                                updateWindowState={createWindowStateUpdater(visibleWindows[0])}
-                                onAnnotationsClick={handleAnnotationsClick}
-                                sourceWindowState={windowStates[visibleWindows[1]]}
-                                updateSourceWindowState={createWindowStateUpdater(visibleWindows[1])}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                                setHighlightedAnnotationId={setHighlightedAnnotationId}
-                            />
-                        </div>
-
-                        {/* Resizer */}
-                        <div
-                            onMouseDown={handleMouseDown}
-                            style={{
-                                width: '8px',
-                                cursor: 'col-resize',
-                                background: isDragging ? '#2196f3' : 'transparent',
-                                transition: isDragging ? 'none' : 'background 0.2s ease',
-                                position: 'relative',
-                                zIndex: 5,
-                                flexShrink: 0
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!isDragging) {
-                                    e.target.style.background = '#444';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!isDragging) {
-                                    e.target.style.background = 'transparent';
-                                }
-                            }}
-                        >
-                            {/* Visual handle */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                width: '4px',
-                                height: '40px',
-                                background: '#555',
-                                borderRadius: '2px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '3px'
-                            }}>
-                                <div style={{ width: '2px', height: '2px', background: '#888', borderRadius: '1px' }} />
-                                <div style={{ width: '2px', height: '2px', background: '#888', borderRadius: '1px' }} />
-                                <div style={{ width: '2px', height: '2px', background: '#888', borderRadius: '1px' }} />
-                            </div>
-                        </div>
-
-                        <div style={{
-                            width: `calc(${100 - splitPosition}% - 4px)`,
-                            minWidth: 0,
-                            display: 'flex'
-                        }}>
-                            <ProfileWindow
-                                key={visibleWindows[1]}
-                                windowId={visibleWindows[1]}
-                                canSplit={false}
-                                canClose={true}
-                                onClose={() => handleCloseWindow(visibleWindows[1])}
-                                data={sharedData}
-                                windowState={windowStates[visibleWindows[1]]}
-                                updateWindowState={createWindowStateUpdater(visibleWindows[1])}
-                                onAnnotationsClick={handleAnnotationsClick}
-                                sourceWindowState={windowStates[visibleWindows[0]]}
-                                updateSourceWindowState={createWindowStateUpdater(visibleWindows[0])}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                                setHighlightedAnnotationId={setHighlightedAnnotationId}
-                            />
-                        </div>
-                    </>
-                )}
+                <ProfileWindowLayout
+                    layout={layout}
+                    onLayoutChange={setLayout}
+                    renderWindow={renderWindow}
+                />
             </div>
         </div>
     );
