@@ -58,15 +58,15 @@ def _get_entity_info(event: Event):
     parts = event.name.split('.')
     entity_type = parts[0] if len(parts) > 0 else 'unknown'
     
-    # Common ID field names
+    # Common ID field names - ordered by specificity
     id_fields = [
         f"{entity_type}_id", 
-        'id', 
+        'instance_id',
+        'activity_id',
+        'target_id',
         'goal_id', 
         'session_id', 
-        'target_id', 
-        'activity_id',
-        'instance_id'
+        'id'
     ]
     
     entity_id = None
@@ -79,7 +79,12 @@ def _get_entity_info(event: Event):
 
 def _get_event_description(event: Event):
     """Generate a human-readable description for the event."""
-    name = event.data.get('name') or event.data.get('goal_name') or event.data.get('session_name')
+    name = (
+        event.data.get('activity_name') or 
+        event.data.get('name') or 
+        event.data.get('goal_name') or 
+        event.data.get('session_name')
+    )
     
     descriptions = {
         Events.SESSION_CREATED: f"Created session: {name}" if name else "Created a new session",

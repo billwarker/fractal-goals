@@ -3,11 +3,14 @@ from datetime import datetime
 import json
 import uuid
 import models
+from sqlalchemy.orm import joinedload
 from models import (
     get_session,
     ActivityInstance, Session,
+    ActivityDefinition,
     validate_root_goal
 )
+from services.events import event_bus, Event, Events
 
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
@@ -55,7 +58,20 @@ def activity_instances(root_id):
                 root_id=root_id  # Add root_id for performance
             )
             db_session.add(instance)
+            
+            # Get activity name directly from definition
+            activity_def = db_session.query(ActivityDefinition).filter_by(id=activity_definition_id).first()
+            activity_name = activity_def.name if activity_def else 'Unknown'
             db_session.commit()
+            
+            # Emit event
+            event_bus.emit(Event(Events.ACTIVITY_INSTANCE_CREATED, {
+                'instance_id': instance.id,
+                'activity_definition_id': activity_definition_id,
+                'activity_name': activity_name,
+                'session_id': session_id,
+                'root_id': root_id
+            }, source='timers_api.activity_instances'))
             
             return jsonify(instance.to_dict()), 201
         
@@ -93,7 +109,8 @@ def start_activity_timer(root_id, instance_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        from sqlalchemy.orm import joinedload
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
         print(f"[START TIMER] Instance found: {instance is not None}")
         
         if not instance:
@@ -127,7 +144,20 @@ def start_activity_timer(root_id, instance_id):
         print(f"[START TIMER] Set time_start to: {start_time}")
         print(f"[START TIMER] Instance time_start before commit: {instance.time_start}")
         
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
+        
+        # Emit event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
+            'session_id': instance.session_id,
+            'root_id': root_id,
+            'updated_fields': ['time_start']
+        }, source='timers_api.start_activity_timer'))
         
         print(f"[START TIMER] Committed successfully")
         print(f"[START TIMER] Instance time_start after commit: {instance.time_start}")
@@ -160,7 +190,8 @@ def stop_activity_timer(root_id, instance_id):
         
         # Get the activity instance
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
+        from sqlalchemy.orm import joinedload
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
         if not instance:
             # Instance doesn't exist - this is an error condition
             # The instance should have been created when the activity was added to the session
@@ -179,7 +210,20 @@ def stop_activity_timer(root_id, instance_id):
         duration = (instance.time_stop - instance.time_start).total_seconds()
         instance.duration_seconds = int(duration)
         
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
+        
+        # Emit event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
+            'session_id': instance.session_id,
+            'root_id': root_id,
+            'updated_fields': ['time_stop', 'duration_seconds']
+        }, source='timers_api.stop_activity_timer'))
         
         return jsonify(instance.to_dict())
         
@@ -239,7 +283,7 @@ def update_activity_instance(root_id, instance_id):
         data = request.get_json() or {}
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
         
         if not instance:
             # Create if missing, but we strictly need connection IDs
@@ -305,7 +349,21 @@ def update_activity_instance(root_id, instance_id):
         elif not instance.time_start or not instance.time_stop:
              instance.duration_seconds = None
         
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
+        
+        # Emit event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
+            'session_id': instance.session_id,
+            'root_id': root_id,
+            'updated_fields': list(data.keys())
+        }, source='timers_api.update_activity_instance'))
+        
         print(f"[UPDATE INSTANCE] Successfully updated instance")
         
         return jsonify(instance.to_dict())

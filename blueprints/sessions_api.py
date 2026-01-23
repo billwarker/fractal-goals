@@ -12,6 +12,7 @@ from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
+    ActivityDefinition,
     validate_root_goal, get_all_sessions, get_sessions_for_root,
     get_immediate_goals_for_session, get_session_by_id
 )
@@ -516,14 +517,19 @@ def add_activity_to_session(root_id, session_id):
             activity_definition_id=activity_definition_id,
             root_id=root_id  # Add root_id for performance
         )
-        
         db_session.add(instance)
+        
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
+        db_session.refresh(instance)
         
         # Emit activity instance created event
         event_bus.emit(Event(Events.ACTIVITY_INSTANCE_CREATED, {
             'instance_id': instance.id,
             'activity_definition_id': activity_definition_id,
+            'activity_name': activity_name,
             'session_id': session_id,
             'root_id': root_id
         }, source='sessions_api.add_activity_to_session'))
@@ -574,7 +580,7 @@ def update_activity_instance_in_session(root_id, session_id, instance_id):
     db_session = get_session(engine)
     try:
         data = request.get_json()
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
         if not instance:
             return jsonify({"error": "Instance not found"}), 404
         
@@ -583,13 +589,16 @@ def update_activity_instance_in_session(root_id, session_id, instance_id):
         if 'completed' in data:
             instance.completed = data.get('completed')
         
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
         # Emit activity instance updated event
         event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
-            'activity_name': instance.activity_definition.name if instance.activity_definition else 'Unknown',
+            'activity_name': activity_name,
             'session_id': session_id,
             'root_id': root_id,
             'updated_fields': list(data.keys())
@@ -625,6 +634,9 @@ def remove_activity_from_session(root_id, session_id, instance_id):
             return jsonify({"error": "Activity instance not found"}), 404
         
         activity_definition_id = instance.activity_definition_id
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.delete(instance)
         db_session.commit()
         
@@ -632,6 +644,7 @@ def remove_activity_from_session(root_id, session_id, instance_id):
         event_bus.emit(Event(Events.ACTIVITY_INSTANCE_DELETED, {
             'instance_id': instance_id,
             'activity_definition_id': activity_definition_id,
+            'activity_name': activity_name,
             'session_id': session_id,
             'root_id': root_id
         }, source='sessions_api.remove_activity_from_session'))
@@ -658,7 +671,7 @@ def update_activity_metrics(root_id, session_id, instance_id):
             return jsonify({"error": "Fractal not found"}), 404
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).filter_by(
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(
             id=instance_id,
             session_id=session_id
         ).first()
@@ -708,12 +721,16 @@ def update_activity_metrics(root_id, session_id, instance_id):
             except ValueError:
                 continue
         
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
         # Emit activity metrics updated event
         event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
             'instance_id': instance_id,
             'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
             'session_id': session_id,
             'root_id': root_id,
             'metrics_count': len(metrics)

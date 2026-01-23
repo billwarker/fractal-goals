@@ -253,6 +253,7 @@ Captures and persists all application events to the database for auditing and hi
 - **Frontend Integration:**
   - **Standalone Logs Page:** Reachable via the "LOGS" button in the navigation header.
   - **Enhanced Log View:** Displays interactive event log with human-readable descriptions, full entity IDs, and color-coded event badges (including red for deletion events).
+  - **Audit Quality Improvements:** Backend events now reliably include human-readable entity names (e.g., activity name, goal name) to ensure logs aren't filled with "Unknown" labels.
   - **Categorized Tracking:** Automatically tracks Goals, Sessions, Targets, Activities (Definitions & Instances), Activity Groups, and Programs.
 
 ---
