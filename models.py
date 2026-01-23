@@ -899,7 +899,7 @@ class Program(Base):
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at),
             "is_active": self.is_active,
-            "goal_ids": self.goal_ids or [],
+            "goal_ids": _safe_load_json(self.goal_ids, []),
             "weekly_schedule": schedule_from_db,
             "blocks": [b.to_dict() for b in self.blocks]
         }
@@ -916,7 +916,7 @@ class ProgramBlock(Base):
     color = Column(String)
     
     # JSON List of Goal IDs specific to this block
-    goal_ids = Column(Text) 
+    goal_ids = Column(JSON_TYPE, nullable=False, default=list) 
     
     program = relationship("Program", back_populates="blocks")
     days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
@@ -929,7 +929,7 @@ class ProgramBlock(Base):
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "end_date": self.end_date.isoformat() if self.end_date else None,
             "color": self.color,
-            "goal_ids": self.goal_ids or [],
+            "goal_ids": _safe_load_json(self.goal_ids, []),
             # Include nested days for UI
             "days": [d.to_dict() for d in self.days]
         }
