@@ -563,7 +563,7 @@ def get_active_program_days(root_id):
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": json.loads(template.template_data) if template.template_data else {}
+                                        "template_data": models._safe_load_json(template.template_data, {})
                                     })
                                 
                                 result.append({
@@ -606,7 +606,7 @@ def attach_goal_to_block(root_id, program_id, block_id):
         if not goal_id: return jsonify({"error": "Goal ID required"}), 400
         
         # 1. Update Block goal_ids
-        current_ids = json.loads(block.goal_ids) if block.goal_ids else []
+        current_ids = models._safe_load_json(block.goal_ids, [])
         if goal_id not in current_ids:
             current_ids.append(goal_id)
             block.goal_ids = json.dumps(current_ids)

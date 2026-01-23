@@ -28,35 +28,50 @@ export function GoalsProvider({ children }) {
 
     // 2. Mutations
     const createFractalMutation = useMutation({
-        mutationFn: (data) => globalApi.createFractal(data),
+        mutationFn: async (data) => {
+            const res = await globalApi.createFractal(data);
+            return res.data;
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['fractals'] });
         }
     });
 
     const createGoalMutation = useMutation({
-        mutationFn: ({ rootId, goalData }) => fractalApi.createGoal(rootId, goalData),
+        mutationFn: async ({ rootId, goalData }) => {
+            const res = await fractalApi.createGoal(rootId, goalData);
+            return res.data;
+        },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
     });
 
     const updateGoalMutation = useMutation({
-        mutationFn: ({ rootId, goalId, updates }) => fractalApi.updateGoal(rootId, goalId, updates),
+        mutationFn: async ({ rootId, goalId, updates }) => {
+            const res = await fractalApi.updateGoal(rootId, goalId, updates);
+            return res.data;
+        },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
     });
 
     const deleteGoalMutation = useMutation({
-        mutationFn: ({ rootId, goalId }) => fractalApi.deleteGoal(rootId, goalId),
+        mutationFn: async ({ rootId, goalId }) => {
+            const res = await fractalApi.deleteGoal(rootId, goalId);
+            return res.data;
+        },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
     });
 
     const toggleGoalCompletionMutation = useMutation({
-        mutationFn: ({ rootId, goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
+        mutationFn: async ({ rootId, goalId, completed }) => {
+            const res = await fractalApi.toggleGoalCompletion(rootId, goalId, completed);
+            return res.data;
+        },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }

@@ -148,12 +148,7 @@ def create_fractal_session(root_id):
         s_end = parse_datetime(data.get('session_end'))
 
         # Parse session_data
-        session_data = data.get('session_data', {})
-        if isinstance(session_data, str):
-            try:
-                session_data = json.loads(session_data)
-            except:
-                session_data = {}
+        session_data = models._safe_load_json(data.get('session_data'), {})
         
         program_context = session_data.get('program_context', {})
 
@@ -170,25 +165,16 @@ def create_fractal_session(root_id):
         )
         
         # Handle attributes
-        if isinstance(session_data, dict):
-            new_session.attributes = session_data
-        else:
-            try:
-                new_session.attributes = json.loads(session_data) if session_data else {}
-            except:
-                new_session.attributes = {}
+        new_session.attributes = models._safe_load_json(session_data, {})
         
         # Extract program_day_id from program_context if present
         program_day_id = None
         if new_session.attributes:
-            try:
-                session_data_dict = json.loads(new_session.attributes) if isinstance(new_session.attributes, str) else new_session.attributes
-                program_context = session_data_dict.get('program_context')
-                if program_context and 'day_id' in program_context:
-                    program_day_id = program_context['day_id']
-                    new_session.program_day_id = program_day_id
-            except (json.JSONDecodeError, TypeError):
-                pass
+            session_data_dict = models._safe_load_json(new_session.attributes, {})
+            program_context = session_data_dict.get('program_context')
+            if program_context and 'day_id' in program_context:
+                program_day_id = program_context['day_id']
+                new_session.program_day_id = program_day_id
         
         db_session.add(new_session)
         db_session.flush()  # Get the ID before committing
@@ -337,13 +323,7 @@ def update_session(root_id, session_id):
         
         if 'session_data' in data:
             val = data['session_data']
-            if isinstance(val, str):
-                try:
-                    session.attributes = json.loads(val)
-                except:
-                    session.attributes = val
-            else:
-                session.attributes = val
+            session.attributes = models._safe_load_json(val, val)
         
         db_session.commit()
         

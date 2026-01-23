@@ -287,7 +287,7 @@ def update_activity_instance(root_id, instance_id):
              instance.notes = data['notes']
 
         # Handle extended data (sets, etc)
-        current_data = json.loads(instance.data) if instance.data else {}
+        current_data = models._safe_load_json(instance.data, {})
         data_changed = False
 
         if 'sets' in data:

@@ -599,13 +599,21 @@ export const fractalApi = {
     // ========== Logs ==========
 
     /**
-     * Get event logs for a fractal
+     * Get event logs for a fractal with filtering and pagination
      * @param {string} rootId - ID of the fractal
-     * @param {number} limit - Number of logs to fetch
-     * @param {number} offset - Offset for pagination
+     * @param {Object} options - {limit, offset, event_type, start_date, end_date}
      */
-    getLogs: (rootId, limit = 50, offset = 0) =>
-        axios.get(`${API_BASE}/${rootId}/logs?limit=${limit}&offset=${offset}`),
+    getLogs: (rootId, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.limit) params.append('limit', options.limit);
+        if (options.offset !== undefined) params.append('offset', options.offset);
+        if (options.event_type) params.append('event_type', options.event_type);
+        if (options.start_date) params.append('start_date', options.start_date);
+        if (options.end_date) params.append('end_date', options.end_date);
+
+        const queryString = params.toString();
+        return axios.get(`${API_BASE}/${rootId}/logs${queryString ? '?' + queryString : ''}`);
+    },
 
     /**
      * Clear all event logs for a fractal

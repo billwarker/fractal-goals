@@ -234,7 +234,7 @@ def add_goal_target(goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        current_targets = json.loads(goal.targets) if goal.targets else []
+        current_targets = models._safe_load_json(goal.targets, [])
         if 'id' not in data:
             data['id'] = str(uuid.uuid4())
             
@@ -269,7 +269,7 @@ def remove_goal_target(goal_id, target_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        current_targets = json.loads(goal.targets) if goal.targets else []
+        current_targets = models._safe_load_json(goal.targets, [])
         new_targets = [t for t in current_targets if t.get('id') != target_id]
         
         if len(new_targets) == len(current_targets):

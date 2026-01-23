@@ -12,35 +12,41 @@ function Logs() {
 
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [offset, setOffset] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
-    const limit = 50;
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [eventTypes, setEventTypes] = useState([]);
+    const pageSize = 50;
+
+    // Filter states
+    const [eventType, setEventType] = useState('all');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     useEffect(() => {
         if (!rootId) {
             navigate('/');
             return;
         }
-        fetchLogs(true);
-    }, [rootId, navigate]);
+        fetchLogs();
+    }, [rootId, page, eventType, startDate, endDate]);
 
-    const fetchLogs = async (refresh = false) => {
+    const fetchLogs = async () => {
         try {
             setLoading(true);
-            const currentOffset = refresh ? 0 : offset;
-            const res = await fractalApi.getLogs(rootId, limit, currentOffset);
+            const offset = (page - 1) * pageSize;
+            const res = await fractalApi.getLogs(rootId, {
+                limit: pageSize,
+                offset: offset,
+                event_type: eventType !== 'all' ? eventType : undefined,
+                start_date: startDate ? new Date(startDate).toISOString() : undefined,
+                end_date: endDate ? new Date(endDate).toISOString() : undefined
+            });
 
-            const newLogs = res.data.logs || [];
-
-            if (refresh) {
-                setLogs(newLogs);
-                setOffset(newLogs.length);
-            } else {
-                setLogs(prev => [...prev, ...newLogs]);
-                setOffset(prev => prev + newLogs.length);
+            setLogs(res.data.logs || []);
+            setTotal(res.data.pagination.total || 0);
+            if (res.data.event_types) {
+                setEventTypes(res.data.event_types);
             }
-
-            setHasMore(newLogs.length === limit);
         } catch (err) {
             console.error("Failed to fetch logs:", err);
         } finally {
@@ -54,12 +60,14 @@ function Logs() {
         try {
             await fractalApi.clearLogs(rootId);
             setLogs([]);
-            setOffset(0);
-            setHasMore(false);
+            setTotal(0);
+            setPage(1);
         } catch (err) {
             console.error("Failed to clear logs:", err);
         }
     };
+
+    const totalPages = Math.ceil(total / pageSize);
 
     return (
         <div className="logs-page-container">
@@ -69,8 +77,31 @@ function Logs() {
                     <p className="header-subtitle">Audit trail and history of activities</p>
                 </div>
                 <div className="logs-header-actions">
-                    <button className="refresh-logs-btn" onClick={() => fetchLogs(true)}>REFRESH</button>
+                    <button className="refresh-logs-btn" onClick={() => fetchLogs()}>REFRESH</button>
                     <button className="clear-logs-btn" onClick={handleClearLogs}>CLEAR ALL</button>
+                </div>
+            </div>
+
+            <div className="logs-filters">
+                <div className="filter-group">
+                    <label>Event Type</label>
+                    <select value={eventType} onChange={(e) => { setEventType(e.target.value); setPage(1); }}>
+                        <option value="all">All Events</option>
+                        {eventTypes.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="filter-group">
+                    <label>From</label>
+                    <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} />
+                </div>
+                <div className="filter-group">
+                    <label>To</label>
+                    <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} />
+                </div>
+                <div className="logs-stats">
+                    Total: {total} events
                 </div>
             </div>
 
@@ -78,7 +109,7 @@ function Logs() {
                 {loading && logs.length === 0 ? (
                     <div className="logs-loading">Loading events...</div>
                 ) : logs.length === 0 ? (
-                    <div className="logs-empty">No events captured yet for this fractal.</div>
+                    <div className="logs-empty">No events matching your filters.</div>
                 ) : (
                     <div className="logs-list-container">
                         <div className="logs-grid-header">
@@ -109,17 +140,29 @@ function Logs() {
                                     <span className="log-source col-source">{log.source || 'system'}</span>
                                 </div>
                             ))}
-
-                            {hasMore && (
-                                <button
-                                    className="load-more-logs"
-                                    onClick={() => fetchLogs()}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Loading...' : 'Load More Events'}
-                                </button>
-                            )}
                         </div>
+
+                        {totalPages > 1 && (
+                            <div className="logs-pagination">
+                                <button
+                                    disabled={page === 1}
+                                    onClick={() => setPage(p => p - 1)}
+                                    className="page-btn"
+                                >
+                                    Previous
+                                </button>
+                                <span className="page-info">
+                                    Page {page} of {totalPages}
+                                </span>
+                                <button
+                                    disabled={page === totalPages}
+                                    onClick={() => setPage(p => p + 1)}
+                                    className="page-btn"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

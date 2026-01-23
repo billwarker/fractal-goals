@@ -183,6 +183,8 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - Automatic caching with `staleTime: 60s` and `cacheTime: 5m`.
   - Automatic cache invalidation on mutations (create/update/delete).
   - Background revalidation prevents stale data while maintaining "instant" UI feel.
+  - **Mutation Return Values:** Mutations consistently return `response.data` rather than the full Axios response object, preventing stale UI states and empty modals when updating entities.
+- **Robust JSON Handling:** Standardized backend JSON parsing across all blueprints using `models._safe_load_json`. This ensures compatibility between SQLite (which returns JSON as strings) and PostgreSQL (which returns `JSONB` as native Python dictionaries), preventing `TypeError` during deserialization in production.
 - **Server-Side Compression:** `flask-compress` enabled on backend. Reduces large JSON payloads (fractal tree) by up to 90%.
 - **Native JSONB Storage:** Optimized metadata storage using PostgreSQL `JSONB` for targets, attributes, and templates. Enables binary indexing and removes serialization overhead in Python.
 - **Pagination:** Sessions list API returns paginated results (default: 10 per page, max: 50)

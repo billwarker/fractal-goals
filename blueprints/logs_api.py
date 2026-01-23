@@ -11,32 +11,66 @@ logs_api = Blueprint('logs_api', __name__)
 def get_logs(root_id):
     """
     Get all event logs for a specific fractal.
-    Supports pagination.
+    Supports filtering and pagination.
     """
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)
+    event_type = request.args.get('event_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
     
     db_session = get_scoped_session()
     try:
+        from sqlalchemy import func
+        from datetime import datetime
+        
         # Create base query
-        stmt = select(EventLog).where(
-            EventLog.root_id == root_id
-        ).order_by(desc(EventLog.timestamp))
+        stmt = select(EventLog).where(EventLog.root_id == root_id)
         
-        # Get total count for pagination
-        # (Simplified for now, as we're usually interested in recent logs)
+        # Apply filters
+        if event_type and event_type != 'all':
+            stmt = stmt.where(EventLog.event_type == event_type)
         
-        # Apply limit and offset
-        stmt = stmt.limit(limit).offset(offset)
+        if start_date:
+            try:
+                # Handle ISO date strings
+                s_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                stmt = stmt.where(EventLog.timestamp >= s_dt)
+            except ValueError:
+                pass
+                
+        if end_date:
+            try:
+                # Append end of day time for date-only filters
+                if len(end_date) <= 10: # YYYY-MM-DD
+                    end_date += "T23:59:59"
+                e_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                stmt = stmt.where(EventLog.timestamp <= e_dt)
+            except ValueError:
+                pass
+        
+        # Get total count for pagination WITH filters applied
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_count = db_session.execute(count_stmt).scalar()
+        
+        # Final ordering, limit and offset
+        stmt = stmt.order_by(desc(EventLog.timestamp)).limit(limit).offset(offset)
         
         results = db_session.execute(stmt).scalars().all()
         
+        # Also get all available event types for the filter dropdown
+        types_stmt = select(EventLog.event_type).where(EventLog.root_id == root_id).distinct()
+        event_types = [t for t in db_session.execute(types_stmt).scalars().all()]
+        
         return jsonify({
             "logs": [log.to_dict() for log in results],
+            "event_types": sorted(event_types),
             "pagination": {
                 "limit": limit,
                 "offset": offset,
-                "count": len(results)
+                "total": total_count,
+                "count": len(results),
+                "has_more": (offset + limit) < total_count
             }
         })
     except Exception as e:
