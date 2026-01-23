@@ -114,6 +114,35 @@ function ProfileWindow({
         }
     };
 
+    const handleBack = () => {
+        if (selectedVisualization) {
+            updateWindowState({
+                selectedVisualization: null,
+                selectedActivity: null,
+                selectedGoal: null,
+                isAnnotating: false
+            });
+        } else if (selectedCategory) {
+            updateWindowState({
+                selectedCategory: null,
+                selectedVisualization: null,
+                selectedActivity: null,
+                selectedGoal: null,
+                isAnnotating: false
+            });
+        }
+    };
+
+    const handleTop = () => {
+        updateWindowState({
+            selectedCategory: null,
+            selectedVisualization: null,
+            selectedActivity: null,
+            selectedGoal: null,
+            isAnnotating: false
+        });
+    };
+
     // ... (rest of file until AnnotatedChartWrapper usages)
 
     // We need to use multi_replace or specific target replacement for the AnnotatedChartWrapper usages.
@@ -319,467 +348,308 @@ function ProfileWindow({
         annotations: '📝'
     };
 
-    // Render the category selector buttons
-    const renderCategorySelector = () => (
-        <div style={{
-            display: 'flex',
-            gap: isNarrow ? '2px' : '4px',
-            padding: isNarrow ? '8px 8px' : '12px 16px',
-            borderBottom: '1px solid #333',
-            background: '#252525',
-            flexWrap: isVeryNarrow ? 'wrap' : 'nowrap',
-            alignItems: 'center'
-        }}>
-            {/* Main category buttons */}
-            {['goals', 'sessions', 'activities'].map(category => (
-                <button
-                    key={category}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleCategoryChange(category);
-                    }}
-                    title={category.charAt(0).toUpperCase() + category.slice(1)}
-                    style={{
-                        flex: isVeryNarrow ? '1 1 30%' : 1,
-                        padding: isVeryNarrow ? '6px 4px' : (isNarrow ? '8px 8px' : '10px 16px'),
-                        background: selectedCategory === category ? '#2196f3' : '#333',
-                        border: 'none',
-                        borderRadius: '6px',
-                        color: selectedCategory === category ? 'white' : '#888',
-                        fontSize: isVeryNarrow ? '11px' : (isNarrow ? '11px' : '13px'),
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        textTransform: 'capitalize',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        minWidth: 0
-                    }}
-                >
-                    {isVeryNarrow ? (
-                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <span>{categoryIcons[category]}</span>
-                            <span style={{ fontSize: '10px' }}>{category.slice(0, 4)}</span>
-                        </span>
-                    ) : isNarrow ? (
-                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <span>{categoryIcons[category]}</span>
-                            <span>{category.slice(0, 5)}</span>
-                        </span>
-                    ) : (
-                        category
-                    )}
-                </button>
-            ))}
+    // Unified Navigation Styles
+    const navButtonStyle = {
+        padding: '6px 8px',
+        background: '#333',
+        border: '1px solid #444',
+        borderRadius: '4px',
+        color: '#888',
+        fontSize: '14px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.2s ease',
+        height: '32px',
+        minWidth: '32px'
+    };
 
-            {/* Divider between main categories and annotations */}
-            <div style={{
-                width: '1px',
-                height: isNarrow ? '20px' : '24px',
-                background: '#444',
-                margin: isNarrow ? '0 4px' : '0 8px',
-                flexShrink: 0
-            }} />
+    const levelButtonStyle = (isActive) => ({
+        padding: '6px 12px',
+        background: isActive ? '#2196f3' : '#333',
+        border: 'none',
+        borderRadius: '6px',
+        color: isActive ? 'white' : '#888',
+        fontSize: '12px',
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        whiteSpace: 'nowrap',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px'
+    });
 
-            {/* Annotations button - smaller and separate */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
-                }}
-                title="Annotations"
-                style={{
-                    flex: 'none',
-                    padding: isVeryNarrow ? '6px 8px' : (isNarrow ? '8px 10px' : '10px 14px'),
-                    background: selectedCategory === 'annotations' ? '#2196f3' : '#333',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: selectedCategory === 'annotations' ? 'white' : '#888',
-                    fontSize: isVeryNarrow ? '11px' : (isNarrow ? '11px' : '12px'),
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                }}
-            >
-                <span>{categoryIcons.annotations}</span>
-                {!isVeryNarrow && <span>{isNarrow ? 'Notes' : 'Annotations'}</span>}
-            </button>
-
-            {/* Split/Close buttons */}
-            <div style={{
-                display: 'flex',
-                gap: '4px',
-                marginLeft: isVeryNarrow ? '0' : 'auto',
-                position: 'relative',
-                ...(isVeryNarrow && { width: '100%', marginTop: '4px', justifyContent: 'flex-end' })
-            }}>
-                {canSplit && (
-                    <div style={{ position: 'relative' }}>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowSplitMenu(!showSplitMenu);
-                            }}
-                            title="Split profile window"
-                            style={{
-                                padding: isNarrow ? '6px 8px' : '8px 12px',
-                                background: showSplitMenu ? '#444' : '#333',
-                                border: '1px solid #444',
-                                borderRadius: '6px',
-                                color: '#888',
-                                fontSize: isNarrow ? '12px' : '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!showSplitMenu) {
-                                    e.currentTarget.style.background = '#444';
-                                    e.currentTarget.style.borderColor = '#555';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!showSplitMenu) {
-                                    e.currentTarget.style.background = '#333';
-                                    e.currentTarget.style.borderColor = '#444';
-                                }
-                            }}
-                        >
-                            {isNarrow ? '⊞▾' : '⊞ Split ▾'}
-                        </button>
-
-                        {/* Split dropdown menu */}
-                        {showSplitMenu && (
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    right: 0,
-                                    marginTop: '4px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '6px',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                                    zIndex: 100,
-                                    minWidth: '160px',
-                                    overflow: 'hidden'
-                                }}
-                            >
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onSplit('vertical');
-                                        setShowSplitMenu(false);
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#ccc',
-                                        fontSize: '13px',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                >
-                                    <span style={{ fontSize: '16px' }}>◫</span>
-                                    Split Vertical
-                                    <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto' }}>Side by side</span>
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onSplit('horizontal');
-                                        setShowSplitMenu(false);
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        borderTop: '1px solid #333',
-                                        color: '#ccc',
-                                        fontSize: '13px',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                >
-                                    <span style={{ fontSize: '16px' }}>⬓</span>
-                                    Split Horizontal
-                                    <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto' }}>Stacked</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-                {canClose && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                        }}
-                        title="Close window"
-                        style={{
-                            padding: '8px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
-                            borderRadius: '6px',
-                            color: '#888',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.background = '#5c3030';
-                            e.target.style.borderColor = '#744';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.background = '#333';
-                            e.target.style.borderColor = '#444';
-                        }}
-                    >
-                        ✕
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-
-    // Render visualization options for selected category
-    const renderVisualizationOptions = () => {
-        if (!selectedCategory) return null;
-
-        const categoryVis = visualizations[selectedCategory];
-        if (!categoryVis || categoryVis.length === 0) return null;
+    const renderUnifiedHeader = () => {
+        const hasCategory = !!selectedCategory;
+        const hasViz = !!selectedVisualization;
 
         return (
             <div style={{
                 display: 'flex',
                 gap: '8px',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 borderBottom: '1px solid #333',
-                background: '#1e1e1e',
-                flexWrap: 'wrap'
-            }}>
-                {categoryVis.map(vis => (
-                    <button
-                        key={vis.id}
-                        onClick={() => setSelectedVisualization(vis.id)}
-                        style={{
-                            padding: '8px 14px',
-                            background: selectedVisualization === vis.id ? '#2196f3' : '#333',
-                            border: `1px solid ${selectedVisualization === vis.id ? '#1976d2' : '#444'}`,
-                            borderRadius: '6px',
-                            color: selectedVisualization === vis.id ? 'white' : '#888',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
-                    >
-                        <span>{vis.icon}</span>
-                        {vis.name}
-                    </button>
-                ))}
-            </div>
-        );
-    };
-
-    // Render activity selector for activity visualizations
-    const renderActivitySelector = () => {
-        if (selectedCategory !== 'activities' || !selectedVisualization) return null;
-
-        const sortedActivities = [...activities].sort((a, b) => {
-            const aInstances = activityInstances[a.id] || [];
-            const bInstances = activityInstances[b.id] || [];
-            if (aInstances.length === 0 && bInstances.length === 0) return 0;
-            if (aInstances.length === 0) return 1;
-            if (bInstances.length === 0) return -1;
-            const aLatest = aInstances.reduce((latest, inst) => {
-                const instDate = new Date(inst.session_date);
-                return instDate > latest ? instDate : latest;
-            }, new Date(0));
-            const bLatest = bInstances.reduce((latest, inst) => {
-                const instDate = new Date(inst.session_date);
-                return instDate > latest ? instDate : latest;
-            }, new Date(0));
-            return bLatest - aLatest;
-        });
-
-        const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
-        const hasSplits = currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0;
-
-        return (
-            <div style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #333',
-                background: '#1e1e1e',
-                display: 'flex',
-                gap: '12px',
+                background: '#252525',
                 alignItems: 'center',
-                flexWrap: 'wrap'
+                minHeight: '48px',
+                flexWrap: isVeryNarrow ? 'wrap' : 'nowrap',
+                position: 'relative',
+                zIndex: 10
             }}>
-                <select
-                    value={selectedActivity?.id || ''}
-                    onChange={(e) => {
-                        const activity = activities.find(a => a.id === e.target.value);
-                        setSelectedActivity(activity || null);
-                        setSelectedSplit('all');
-                    }}
-                    style={{
-                        padding: '8px 12px',
-                        background: '#333',
-                        border: '1px solid #444',
-                        borderRadius: '6px',
-                        color: 'white',
-                        fontSize: '12px',
-                        minWidth: '200px'
-                    }}
-                >
-                    <option value="">Select Activity...</option>
-                    {sortedActivities.map(activity => (
-                        <option key={activity.id} value={activity.id}>
-                            {activity.name} ({(activityInstances[activity.id] || []).length} instances)
-                        </option>
-                    ))}
-                </select>
-
-                {selectedActivity && currentActivityDef?.has_sets && (
-                    <select
-                        value={setsHandling}
-                        onChange={(e) => setSetsHandling(e.target.value)}
-                        style={{
-                            padding: '8px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '12px'
-                        }}
-                    >
-                        <option value="top">Top Set</option>
-                        <option value="average">Average</option>
-                    </select>
-                )}
-
-                {selectedActivity && hasSplits && (
-                    <select
-                        value={selectedSplit}
-                        onChange={(e) => setSelectedSplit(e.target.value)}
-                        style={{
-                            padding: '8px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
-                            borderRadius: '6px',
-                            color: 'white',
-                            fontSize: '12px'
-                        }}
-                    >
-                        <option value="all">All Splits</option>
-                        {currentActivityDef.split_definitions.map(split => (
-                            <option key={split.id} value={split.id}>{split.name}</option>
-                        ))}
-                    </select>
-                )}
-            </div>
-        );
-    };
-
-    // Render goal selector for goal detail visualization
-    const renderGoalSelector = () => {
-        if (selectedCategory !== 'goals' || selectedVisualization !== 'goalDetail') return null;
-
-        const goals = goalAnalytics?.goals || [];
-
-        return (
-            <div style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #333',
-                background: '#1e1e1e',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'center',
-                flexWrap: 'wrap'
-            }}>
-                <select
-                    value={selectedGoal?.id || ''}
-                    onChange={(e) => {
-                        const goal = goals.find(g => g.id === e.target.value);
-                        setSelectedGoal(goal || null);
-                    }}
-                    style={{
-                        padding: '8px 12px',
-                        background: '#333',
-                        border: '1px solid #444',
-                        borderRadius: '6px',
-                        color: 'white',
-                        fontSize: '12px',
-                        minWidth: '250px'
-                    }}
-                >
-                    <option value="">Select Goal...</option>
-                    {goals.map(goal => (
-                        <option key={goal.id} value={goal.id}>
-                            {goal.name} ({goal.session_count} sessions)
-                        </option>
-                    ))}
-                </select>
-
-                {selectedGoal && (
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                {/* Navigation Controls (Back/Top) */}
+                {hasCategory && (
+                    <div style={{
+                        display: 'flex',
+                        gap: '4px',
+                        marginRight: '8px',
+                        borderRight: '1px solid #444',
+                        paddingRight: '8px',
+                        flexShrink: 0
+                    }}>
                         <button
-                            onClick={() => setSelectedGoalChart('duration')}
-                            style={{
-                                padding: '6px 12px',
-                                background: selectedGoalChart === 'duration' ? '#2196f3' : '#333',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: selectedGoalChart === 'duration' ? 'white' : '#888',
-                                fontSize: '11px',
-                                cursor: 'pointer'
-                            }}
+                            onClick={handleTop}
+                            title="Top Level (All Categories)"
+                            style={navButtonStyle}
+                            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                            onMouseLeave={e => e.currentTarget.style.color = '#888'}
                         >
-                            Duration
+                            🏠
                         </button>
                         <button
-                            onClick={() => setSelectedGoalChart('activity')}
-                            style={{
-                                padding: '6px 12px',
-                                background: selectedGoalChart === 'activity' ? '#2196f3' : '#333',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: selectedGoalChart === 'activity' ? 'white' : '#888',
-                                fontSize: '11px',
-                                cursor: 'pointer'
-                            }}
+                            onClick={handleBack}
+                            title="Go Back"
+                            style={navButtonStyle}
+                            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                            onMouseLeave={e => e.currentTarget.style.color = '#888'}
                         >
-                            Activities
+                            ⬅️
                         </button>
                     </div>
                 )}
+
+                {/* Main Action Area */}
+                <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    flex: 1,
+                    overflowX: 'auto',
+                    paddingBottom: '2px',
+                    alignItems: 'center'
+                }}>
+                    {!hasCategory && renderLevel0()}
+                    {hasCategory && !hasViz && renderLevel1()}
+                    {hasCategory && hasViz && renderLevel2()}
+                </div>
+
+                {/* Global Actions (Annotations, Split, Close) */}
+                <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    marginLeft: 'auto',
+                    flexShrink: 0
+                }}>
+                    {(!hasAnnotationsWindow || selectedCategory === 'annotations') && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
+                            }}
+                            title="View Annotations"
+                            style={{
+                                ...navButtonStyle,
+                                background: selectedCategory === 'annotations' ? '#2196f3' : '#333',
+                                color: selectedCategory === 'annotations' ? 'white' : '#888',
+                                width: isNarrow ? '32px' : 'auto',
+                                padding: isNarrow ? '0' : '0 10px'
+                            }}
+                        >
+                            <span>📝</span>
+                            {!isNarrow && <span style={{ marginLeft: '4px' }}>Annotations</span>}
+                        </button>
+                    )}
+
+                    {canSplit && (
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowSplitMenu(!showSplitMenu);
+                                }}
+                                style={navButtonStyle}
+                            >
+                                {isNarrow ? '⊞▾' : '⊞ Split ▾'}
+                            </button>
+                            {showSplitMenu && (
+                                <div style={{
+                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px',
+                                    background: '#2a2a2a', border: '1px solid #444', borderRadius: '6px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 100, minWidth: '160px'
+                                }}>
+                                    <button onClick={(e) => { e.stopPropagation(); onSplit('vertical'); setShowSplitMenu(false); }}
+                                        style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', color: '#ccc', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '16px' }}>◫</span> Split Vertical
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); onSplit('horizontal'); setShowSplitMenu(false); }}
+                                        style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderTop: '1px solid #333', color: '#ccc', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '16px' }}>⬓</span> Split Horizontal
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {canClose && (
+                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={navButtonStyle}>✕</button>
+                    )}
+                </div>
             </div>
         );
     };
+
+    const renderLevel0 = () => (
+        <>
+            {['goals', 'sessions', 'activities'].map(category => (
+                <button
+                    key={category}
+                    onClick={() => handleCategoryChange(category)}
+                    style={levelButtonStyle(selectedCategory === category)}
+                >
+                    {categoryIcons[category]} {category.charAt(0).toUpperCase() + category.slice(1)}
+                </button>
+            ))}
+        </>
+    );
+
+    const renderLevel1 = () => (
+        <>
+            <span style={{ color: '#666', fontSize: '12px', fontWeight: 600, marginRight: '8px', textTransform: 'uppercase' }}>
+                {selectedCategory}:
+            </span>
+            {visualizations[selectedCategory]?.map(vis => (
+                <button
+                    key={vis.id}
+                    onClick={() => setSelectedVisualization(vis.id)}
+                    style={levelButtonStyle(selectedVisualization === vis.id)}
+                >
+                    {vis.icon} {vis.name}
+                </button>
+            ))}
+        </>
+    );
+
+    const renderLevel2 = () => {
+        // Special renderers for Level 2 based on selected visualization
+        if (selectedCategory === 'sessions' && selectedVisualization === 'heatmap') {
+            const timeRangeOptions = [
+                { value: 12, label: '1 Year' }, { value: 6, label: '6 Months' },
+                { value: 3, label: '3 Months' }, { value: 1, label: '1 Month' }
+            ];
+            return (
+                <>
+                    <span style={{ color: '#888', fontSize: '12px', marginRight: '8px' }}>Range:</span>
+                    {timeRangeOptions.map(option => (
+                        <button
+                            key={option.value}
+                            onClick={() => setHeatmapMonths(option.value)}
+                            style={levelButtonStyle(heatmapMonths === option.value)}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </>
+            );
+        }
+
+        if (selectedCategory === 'activities') {
+            const sortedActivities = [...activities].sort((a, b) => (activityInstances[b.id]?.length || 0) - (activityInstances[a.id]?.length || 0));
+            const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
+
+            return (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                        value={selectedActivity?.id || ''}
+                        onChange={(e) => {
+                            const activity = activities.find(a => a.id === e.target.value);
+                            setSelectedActivity(activity || null);
+                            setSelectedSplit('all');
+                        }}
+                        style={{
+                            padding: '4px 8px', background: '#333', border: '1px solid #444',
+                            borderRadius: '4px', color: 'white', fontSize: '12px'
+                        }}
+                    >
+                        <option value="">Select Activity...</option>
+                        {sortedActivities.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                    </select>
+
+                    {selectedActivity && currentActivityDef?.has_sets && (
+                        <select
+                            value={setsHandling}
+                            onChange={(e) => setSetsHandling(e.target.value)}
+                            style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                        >
+                            <option value="top">Top Set</option>
+                            <option value="average">Avg</option>
+                        </select>
+                    )}
+
+                    {selectedActivity && currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0 && (
+                        <select
+                            value={selectedSplit}
+                            onChange={(e) => setSelectedSplit(e.target.value)}
+                            style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                        >
+                            <option value="all">All Splits</option>
+                            {currentActivityDef.split_definitions.map(split => (
+                                <option key={split.id} value={split.id}>{split.name}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            );
+        }
+
+        if (selectedCategory === 'goals' && selectedVisualization === 'goalDetail') {
+            const goals = goalAnalytics?.goals || [];
+            return (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                        value={selectedGoal?.id || ''}
+                        onChange={(e) => setSelectedGoal(goals.find(g => g.id === e.target.value) || null)}
+                        style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                    >
+                        <option value="">Select Goal...</option>
+                        {goals.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                    </select>
+                    {selectedGoal && (
+                        <div style={{ display: 'flex', gap: '4px', borderLeft: '1px solid #444', paddingLeft: '8px' }}>
+                            <button onClick={() => setSelectedGoalChart('duration')} style={levelButtonStyle(selectedGoalChart === 'duration')}>Time</button>
+                            <button onClick={() => setSelectedGoalChart('activity')} style={levelButtonStyle(selectedGoalChart === 'activity')}>Acts</button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Just show the viz name for others
+        return (
+            <span style={{ color: '#ccc', fontSize: '12px', fontWeight: 500 }}>
+                {visualizations[selectedCategory]?.find(v => v.id === selectedVisualization)?.name}
+            </span>
+        );
+    };
+
+
+
+
+
+
 
     // Render the actual visualization content
     const renderVisualizationContent = () => {
@@ -962,52 +832,15 @@ function ProfileWindow({
                         </div>
                     );
                 case 'heatmap': {
-                    const timeRangeOptions = [
-                        { value: 12, label: '1 Year' },
-                        { value: 6, label: '6 Months' },
-                        { value: 3, label: '3 Months' },
-                        { value: 1, label: '1 Month' }
-                    ];
                     return (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '16px' }}>
-                            {/* Time range selector */}
-                            <div style={{
-                                display: 'flex',
-                                gap: '8px',
-                                padding: '12px 16px',
-                                marginBottom: '16px',
-                                background: '#252525',
-                                borderRadius: '8px',
-                                alignItems: 'center'
-                            }}>
-                                <span style={{ color: '#888', fontSize: '12px', marginRight: '8px' }}>
-                                    Time Range:
-                                </span>
-                                {timeRangeOptions.map(option => (
-                                    <button
-                                        key={option.value}
-                                        onClick={() => setHeatmapMonths(option.value)}
-                                        style={{
-                                            padding: '6px 14px',
-                                            background: heatmapMonths === option.value ? '#2196f3' : '#333',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            color: heatmapMonths === option.value ? 'white' : '#888',
-                                            fontSize: '12px',
-                                            fontWeight: 500,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                            </div>
                             {/* Annotated Heatmap with selection support */}
                             <AnnotatedHeatmap
                                 sessions={sessions}
                                 months={heatmapMonths || 12}
                                 rootId={rootId}
+                                highlightedAnnotationId={highlightedAnnotationId}
+                                setHighlightedAnnotationId={setHighlightedAnnotationId}
                             />
                         </div>
                     );
@@ -1172,10 +1005,7 @@ function ProfileWindow({
                 transition: 'border 0.2s ease, box-shadow 0.2s ease'
             }}
         >
-            {renderCategorySelector()}
-            {renderVisualizationOptions()}
-            {renderActivitySelector()}
-            {renderGoalSelector()}
+            {renderUnifiedHeader()}
             {renderVisualizationContent()}
         </div>
     );

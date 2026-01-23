@@ -182,8 +182,16 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
 - **Visual Feedback:** Selection is highlighted, and annotated regions are marked with interactive indicators.
 - **Persistence:** Annotations are stored in the database linked to the visualization type, context (e.g., specific activity), and selected data points.
 - **Interactive Modals:** Annotation Modal for creating notes, and view modal for reading existing annotations.
+- **Activity Heatmap Fixes:** Improved crash resilience by handling non-array API responses and added interactive highlighting synchronized with the sidebar.
 
-### 11. Event-Driven Architecture (services/)
+### 11. Profile Window & Unified Navigation
+- **Breadcrumb-Style Navigation:** Visualizations now use a single unified header that replaces buttons as you drill down (Category → Visualization → Configuration).
+- **Navigation Controls:** Added [🏠 Top] and [⬅️ Back] buttons to navigate between hierarchical levels while saving vertical space.
+- **Integrated Configs:** Visualization-specific controls (like Heatmap Time Range or Activity Selectors) are now rendered inside the top bar.
+- **Persistent Annotations:** The "Annotations" button has been moved to the right side next to Split/Close controls for constant accessibility.
+- **Responsive Header:** Header adapts to narrow windows by collapsing labels into icons.
+
+### 12. Event-Driven Architecture (services/)
 Backend event system for decoupled, cascading updates:
 
 **Event Bus (`services/events.py`):**

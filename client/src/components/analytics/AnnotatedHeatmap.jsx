@@ -1,11 +1,19 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { fractalApi } from '../../utils/api';
+import AnnotationModal from './AnnotationModal';
 
 /**
  * AnnotatedHeatmap - ActivityHeatmap with annotation support.
  * 
  * Wraps the heatmap with selection capabilities and persists annotations to the backend.
  */
-function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
+function AnnotatedHeatmap({
+    sessions = [],
+    months = 12,
+    rootId,
+    highlightedAnnotationId,
+    setHighlightedAnnotationId
+}) {
     const containerRef = useRef(null);
     const cellRefs = useRef({}); // Store refs to each cell for hit detection
 
@@ -22,84 +30,96 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
     // Heatmap data state (we'll compute this like ActivityHeatmap does)
     const [hoveredCell, setHoveredCell] = useState(null);
 
+    // Ensure sessions is always an array
+    const safeSessions = Array.isArray(sessions) ? sessions : [];
+
     // Process sessions into daily counts
     const { dailyData, weeks, maxCount, monthLabels } = React.useMemo(() => {
-        const today = new Date();
-        today.setHours(23, 59, 59, 999);
+        try {
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
 
-        const startDate = new Date(today);
-        startDate.setMonth(startDate.getMonth() - months);
-        startDate.setDate(startDate.getDate() - startDate.getDay());
-        startDate.setHours(0, 0, 0, 0);
+            const startDate = new Date(today);
+            startDate.setMonth(startDate.getMonth() - months);
+            startDate.setDate(startDate.getDate() - startDate.getDay());
+            startDate.setHours(0, 0, 0, 0);
 
-        const countMap = {};
-        sessions.forEach(session => {
-            const sessionDate = session.session_start || session.created_at;
-            if (!sessionDate) return;
-            const date = new Date(sessionDate);
-            const dateKey = date.toISOString().split('T')[0];
-            countMap[dateKey] = (countMap[dateKey] || 0) + 1;
-        });
-
-        const allDays = [];
-        const current = new Date(startDate);
-        while (current <= today) {
-            const dateKey = current.toISOString().split('T')[0];
-            allDays.push({
-                date: new Date(current),
-                dateKey,
-                count: countMap[dateKey] || 0,
-                dayOfWeek: current.getDay()
+            const countMap = {};
+            safeSessions.forEach(session => {
+                const sessionDate = session?.session_start || session?.created_at;
+                if (!sessionDate) return;
+                const date = new Date(sessionDate);
+                if (isNaN(date.getTime())) return; // Skip invalid dates
+                const dateKey = date.toISOString().split('T')[0];
+                countMap[dateKey] = (countMap[dateKey] || 0) + 1;
             });
-            current.setDate(current.getDate() + 1);
+
+            const allDays = [];
+            const current = new Date(startDate);
+            while (current <= today) {
+                const dateKey = current.toISOString().split('T')[0];
+                allDays.push({
+                    date: new Date(current),
+                    dateKey,
+                    count: countMap[dateKey] || 0,
+                    dayOfWeek: current.getDay()
+                });
+                current.setDate(current.getDate() + 1);
+            }
+
+            const weeksArray = [];
+            let currentWeek = [];
+
+            allDays.forEach((day, index) => {
+                if (index === 0 && day.dayOfWeek > 0) {
+                    for (let i = 0; i < day.dayOfWeek; i++) {
+                        currentWeek.push(null);
+                    }
+                }
+                currentWeek.push(day);
+                if (day.dayOfWeek === 6 || index === allDays.length - 1) {
+                    while (currentWeek.length < 7) {
+                        currentWeek.push(null);
+                    }
+                    weeksArray.push(currentWeek);
+                    currentWeek = [];
+                }
+            });
+
+            const max = Math.max(1, ...allDays.map(d => d.count));
+
+            const labels = [];
+            let lastMonth = -1;
+            weeksArray.forEach((week, weekIndex) => {
+                const firstDayOfWeek = week.find(d => d !== null);
+                if (firstDayOfWeek) {
+                    const month = firstDayOfWeek.date.getMonth();
+                    if (month !== lastMonth) {
+                        labels.push({
+                            weekIndex,
+                            label: firstDayOfWeek.date.toLocaleDateString('en-US', { month: 'short' })
+                        });
+                        lastMonth = month;
+                    }
+                }
+            });
+
+            return { dailyData: allDays, weeks: weeksArray, maxCount: max, monthLabels: labels };
+        } catch (err) {
+            console.error('Error processing heatmap data:', err);
+            // Return empty data structure on error
+            return { dailyData: [], weeks: [], maxCount: 1, monthLabels: [] };
         }
-
-        const weeksArray = [];
-        let currentWeek = [];
-
-        allDays.forEach((day, index) => {
-            if (index === 0 && day.dayOfWeek > 0) {
-                for (let i = 0; i < day.dayOfWeek; i++) {
-                    currentWeek.push(null);
-                }
-            }
-            currentWeek.push(day);
-            if (day.dayOfWeek === 6 || index === allDays.length - 1) {
-                while (currentWeek.length < 7) {
-                    currentWeek.push(null);
-                }
-                weeksArray.push(currentWeek);
-                currentWeek = [];
-            }
-        });
-
-        const max = Math.max(1, ...allDays.map(d => d.count));
-
-        const labels = [];
-        let lastMonth = -1;
-        weeksArray.forEach((week, weekIndex) => {
-            const firstDayOfWeek = week.find(d => d !== null);
-            if (firstDayOfWeek) {
-                const month = firstDayOfWeek.date.getMonth();
-                if (month !== lastMonth) {
-                    labels.push({
-                        weekIndex,
-                        label: firstDayOfWeek.date.toLocaleDateString('en-US', { month: 'short' })
-                    });
-                    lastMonth = month;
-                }
-            }
-        });
-
-        return { dailyData: allDays, weeks: weeksArray, maxCount: max, monthLabels: labels };
-    }, [sessions, months]);
+    }, [safeSessions, months]);
 
     // Define loadAnnotations first so it can be used in useEffect
     const loadAnnotations = useCallback(async () => {
         try {
             const context = { time_range: months };
             const response = await fractalApi.getAnnotations(rootId, 'heatmap', context);
-            setAnnotations(response.data || []);
+            // API usually returns { status: 'success', data: [...] } or just [...]
+            const annotationsData = response.data?.data || response.data || [];
+            setAnnotations(Array.isArray(annotationsData) ? annotationsData : []);
         } catch (err) {
             console.error('Failed to load annotations:', err);
         }
@@ -159,7 +179,15 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
 
     // Check if a date is in any saved annotation
     const isDateAnnotated = (dateKey) => {
+        if (!Array.isArray(annotations)) return false;
         return annotations.some(a => a.selected_points?.includes(dateKey));
+    };
+
+    // Check if a date is in the currently highlighted annotation
+    const isDateHighlighted = (dateKey) => {
+        if (!highlightedAnnotationId || !Array.isArray(annotations)) return false;
+        const highlighted = annotations.find(a => a.id === highlightedAnnotationId);
+        return highlighted?.selected_points?.includes(dateKey);
     };
 
     // Mouse handlers for selection
@@ -365,6 +393,7 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
                             {week.map((day, dayIndex) => {
                                 const isSelected = day && selectedDates.includes(day.dateKey);
                                 const isAnnotated = day && isDateAnnotated(day.dateKey);
+                                const isHighlighted = day && isDateHighlighted(day.dateKey);
 
                                 return (
                                     <div
@@ -373,12 +402,16 @@ function AnnotatedHeatmap({ sessions = [], months = 12, rootId }) {
                                         style={{
                                             width: `${cellSize}px`,
                                             height: `${cellSize}px`,
-                                            backgroundColor: day ? getColor(day.count, isSelected, isAnnotated) : 'transparent',
+                                            backgroundColor: day ? getColor(day.count, isSelected, isAnnotated || isHighlighted) : 'transparent',
                                             borderRadius: '2px',
                                             cursor: day ? 'pointer' : 'default',
-                                            transition: 'transform 0.1s ease',
-                                            transform: hoveredCell === `${weekIndex}-${dayIndex}` ? 'scale(1.2)' : 'scale(1)',
-                                            border: isAnnotated && !isSelected ? '1px solid #ff9800' : 'none',
+                                            transition: 'all 0.1s ease',
+                                            transform: (hoveredCell === `${weekIndex}-${dayIndex}` || isHighlighted) ? 'scale(1.2)' : 'scale(1)',
+                                            border: (isAnnotated || isHighlighted) && !isSelected
+                                                ? `1px solid ${isHighlighted ? '#ffeb3b' : '#ff9800'}`
+                                                : 'none',
+                                            boxShadow: isHighlighted ? '0 0 8px rgba(255, 235, 59, 0.6)' : 'none',
+                                            zIndex: isHighlighted ? 1 : 0,
                                             boxSizing: 'border-box'
                                         }}
                                         onMouseEnter={() => day && setHoveredCell(`${weekIndex}-${dayIndex}`)}

@@ -275,7 +275,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
     }
 
     return (
-        <div style={{ width: '100%', height: '100%' }}>
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             <Line ref={chartRef} data={chartData} options={chartOptions} />
         </div>
     );

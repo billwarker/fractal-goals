@@ -173,15 +173,24 @@ function AnnotatedChartWrapper({
         }
         const chart = chartRef.current;
 
-        // Helper to restore original colors
+        // Helper to restore original colors (handles both bar and point-based charts)
         const restoreOriginalColors = () => {
             if (originalColorsRef.current) {
                 chart.data.datasets.forEach((dataset, dIdx) => {
                     const origColors = originalColorsRef.current[dIdx];
                     if (origColors) {
-                        dataset.pointBackgroundColor = origColors.pointBackgroundColor;
-                        dataset.pointBorderColor = origColors.pointBorderColor;
-                        dataset.pointRadius = origColors.pointRadius;
+                        // Restore bar chart properties if they exist
+                        if ('backgroundColor' in origColors) {
+                            dataset.backgroundColor = origColors.backgroundColor;
+                            dataset.borderColor = origColors.borderColor;
+                            dataset.borderWidth = origColors.borderWidth;
+                        }
+                        // Restore point chart properties if they exist
+                        if ('pointBackgroundColor' in origColors) {
+                            dataset.pointBackgroundColor = origColors.pointBackgroundColor;
+                            dataset.pointBorderColor = origColors.pointBorderColor;
+                            dataset.pointRadius = origColors.pointRadius;
+                        }
                     }
                 });
                 originalColorsRef.current = null;
@@ -343,36 +352,82 @@ function AnnotatedChartWrapper({
 
                 // Store original colors before modifying
                 originalColorsRef.current = {};
+
+                // Detect chart type from the first dataset's type or chart config
+                const chartType = chart.config.type || chart.data.datasets[0]?.type || 'scatter';
+                const isBarChart = chartType === 'bar';
+
                 chart.data.datasets.forEach((dataset, dIdx) => {
                     const dataLength = dataset.data.length;
-                    originalColorsRef.current[dIdx] = {
-                        pointBackgroundColor: dataset.pointBackgroundColor,
-                        pointBorderColor: dataset.pointBorderColor,
-                        pointRadius: dataset.pointRadius
-                    };
 
-                    // Create arrays for individual point styling
-                    const origBgColor = dataset.pointBackgroundColor || dataset.borderColor || '#2196f3';
-                    const origBorderColor = dataset.pointBorderColor || dataset.borderColor || '#1976d2';
-                    const origRadius = dataset.pointRadius || 4;
+                    if (isBarChart) {
+                        // Bar chart: store backgroundColor and borderColor
+                        originalColorsRef.current[dIdx] = {
+                            backgroundColor: dataset.backgroundColor,
+                            borderColor: dataset.borderColor,
+                            borderWidth: dataset.borderWidth
+                        };
 
-                    // Create color arrays with highlight colors for matching points
-                    const bgColors = new Array(dataLength).fill(origBgColor);
-                    const borderColors = new Array(dataLength).fill(origBorderColor);
-                    const radii = new Array(dataLength).fill(origRadius);
+                        // Get original colors (handle both single value and array)
+                        const origBgColor = Array.isArray(dataset.backgroundColor)
+                            ? dataset.backgroundColor
+                            : dataset.backgroundColor || '#2196f3';
+                        const origBorderColor = Array.isArray(dataset.borderColor)
+                            ? dataset.borderColor
+                            : dataset.borderColor || '#1976d2';
 
-                    // Apply highlight to matching points in this dataset
-                    pointsToHighlight.forEach(pt => {
-                        if (pt.datasetIndex === dIdx) {
-                            bgColors[pt.index] = HIGHLIGHT_COLOR;
-                            borderColors[pt.index] = HIGHLIGHT_BORDER;
-                            radii[pt.index] = (typeof origRadius === 'number' ? origRadius : 4) + 2; // Subtle size increase
-                        }
-                    });
+                        // Create color arrays with highlight colors for matching bars
+                        const bgColors = new Array(dataLength).fill(null).map((_, i) =>
+                            Array.isArray(origBgColor) ? origBgColor[i] || origBgColor[0] : origBgColor
+                        );
+                        const borderColors = new Array(dataLength).fill(null).map((_, i) =>
+                            Array.isArray(origBorderColor) ? origBorderColor[i] || origBorderColor[0] : origBorderColor
+                        );
+                        const borderWidths = new Array(dataLength).fill(dataset.borderWidth || 1);
 
-                    dataset.pointBackgroundColor = bgColors;
-                    dataset.pointBorderColor = borderColors;
-                    dataset.pointRadius = radii;
+                        // Apply highlight to matching bars in this dataset
+                        pointsToHighlight.forEach(pt => {
+                            if (pt.datasetIndex === dIdx) {
+                                bgColors[pt.index] = HIGHLIGHT_COLOR;
+                                borderColors[pt.index] = HIGHLIGHT_BORDER;
+                                borderWidths[pt.index] = 3; // Thicker border for highlight
+                            }
+                        });
+
+                        dataset.backgroundColor = bgColors;
+                        dataset.borderColor = borderColors;
+                        dataset.borderWidth = borderWidths;
+                    } else {
+                        // Scatter/Line chart: store point properties
+                        originalColorsRef.current[dIdx] = {
+                            pointBackgroundColor: dataset.pointBackgroundColor,
+                            pointBorderColor: dataset.pointBorderColor,
+                            pointRadius: dataset.pointRadius
+                        };
+
+                        // Create arrays for individual point styling
+                        const origBgColor = dataset.pointBackgroundColor || dataset.borderColor || '#2196f3';
+                        const origBorderColor = dataset.pointBorderColor || dataset.borderColor || '#1976d2';
+                        const origRadius = dataset.pointRadius || 4;
+
+                        // Create color arrays with highlight colors for matching points
+                        const bgColors = new Array(dataLength).fill(origBgColor);
+                        const borderColors = new Array(dataLength).fill(origBorderColor);
+                        const radii = new Array(dataLength).fill(origRadius);
+
+                        // Apply highlight to matching points in this dataset
+                        pointsToHighlight.forEach(pt => {
+                            if (pt.datasetIndex === dIdx) {
+                                bgColors[pt.index] = HIGHLIGHT_COLOR;
+                                borderColors[pt.index] = HIGHLIGHT_BORDER;
+                                radii[pt.index] = (typeof origRadius === 'number' ? origRadius : 4) + 2;
+                            }
+                        });
+
+                        dataset.pointBackgroundColor = bgColors;
+                        dataset.pointBorderColor = borderColors;
+                        dataset.pointRadius = radii;
+                    }
                 });
 
                 chart.setActiveElements(pointsToHighlight);

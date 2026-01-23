@@ -378,7 +378,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
         </div>

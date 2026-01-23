@@ -603,7 +603,7 @@ function LineGraph({
             {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
 
             {/* Chart */}
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <Line ref={chartRef} data={chartData} options={options} />
             </div>
         </div>

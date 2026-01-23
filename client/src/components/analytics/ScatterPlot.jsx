@@ -395,7 +395,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <Scatter ref={chartRef} data={chartData} options={options} />
             </div>
         </div>
