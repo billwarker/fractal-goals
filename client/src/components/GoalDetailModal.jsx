@@ -194,6 +194,7 @@ function GoalDetailModal({
             description,
             deadline: deadline || null,
             type: goalType,
+            relevance_statement: relevanceStatement,
             parent_id: parentGoal?.attributes?.id || parentGoal?.id,
             targets: targets,
             completed_via_children: completedViaChildren,
@@ -896,19 +897,22 @@ function GoalDetailModal({
                         </div>
 
                         {/* Relevance Statement - SMART "R" Criterion */}
-                        {(goal?.attributes?.parent_id || mode === 'create') && parentGoalName && (
+                        {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
                             <div>
                                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                                     Relevance (SMART)
                                 </label>
                                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span>
+                                    {goalType === 'UltimateGoal'
+                                        ? "Why does this Ultimate Goal matter to you?"
+                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span></span>
+                                    }
                                 </div>
                                 <textarea
                                     value={relevanceStatement}
                                     onChange={(e) => setRelevanceStatement(e.target.value)}
                                     rows={2}
-                                    placeholder="Explain how this goal contributes to your higher-level objective..."
+                                    placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
                                     style={{
                                         width: '100%',
                                         padding: '8px',
@@ -1222,10 +1226,13 @@ function GoalDetailModal({
                         </div>
 
                         {/* Relevance Statement - View Mode */}
-                        {parentGoalName && (goal.attributes?.relevance_statement || relevanceStatement) && (
+                        {((parentGoalName && (goal.attributes?.parent_id || mode === 'create')) || goalType === 'UltimateGoal') && (goal.attributes?.relevance_statement || relevanceStatement) && (
                             <div>
                                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
-                                    How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?
+                                    {goalType === 'UltimateGoal'
+                                        ? "Why does this Ultimate Goal matter to you?"
+                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?</span>
+                                    }
                                 </label>
                                 <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                                     {goal.attributes?.relevance_statement || relevanceStatement}

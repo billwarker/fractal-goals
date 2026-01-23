@@ -5,6 +5,7 @@ import AddTargetModal from '../AddTargetModal';
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [relevanceStatement, setRelevanceStatement] = useState('');
     const [deadline, setDeadline] = useState('');
     const [goalType, setGoalType] = useState('UltimateGoal');
     const [targets, setTargets] = useState([]);
@@ -16,6 +17,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
         if (isOpen) {
             setName('');
             setDescription('');
+            setRelevanceStatement('');
             setDeadline('');
             setTargets([]);
 
@@ -38,6 +40,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
         onSubmit({
             name,
             description,
+            relevance_statement: relevanceStatement,
             deadline: deadline || null,
             type: goalType,
             parent_id: parent ? (parent.attributes?.id || parent.id) : null,
@@ -102,6 +105,19 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                         <textarea
                             value={description}
                             onChange={e => setDescription(e.target.value)}
+                        />
+
+                        <label>Relevance (SMART):</label>
+                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', fontStyle: 'italic' }}>
+                            {!parent
+                                ? `Why does ${name || 'this goal'} matter to you?`
+                                : `How does this help achieve "${parent.name}"?`
+                            }
+                        </div>
+                        <textarea
+                            value={relevanceStatement}
+                            onChange={e => setRelevanceStatement(e.target.value)}
+                            placeholder={!parent ? "Explain the deep significance of this goal..." : "Explain how this contributes to the parent goal..."}
                         />
 
                         <label>Deadline:</label>

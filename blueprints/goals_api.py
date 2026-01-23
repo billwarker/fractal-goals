@@ -72,6 +72,7 @@ def create_goal(validated_data):
             deadline=deadline,
             completed=False,
             completed_via_children=validated_data.get('completed_via_children', False),
+            relevance_statement=validated_data.get('relevance_statement'),
             parent_id=parent_id
         )
         
@@ -402,6 +403,7 @@ def create_fractal(validated_data):
             type=validated_data.get('type', 'UltimateGoal'),
             name=validated_data['name'],  # Already sanitized
             description=validated_data.get('description', ''),
+            relevance_statement=validated_data.get('relevance_statement'),
             parent_id=None  # Root goal has no parent
         )
         
@@ -573,6 +575,7 @@ def create_fractal_goal(root_id, validated_data):
             completed_via_children=validated_data.get('completed_via_children', False),
             allow_manual_completion=validated_data.get('allow_manual_completion', True),
             track_activities=validated_data.get('track_activities', True),
+            relevance_statement=validated_data.get('relevance_statement'),
             root_id=root_id  # Set root_id for performance
         )
         

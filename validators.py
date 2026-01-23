@@ -170,6 +170,7 @@ class GoalCreateSchema(BaseModel):
     parent_id: Optional[str] = None
     deadline: Optional[str] = None
     targets: Optional[List[Dict[str, Any]]] = None
+    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     completed_via_children: Optional[bool] = False
     allow_manual_completion: Optional[bool] = True
     track_activities: Optional[bool] = True
@@ -182,6 +183,13 @@ class GoalCreateSchema(BaseModel):
     @field_validator('description')
     @classmethod
     def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+    @field_validator('relevance_statement')
+    @classmethod
+    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         return sanitize_string(v)
@@ -250,10 +258,18 @@ class FractalCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     type: Optional[str] = Field('UltimateGoal')
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: str) -> str:
+        return sanitize_string(v)
+
+    @field_validator('relevance_statement')
+    @classmethod
+    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
         return sanitize_string(v)
     
     @field_validator('type')
