@@ -27,20 +27,28 @@ function FractalGoals() {
 
     // Contexts
     const {
-        currentFractal: fractalData,
-        fetchFractalTree,
+        useFractalTreeQuery,
         createGoal,
         updateGoal,
         deleteGoal,
-        toggleGoalCompletion,
-        loading: goalsLoading
+        toggleGoalCompletion
     } = useGoals();
 
+    // 1. Data Query (TanStack Query)
     const {
-        sessions,
+        data: fractalData,
+        isLoading: goalsLoading
+    } = useFractalTreeQuery(rootId);
+
+    const {
         fetchSessions,
-        loading: sessionsLoading
+        useSessionsQuery
     } = useSessions();
+
+    const {
+        data: sessions = [],
+        isLoading: sessionsLoading
+    } = useSessionsQuery(rootId);
 
     const {
         activities,
@@ -87,13 +95,12 @@ function FractalGoals() {
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
 
-    // Initial Data Fetch
+    // Initial Data Fetch (Only for non-Query managed data)
     useEffect(() => {
         if (!rootId) {
             navigate('/');
             return;
         }
-        fetchFractalTree(rootId);
         fetchSessions(rootId);
         fetchActivities(rootId);
         fetchActivityGroups(rootId);

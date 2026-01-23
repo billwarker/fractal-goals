@@ -738,7 +738,11 @@ def get_session_goals(root_id, session_id):
         
         # Get goals via the junction table
         from sqlalchemy import select
-        stmt = select(Goal, session_goals.c.goal_type).join(
+        from sqlalchemy.orm import selectinload
+        stmt = select(Goal, session_goals.c.goal_type).options(
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups)
+        ).join(
             session_goals, Goal.id == session_goals.c.goal_id
         ).where(session_goals.c.session_id == session_id)
         

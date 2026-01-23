@@ -1,7 +1,13 @@
 
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Table, CheckConstraint, Float, Text
+import sqlalchemy as sa
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Table, CheckConstraint, Float, Text, JSON
+from sqlalchemy.dialects.postgresql import JSONB
+
+# Fallback for SQLite/other engines
+# JSONB gives us indexing and faster processing in Postgres
+JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 from sqlalchemy.pool import QueuePool, NullPool
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref, scoped_session
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref, scoped_session, selectinload
 from datetime import datetime, timezone
 import uuid
 import json
@@ -80,7 +86,7 @@ class Goal(Base):
     sort_order = Column(Integer, default=0)  # Sibling order for UI display
     
     # Root goal reference (for performance queries)
-    root_id = Column(String, nullable=True)
+    root_id = Column(String, nullable=True, index=True)
     
     # SMART goal fields
     relevance_statement = Column(Text, nullable=True)  # "How does this goal help achieve [parent]?"
@@ -90,7 +96,7 @@ class Goal(Base):
     track_activities = Column(Boolean, default=True)
 
     # JSON Plans/Targets
-    targets = Column(Text, nullable=True)
+    targets = Column(JSON_TYPE, nullable=True)
     
     __table_args__ = (
         CheckConstraint(
@@ -100,6 +106,9 @@ class Goal(Base):
             ]),
             name='valid_goal_type'
         ),
+        # Composite indexes for common query patterns
+        sa.Index('ix_goals_root_deleted_type', 'root_id', 'deleted_at', 'type'),
+        sa.Index('ix_goals_root_parent_deleted', 'root_id', 'parent_id', 'deleted_at'),
     )
     
     # SQLAlchemy Polymorphism
@@ -141,7 +150,7 @@ class Goal(Base):
 
     def calculate_smart_status(self):
         """Calculate SMART criteria status for this goal."""
-        targets = json.loads(self.targets) if self.targets else []
+        targets = self.targets or []
         
         # Achievable: has associated activities OR has associated activity groups OR completed via children
         # If track_activities is False, we consider it achievable by default (user's responsibility)
@@ -187,7 +196,7 @@ class Goal(Base):
                 "completed_at": format_utc(self.completed_at),
                 "created_at": format_utc(self.created_at),
                 "updated_at": format_utc(self.updated_at),
-                "targets": json.loads(self.targets) if self.targets else [],
+                "targets": self.targets or [],
                 "relevance_statement": self.relevance_statement,
                 "completed_via_children": self.completed_via_children,
                 "allow_manual_completion": self.allow_manual_completion,
@@ -240,7 +249,7 @@ class Session(Base):
     __tablename__ = 'sessions'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
     
@@ -250,12 +259,16 @@ class Session(Base):
     duration_minutes = Column(Integer, nullable=True)
     total_duration_seconds = Column(Integer, nullable=True)
     
+    __table_args__ = (
+        sa.Index('ix_sessions_root_deleted_completed', 'root_id', 'deleted_at', 'completed'),
+    )
+    
     # Template/Program references
     template_id = Column(String, ForeignKey('session_templates.id'), nullable=True)
     program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True)
     
     # Flexible data storage (sections, exercises, notes, etc.)
-    attributes = Column(Text, nullable=True)
+    attributes = Column(JSON_TYPE, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
@@ -367,7 +380,7 @@ class Session(Base):
         # Parse session data from attributes
         if self.attributes:
             try:
-                data_obj = json.loads(self.attributes)
+                data_obj = self.attributes
                 result["attributes"]["session_data"] = data_obj
                 
                 # Hydrate "exercises" from database ActivityInstances
@@ -458,7 +471,7 @@ class ActivityGroup(Base):
     __tablename__ = 'activity_groups'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
     created_at = Column(DateTime, default=utc_now)
@@ -490,7 +503,7 @@ class ActivityDefinition(Base):
     __tablename__ = 'activity_definitions'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
     created_at = Column(DateTime, default=utc_now)
@@ -581,7 +594,7 @@ class ActivityInstance(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     # New session_id column pointing to sessions table
-    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True)
+    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
     # Legacy column - kept for migration compatibility, will be deprecated
     practice_session_id = Column(String, nullable=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
@@ -600,10 +613,14 @@ class ActivityInstance(Base):
     # Additional fields for state persistence
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)
-    data = Column(String, nullable=True)  # JSON store for sets and other extended attributes
+    data = Column(JSON_TYPE, nullable=True)  # JSON store for sets and other extended attributes
+    
+    __table_args__ = (
+        sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
+    )
 
     def to_dict(self):
-        data_dict = json.loads(self.data) if self.data else {}
+        data_dict = self.data or {}
         metric_values_list = [m.to_dict() for m in self.metric_values]
         return {
             "id": self.id,
@@ -668,6 +685,10 @@ class Note(Base):
     # Polymorphic context - what is this note attached to?
     context_type = Column(String, nullable=False)  # 'session', 'activity_instance', 'set'
     context_id = Column(String, nullable=False, index=True)  # ID of the parent entity
+    
+    __table_args__ = (
+        sa.Index('ix_notes_root_context_deleted', 'root_id', 'context_type', 'context_id', 'deleted_at'),
+    )
     
     # Denormalized foreign keys for efficient queries
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -739,16 +760,20 @@ class VisualizationAnnotation(Base):
     
     # Visualization identification
     visualization_type = Column(String, nullable=False)  # 'heatmap', 'scatter', 'line', 'bar', 'timeline', etc.
-    visualization_context = Column(Text, nullable=True)  # JSON: {"activity_id": "...", "time_range": 12, ...}
+    visualization_context = Column(JSON_TYPE, nullable=True)  # JSON: {"activity_id": "...", "time_range": 12, ...}
     
     # Selected data points (format varies by visualization type)
     # Heatmap: ["2024-01-15", "2024-01-16", ...]
     # Scatter/Line: [{"x": "2024-01-15", "y": 45}, ...]
     # Bar: [{"label": "Week 1", "value": 5}, ...]
-    selected_points = Column(Text, nullable=False)  # JSON array
+    selected_points = Column(JSON_TYPE, nullable=False)  # JSON array
     
     # Selection bounds (optional, for visual reconstruction)
-    selection_bounds = Column(Text, nullable=True)  # JSON: {"x1": 0, "y1": 0, "x2": 100, "y2": 100}
+    selection_bounds = Column(JSON_TYPE, nullable=True)  # JSON: {"x1": 0, "y1": 0, "x2": 100, "y2": 100}
+    
+    __table_args__ = (
+        sa.Index('ix_viz_annotations_root_type_context', 'root_id', 'visualization_type', 'deleted_at'),
+    )
     
     # The annotation content
     content = Column(Text, nullable=False)
@@ -763,9 +788,9 @@ class VisualizationAnnotation(Base):
             "id": self.id,
             "root_id": self.root_id,
             "visualization_type": self.visualization_type,
-            "visualization_context": json.loads(self.visualization_context) if self.visualization_context else None,
-            "selected_points": json.loads(self.selected_points) if self.selected_points else [],
-            "selection_bounds": json.loads(self.selection_bounds) if self.selection_bounds else None,
+            "visualization_context": self.visualization_context,
+            "selected_points": self.selected_points or [],
+            "selection_bounds": self.selection_bounds,
             "content": self.content,
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at)
@@ -777,21 +802,21 @@ class SessionTemplate(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(String, default='')
-    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
-    template_data = Column(String, nullable=False)
+    template_data = Column(JSON_TYPE, nullable=False)
     
     def to_dict(self):
-        return {"id": self.id, "name": self.name, "template_data": json.loads(self.template_data) if self.template_data else {}}
+        return {"id": self.id, "name": self.name, "template_data": self.template_data or {}}
 
 
 class Program(Base):
     __tablename__ = 'programs'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id'), nullable=False)
+    root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
     start_date = Column(DateTime, nullable=False)
@@ -801,8 +826,8 @@ class Program(Base):
     is_active = Column(Boolean, default=True)
     
     # JSON fields (Legacy/Deprecated in favor of relational structure)
-    goal_ids = Column(Text, nullable=False)  # JSON array of goal IDs
-    weekly_schedule = Column(Text, nullable=False)  # JSON object with days -> template IDs
+    goal_ids = Column(JSON_TYPE, nullable=False)  # JSON array of goal IDs
+    weekly_schedule = Column(JSON_TYPE, nullable=False)  # JSON object with days -> template IDs
     
     # Relationships
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
@@ -828,7 +853,7 @@ class Program(Base):
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at),
             "is_active": self.is_active,
-            "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
+            "goal_ids": self.goal_ids or [],
             "weekly_schedule": schedule_from_db,
             "blocks": [b.to_dict() for b in self.blocks]
         }
@@ -858,7 +883,7 @@ class ProgramBlock(Base):
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "end_date": self.end_date.isoformat() if self.end_date else None,
             "color": self.color,
-            "goal_ids": json.loads(self.goal_ids) if self.goal_ids else [],
+            "goal_ids": self.goal_ids or [],
             # Include nested days for UI
             "days": [d.to_dict() for d in self.days]
         }
@@ -1004,12 +1029,21 @@ def get_session(engine):
     return DBSession()
 
 def get_all_root_goals(db_session):
-    return db_session.query(Goal).filter(
+    return db_session.query(Goal).options(
+        selectinload(Goal.associated_activities),
+        selectinload(Goal.associated_activity_groups)
+    ).filter(
         Goal.parent_id == None
     ).all()
 
-def get_goal_by_id(db_session, goal_id):
-    return db_session.query(Goal).filter(Goal.id == goal_id).first()
+def get_goal_by_id(db_session, goal_id, load_associations=True):
+    query = db_session.query(Goal)
+    if load_associations:
+        query = query.options(
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups)
+        )
+    return query.filter(Goal.id == goal_id).first()
 
 def get_session_by_id(db_session, session_id):
     """Get a session by its ID."""
@@ -1050,7 +1084,11 @@ def delete_session(db_session, session_id):
     return False
 
 def build_goal_tree(db_session, goal):
-    # Goal.to_dict(include_children=True) uses the relationship, which is efficient/lazy loaded.
+    """
+    Build a tree dictionary from a goal.
+    If the goal hasn't had its hierarchy eagerly loaded, this will trigger N+1 queries.
+    The caller should ideally use get_fractal_goals optimized query.
+    """
     return goal.to_dict(include_children=True)
 
 # Common 'root_id' finder

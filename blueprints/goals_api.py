@@ -431,18 +431,61 @@ def delete_fractal(root_id):
 
 @goals_bp.route('/<root_id>/goals', methods=['GET'])
 def get_fractal_goals(root_id):
-    """Get the complete goal tree for a specific fractal."""
+    """
+    Get the complete goal tree for a specific fractal.
+    
+    Optimized to use selectinload for the entire hierarchy (7 levels)
+    and eagerly load associations needed for SMART status calculation.
+    """
+    from sqlalchemy.orm import selectinload
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        # Define the recursive path for children + associations at each level
+        # We load up to 7 levels (Ultimate -> Long -> Mid -> Short -> Immediate -> Micro -> Nano)
+        # At each level, we also need associated_activities and associated_activity_groups
+        # to calculate SMART status without N+1 queries.
+        
+        # Helper to create the combined options for child + its associations
+        def child_options(query_path):
+            return [
+                query_path.selectinload(Goal.associated_activities),
+                query_path.selectinload(Goal.associated_activity_groups)
+            ]
+
+        # Start with rootAssociations
+        curr_path = Goal.children
+        options = [
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups)
+        ]
+        
+        # Build the recursive chain
+        # Ultimate -> Long -> Mid -> Short -> Immediate -> Micro -> Nano
+        for _ in range(7):
+            options.append(selectinload(curr_path))
+            options.extend(child_options(curr_path))
+            curr_path = curr_path.children
+
+        root = db_session.query(Goal).options(*options).filter(
+            Goal.id == root_id, 
+            Goal.parent_id == None,
+            Goal.deleted_at == None
+        ).first()
+
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            # Fallback to simple validation if the complex query fails or returns nothing
+            root = validate_root_goal(db_session, root_id)
+            if not root:
+                return jsonify({"error": "Fractal not found"}), 404
         
         # Build complete tree for this fractal
         result = build_goal_tree(db_session, root)
         return jsonify(result)
         
+    except Exception as e:
+        logger.exception("Error fetching fractal tree")
+        return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
 
@@ -462,7 +505,14 @@ def get_active_goals_for_selection(root_id):
         
         # Query ShortTermGoals directly using root_id index
         # Filter for active (not completed) goals only
-        st_goals = db_session.query(Goal).filter(
+        # Eagerly load children and associations for SMART status checks
+        from sqlalchemy.orm import selectinload
+        st_goals = db_session.query(Goal).options(
+            selectinload(Goal.children).selectinload(Goal.associated_activities),
+            selectinload(Goal.children).selectinload(Goal.associated_activity_groups),
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups)
+        ).filter(
             Goal.root_id == root_id,
             Goal.type == 'ShortTermGoal',
             Goal.completed == False,

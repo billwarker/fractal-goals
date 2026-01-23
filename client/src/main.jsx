@@ -13,21 +13,47 @@ import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
 
 import { DebugProvider } from './contexts/DebugContext.jsx'
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+
+import { useDebug } from './contexts/DebugContext.jsx'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+      cacheTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
+// Helper to conditionally render devtools based on debug mode
+const QueryDevtools = () => {
+  const { debugMode } = useDebug();
+  if (!debugMode) return null;
+  return <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />;
+};
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <DebugProvider>
-        <TimezoneProvider>
-          <ActivitiesProvider>
-            <SessionsProvider>
-              <GoalsProvider>
-                <AppRouter />
-              </GoalsProvider>
-            </SessionsProvider>
-          </ActivitiesProvider>
-        </TimezoneProvider>
-      </DebugProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <DebugProvider>
+          <QueryDevtools />
+          <TimezoneProvider>
+            <ActivitiesProvider>
+              <SessionsProvider>
+                <GoalsProvider>
+                  <AppRouter />
+                </GoalsProvider>
+              </SessionsProvider>
+            </ActivitiesProvider>
+          </TimezoneProvider>
+        </DebugProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 )
 

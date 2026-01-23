@@ -170,7 +170,21 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - `activity_definitions`, `activity_groups`, `programs`, `session_templates`: root_id
 - **Scoped Sessions:** `get_scoped_session()` provides thread-local sessions with automatic cleanup via Flask's `teardown_appcontext`
 - **Batched Analytics:** Analytics endpoint uses 3 batch queries instead of N+1 pattern
-- **Eager Loading:** Session endpoints use `selectinload()` for goals, notes, activity_instances (avoids Cartesian product)
+- **Eager Loading:** Session and Goal endpoints use `selectinload()` for goals, notes, activity_instances, and recursive goal children (avoids N+1 query pattern)
+- **Recursive Tree Optimization:** The main fractal tree fetcher (`get_fractal_goals`) uses a specialized recursive `selectinload` to fetch the entire 7-level hierarchy and all SMART status associations in one operation.
+- **SMART Status Optimization:** `Goal.to_dict()` associations are now eagerly loaded in all common query paths, preventing database waterfalls during serialization.
+- **Composite Indexing:** Optimized common query patterns with multi-column indexes:
+  - `ix_goals_root_deleted_type`: (root_id, deleted_at, type)
+  - `ix_goals_root_parent_deleted`: (root_id, parent_id, deleted_at)
+  - `ix_sessions_root_deleted_completed`: (root_id, deleted_at, completed)
+  - `ix_activity_instances_session_deleted`: (session_id, deleted_at)
+  - `ix_notes_root_context_deleted`: (root_id, context_type, context_id, deleted_at)
+- **TanStack Query (React Query):** Implemented on the frontend for `GoalsContext` and `SessionsContext`:
+  - Automatic caching with `staleTime: 60s` and `cacheTime: 5m`.
+  - Automatic cache invalidation on mutations (create/update/delete).
+  - Background revalidation prevents stale data while maintaining "instant" UI feel.
+- **Server-Side Compression:** `flask-compress` enabled on backend. Reduces large JSON payloads (fractal tree) by up to 90%.
+- **Native JSONB Storage:** Optimized metadata storage using PostgreSQL `JSONB` for targets, attributes, and templates. Enables binary indexing and removes serialization overhead in Python.
 - **Pagination:** Sessions list API returns paginated results (default: 10 per page, max: 50)
   - API: `GET /<root_id>/sessions?limit=10&offset=0` → `{sessions: [...], pagination: {limit, offset, total, has_more}}`
   - Frontend: Sessions page has "Load More" button to fetch additional sessions

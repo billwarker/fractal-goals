@@ -1,114 +1,96 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi, globalApi } from '../utils/api';
 
 const GoalsContext = createContext();
 
 export function GoalsProvider({ children }) {
-    const [fractals, setFractals] = useState([]); // List of roots
-    const [currentFractal, setCurrentFractal] = useState(null); // Full tree of current fractal
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const queryClient = useQueryClient();
 
-    // Fetch list of all fractals (roots)
-    const fetchFractals = useCallback(async () => {
-        try {
-            setLoading(true);
+    // 1. Queries
+    const fractalsQuery = useQuery({
+        queryKey: ['fractals'],
+        queryFn: async () => {
             const res = await globalApi.getAllFractals();
-            setFractals(res.data);
-        } catch (err) {
-            console.error('Failed to fetch fractals:', err);
-            setError('Failed to load fractals');
-        } finally {
-            setLoading(false);
+            return res.data;
         }
-    }, []);
+    });
 
-    // Fetch specific fractal tree
-    const fetchFractalTree = useCallback(async (rootId) => {
-        if (!rootId) return;
-        try {
-            setLoading(true);
-            // Fetch root goals tree
+    const useFractalTreeQuery = (rootId) => useQuery({
+        queryKey: ['fractalTree', rootId],
+        queryFn: async () => {
+            if (!rootId) return null;
             const res = await fractalApi.getGoals(rootId);
-            setCurrentFractal(res.data);
-        } catch (err) {
-            console.error('Failed to fetch fractal tree:', err);
-            setError('Failed to load goal tree');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // Create a new Fractal (Root Goal)
-    const createFractal = useCallback(async (data) => {
-        try {
-            const res = await globalApi.createFractal(data);
-            await fetchFractals();
             return res.data;
-        } catch (err) {
-            console.error('Failed to create fractal:', err);
-            throw err;
-        }
-    }, [fetchFractals]);
+        },
+        enabled: !!rootId
+    });
 
-    // Create a Goal within a fractal
-    const createGoal = useCallback(async (rootId, goalData) => {
-        try {
-            const res = await fractalApi.createGoal(rootId, goalData);
-            await fetchFractalTree(rootId); // Refresh tree
-            return res.data;
-        } catch (err) {
-            console.error('Failed to create goal:', err);
-            throw err;
+    // 2. Mutations
+    const createFractalMutation = useMutation({
+        mutationFn: (data) => globalApi.createFractal(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['fractals'] });
         }
-    }, [fetchFractalTree]);
+    });
 
-    // Update a Goal
-    const updateGoal = useCallback(async (rootId, goalId, updates) => {
-        try {
-            const res = await fractalApi.updateGoal(rootId, goalId, updates);
-            await fetchFractalTree(rootId); // Refresh tree
-            return res.data;
-        } catch (err) {
-            console.error('Failed to update goal:', err);
-            throw err;
+    const createGoalMutation = useMutation({
+        mutationFn: ({ rootId, goalData }) => fractalApi.createGoal(rootId, goalData),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
-    }, [fetchFractalTree]);
+    });
 
-    // Delete a Goal
-    const deleteGoal = useCallback(async (rootId, goalId) => {
-        try {
-            await fractalApi.deleteGoal(rootId, goalId);
-            await fetchFractalTree(rootId); // Refresh tree
-        } catch (err) {
-            console.error('Failed to delete goal:', err);
-            throw err;
+    const updateGoalMutation = useMutation({
+        mutationFn: ({ rootId, goalId, updates }) => fractalApi.updateGoal(rootId, goalId, updates),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
-    }, [fetchFractalTree]);
+    });
 
-    // Toggle Completion
-    const toggleGoalCompletion = useCallback(async (rootId, goalId, completed) => {
-        try {
-            await fractalApi.toggleGoalCompletion(rootId, goalId, completed);
-            await fetchFractalTree(rootId);
-        } catch (err) {
-            console.error('Failed to toggle completion:', err);
-            throw err;
+    const deleteGoalMutation = useMutation({
+        mutationFn: ({ rootId, goalId }) => fractalApi.deleteGoal(rootId, goalId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
         }
-    }, [fetchFractalTree]);
+    });
+
+    const toggleGoalCompletionMutation = useMutation({
+        mutationFn: ({ rootId, goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+        }
+    });
+
+    // 3. Glue/Backwards Compatibility
+    // We can't use useFractalTreeQuery here dynamically for all rootIds, 
+    // so we expose a way to get the data for the 'currently active' rootId if needed.
+    // However, most components pass rootId to the fetch functions.
+
+    // For now, we'll keep the "last fetched" tree in a state-like way if needed, 
+    // but better to encourage components to use the query hooks.
+    // To maintain compatibility with current views:
+    const fetchFractals = useCallback(() => fractalsQuery.refetch(), [fractalsQuery]);
+
+    // This is a bridge: it doesn't return data but triggers a fetch/refetch
+    const fetchFractalTree = useCallback((rootId) => {
+        queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+    }, [queryClient]);
 
     const value = {
-        fractals,
-        currentFractal,
-        loading,
-        error,
+        fractals: fractalsQuery.data || [],
+        currentFractal: null, // This will be handled differently in components
+        loading: fractalsQuery.isLoading,
+        error: fractalsQuery.error,
         fetchFractals,
         fetchFractalTree,
-        createFractal,
-        createGoal,
-        updateGoal,
-        deleteGoal,
-        toggleGoalCompletion
+        createFractal: createFractalMutation.mutateAsync,
+        createGoal: (rootId, goalData) => createGoalMutation.mutateAsync({ rootId, goalData }),
+        updateGoal: (rootId, goalId, updates) => updateGoalMutation.mutateAsync({ rootId, goalId, updates }),
+        deleteGoal: (rootId, goalId) => deleteGoalMutation.mutateAsync({ rootId, goalId }),
+        toggleGoalCompletion: (rootId, goalId, completed) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed }),
+        // New Query-specific additions
+        useFractalTreeQuery
     };
 
     return (

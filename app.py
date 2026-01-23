@@ -5,6 +5,7 @@ Main application file that integrates API and page routes.
 
 from flask import Flask
 from flask_cors import CORS
+from flask_compress import Compress
 import logging
 
 from config import config
@@ -27,6 +28,7 @@ config.print_config()
 app = Flask(__name__)
 app.config['ENV'] = config.ENV
 app.config['DEBUG'] = config.DEBUG
+Compress(app)
 
 # Configure logging
 logging.basicConfig(

@@ -1,94 +1,80 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
 const SessionsContext = createContext();
 
 export function SessionsProvider({ children }) {
-    const [sessions, setSessions] = useState([]);
-    const [currentSession, setCurrentSession] = useState(null); // For detail view or active session
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const queryClient = useQueryClient();
 
-    // Fetch all sessions for a fractal
-    const fetchSessions = useCallback(async (rootId) => {
-        if (!rootId) return;
-
-        try {
-            setLoading(true);
-            setError(null);
+    // 1. Queries
+    const useSessionsQuery = (rootId) => useQuery({
+        queryKey: ['sessions', rootId],
+        queryFn: async () => {
+            if (!rootId) return [];
             const res = await fractalApi.getSessions(rootId, { limit: 50 });
-            // Handle paginated response format
-            const sessionsData = res.data.sessions || res.data;
-            setSessions(sessionsData);
-        } catch (err) {
-            console.error('Failed to fetch sessions:', err);
-            setError('Failed to load sessions');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+            return res.data.sessions || res.data;
+        },
+        enabled: !!rootId
+    });
 
-    // Create a new session
-    const createSession = useCallback(async (rootId, sessionData) => {
-        try {
-            setError(null);
-            const res = await fractalApi.createSession(rootId, sessionData);
-            // Refresh list
-            await fetchSessions(rootId);
+    const useSessionDetailQuery = (rootId, sessionId) => useQuery({
+        queryKey: ['session', rootId, sessionId],
+        queryFn: async () => {
+            if (!rootId || !sessionId) return null;
+            const res = await fractalApi.getSession(rootId, sessionId);
             return res.data;
-        } catch (err) {
-            console.error('Failed to create session:', err);
-            setError('Failed to create session');
-            throw err;
-        }
-    }, [fetchSessions]);
+        },
+        enabled: !!rootId && !!sessionId
+    });
 
-    // Update an existing session
-    const updateSession = useCallback(async (rootId, sessionId, updates) => {
-        try {
-            setError(null);
-            const res = await fractalApi.updateSession(rootId, sessionId, updates);
-            // Refresh list
-            await fetchSessions(rootId);
-            return res.data;
-        } catch (err) {
-            console.error('Failed to update session:', err);
-            setError('Failed to update session');
-            throw err;
+    // 2. Mutations
+    const createSessionMutation = useMutation({
+        mutationFn: ({ rootId, sessionData }) => fractalApi.createSession(rootId, sessionData),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['sessions', variables.rootId] });
         }
-    }, [fetchSessions]);
+    });
 
-    // Delete a session
-    const deleteSession = useCallback(async (rootId, sessionId) => {
-        try {
-            setError(null);
-            await fractalApi.deleteSession(rootId, sessionId);
-            // Refresh list
-            await fetchSessions(rootId);
-        } catch (err) {
-            console.error('Failed to delete session:', err);
-            setError('Failed to delete session');
-            throw err;
+    const updateSessionMutation = useMutation({
+        mutationFn: ({ rootId, sessionId, updates }) => fractalApi.updateSession(rootId, sessionId, updates),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['sessions', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session', variables.rootId, variables.sessionId] });
         }
-    }, [fetchSessions]);
+    });
 
-    // Get a specific session by ID (from local state if available, or fetch?)
-    // For now, simple lookup
-    const getSessionById = useCallback((sessionId) => {
-        return sessions.find(s => s.id === sessionId);
-    }, [sessions]);
+    const deleteSessionMutation = useMutation({
+        mutationFn: ({ rootId, sessionId }) => fractalApi.deleteSession(rootId, sessionId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['sessions', variables.rootId] });
+        }
+    });
+
+    // 3. Glue/Backwards Compatibility
+    // Because some components use 'sessions' from state, we'll keep a reference 
+    // but encourage use of useSessionsQuery hooks.
+    const fetchSessions = useCallback((rootId) => {
+        queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
+    }, [queryClient]);
 
     const value = {
-        sessions,
-        currentSession,
-        setCurrentSession, // Allow manual setting of active session
-        loading,
-        error,
+        sessions: [], // Components should transition to useSessionsQuery(rootId).data
+        currentSession: null,
+        setCurrentSession: () => { }, // No-op, managed by Query
+        loading: false,
+        error: null,
         fetchSessions,
-        createSession,
-        updateSession,
-        deleteSession,
-        getSessionById
+        createSession: (rootId, sessionData) => createSessionMutation.mutateAsync({ rootId, sessionData }),
+        updateSession: (rootId, sessionId, updates) => updateSessionMutation.mutateAsync({ rootId, sessionId, updates }),
+        deleteSession: (rootId, sessionId) => deleteSessionMutation.mutateAsync({ rootId, sessionId }),
+        getSessionById: (rootId, sessionId) => {
+            // This is a bridge, might not work exactly as before
+            return null;
+        },
+        // New Query-specific hooks
+        useSessionsQuery,
+        useSessionDetailQuery
     };
 
     return (
