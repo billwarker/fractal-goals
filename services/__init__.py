@@ -21,6 +21,7 @@ Usage:
 
 from services.events import event_bus, Event, Events, EventBus
 from services.completion_handlers import init_completion_handlers
+from services.event_logger import setup_event_logging
 
 
 def init_services():
@@ -29,6 +30,7 @@ def init_services():
     Call this on application startup.
     """
     init_completion_handlers()
+    setup_event_logging()
     # Add future service initializations here
 
 

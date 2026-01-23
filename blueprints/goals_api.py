@@ -441,31 +441,12 @@ def get_fractal_goals(root_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Define the recursive path for children + associations at each level
-        # We load up to 7 levels (Ultimate -> Long -> Mid -> Short -> Immediate -> Micro -> Nano)
-        # At each level, we also need associated_activities and associated_activity_groups
-        # to calculate SMART status without N+1 queries.
-        
-        # Helper to create the combined options for child + its associations
-        def child_options(query_path):
-            return [
-                query_path.selectinload(Goal.associated_activities),
-                query_path.selectinload(Goal.associated_activity_groups)
-            ]
-
-        # Start with rootAssociations
-        curr_path = Goal.children
+        # Simplified eager loading to ensure stability
         options = [
+            selectinload(Goal.children),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups)
         ]
-        
-        # Build the recursive chain
-        # Ultimate -> Long -> Mid -> Short -> Immediate -> Micro -> Nano
-        for _ in range(7):
-            options.append(selectinload(curr_path))
-            options.extend(child_options(curr_path))
-            curr_path = curr_path.children
 
         root = db_session.query(Goal).options(*options).filter(
             Goal.id == root_id, 
@@ -508,8 +489,7 @@ def get_active_goals_for_selection(root_id):
         # Eagerly load children and associations for SMART status checks
         from sqlalchemy.orm import selectinload
         st_goals = db_session.query(Goal).options(
-            selectinload(Goal.children).selectinload(Goal.associated_activities),
-            selectinload(Goal.children).selectinload(Goal.associated_activity_groups),
+            selectinload(Goal.children),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups)
         ).filter(

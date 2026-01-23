@@ -16,6 +16,7 @@ import CreateSession from './pages/CreateSession';
 import CreateSessionTemplate from './pages/CreateSessionTemplate';
 import ManageActivities from './pages/ManageActivities';
 import Analytics from './pages/Analytics';
+import Logs from './pages/Logs';
 
 const API_URL = 'http://localhost:8000/api/goals';
 
@@ -115,7 +116,8 @@ function App() {
             { path: `/${rootId}/goals`, label: 'GOALS' },
             { path: `/${rootId}/programs`, label: 'PROGRAMS' },
             { path: `/${rootId}/sessions`, label: 'SESSIONS' },
-            { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
+            { path: `/${rootId}/analytics`, label: 'ANALYTICS' },
+            { path: `/${rootId}/logs`, label: 'LOGS' }
         ];
 
         return (
@@ -195,6 +197,7 @@ function App() {
                             <Route path="/:rootId/programs/:programId" element={<ProgramDetail />} />
                             <Route path="/:rootId/sessions" element={<Sessions />} />
                             <Route path="/:rootId/analytics" element={<Analytics />} />
+                            <Route path="/:rootId/logs" element={<Logs />} />
                             <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
                             <Route path="/:rootId/create-session" element={<CreateSession />} />
                             <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />

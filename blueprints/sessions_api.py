@@ -52,9 +52,7 @@ def get_all_sessions_endpoint():
         sessions = db_session.query(Session).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)  # One-to-one, safe to joinedload
+            selectinload(Session.activity_instances)
         ).filter(Session.deleted_at == None).order_by(Session.created_at.desc()).all()
         # Don't include image data in list view for performance (prevents multi-MB responses)
         result = [s.to_dict(include_image_data=False) for s in sessions]
@@ -98,9 +96,7 @@ def get_fractal_sessions(root_id):
         sessions = base_query.options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)  # One-to-one, safe to joinedload
+            selectinload(Session.activity_instances)
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
         # Don't include image data in list view for performance (prevents multi-MB responses)
@@ -175,9 +171,12 @@ def create_fractal_session(root_id):
         
         # Handle attributes
         if isinstance(session_data, dict):
-            new_session.attributes = json.dumps(session_data)
-        else:
             new_session.attributes = session_data
+        else:
+            try:
+                new_session.attributes = json.loads(session_data) if session_data else {}
+            except:
+                new_session.attributes = {}
         
         # Extract program_day_id from program_context if present
         program_day_id = None
@@ -337,10 +336,14 @@ def update_session(root_id, session_id):
             session.template_id = data['template_id']
         
         if 'session_data' in data:
-            if isinstance(data['session_data'], str):
-                session.attributes = data['session_data']
+            val = data['session_data']
+            if isinstance(val, str):
+                try:
+                    session.attributes = json.loads(val)
+                except:
+                    session.attributes = val
             else:
-                session.attributes = json.dumps(data['session_data'])
+                session.attributes = val
         
         db_session.commit()
         
@@ -383,10 +386,7 @@ def get_session_endpoint(root_id, session_id):
         session = db_session.query(Session).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.notes_list),
-            joinedload(Session.program_day)  # One-to-one, safe to joinedload
+            selectinload(Session.activity_instances)
         ).filter(Session.id == session_id, Session.deleted_at == None).first()
         
         if not session:

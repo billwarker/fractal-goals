@@ -244,10 +244,31 @@ event_bus.emit(Event(Events.SESSION_COMPLETED, {
 
 **Initialization:** `init_services()` called in `app.py` on startup.
 
+### 13. Event-Driven Logging System
+Captures and persists all application events to the database for auditing and history.
+- **Event Logger (`services/event_logger.py`):** Subscribes to all events (`*`) and stores them in `event_logs` table.
+- **Logs API (`blueprints/logs_api.py`):** Endpoint to fetch paginated logs scoped by `root_id`.
+- **Frontend Integration:**
+  - **LOGS button** in the top navigation bar next to "EXIT TO HOME".
+  - **LogsModal** component displays searchable/filterable log history with timestamps, event types, and descriptions.
+  - **Auto-tracking:** Every action that emits an event (session completion, goal creation, target achievement, etc.) is automatically logged.
+
 ---
 ---
 
 ## Database Schema
+
+#### `event_logs`
+Stores history of all application events.
+- `id` (PK, UUID)
+- `root_id` (FK to goals.id)
+- `event_type` (String, e.g., 'session.completed')
+- `entity_type` (String, e.g., 'session')
+- `entity_id` (String)
+- `description` (Text, human-readable)
+- `payload` (JSON, full event data)
+- `source` (String)
+- `timestamp` (DateTime)
 
 ### Core Tables
 

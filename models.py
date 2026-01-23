@@ -24,6 +24,14 @@ def format_utc(dt):
     # If aware, ensure UTC and use Z suffix
     return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
 
+def _safe_load_json(data, default=None):
+    if data is None: return default
+    if isinstance(data, (dict, list)): return data
+    try:
+        return json.loads(data)
+    except:
+        return default
+
 Base = declarative_base()
 
 # Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
@@ -150,7 +158,9 @@ class Goal(Base):
 
     def calculate_smart_status(self):
         """Calculate SMART criteria status for this goal."""
-        targets = self.targets or []
+        targets = _safe_load_json(self.targets, [])
+        if not isinstance(targets, list):
+            targets = []
         
         # Achievable: has associated activities OR has associated activity groups OR completed via children
         # If track_activities is False, we consider it achievable by default (user's responsibility)
@@ -196,7 +206,7 @@ class Goal(Base):
                 "completed_at": format_utc(self.completed_at),
                 "created_at": format_utc(self.created_at),
                 "updated_at": format_utc(self.updated_at),
-                "targets": self.targets or [],
+                "targets": _safe_load_json(self.targets, []),
                 "relevance_statement": self.relevance_statement,
                 "completed_via_children": self.completed_via_children,
                 "allow_manual_completion": self.allow_manual_completion,
@@ -364,7 +374,7 @@ class Session(Base):
             "updated_at": format_utc(self.updated_at),
             "attributes": {
                 "id": self.id,
-                "type": "Session",  # For frontend compatibility
+                "type": "Session",
                 "session_start": format_utc(self.session_start),
                 "session_end": format_utc(self.session_end),
                 "duration_minutes": self.duration_minutes,
@@ -378,33 +388,35 @@ class Session(Base):
         }
         
         # Parse session data from attributes
-        if self.attributes:
-            try:
-                data_obj = self.attributes
-                result["attributes"]["session_data"] = data_obj
-                
-                # Hydrate "exercises" from database ActivityInstances
-                if "sections" in data_obj:
-                    instance_map = {inst.id: inst for inst in self.activity_instances}
-                    
-                    for section in data_obj["sections"]:
-                        if "activity_ids" in section:
-                            activity_ids = section["activity_ids"]
-                            exercises = []
-                            for inst_id in activity_ids:
-                                if inst_id in instance_map:
-                                    inst = instance_map[inst_id]
-                                    ex = inst.to_dict()
-                                    ex['type'] = 'activity'
-                                    ex['instance_id'] = inst.id
-                                    ex['name'] = ex.get('definition_name', 'Unknown Activity')
-                                    ex['activity_id'] = inst.activity_definition_id
-                                    ex['has_sets'] = len(ex.get('sets', [])) > 0
-                                    ex['metrics'] = ex['metric_values']
-                                    exercises.append(ex)
-                            section["exercises"] = exercises
-            except:
-                pass
+        attrs = _safe_load_json(self.attributes, {})
+        if attrs:
+            # Legacy field mapping: the frontend expects session_data to be the dict itself
+            result["attributes"]["session_data"] = attrs
+            
+            # Merge other attributes into result['attributes']
+            for k, v in attrs.items():
+                if k not in result["attributes"]:
+                    result["attributes"][k] = v
+
+            # Hydrate "exercises" from database ActivityInstances
+            if "sections" in attrs:
+                instance_map = {inst.id: inst for inst in self.activity_instances}
+                for section in attrs["sections"]:
+                    if "activity_ids" in section:
+                        activity_ids = section["activity_ids"]
+                        exercises = []
+                        for inst_id in activity_ids:
+                            if inst_id in instance_map:
+                                inst = instance_map[inst_id]
+                                ex = inst.to_dict()
+                                ex['type'] = 'activity'
+                                ex['instance_id'] = inst.id
+                                ex['name'] = ex.get('definition_name', 'Unknown Activity')
+                                ex['activity_id'] = inst.activity_definition_id
+                                ex['has_sets'] = len(ex.get('sets', [])) > 0
+                                ex['metrics'] = ex.get('metric_values', [])
+                                exercises.append(ex)
+                        section["exercises"] = exercises
         
         # Get associated goals with type information
         short_term_goals = []
@@ -794,6 +806,40 @@ class VisualizationAnnotation(Base):
             "content": self.content,
             "created_at": format_utc(self.created_at),
             "updated_at": format_utc(self.updated_at)
+        }
+
+
+class EventLog(Base):
+    """
+    Captured logs for all events that occur in the application.
+    This allows for auditing, debugging, and providing a history of actions.
+    """
+    __tablename__ = 'event_logs'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    event_type = Column(String, nullable=False)  # e.g., 'session.completed', 'goal.created'
+    entity_type = Column(String, nullable=True)  # e.g., 'session', 'goal', 'target'
+    entity_id = Column(String, nullable=True)    # ID of the involved entity
+    
+    description = Column(Text, nullable=True)
+    payload = Column(JSON_TYPE, nullable=True)    # Full event payload
+    
+    source = Column(String, nullable=True)       # Where the event originated
+    timestamp = Column(DateTime, default=utc_now)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "root_id": self.root_id,
+            "event_type": self.event_type,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "description": self.description,
+            "payload": self.payload,
+            "source": self.source,
+            "timestamp": format_utc(self.timestamp)
         }
 
 class SessionTemplate(Base):

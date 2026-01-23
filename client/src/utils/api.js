@@ -595,6 +595,24 @@ export const fractalApi = {
      */
     deleteAnnotation: (rootId, annotationId) =>
         axios.delete(`${API_BASE}/roots/${rootId}/annotations/${annotationId}`),
+
+    // ========== Logs ==========
+
+    /**
+     * Get event logs for a fractal
+     * @param {string} rootId - ID of the fractal
+     * @param {number} limit - Number of logs to fetch
+     * @param {number} offset - Offset for pagination
+     */
+    getLogs: (rootId, limit = 50, offset = 0) =>
+        axios.get(`${API_BASE}/${rootId}/logs?limit=${limit}&offset=${offset}`),
+
+    /**
+     * Clear all event logs for a fractal
+     * @param {string} rootId - ID of the fractal
+     */
+    clearLogs: (rootId) =>
+        axios.delete(`${API_BASE}/${rootId}/logs/clear`),
 };
 
 /**

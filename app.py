@@ -18,6 +18,7 @@ from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
 from blueprints.annotations_api import annotations_bp
+from blueprints.logs_api import logs_api
 from blueprints.pages import pages_bp
 from services import init_services
 
@@ -60,6 +61,7 @@ app.register_blueprint(timers_bp)
 app.register_blueprint(programs_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(annotations_bp)
+app.register_blueprint(logs_api)
 app.register_blueprint(pages_bp)
 
 # Initialize services (event bus, completion handlers, etc.)
