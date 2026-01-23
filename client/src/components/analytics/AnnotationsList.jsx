@@ -118,7 +118,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 textAlign: 'center'
             }}>
                 <div style={{ fontSize: '32px', opacity: 0.5 }}>📝</div>
-                <div>Select a visualization in the left window to view its annotations</div>
+                <div>Select a visualization to see its annotations</div>
             </div>
         );
     }

@@ -70,6 +70,10 @@ function Analytics() {
     // { type: 'split', direction: 'vertical'|'horizontal', position: 50, first: {...}, second: {...} } for splits
     const [layout, setLayout] = useState({ type: 'window', id: 'window-1' });
 
+    // Track which window is selected for annotations
+    // When multiple visualizations exist, clicking a window selects it for annotation targeting
+    const [selectedWindowId, setSelectedWindowId] = useState('window-1');
+
     // Window state - each window has its own state object
     const [windowStates, setWindowStates] = useState({
         'window-1': getDefaultWindowState()
@@ -223,8 +227,10 @@ function Analytics() {
         const canSplit = windowCount < MAX_WINDOWS;
         const canClose = windowCount > 1;
 
-        // Find a sibling window for sourceWindowState (for annotations)
-        const otherWindowId = windowIds.find(id => id !== windowId) || windowId;
+        // Check if any window has annotations open
+        const hasAnnotationsWindow = windowIds.some(id =>
+            windowStates[id]?.selectedCategory === 'annotations'
+        );
 
         return (
             <ProfileWindow
@@ -238,13 +244,18 @@ function Analytics() {
                 windowState={windowStates[windowId] || getDefaultWindowState()}
                 updateWindowState={createWindowStateUpdater(windowId)}
                 onAnnotationsClick={() => handleAnnotationsClick(windowId)}
-                sourceWindowState={windowStates[otherWindowId] || getDefaultWindowState()}
-                updateSourceWindowState={createWindowStateUpdater(otherWindowId)}
+                // For annotations: use the selected window's state as the source
+                // This ensures the annotations panel shows data from the selected visualization
+                isSelected={selectedWindowId === windowId}
+                onSelect={() => setSelectedWindowId(windowId)}
+                hasAnnotationsWindow={hasAnnotationsWindow}
+                sourceWindowState={windowStates[selectedWindowId] || getDefaultWindowState()}
+                updateSourceWindowState={createWindowStateUpdater(selectedWindowId)}
                 highlightedAnnotationId={highlightedAnnotationId}
                 setHighlightedAnnotationId={setHighlightedAnnotationId}
             />
         );
-    }, [layout, windowStates, sharedData, handleSplit, handleCloseWindow, handleAnnotationsClick, highlightedAnnotationId]);
+    }, [layout, windowStates, sharedData, handleSplit, handleCloseWindow, handleAnnotationsClick, highlightedAnnotationId, selectedWindowId]);
 
     if (loading || activitiesLoading) {
         return (

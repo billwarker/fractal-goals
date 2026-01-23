@@ -26,6 +26,9 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * @param {function} props.updateWindowState - Callback to update window state
  * @param {function} props.onAnnotationsClick - Callback when annotations category is clicked
  * @param {object} props.sourceWindowState - State from the source window (for annotations view)
+ * @param {boolean} props.isSelected - Whether this window is selected for annotation targeting
+ * @param {function} props.onSelect - Callback when the window is clicked to select it
+ * @param {boolean} props.hasAnnotationsWindow - Whether any window is showing annotations
  */
 function ProfileWindow({
     windowId,
@@ -40,7 +43,10 @@ function ProfileWindow({
     sourceWindowState,
     updateSourceWindowState,
     highlightedAnnotationId,
-    setHighlightedAnnotationId
+    setHighlightedAnnotationId,
+    isSelected = false,
+    onSelect,
+    hasAnnotationsWindow = false
 }) {
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
@@ -321,21 +327,20 @@ function ProfileWindow({
             padding: isNarrow ? '8px 8px' : '12px 16px',
             borderBottom: '1px solid #333',
             background: '#252525',
-            flexWrap: isVeryNarrow ? 'wrap' : 'nowrap'
+            flexWrap: isVeryNarrow ? 'wrap' : 'nowrap',
+            alignItems: 'center'
         }}>
-            {['goals', 'sessions', 'activities', 'annotations'].map(category => (
+            {/* Main category buttons */}
+            {['goals', 'sessions', 'activities'].map(category => (
                 <button
                     key={category}
-                    onClick={() => {
-                        if (category === 'annotations' && onAnnotationsClick) {
-                            onAnnotationsClick();
-                        } else {
-                            handleCategoryChange(category);
-                        }
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleCategoryChange(category);
                     }}
                     title={category.charAt(0).toUpperCase() + category.slice(1)}
                     style={{
-                        flex: isVeryNarrow ? '1 1 45%' : 1,
+                        flex: isVeryNarrow ? '1 1 30%' : 1,
                         padding: isVeryNarrow ? '6px 4px' : (isNarrow ? '8px 8px' : '10px 16px'),
                         background: selectedCategory === category ? '#2196f3' : '#333',
                         border: 'none',
@@ -368,6 +373,43 @@ function ProfileWindow({
                 </button>
             ))}
 
+            {/* Divider between main categories and annotations */}
+            <div style={{
+                width: '1px',
+                height: isNarrow ? '20px' : '24px',
+                background: '#444',
+                margin: isNarrow ? '0 4px' : '0 8px',
+                flexShrink: 0
+            }} />
+
+            {/* Annotations button - smaller and separate */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
+                }}
+                title="Annotations"
+                style={{
+                    flex: 'none',
+                    padding: isVeryNarrow ? '6px 8px' : (isNarrow ? '8px 10px' : '10px 14px'),
+                    background: selectedCategory === 'annotations' ? '#2196f3' : '#333',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: selectedCategory === 'annotations' ? 'white' : '#888',
+                    fontSize: isVeryNarrow ? '11px' : (isNarrow ? '11px' : '12px'),
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                }}
+            >
+                <span>{categoryIcons.annotations}</span>
+                {!isVeryNarrow && <span>{isNarrow ? 'Notes' : 'Annotations'}</span>}
+            </button>
+
             {/* Split/Close buttons */}
             <div style={{
                 display: 'flex',
@@ -379,7 +421,10 @@ function ProfileWindow({
                 {canSplit && (
                     <div style={{ position: 'relative' }}>
                         <button
-                            onClick={() => setShowSplitMenu(!showSplitMenu)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowSplitMenu(!showSplitMenu);
+                            }}
                             title="Split profile window"
                             style={{
                                 padding: isNarrow ? '6px 8px' : '8px 12px',
@@ -428,7 +473,8 @@ function ProfileWindow({
                                 }}
                             >
                                 <button
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         onSplit('vertical');
                                         setShowSplitMenu(false);
                                     }}
@@ -453,7 +499,8 @@ function ProfileWindow({
                                     <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto' }}>Side by side</span>
                                 </button>
                                 <button
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         onSplit('horizontal');
                                         setShowSplitMenu(false);
                                     }}
@@ -484,7 +531,10 @@ function ProfileWindow({
                 )}
                 {canClose && (
                     <button
-                        onClick={onClose}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
                         title="Close window"
                         style={{
                             padding: '8px 12px',
@@ -1089,18 +1139,37 @@ function ProfileWindow({
         return null;
     };
 
+    // Whether this is a visualization window (not annotations)
+    const isVisualizationWindow = selectedCategory !== 'annotations';
+
     return (
         <div
             ref={containerRef}
+            onClick={() => {
+                // Only allow selection for visualization windows
+                if (isVisualizationWindow && onSelect) {
+                    onSelect();
+                }
+            }}
             style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 background: '#1a1a1a',
-                border: '1px solid #333',
+                // Show selection indicator only when there's an annotations window open
+                border: isVisualizationWindow && isSelected && hasAnnotationsWindow
+                    ? '2px solid #2196f3'
+                    : '1px solid #333',
                 borderRadius: '8px',
                 overflow: 'hidden',
-                minWidth: 0
+                minWidth: 0,
+                position: 'relative',
+                cursor: isVisualizationWindow && hasAnnotationsWindow ? 'pointer' : 'default',
+                // Add a subtle glow for selected window when annotations are open
+                boxShadow: isVisualizationWindow && isSelected && hasAnnotationsWindow
+                    ? '0 0 12px rgba(33, 150, 243, 0.3)'
+                    : 'none',
+                transition: 'border 0.2s ease, box-shadow 0.2s ease'
             }}
         >
             {renderCategorySelector()}
