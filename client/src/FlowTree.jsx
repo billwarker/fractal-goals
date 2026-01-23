@@ -61,15 +61,19 @@ const CustomNode = ({ data }) => {
         let timeStr;
         if (absDays >= 365) {
             timeStr = `${(absDays / 365).toFixed(1)}y`;
-        } else if (absDays >= 30 || absDays > 7) {
+        } else if (absDays >= 30) {
             timeStr = `${(absDays / 30.44).toFixed(1)}mo`;
-        } else if (absDays > 6) {
-            timeStr = `${(absDays / 7).toFixed(1)}w`;
         } else {
             timeStr = `${Math.ceil(absDays)}d`;
         }
 
         return isPast ? `-${timeStr}` : timeStr;
+    };
+
+    const getCompletedDateLabel = () => {
+        if (!data.completed_at) return null;
+        const completedDate = new Date(data.completed_at);
+        return `Completed: ${completedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
     };
 
     const dueTime = getDueTime();
@@ -206,7 +210,19 @@ const CustomNode = ({ data }) => {
                     {data.label}
                 </div>
                 {
-                    (timingLabel || dueTime) && (
+                    isCompleted ? (
+                        <div
+                            style={{
+                                color: completedGold,
+                                fontSize: '12px',
+                                marginTop: '2px',
+                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {getCompletedDateLabel()}
+                        </div>
+                    ) : (timingLabel || dueTime) && (
                         <div
                             style={{
                                 color: '#fff',
@@ -440,6 +456,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
                 label: node.name,
                 type: nodeType,
                 completed: node.attributes?.completed,
+                completed_at: node.attributes?.completed_at,
                 created_at: node.attributes?.created_at,
                 deadline: node.attributes?.deadline,
                 hasChildren: node.children && node.children.length > 0,
