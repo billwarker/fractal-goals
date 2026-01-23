@@ -347,6 +347,21 @@ def update_session(root_id, session_id):
         
         db_session.commit()
         
+        # Emit session updated event
+        try:
+            event_bus.emit(Event(
+                Events.SESSION_UPDATED,
+                {
+                    'session_id': session.id,
+                    'session_name': session.name,
+                    'root_id': root_id,
+                    'updated_fields': list(data.keys())
+                },
+                source='sessions_api.update_session'
+            ))
+        except Exception as e:
+            logger.error(f"Error emitting SESSION_UPDATED event: {e}")
+
         # Emit session completed event AFTER commit to ensure consistent state
         # This triggers the cascade: target evaluation → goal completion → program updates
         if data.get('completed') and session.completed:
@@ -355,6 +370,7 @@ def update_session(root_id, session_id):
                     Events.SESSION_COMPLETED,
                     {
                         'session_id': session.id,
+                        'session_name': session.name,
                         'root_id': root_id
                     },
                     source='sessions_api.update_session'
@@ -588,6 +604,17 @@ def update_activity_instance_in_session(root_id, session_id, instance_id):
             instance.completed = data.get('completed')
         
         db_session.commit()
+        
+        # Emit activity instance updated event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': instance.activity_definition.name if instance.activity_definition else 'Unknown',
+            'session_id': session_id,
+            'root_id': root_id,
+            'updated_fields': list(data.keys())
+        }, source='sessions_api.update_activity_instance'))
+        
         return jsonify(instance.to_dict())
     except Exception as e:
         db_session.rollback()

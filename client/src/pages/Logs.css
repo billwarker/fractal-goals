@@ -83,7 +83,7 @@
 
 .logs-grid-header {
     display: grid;
-    grid-template-columns: 200px 220px 1fr 120px;
+    grid-template-columns: 200px 220px 1fr 240px;
     background: #252525;
     padding: 12px 20px;
     font-weight: 600;
@@ -101,7 +101,7 @@
 
 .log-item {
     display: grid;
-    grid-template-columns: 200px 220px 1fr 120px;
+    grid-template-columns: 200px 220px 1fr 240px;
     padding: 14px 20px;
     border-bottom: 1px solid #222;
     font-size: 14px;
@@ -151,6 +151,12 @@
     background: rgba(0, 188, 212, 0.15);
     color: #4dd0e1;
     border: 1px solid rgba(0, 188, 212, 0.3);
+}
+
+.log-event-tag.deleted {
+    background: rgba(198, 40, 40, 0.15);
+    color: #ef5350;
+    border: 1px solid rgba(198, 40, 40, 0.3);
 }
 
 .log-description {

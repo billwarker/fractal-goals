@@ -242,6 +242,15 @@ def add_goal_target(goal_id):
         goal.targets = json.dumps(current_targets)
         db_session.commit()
         
+        # Emit target created event
+        event_bus.emit(Event(Events.TARGET_CREATED, {
+            'target_id': data['id'],
+            'target_name': data.get('name', 'Measure'),
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id
+        }, source='goals_api.add_target'))
+        
         return jsonify({"targets": current_targets, "id": data['id']}), 201
     except Exception as e:
         db_session.rollback()
@@ -268,6 +277,15 @@ def remove_goal_target(goal_id, target_id):
              
         goal.targets = json.dumps(new_targets)
         db_session.commit()
+        
+        # Emit target deleted event
+        event_bus.emit(Event(Events.TARGET_DELETED, {
+            'target_id': target_id,
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id
+        }, source='goals_api.remove_target'))
+        
         return jsonify({"targets": new_targets}), 200
     except Exception as e:
         db_session.rollback()
@@ -564,6 +582,16 @@ def create_fractal_goal(root_id, validated_data):
         
         db_session.add(new_goal)
         db_session.commit()
+        db_session.refresh(new_goal)
+        
+        # Emit goal created event
+        event_bus.emit(Event(Events.GOAL_CREATED, {
+            'goal_id': new_goal.id,
+            'goal_name': new_goal.name,
+            'goal_type': new_goal.type,
+            'parent_id': new_goal.parent_id,
+            'root_id': new_goal.root_id
+        }, source='goals_api.create_fractal_goal'))
         
         # Return the created goal
         return jsonify(new_goal.to_dict(include_children=False)), 201
@@ -616,9 +644,21 @@ def delete_fractal_goal(root_id, goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
+        # Capture data before delete for the event
+        goal_id = goal.id
+        goal_name = goal.name
+        root_id = goal.root_id
+        
         # Delete the goal (cascade will handle children)
         db_session.delete(goal)
         db_session.commit()
+        
+        # Emit goal deleted event
+        event_bus.emit(Event(Events.GOAL_DELETED, {
+            'goal_id': goal_id,
+            'goal_name': goal_name,
+            'root_id': root_id
+        }, source='goals_api.delete_fractal_goal'))
         
         return jsonify({"status": "success", "message": "Goal deleted"}), 200
         
@@ -684,6 +724,14 @@ def update_fractal_goal(root_id, goal_id):
         
         db_session.commit()
         db_session.refresh(goal)
+        
+        # Emit goal updated event
+        event_bus.emit(Event(Events.GOAL_UPDATED, {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id,
+            'updated_fields': list(data.keys())
+        }, source='goals_api.update_fractal_goal'))
         
         return jsonify(goal.to_dict(include_children=False)), 200
         

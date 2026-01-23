@@ -99,13 +99,22 @@ def _get_event_description(event: Event):
         
         Events.ACTIVITY_INSTANCE_CREATED: f"Started activity: {event.data.get('activity_name', 'Unknown')}",
         Events.ACTIVITY_INSTANCE_DELETED: f"Removed activity: {event.data.get('activity_name', 'Unknown')}",
+        Events.ACTIVITY_INSTANCE_UPDATED: f"Updated activity: {event.data.get('activity_name', 'Unknown')}",
         Events.ACTIVITY_METRICS_UPDATED: f"Updated metrics for: {event.data.get('activity_name', 'Unknown')}",
         
         Events.PROGRAM_CREATED: f"Created program: {name}" if name else "Created program",
         Events.PROGRAM_UPDATED: f"Updated program: {name}" if name else "Updated program",
         Events.PROGRAM_DELETED: f"Deleted program: {name}" if name else "Deleted program",
         Events.PROGRAM_COMPLETED: f"Completed program: {name}" if name else "Program completed",
-        Events.PROGRAM_DAY_COMPLETED: f"Completed program day: {event.data.get('day_name', 'Unknown')}"
+        Events.PROGRAM_DAY_COMPLETED: f"Completed program day: {event.data.get('day_name', 'Unknown')}",
+        
+        Events.ACTIVITY_CREATED: f"Created activity: {event.data.get('activity_name') or name}" if (event.data.get('activity_name') or name) else "Created activity",
+        Events.ACTIVITY_UPDATED: f"Updated activity: {event.data.get('activity_name') or name}" if (event.data.get('activity_name') or name) else "Updated activity",
+        Events.ACTIVITY_DELETED: f"Deleted activity: {event.data.get('activity_name') or name}" if (event.data.get('activity_name') or name) else "Deleted activity",
+        
+        Events.ACTIVITY_GROUP_CREATED: f"Created activity group: {name}" if name else "Created activity group",
+        Events.ACTIVITY_GROUP_UPDATED: f"Updated activity group: {name}" if name else "Updated activity group",
+        Events.ACTIVITY_GROUP_DELETED: f"Deleted activity group: {name}" if name else "Deleted activity group"
     }
     
     return descriptions.get(event.name, f"Event {event.name} occurred")

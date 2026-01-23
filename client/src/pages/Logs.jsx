@@ -82,7 +82,7 @@ function Logs() {
                 ) : (
                     <div className="logs-list-container">
                         <div className="logs-grid-header">
-                            <span className="col-timestamp">Timestamp</span>
+                            <span className="col-timestamp">Datetime</span>
                             <span className="col-event">Event</span>
                             <span className="col-description">Description</span>
                             <span className="col-source">Source</span>
@@ -94,7 +94,7 @@ function Logs() {
                                         {new Date(log.timestamp).toLocaleString()}
                                     </span>
                                     <span className="col-event">
-                                        <span className={`log-event-tag ${(log.event_type || 'system').split('.')[0]}`}>
+                                        <span className={`log-event-tag ${(log.event_type || 'system').split('.')[0]} ${(log.event_type || '').endsWith('.deleted') ? 'deleted' : ''}`}>
                                             {log.event_type}
                                         </span>
                                     </span>
@@ -102,7 +102,7 @@ function Logs() {
                                         <div className="description-text">{log.description}</div>
                                         {log.entity_id && (
                                             <span className="log-entity-id" title={log.entity_id}>
-                                                ID: {log.entity_id.substring(0, 8)}...
+                                                ID: {log.entity_id}
                                             </span>
                                         )}
                                     </span>

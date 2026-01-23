@@ -188,6 +188,7 @@ class Events:
     # Activity Instance events
     ACTIVITY_INSTANCE_CREATED = 'activity_instance.created'
     ACTIVITY_INSTANCE_DELETED = 'activity_instance.deleted'
+    ACTIVITY_INSTANCE_UPDATED = 'activity_instance.updated'
     ACTIVITY_METRICS_UPDATED = 'activity_instance.metrics_updated'
     
     # Program events
@@ -196,3 +197,13 @@ class Events:
     PROGRAM_DELETED = 'program.deleted'
     PROGRAM_COMPLETED = 'program.completed'
     PROGRAM_DAY_COMPLETED = 'program.day_completed'
+    
+    # Activity Definition events
+    ACTIVITY_CREATED = 'activity.created'
+    ACTIVITY_UPDATED = 'activity.updated'
+    ACTIVITY_DELETED = 'activity.deleted'
+    
+    # Activity Group events
+    ACTIVITY_GROUP_CREATED = 'activity_group.created'
+    ACTIVITY_GROUP_UPDATED = 'activity_group.updated'
+    ACTIVITY_GROUP_DELETED = 'activity_group.deleted'

@@ -249,9 +249,9 @@ Captures and persists all application events to the database for auditing and hi
 - **Event Logger (`services/event_logger.py`):** Subscribes to all events (`*`) and stores them in `event_logs` table.
 - **Logs API (`blueprints/logs_api.py`):** Endpoint to fetch paginated logs scoped by `root_id`.
 - **Frontend Integration:**
-  - **LOGS button** in the top navigation bar next to "EXIT TO HOME".
-  - **LogsModal** component displays searchable/filterable log history with timestamps, event types, and descriptions.
-  - **Auto-tracking:** Every action that emits an event (session completion, goal creation, target achievement, etc.) is automatically logged.
+  - **Standalone Logs Page:** Reachable via the "LOGS" button in the navigation header.
+  - **Enhanced Log View:** Displays interactive event log with human-readable descriptions, full entity IDs, and color-coded event badges (including red for deletion events).
+  - **Categorized Tracking:** Automatically tracks Goals, Sessions, Targets, Activities (Definitions & Instances), Activity Groups, and Programs.
 
 ---
 ---
@@ -1435,8 +1435,8 @@ python python-scripts/migrate_<name>.py
 
 ---
 
-**Last Updated:** 2026-01-09  
-**Version:** 1.2.0  
+**Last Updated:** 2026-01-23  
+**Version:** 1.3.0  
 **Maintained By:** Project AI Agents
 
 ---

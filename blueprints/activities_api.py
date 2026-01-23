@@ -62,6 +62,14 @@ def create_activity_group(root_id, validated_data):
         )
         session.add(new_group)
         session.commit()
+        
+        # Emit activity group created event
+        event_bus.emit(Event(Events.ACTIVITY_GROUP_CREATED, {
+            'group_id': new_group.id,
+            'name': new_group.name,
+            'root_id': root_id
+        }, source='activities_api.create_activity_group'))
+        
         return jsonify(new_group.to_dict()), 201
     except Exception as e:
         session.rollback()
@@ -87,6 +95,15 @@ def update_activity_group(root_id, group_id, validated_data):
             group.description = validated_data['description']
             
         session.commit()
+        
+        # Emit activity group updated event
+        event_bus.emit(Event(Events.ACTIVITY_GROUP_UPDATED, {
+            'group_id': group_id,
+            'name': group.name,
+            'root_id': root_id,
+            'updated_fields': list(validated_data.keys())
+        }, source='activities_api.update_activity_group'))
+        
         return jsonify(group.to_dict())
     except Exception as e:
         session.rollback()
@@ -110,8 +127,20 @@ def delete_activity_group(root_id, group_id):
         for activity in activities:
             activity.group_id = None
             
+        # Capture data before delete
+        group_id = group.id
+        group_name = group.name
+        
         session.delete(group)
         session.commit()
+        
+        # Emit activity group deleted event
+        event_bus.emit(Event(Events.ACTIVITY_GROUP_DELETED, {
+            'group_id': group_id,
+            'name': group_name,
+            'root_id': root_id
+        }, source='activities_api.delete_activity_group'))
+        
         return jsonify({"message": "Group deleted"})
     except Exception as e:
         session.rollback()
@@ -235,6 +264,14 @@ def create_activity(root_id):
         
         session.commit()
         session.refresh(new_activity) # refresh to load metrics and splits
+        
+        # Emit activity created event
+        event_bus.emit(Event(Events.ACTIVITY_CREATED, {
+            'activity_id': new_activity.id,
+            'activity_name': new_activity.name,
+            'root_id': root_id
+        }, source='activities_api.create_activity'))
+        
         return jsonify(new_activity.to_dict()), 201
 
     except Exception as e:
@@ -374,6 +411,15 @@ def update_activity(root_id, activity_id):
         
         session.commit()
         session.refresh(activity)  # Refresh to load updated metrics
+        
+        # Emit activity updated event
+        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
+            'activity_id': activity_id,
+            'activity_name': activity.name,
+            'root_id': root_id,
+            'updated_fields': list(data.keys())
+        }, source='activities_api.update_activity'))
+        
         return jsonify(activity.to_dict()), 200
     
     except Exception as e:
@@ -393,8 +439,20 @@ def delete_activity(root_id, activity_id):
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
             
+        # Capture data before delete
+        act_id = activity.id
+        act_name = activity.name
+        
         session.delete(activity)
         session.commit()
+        
+        # Emit activity deleted event
+        event_bus.emit(Event(Events.ACTIVITY_DELETED, {
+            'activity_id': act_id,
+            'activity_name': act_name,
+            'root_id': root_id
+        }, source='activities_api.delete_activity'))
+        
         return jsonify({"message": "Activity deleted"})
     except Exception as e:
         session.rollback()
