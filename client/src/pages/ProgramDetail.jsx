@@ -136,6 +136,14 @@ const ProgramDetail = () => {
         return moment(dateString).format(format);
     };
 
+    const formatDurationSeconds = (seconds) => {
+        if (!seconds || seconds <= 0) return '0m';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m`;
+    };
+
     const handleSaveProgram = async (programData) => {
         try {
             const apiData = {
@@ -678,11 +686,12 @@ const ProgramDetail = () => {
         if (goal.deadline && attachedGoalIds.has(goal.id)) {
             const goalType = goal.attributes?.type || goal.type;
             const isCompleted = goal.completed || goal.attributes?.completed;
+            const completionDate = goal.completed_at || goal.attributes?.completed_at;
 
             calendarEvents.push({
                 id: `goal-${goal.id}`,
                 title: isCompleted ? `✅ ${goal.name}` : `🎯 ${goal.name}`,
-                start: goal.deadline, // The deadline is the date
+                start: (isCompleted && completionDate) ? getLocalDateString(completionDate) : goal.deadline,
                 allDay: true,
                 backgroundColor: isCompleted ? '#2e7d32' : getGoalColor(goalType),
                 borderColor: isCompleted ? '#4caf50' : getGoalColor(goalType),
@@ -699,6 +708,34 @@ const ProgramDetail = () => {
 
     // Find generic block for attach modal deadline constraints
     const attachBlock = sortedBlocks.find(b => b.id === attachBlockId);
+
+    // Calculate active block and its metrics
+    const activeBlock = program?.blocks?.find(block => isBlockActive(block));
+    const blockMetrics = activeBlock ? {
+        name: activeBlock.name,
+        color: activeBlock.color || '#3A86FF',
+        completedSessions: sessions.filter(s => {
+            if (!s.completed) return false;
+            const sessDate = moment(s.session_start || s.created_at);
+            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
+                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
+        }).length,
+        scheduledSessions: sessions.filter(s => {
+            const sessDate = moment(s.session_start || s.created_at);
+            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
+                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
+        }).length,
+        goalsMet: (activeBlock.goal_ids || []).filter(id => {
+            const goal = getGoalDetails(id);
+            return goal && (goal.completed || goal.attributes?.completed);
+        }).length,
+        totalGoals: (activeBlock.goal_ids || []).length,
+        totalDuration: sessions.filter(s => {
+            const sessDate = moment(s.session_start || s.created_at);
+            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
+                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
+        }).reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0)
+    } : null;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', paddingTop: '60px' }}>
@@ -782,6 +819,19 @@ const ProgramDetail = () => {
                         </p>
                     </div>
 
+                    {/* Metrics Section */}
+                    {activeBlock && (
+                        <div style={{ marginBottom: '32px' }}>
+                            <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
+                                <div><span style={{ color: '#888' }}>Block:</span> <span style={{ color: blockMetrics.color, fontWeight: 600 }}>{blockMetrics.name}</span></div>
+                                <div><span style={{ color: '#888' }}>Sessions:</span> {blockMetrics.completedSessions} completed / {blockMetrics.scheduledSessions} scheduled</div>
+                                <div><span style={{ color: '#888' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
+                                <div><span style={{ color: '#888' }}>Goals met:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                            </div>
+                        </div>
+                    )}
+
                     <div style={{ marginBottom: '32px' }}>
                         <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -840,6 +890,7 @@ const ProgramDetail = () => {
                             })}
                         </div>
                     </div>
+
                 </div>
 
                 {/* Right Panel */}
@@ -930,8 +981,16 @@ const ProgramDetail = () => {
                                                     <h3 style={{ margin: 0, color: 'white', fontSize: '16px' }}>{block.name}</h3>
                                                     {isBlockActive(block) && <ActiveBlockBadge />}
                                                 </div>
-                                                <div style={{ color: '#666', fontSize: '12px' }}>
+                                                <div style={{ color: '#666', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     {formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days
+                                                    {isBlockActive(block) && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span style={{ color: block.color || '#3A86FF', fontWeight: 600 }}>
+                                                                {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Remaining
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
                                                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                                     {blockAttachedGoals.map(g => {
@@ -1006,16 +1065,33 @@ const ProgramDetail = () => {
                                                         e.currentTarget.style.background = '#2a2a2a';
                                                     }}
                                                 >
-                                                    <div style={{ marginBottom: '6px' }}>
+                                                    <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                         <div style={{ color: '#888', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                                             {day.name}
                                                         </div>
-                                                        {day.date && (
-                                                            <div style={{ color: '#666', fontSize: '10px', marginTop: '2px' }}>
-                                                                {moment(day.date).format('dddd')}
-                                                            </div>
-                                                        )}
+                                                        {(() => {
+                                                            const blockStart = moment(block.start_date).startOf('day');
+                                                            const blockEnd = moment(block.end_date).endOf('day');
+                                                            const completedCount = sessions.filter(s => {
+                                                                if (s.program_day_id !== day.id || !s.completed) return false;
+                                                                const sessDate = moment(s.session_start || s.created_at);
+                                                                return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
+                                                            }).length;
+                                                            if (completedCount > 0) {
+                                                                return (
+                                                                    <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                        ✓ {completedCount}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return <div style={{ color: '#555', fontSize: '10px' }}>none</div>;
+                                                        })()}
                                                     </div>
+                                                    {day.date && (
+                                                        <div style={{ color: '#666', fontSize: '10px', marginTop: '-4px', marginBottom: '6px' }}>
+                                                            {moment(day.date).format('dddd')}
+                                                        </div>
+                                                    )}
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                             {day.templates?.length > 0 ? day.templates.map(template => (
@@ -1104,7 +1180,7 @@ const ProgramDetail = () => {
                 activityGroups={activityGroups}
                 displayMode="modal"
             />
-        </div>
+        </div >
     );
 };
 

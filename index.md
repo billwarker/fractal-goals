@@ -785,8 +785,11 @@ Detailed view of a single program/template.
   - Create and edit training blocks with custom colors and date ranges
   - User-controlled day creation (days not auto-populated)
   - Edit existing blocks (name, dates, color)
-  - Delete blocks with confirmation dialog and cascade warning
   - Active block indicators
+  - **Metrics Section:** Left sidebar displays simple text metrics strictly for the active block (completed vs. scheduled sessions, total duration spent, and total achieved goals *within the block*) beneath the description.
+  - **Program Day Tracking:** Every program day card in the block panel shows a checkmark and the count of completed sessions for that day *within the current block*, or "none" if not yet practiced.
+  - **Days Remaining:** Active blocks in the blocks view now display a "Days Remaining" metric highlighted in the block's specific color.
+  - **Smart Calendar Goals:** Completed goals on the calendar now move to their actual completion date (instead of the original deadline) for better historical tracking.
 - **Scheduling (New Architecture):**
   - "Assigning" a Program Day to a calendar date creates a **Practice Session** (linked to the template) rather than duplicating the Program Day definition.
   - Calendar displays these "Planned Sessions" unified with "Completed Sessions".
