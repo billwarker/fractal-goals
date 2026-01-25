@@ -632,7 +632,7 @@ class ActivityInstance(Base):
     )
 
     def to_dict(self):
-        data_dict = self.data or {}
+        data_dict = _safe_load_json(self.data, {})
         metric_values_list = [m.to_dict() for m in self.metric_values]
         return {
             "id": self.id,

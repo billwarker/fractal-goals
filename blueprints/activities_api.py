@@ -13,6 +13,7 @@ from validators import (
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
     ActivityGoalsSetSchema, GroupReorderSchema
 )
+from services.events import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,7 @@ def update_activity(root_id, activity_id):
             activity.has_metrics = data['has_metrics']
         if 'metrics_multiplicative' in data:
             activity.metrics_multiplicative = data['metrics_multiplicative']
+        if 'has_splits' in data:
             activity.has_splits = data['has_splits']
         if 'group_id' in data:
             activity.group_id = data['group_id']
@@ -518,6 +520,15 @@ def set_activity_goals(root_id, activity_id):
         
         # Refresh and return updated activity
         session.refresh(activity)
+        
+        # Emit activity updated event (goals changed)
+        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
+            'activity_id': activity_id,
+            'activity_name': activity.name,
+            'root_id': root_id,
+            'updated_fields': ['associated_goals']
+        }, source='activities_api.set_activity_goals'))
+        
         return jsonify(activity.to_dict()), 200
         
     except Exception as e:
@@ -551,6 +562,15 @@ def remove_activity_goal(root_id, activity_id, goal_id):
             return jsonify({"error": "Association not found"}), 404
         
         session.commit()
+        
+        # Emit activity updated event (goal removed)
+        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
+            'activity_id': activity_id,
+            'activity_name': activity.name,
+            'root_id': root_id,
+            'updated_fields': ['associated_goals']
+        }, source='activities_api.remove_activity_goal'))
+        
         return jsonify({"message": "Goal association removed"}), 200
         
     except Exception as e:

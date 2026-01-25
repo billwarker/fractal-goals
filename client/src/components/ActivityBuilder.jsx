@@ -10,7 +10,10 @@ import DeleteConfirmModal from './modals/DeleteConfirmModal';
  */
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
-    const { currentFractal, fetchFractalTree } = useGoals();
+    const { useFractalTreeQuery } = useGoals();
+
+    // Use the query hook to get the fractal tree
+    const { data: currentFractal, isLoading: isLoadingGoals } = useFractalTreeQuery(rootId);
 
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
@@ -46,18 +49,14 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         return goals;
     };
 
-    const allGoals = flattenGoals(currentFractal);
+    const allGoals = React.useMemo(() => flattenGoals(currentFractal), [currentFractal]);
 
-    // Fetch groups and goals when opened
+    // Fetch groups when opened
     useEffect(() => {
         if (isOpen && rootId) {
             fetchActivityGroups(rootId);
-            // Fetch goal tree if not already loaded
-            if (!currentFractal) {
-                fetchFractalTree(rootId);
-            }
         }
-    }, [isOpen, rootId, fetchActivityGroups, fetchFractalTree, currentFractal]);
+    }, [isOpen, rootId, fetchActivityGroups]);
 
     // Load activity data when editing
     useEffect(() => {

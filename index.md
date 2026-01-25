@@ -17,6 +17,17 @@
 - **Database:** SQLite (development) / PostgreSQL (production) with Alembic migrations
 - **Migrations:** Alembic for database schema versioning
 
+## Recent Updates
+- Refactored Program logic into `ProgramService`
+- Implemented Program Day and Block completion logic
+- Added granular program events: `PROGRAM_DAY_COMPLETED`, `PROGRAM_BLOCK_COMPLETED`, `PROGRAM_COMPLETED`
+- Enforced SINGLE active program constraint
+- Implemented smart navigation redirect to active program
+- Fixed `ActivityBuilder` goal loading issue using `useFractalTreeQuery`
+- Fixed `activities_api` 500 error when updating activities
+- Added event emission for Activity Goal Association changes (`ACTIVITY_UPDATED` event)
+- Fixed `AttributeError` in `ActivityInstance.to_dict` causing sessions not to load in Production
+
 ---
 
 ## Core Features
@@ -224,14 +235,15 @@ Backend event system for decoupled, cascading updates:
 | Program | `PROGRAM_CREATED`, `PROGRAM_UPDATED`, `PROGRAM_DELETED`, `PROGRAM_COMPLETED` |
 
 **Completion Handlers (`services/completion_handlers.py`):**
-- `@event_bus.on(Events.SESSION_COMPLETED)`: Evaluates targets for linked goals
+- `@event_bus.on(Events.SESSION_COMPLETED)`: Evaluates targets for linked goals AND checks Program Day completion
 - `@event_bus.on(Events.GOAL_COMPLETED)`: Updates parent goals (`completed_via_children`) and program progress
 - Auto-completion cascade: Session → Targets → Goal → Parent Goal → Program
+- Program Cascade: Session → Program Day → Program Block → Program
 
 **API Endpoints Emitting Events:**
 - `blueprints/goals_api.py`: Goal CRUD + completion toggle
 - `blueprints/sessions_api.py`: Session CRUD + activity instance operations
-- `blueprints/programs_api.py`: Program CRUD
+- `services/programs.py`: Program CRUD (emitted by service now)
 
 **Usage:**
 ```python
@@ -635,6 +647,8 @@ Manages training programs, blocks, and scheduled sessions.
 - `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
 - `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
+
+**Note:** Logic refactored into `services/programs.py` (`ProgramService`). Use this service for all program-related operations.
 
 #### `notes_api.py`
 Manages timestamped notes for sessions, activities, and sets.

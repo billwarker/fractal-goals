@@ -70,8 +70,13 @@ def handle_session_completed(event: Event):
             instances_by_activity[activity_id].append(inst.to_dict())
         
         # Evaluate targets for each linked goal
+        # Evaluate targets for each linked goal
         for goal in linked_goals:
             _evaluate_goal_targets(db_session, goal, instances_by_activity, session_id)
+            
+        # Check Program Day Completion
+        from services.programs import ProgramService
+        ProgramService.check_program_day_completion(db_session, session_id)
         
         db_session.commit()
         

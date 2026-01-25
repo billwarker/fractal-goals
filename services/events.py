@@ -207,3 +207,6 @@ class Events:
     ACTIVITY_GROUP_CREATED = 'activity_group.created'
     ACTIVITY_GROUP_UPDATED = 'activity_group.updated'
     ACTIVITY_GROUP_DELETED = 'activity_group.deleted'
+    
+    # Block events
+    PROGRAM_BLOCK_COMPLETED = 'program.block_completed'

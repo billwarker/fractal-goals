@@ -1,73 +1,18 @@
 from flask import Blueprint, request, jsonify
-import json
-import uuid
 import logging
-from datetime import datetime, timedelta
 import models
-from models import (
-    get_session,
-    Program, ProgramBlock, ProgramDay, Goal, SessionTemplate,
-    validate_root_goal
-)
+from models import get_session, validate_root_goal
 from validators import (
     validate_request,
-    ProgramCreateSchema, ProgramUpdateSchema, ProgramDayCreateSchema
+    ProgramCreateSchema, ProgramUpdateSchema
 )
+from services.programs import ProgramService
 from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
 
 # Create blueprint
 programs_bp = Blueprint('programs', __name__, url_prefix='/api')
-
-# Helper to sync nested structure (Shadow Write)
-def sync_program_structure(session, program, schedule_list):
-    """
-    Syncs the JSON schedule list (from frontend) into ProgramBlock/Day/Session tables.
-    schedule_list matches frontend 'weeklySchedule' array (Blocks).
-    """
-    if not isinstance(schedule_list, list):
-        return
-
-    # 1. Map existing blocks
-    existing_blocks = {b.id: b for b in program.blocks}
-    processed_block_ids = set()
-
-    for block_data in schedule_list:
-        b_id = block_data.get('id') or str(uuid.uuid4())
-        
-        # Parse metadata
-        # Frontend usually validates dates, but safer to try/except in prod (omitted for brevity)
-        start_dt = datetime.fromisoformat(block_data['startDate'].replace('Z', '')).date()
-        end_dt = datetime.fromisoformat(block_data['endDate'].replace('Z', '')).date()
-        
-        if b_id in existing_blocks:
-            block = existing_blocks[b_id]
-            block.name = block_data.get('name', 'Block')
-            block.start_date = start_dt
-            block.end_date = end_dt
-            block.color = block_data.get('color')
-        else:
-            block = ProgramBlock(
-                id=b_id,
-                program_id=program.id,
-                name=block_data.get('name', 'Block'),
-                start_date=start_dt,
-                end_date=end_dt,
-                color=block_data.get('color')
-            )
-            session.add(block)
-        
-        processed_block_ids.add(block.id)
-        
-        # NOTE: Days are no longer auto-populated from the block's date range.
-        # Users must explicitly add days using the "+ Add Day" button.
-        # This gives users full control over which days to configure in each block.
-
-    # Cleanup deleted blocks
-    for bid, blk in existing_blocks.items():
-        if bid not in processed_block_ids:
-            session.delete(blk)
 
 # ============================================================================
 # PROGRAM ENDPOINTS
@@ -79,14 +24,13 @@ def get_programs(root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        programs = session.query(Program).filter_by(root_id=root_id).all()
-        result = [program.to_dict() for program in programs]
-        return jsonify(result)
-        
+        programs = ProgramService.get_programs(session, root_id)
+        if programs is None:
+             return jsonify({"error": "Fractal not found"}), 404
+        return jsonify(programs)
+    except Exception as e:
+        logger.exception("Error getting programs")
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
@@ -97,16 +41,13 @@ def get_program(root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
-        if not program:
-            return jsonify({"error": "Program not found"}), 404
-        
-        return jsonify(program.to_dict())
-        
+        program = ProgramService.get_program(session, root_id, program_id)
+        if program is None:
+            return jsonify({"error": "Program or Fractal not found"}), 404
+        return jsonify(program)
+    except Exception as e:
+        logger.exception("Error getting program")
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
@@ -118,47 +59,11 @@ def create_program(root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        # Parse dates (already validated to exist by schema)
-        try:
-            start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
-            end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
-        except:
-            return jsonify({"error": "Invalid date format"}), 400
-        
-        # Create new program
-        schedule_list = validated_data.get('weeklySchedule', [])
-        
-        new_program = Program(
-            id=str(uuid.uuid4()),
-            root_id=root_id,
-            name=validated_data['name'],  # Already sanitized
-            description=validated_data.get('description', ''),
-            start_date=start_date,
-            end_date=end_date,
-            goal_ids=json.dumps(validated_data.get('selectedGoals', [])),
-            weekly_schedule=json.dumps(schedule_list)
-        )
-        
-        session.add(new_program)
-        
-        # Sync to new tables
-        sync_program_structure(session, new_program, schedule_list)
-        
+        result = ProgramService.create_program(session, root_id, validated_data)
         session.commit()
-        
-        # Emit program created event
-        event_bus.emit(Event(Events.PROGRAM_CREATED, {
-            'program_id': new_program.id,
-            'program_name': new_program.name,
-            'root_id': root_id
-        }, source='programs_api.create_program'))
-        
-        return jsonify(new_program.to_dict()), 201
-        
+        return jsonify(result), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         session.rollback()
         logger.exception("Error creating program")
@@ -174,55 +79,11 @@ def update_program(root_id, program_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
-        if not program:
+        result = ProgramService.update_program(session, root_id, program_id, validated_data)
+        if not result:
             return jsonify({"error": "Program not found"}), 404
-        
-        # Update fields
-        if 'name' in validated_data:
-            program.name = validated_data['name']
-        if 'description' in validated_data:
-            program.description = validated_data['description']
-        if 'start_date' in validated_data:
-            try:
-                program.start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
-            except:
-                return jsonify({"error": "Invalid start_date format"}), 400
-        if 'end_date' in validated_data:
-            try:
-                program.end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
-            except:
-                return jsonify({"error": "Invalid end_date format"}), 400
-        if 'selectedGoals' in validated_data:
-            program.goal_ids = json.dumps(validated_data['selectedGoals'])
-        
-        # Sync Schedule
-        if 'weeklySchedule' in validated_data:
-            schedule_list = validated_data['weeklySchedule']
-            # Update Legacy JSON
-            program.weekly_schedule = json.dumps(schedule_list)
-            # Update New Tables
-            sync_program_structure(session, program, schedule_list)
-            
-        if 'is_active' in validated_data:
-            program.is_active = validated_data['is_active']
-        
         session.commit()
-        
-        # Emit program updated event
-        event_bus.emit(Event(Events.PROGRAM_UPDATED, {
-            'program_id': program.id,
-            'program_name': program.name,
-            'root_id': root_id,
-            'updated_fields': list(validated_data.keys())
-        }, source='programs_api.update_program'))
-        
-        return jsonify(program.to_dict())
-        
+        return jsonify(result)
     except Exception as e:
         session.rollback()
         logger.exception("Error updating program")
@@ -237,37 +98,14 @@ def delete_program(root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
-        if not program:
-            return jsonify({"error": "Program not found"}), 404
-        
-        # Count sessions that will be affected (lose their program association)
-        # Sessions are linked via program_day_id -> ProgramDay -> ProgramBlock -> Program
-        affected_sessions_count = 0
-        for block in program.blocks:
-            for day in block.days:
-                affected_sessions_count += len([s for s in day.completed_sessions if not s.deleted_at])
-        
-        program_name = program.name
-        session.delete(program)
+        result = ProgramService.delete_program(session, root_id, program_id)
         session.commit()
-        
-        # Emit program deleted event
-        event_bus.emit(Event(Events.PROGRAM_DELETED, {
-            'program_id': program_id,
-            'program_name': program_name,
-            'root_id': root_id
-        }, source='programs_api.delete_program'))
-        
         return jsonify({
             "message": "Program deleted successfully",
-            "affected_sessions": affected_sessions_count
+            "affected_sessions": result["affected_sessions"]
         })
-        
+    except ValueError as e:
+         return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -280,18 +118,10 @@ def get_program_session_count(root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
-        if not program:
-            return jsonify({"error": "Program not found"}), 404
-        
-        # Count sessions linked to this program
-        session_count = 0
-        for block in program.blocks:
-            for day in block.days:
-                session_count += len([s for s in day.completed_sessions if not s.deleted_at])
-        
-        return jsonify({"session_count": session_count})
-        
+        count = ProgramService.get_program_session_count(session, root_id, program_id)
+        return jsonify({"session_count": count})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -303,87 +133,12 @@ def add_block_day(root_id, program_id, block_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        # Validate hierarchy
-        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
-        if not block: return jsonify({"error": "Block not found"}), 404
-        
         data = request.get_json()
-        name = data.get('name')
-        
-        # Multiple templates support
-        template_ids = data.get('template_ids', [])
-        if 'template_id' in data and data['template_id']:
-            if data['template_id'] not in template_ids:
-                template_ids.append(data['template_id'])
-        
-        day_of_week = data.get('day_of_week') # 'Monday', etc.
-        cascade = data.get('cascade', False)
-        
-        # Identify Target Blocks
-        target_blocks = [block]
-        if cascade:
-            all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
-            all_blocks.sort(key=lambda b: b.start_date if b.start_date else datetime.max.date())
-            try:
-                idx = next(i for i, b in enumerate(all_blocks) if b.id == block_id)
-                target_blocks.extend(all_blocks[idx+1:])
-            except StopIteration: pass
-
-        created_count = 0
-        
-        for target in target_blocks:
-            dates_to_add = []
-            
-            # 1. Explicit Date (Manual Scheduling)
-            if data.get('date'):
-                try:
-                    # Parse YYYY-MM-DD
-                    dt_str = data.get('date')
-                    if 'T' in dt_str: dt_str = dt_str.split('T')[0]
-                    d_obj = datetime.strptime(dt_str, '%Y-%m-%d').date()
-                    dates_to_add.append(d_obj)
-                except ValueError:
-                    return jsonify({"error": "Invalid date format, use YYYY-MM-DD"}), 400
-            
-            # 2. Pattern Matching (Day of Week)
-            elif day_of_week and target.start_date and target.end_date:
-                curr = target.start_date
-                while curr <= target.end_date:
-                    if curr.strftime('%A') == day_of_week: dates_to_add.append(curr)
-                    curr += timedelta(days=1)
-            
-            # 3. Abstract Day (No Date)
-            else:
-                dates_to_add.append(None)
-            
-            for d in dates_to_add:
-                day = None
-                if d: day = session.query(ProgramDay).filter_by(block_id=target.id, date=d).first()
-                
-                if not day:
-                    count = session.query(ProgramDay).filter_by(block_id=target.id).count()
-                    day_num = count + 1
-                    day = ProgramDay(
-                        id=str(uuid.uuid4()),
-                        block_id=target.id,
-                        date=d,
-                        day_number=day_num,
-                        name=name
-                    )
-                    session.add(day)
-                else:
-                    if name: day.name = name
-                
-                # Add Templates
-                if template_ids:
-                    templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
-                    day.templates = templates
-                
-                created_count += 1
-
+        count = ProgramService.add_block_day(session, root_id, program_id, block_id, data)
         session.commit()
-        return jsonify({"message": f"Added {created_count} days/sessions"}), 201
-
+        return jsonify({"message": f"Added {count} days/sessions"}), 201
+    except ValueError as e:
+         return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
     except Exception as e:
         session.rollback()
         import traceback
@@ -398,52 +153,12 @@ def update_block_day(root_id, program_id, block_id, day_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
-        if not day: return jsonify({"error": "Day not found"}), 404
-        
         data = request.get_json()
-        if 'name' in data: day.name = data['name']
-        if 'day_number' in data: day.day_number = data['day_number']
-        
-        cascade = data.get('cascade', False)
-        
-        # Update Session Templates
-        update_sessions = False
-        template_ids = data.get('template_ids', [])
-        if 'template_ids' in data: update_sessions = True
-        
-        if 'template_id' in data:
-            update_sessions = True
-            if data['template_id'] and data['template_id'] not in template_ids:
-                 template_ids.append(data['template_id'])
-
-        if update_sessions:
-            new_templates = []
-            if template_ids:
-                new_templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
-            day.templates = new_templates
-        
-        # Cascade Updates
-        if cascade:
-            all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
-            all_blocks.sort(key=lambda b: b.start_date if b.start_date else datetime.max.date())
-            try:
-                idx = next(i for i, b in enumerate(all_blocks) if b.id == block_id)
-                targets = all_blocks[idx+1:]
-                
-                for target in targets:
-                    # Match by day_number
-                    t_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=day.day_number).first()
-                    if t_day:
-                        if 'name' in data: t_day.name = data['name']
-                        if update_sessions:
-                             # Re-use fetched templates if valid, or refetch if session constraints require generic objects
-                             # SQLA objects attached to session can be assigned to multiple parents' relationships generally
-                             t_day.templates = new_templates
-            except StopIteration: pass
-        
+        ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, data)
         session.commit()
         return jsonify({"message": "Day updated successfully"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -456,11 +171,11 @@ def delete_block_day(root_id, program_id, block_id, day_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
-        if not day: return jsonify({"error": "Day not found"}), 404
-        session.delete(day)
+        ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id)
         session.commit()
         return jsonify({"message": "Day deleted"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -473,47 +188,12 @@ def copy_block_day(root_id, program_id, block_id, day_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        source_day = session.query(ProgramDay).filter_by(id=day_id).first()
-        if not source_day: return jsonify({"error": "Source day not found"}), 404
-        
         data = request.get_json()
-        target_mode = data.get('target_mode', 'all') # 'all'
-        
-        # Find Target Blocks
-        query = session.query(ProgramBlock).filter_by(program_id=program_id)
-        if target_mode == 'all':
-             query = query.filter(ProgramBlock.id != block_id)
-        
-        target_blocks = query.all()
-        copied_count = 0
-        
-        for target in target_blocks:
-             # Find matching day or create
-             target_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=source_day.day_number).first()
-             
-             if not target_day:
-                  # Create
-                  target_day = ProgramDay(
-                      id=str(uuid.uuid4()),
-                      block_id=target.id,
-                      day_number=source_day.day_number,
-                      name=source_day.name,
-                      date=None 
-                  )
-                  session.add(target_day)
-             else:
-                  target_day.name = source_day.name
-             
-             # Copy Templates
-             if source_day.templates:
-                  target_day.templates = list(source_day.templates)
-             else:
-                  target_day.templates = []
-             
-             copied_count += 1
-             
+        count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, data)
         session.commit()
-        return jsonify({"message": f"Copied to {copied_count} blocks"})
+        return jsonify({"message": f"Copied to {count} blocks"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -529,60 +209,11 @@ def get_active_program_days(root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        from datetime import date
-        from models import SessionTemplate
-        import json
-        
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return jsonify({"error": "Fractal not found"}), 404
-        
-        today = date.today()
-        
-        # Get all active programs for this fractal
-        active_programs = session.query(Program).filter_by(
-            root_id=root_id,
-            is_active=True
-        ).all()
-        
-        result = []
-        
-        for program in active_programs:
-            # Find blocks that contain today's date
-            for block in program.blocks:
-                if block.start_date and block.end_date:
-                    if block.start_date <= today <= block.end_date:
-                        # Find days within this block that have templates
-                        for day in block.days:
-                            # Only include days with templates assigned
-                            if day.templates:
-                                # Get template details
-                                session_details = []
-                                for template in day.templates:
-                                    session_details.append({
-                                        "template_id": template.id,
-                                        "template_name": template.name,
-                                        "template_description": template.description,
-                                        "template_data": models._safe_load_json(template.template_data, {})
-                                    })
-                                
-                                result.append({
-                                    "program_id": program.id,
-                                    "program_name": program.name,
-                                    "block_id": block.id,
-                                    "block_name": block.name,
-                                    "block_color": block.color,
-                                    "day_id": day.id,
-                                    "day_name": day.name,
-                                    "day_number": day.day_number,
-                                    "day_date": day.date.isoformat() if day.date else None,
-                                    "is_completed": day.is_completed,
-                                    "sessions": session_details,
-                                    "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
-                                })
-        
-        return jsonify(result)
-        
+        days = ProgramService.get_active_program_days(session, root_id)
+        if days is None:
+             # Should practically not happen with get_active_program_days logic unless error
+             return jsonify([]), 200
+        return jsonify(days)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -596,36 +227,12 @@ def attach_goal_to_block(root_id, program_id, block_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        block = session.query(ProgramBlock).filter_by(id=block_id).first()
-        if not block: return jsonify({"error": "Block not found"}), 404
-        
         data = request.get_json()
-        goal_id = data.get('goal_id')
-        deadline_str = data.get('deadline')
-        
-        if not goal_id: return jsonify({"error": "Goal ID required"}), 400
-        
-        # 1. Update Block goal_ids
-        current_ids = models._safe_load_json(block.goal_ids, [])
-        if goal_id not in current_ids:
-            current_ids.append(goal_id)
-            block.goal_ids = json.dumps(current_ids)
-            session.add(block)
-            
-        # 2. Update Goal Deadline
-        if deadline_str:
-            goal = session.query(Goal).get(goal_id)
-            if goal:
-                try:
-                    if len(deadline_str) > 10: deadline_str = deadline_str[:10]
-                    goal.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-                    session.add(goal)
-                except ValueError:
-                     return jsonify({"error": "Invalid date format"}), 400
-        
+        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, data)
         session.commit()
-        return jsonify({"message": "Goal attached and updated", "block": block.to_dict()})
-        
+        return jsonify({"message": "Goal attached and updated", "block": block_dict})
+    except ValueError as e:
+         return jsonify({"error": str(e)}), 400
     except Exception as e:
         session.rollback()
         import traceback

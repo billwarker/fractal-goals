@@ -727,7 +727,7 @@ const ProgramDetail = () => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <button
-                        onClick={() => navigate(`/${rootId}/programs`)}
+                        onClick={() => navigate(`/${rootId}/programs?show_all=true`)}
                         style={{ background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#ccc', cursor: 'pointer', padding: '8px 12px', fontSize: '14px' }}
                     >
                         ← Back

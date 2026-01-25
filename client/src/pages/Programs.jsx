@@ -52,10 +52,22 @@ function Programs() {
         }
     }, [programId, programs]);
 
+    // Check for active program redirection
+    const searchParams = new URL(window.location.href).searchParams;
+    const showAll = searchParams.get('show_all') === 'true';
+
     const fetchPrograms = async () => {
         try {
             const res = await fractalApi.getPrograms(rootId);
             setPrograms(res.data);
+
+            // Auto-redirect to active program if not suppressed
+            if (!showAll && !programId) {
+                const activeProgram = res.data.find(p => p.is_active);
+                if (activeProgram) {
+                    navigate(`/${rootId}/programs/${activeProgram.id}`, { replace: true });
+                }
+            }
         } catch (err) {
             console.error('Failed to fetch programs:', err);
         } finally {

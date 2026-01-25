@@ -698,27 +698,40 @@ function SessionDetail() {
                 if (activityUpdatesOccurred) {
                     setActivityInstances(updatedInstances);
                 }
+            }
 
-                // Update session_end and calculate total duration when completing
-                if (sessionData) {
-                    const sessionEndTime = new Date().toISOString();
-                    const updatedData = { ...sessionData, session_end: sessionEndTime };
+            // Prepare update payload
+            const updatePayload = { completed: newCompleted };
 
-                    // Calculate total duration if we have session_start
-                    if (sessionData.session_start) {
-                        const startTime = new Date(sessionData.session_start);
-                        const endTime = new Date(sessionEndTime);
-                        const durationSeconds = Math.floor((endTime - startTime) / 1000);
-                        updatedData.total_duration_seconds = durationSeconds;
-                    }
+            // If marking as complete, update timing fields in the SAME request
+            if (newCompleted && sessionData) {
+                const sessionEndTime = new Date().toISOString();
+                updatePayload.session_end = sessionEndTime;
 
-                    setSessionData(updatedData);
+                // Calculate total duration if we have session_start
+                let durationSeconds = null;
+                if (sessionData.session_start) {
+                    const startTime = new Date(sessionData.session_start);
+                    const endTime = new Date(sessionEndTime);
+                    durationSeconds = Math.floor((endTime - startTime) / 1000);
+                    updatePayload.total_duration_seconds = durationSeconds;
                 }
+
+                // Sync the session_data JSON blob as well
+                const updatedData = {
+                    ...sessionData,
+                    session_end: sessionEndTime,
+                    total_duration_seconds: durationSeconds
+                };
+                updatePayload.session_data = JSON.stringify(updatedData);
+
+                // Update local sessionData immediately to prevent stale overwrites from fetchSession
+                setSessionData(updatedData);
             }
 
             // Mark session complete - this triggers backend EVENT SYSTEM:
             // SESSION_COMPLETED → evaluate targets → auto-complete goals if all targets met
-            const res = await fractalApi.updateSession(rootId, sessionId, { completed: newCompleted });
+            const res = await fractalApi.updateSession(rootId, sessionId, updatePayload);
             setSession(res.data);
 
             // If we just completed the session, fetch updated goals to show completion results
