@@ -6,7 +6,7 @@ import TemplateBuilderModal from './TemplateBuilderModal';
 const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
     const [name, setName] = useState('');
     const [selectedTemplates, setSelectedTemplates] = useState([]);
-    const [dayOfWeek, setDayOfWeek] = useState('');
+    const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState([]);
 
     const [sessionTemplates, setSessionTemplates] = useState([]);
     const [activities, setActivities] = useState([]);
@@ -49,11 +49,16 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         if (isOpen) {
             if (initialData) {
                 setName(initialData.name || '');
-                // Try to infer DoW from date if exists, rarely used for edit but good to have
-                if (initialData.date) {
-                    setDayOfWeek(moment(initialData.date).format('dddd'));
+                // Try to load day_of_week first, then fallback to inferring from date
+                if (initialData.day_of_week) {
+                    const dows = Array.isArray(initialData.day_of_week)
+                        ? initialData.day_of_week
+                        : [initialData.day_of_week];
+                    setSelectedDaysOfWeek(dows);
+                } else if (initialData.date) {
+                    setSelectedDaysOfWeek([moment(initialData.date).format('dddd')]);
                 } else {
-                    setDayOfWeek('');
+                    setSelectedDaysOfWeek([]);
                 }
 
                 // Handle new templates structure or fallback to legacy sessions
@@ -67,7 +72,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
 
             } else {
                 setName('');
-                setDayOfWeek('');
+                setSelectedDaysOfWeek([]);
                 setSelectedTemplates([]);
 
             }
@@ -79,8 +84,14 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         onSave({
             name,
             template_ids: selectedTemplates,
-            day_of_week: dayOfWeek
+            day_of_week: selectedDaysOfWeek // Sending an array now
         });
+    };
+
+    const handleToggleDay = (day) => {
+        setSelectedDaysOfWeek(prev =>
+            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+        );
     };
 
     const handleCopy = async () => {
@@ -140,7 +151,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         border: '1px solid #333', boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
     };
 
-    const label = { color: '#ccc', display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 500 };
+    const label = { color: '#ccc', display: 'block', marginBottom: '12px', fontSize: '12px', fontWeight: 500 };
     const input = { width: '100%', padding: '10px', background: '#333', border: '1px solid #444', color: 'white', borderRadius: '4px', fontSize: '14px' };
 
     return (
@@ -220,17 +231,54 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                         </div>
                     </div>
 
-                    {!isEdit && (
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={label}>Optional Day of Week (For Date Mapping)</label>
-                            <select value={dayOfWeek} onChange={e => setDayOfWeek(e.target.value)} style={input}>
-                                <option value="">None (Abstract Day)</option>
-                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
-                                    <option key={d} value={d}>{d}</option>
-                                ))}
-                            </select>
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={label}>Optional Day of Week (For Date Mapping)</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => {
+                                const isSelected = selectedDaysOfWeek.includes(d);
+                                return (
+                                    <div
+                                        key={d}
+                                        onClick={() => handleToggleDay(d)}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: isSelected ? '#3A86FF' : '#2a2a2a',
+                                            border: `1px solid ${isSelected ? '#3A86FF' : '#444'}`,
+                                            borderRadius: '4px',
+                                            color: isSelected ? 'white' : '#ccc',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            minWidth: '40px'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!isSelected) {
+                                                e.currentTarget.style.background = '#333';
+                                                e.currentTarget.style.borderColor = '#555';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!isSelected) {
+                                                e.currentTarget.style.background = '#2a2a2a';
+                                                e.currentTarget.style.borderColor = '#444';
+                                            }
+                                        }}
+                                    >
+                                        {d.substring(0, 3)}
+                                    </div>
+                                );
+                            })}
                         </div>
-                    )}
+                        {selectedDaysOfWeek.length > 0 && (
+                            <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
+                                Day will be automatically scheduled for all occurrences of these days in the block.
+                            </div>
+                        )}
+                    </div>
 
 
 

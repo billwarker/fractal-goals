@@ -221,7 +221,8 @@ class ProgramService:
             if data['template_id'] not in template_ids:
                 template_ids.append(data['template_id'])
         
-        day_of_week = data.get('day_of_week')
+        day_of_week_raw = data.get('day_of_week')
+        day_of_week_list = day_of_week_raw if isinstance(day_of_week_raw, list) else ([day_of_week_raw] if day_of_week_raw else [])
         cascade = data.get('cascade', False)
         
         target_blocks = [block]
@@ -235,45 +236,39 @@ class ProgramService:
 
         created_count = 0
         
+        # Determine the date if provided
+        target_date = None
+        if data.get('date'):
+            dt_str = data.get('date')
+            if 'T' in dt_str: dt_str = dt_str.split('T')[0]
+            target_date = datetime.strptime(dt_str, '%Y-%m-%d').date()
+
         for target in target_blocks:
-            dates_to_add = []
-            if data.get('date'):
-                dt_str = data.get('date')
-                if 'T' in dt_str: dt_str = dt_str.split('T')[0]
-                d_obj = datetime.strptime(dt_str, '%Y-%m-%d').date()
-                dates_to_add.append(d_obj)
-            elif day_of_week and target.start_date and target.end_date:
-                curr = target.start_date
-                while curr <= target.end_date:
-                    if curr.strftime('%A') == day_of_week:
-                        dates_to_add.append(curr)
-                    curr += timedelta(days=1)
-            else:
-                dates_to_add.append(None)
+            # Check if a day with this date already exists in this block
+            day = None
+            if target_date:
+                day = session.query(ProgramDay).filter_by(block_id=target.id, date=target_date).first()
             
-            for d in dates_to_add:
-                day = None
-                if d:
-                    day = session.query(ProgramDay).filter_by(block_id=target.id, date=d).first()
-                
-                if not day:
-                    count = session.query(ProgramDay).filter_by(block_id=target.id).count()
-                    day = ProgramDay(
-                        id=str(uuid.uuid4()),
-                        block_id=target.id,
-                        date=d,
-                        day_number=count + 1,
-                        name=name
-                    )
-                    session.add(day)
-                else:
-                    if name: day.name = name
-                
-                if template_ids:
-                    templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
-                    day.templates = templates
-                
-                created_count += 1
+            if not day:
+                count = session.query(ProgramDay).filter_by(block_id=target.id).count()
+                day = ProgramDay(
+                    id=str(uuid.uuid4()),
+                    block_id=target.id,
+                    date=target_date,
+                    day_number=count + 1,
+                    name=name,
+                    day_of_week=day_of_week_list
+                )
+                session.add(day)
+            else:
+                if name: day.name = name
+                day.day_of_week = day_of_week_list
+            
+            if template_ids:
+                templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
+                day.templates = templates
+            
+            created_count += 1
                 
         return created_count
 
@@ -286,7 +281,6 @@ class ProgramService:
         if 'name' in data: day.name = data['name']
         if 'day_number' in data: day.day_number = data['day_number']
         
-        # Handle Date update explicitly
         if 'date' in data:
             if data['date']:
                 try:
@@ -297,6 +291,12 @@ class ProgramService:
                     raise ValueError("Invalid date format")
             else:
                 day.date = None
+
+        if 'day_of_week' in data:
+            dows = data['day_of_week']
+            if not isinstance(dows, list):
+                dows = [dows] if dows else []
+            day.day_of_week = dows
 
         cascade = data.get('cascade', False)
         

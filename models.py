@@ -984,6 +984,8 @@ class ProgramDay(Base):
     notes = Column(Text)
     is_completed = Column(Boolean, default=False)  # Track if all templates have been completed
     
+    day_of_week = Column(JSON_TYPE) # To persist the mapping (Mon, Tue, etc.)
+    
     # Relationships
     block = relationship("ProgramBlock", back_populates="days")
     templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
@@ -1007,6 +1009,7 @@ class ProgramDay(Base):
             "block_id": self.block_id,
             "date": self.date.isoformat() if self.date else None,
             "day_number": self.day_number,
+            "day_of_week": _safe_load_json(self.day_of_week),
             "name": self.name,
             "notes": self.notes,
             "is_completed": self.is_completed,
