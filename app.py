@@ -19,6 +19,7 @@ from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
 from blueprints.annotations_api import annotations_bp
 from blueprints.logs_api import logs_api
+from blueprints.auth_api import auth_bp
 from blueprints.pages import pages_bp
 from services import init_services
 
@@ -44,10 +45,10 @@ logger = logging.getLogger(__name__)
 
 # Enable CORS with environment-based origins
 CORS(app, resources={
-    r"/api/*": {
+    r"/api/.*": {
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 
@@ -62,6 +63,7 @@ app.register_blueprint(programs_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(annotations_bp)
 app.register_blueprint(logs_api)
+app.register_blueprint(auth_bp)
 app.register_blueprint(pages_bp)
 
 # Initialize services (event bus, completion handlers, etc.)

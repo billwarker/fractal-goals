@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 import uuid
 import logging
 
-from models import get_engine, get_session, Note, Session, ActivityInstance, ActivityDefinition, format_utc
+from models import get_engine, get_session, Note, Session, ActivityInstance, ActivityDefinition, format_utc, validate_root_goal
 from validators import validate_request, NoteCreateSchema, NoteUpdateSchema
+from blueprints.auth_api import token_required
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,8 @@ notes_bp = Blueprint('notes', __name__, url_prefix='/api')
 
 
 @notes_bp.route('/<root_id>/sessions/<session_id>/notes', methods=['GET'])
-def get_session_notes(root_id, session_id):
+@token_required
+def get_session_notes(current_user, root_id, session_id):
     """
     Get all notes for a session (includes activity instance and set notes).
     
@@ -26,6 +28,11 @@ def get_session_notes(root_id, session_id):
     """
     db = get_session(get_engine())
     try:
+        # Verify ownership
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         notes = db.query(Note).filter(
             Note.root_id == root_id,
             Note.session_id == session_id,
@@ -41,10 +48,16 @@ def get_session_notes(root_id, session_id):
 
 
 @notes_bp.route('/<root_id>/activity-instances/<instance_id>/notes', methods=['GET'])
-def get_activity_instance_notes(root_id, instance_id):
+@token_required
+def get_activity_instance_notes(current_user, root_id, instance_id):
     """Get notes for a specific activity instance."""
     db = get_session(get_engine())
     try:
+        # Verify ownership
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         notes = db.query(Note).filter(
             Note.root_id == root_id,
             Note.activity_instance_id == instance_id,
@@ -60,7 +73,8 @@ def get_activity_instance_notes(root_id, instance_id):
 
 
 @notes_bp.route('/<root_id>/sessions/<session_id>/previous-session-notes', methods=['GET'])
-def get_previous_session_notes(root_id, session_id):
+@token_required
+def get_previous_session_notes(current_user, root_id, session_id):
     """
     Get session-level notes from the last 3 sessions (excluding current).
     
@@ -68,6 +82,11 @@ def get_previous_session_notes(root_id, session_id):
     """
     db = get_session(get_engine())
     try:
+        # Verify ownership
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         # Get the 3 most recent sessions before this one
         # Use nullslast() so sessions with actual start times are prioritized
         previous_sessions = db.query(Session).filter(
@@ -110,16 +129,15 @@ def get_previous_session_notes(root_id, session_id):
 
 
 @notes_bp.route('/<root_id>/activities/<activity_id>/notes', methods=['GET'])
-def get_activity_definition_notes(root_id, activity_id):
-    """
-    Get recent notes for an activity definition (across all sessions).
-    
-    Query params:
-    - limit: Maximum number of notes to return (default 20)
-    - exclude_session: Session ID to exclude from results
-    """
+@token_required
+def get_activity_definition_notes(current_user, root_id, activity_id):
+    """Get recent notes for an activity definition if owned by user."""
     db = get_session(get_engine())
     try:
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         limit = request.args.get('limit', 20, type=int)
         exclude_session_id = request.args.get('exclude_session', None)
         
@@ -152,16 +170,15 @@ def get_activity_definition_notes(root_id, activity_id):
 
 
 @notes_bp.route('/<root_id>/activities/<activity_id>/history', methods=['GET'])
-def get_activity_history(root_id, activity_id):
-    """
-    Get previous instances of an activity with their metrics.
-    
-    Query params:
-    - limit: Maximum number of instances to return (default 3)
-    - exclude_session: Session ID to exclude from results (typically current session)
-    """
+@token_required
+def get_activity_history(current_user, root_id, activity_id):
+    """Get previous instances of an activity with their metrics if owned by user."""
     db = get_session(get_engine())
     try:
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         limit = request.args.get('limit', 3, type=int)
         exclude_session_id = request.args.get('exclude_session', None)
         
@@ -214,25 +231,18 @@ def get_activity_history(root_id, activity_id):
 
 
 @notes_bp.route('/<root_id>/notes', methods=['POST'])
+@token_required
 @validate_request(NoteCreateSchema)
-def create_note(root_id, validated_data):
+def create_note(current_user, root_id, validated_data):
     """
-    Create a new note.
-    
-    Request body:
-    {
-        "context_type": "session" | "activity_instance" | "set",
-        "context_id": "<id of parent entity>",
-        "session_id": "<session id>",
-        "activity_instance_id": "<optional>",
-        "activity_definition_id": "<optional>",
-        "set_index": <optional integer>,
-        "content": "<note text>",
-        "image_data": "<optional base64 encoded image>"
-    }
+    Create a new note if owned by user.
     """
     db = get_session(get_engine())
     try:
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         content = validated_data.get('content', '')  # Already sanitized
         image_data = validated_data.get('image_data')
         
@@ -269,18 +279,15 @@ def create_note(root_id, validated_data):
 
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['PUT'])
+@token_required
 @validate_request(NoteUpdateSchema)
-def update_note(root_id, note_id, validated_data):
-    """
-    Update a note's content.
-    
-    Request body:
-    {
-        "content": "<updated note text>"
-    }
-    """
+def update_note(current_user, root_id, note_id, validated_data):
     db = get_session(get_engine())
     try:
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         note = db.query(Note).filter(
             Note.id == note_id,
             Note.root_id == root_id,
@@ -291,10 +298,9 @@ def update_note(root_id, note_id, validated_data):
             return jsonify({"error": "Note not found"}), 404
         
         if 'content' in validated_data:
-            note.content = validated_data['content']  # Already sanitized
+            note.content = validated_data['content']
         
         db.commit()
-        
         logger.info(f"Updated note {note_id}")
         return jsonify(note.to_dict())
         
@@ -307,10 +313,13 @@ def update_note(root_id, note_id, validated_data):
 
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['DELETE'])
-def delete_note(root_id, note_id):
-    """Soft delete a note."""
+@token_required
+def delete_note(current_user, root_id, note_id):
     db = get_session(get_engine())
     try:
+        root = validate_root_goal(db, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         note = db.query(Note).filter(
             Note.id == note_id,
             Note.root_id == root_id,

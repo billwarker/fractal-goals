@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
-from models import EventLog, get_scoped_session
+from models import EventLog, get_scoped_session, validate_root_goal
+from blueprints.auth_api import token_required
 from sqlalchemy import select, desc
 import logging
 
@@ -8,10 +9,10 @@ logger = logging.getLogger(__name__)
 logs_api = Blueprint('logs_api', __name__)
 
 @logs_api.route('/api/<root_id>/logs', methods=['GET'])
-def get_logs(root_id):
+@token_required
+def get_logs(current_user, root_id):
     """
-    Get all event logs for a specific fractal.
-    Supports filtering and pagination.
+    Get all event logs for a specific fractal if owned by user.
     """
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)
@@ -21,6 +22,10 @@ def get_logs(root_id):
     
     db_session = get_scoped_session()
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         from sqlalchemy import func
         from datetime import datetime
         
@@ -80,12 +85,17 @@ def get_logs(root_id):
         db_session.close()
 
 @logs_api.route('/api/<root_id>/logs/clear', methods=['DELETE'])
-def clear_logs(root_id):
+@token_required
+def clear_logs(current_user, root_id):
     """
-    Clear all logs for a specific fractal.
+    Clear all logs for a specific fractal if owned by user.
     """
     db_session = get_scoped_session()
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         from sqlalchemy import delete
         stmt = delete(EventLog).where(EventLog.root_id == root_id)
         db_session.execute(stmt)

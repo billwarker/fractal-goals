@@ -5,32 +5,43 @@ import { getTypeDisplayName } from '../utils/goalHelpers';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import GoalModal from '../components/modals/GoalModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import AuthModal from '../components/modals/AuthModal';
+import { useAuth } from '../contexts/AuthContext';
 import '../App.css';
 
 /**
  * Selection Page - Fractal Goal Selection
  * Displays all root goals as cards and allows navigation to specific fractal views
  */
-function Selection() { // No props needed anymore
+function Selection() {
     const navigate = useNavigate();
     const [fractals, setFractals] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Modal States
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [isAuthModalOpen, setAuthModalOpen] = useState(false);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
+    const { user, logout, isAuthenticated } = useAuth();
+
     useEffect(() => {
-        fetchFractals();
-    }, []);
+        if (isAuthenticated) {
+            fetchFractals();
+        } else {
+            setFractals([]);
+            setLoading(false);
+        }
+    }, [isAuthenticated]);
 
     const fetchFractals = async () => {
         try {
+            setLoading(true);
             const res = await globalApi.getAllFractals();
-            setFractals(res.data);
-            setLoading(false);
+            setFractals(res.data || []);
         } catch (err) {
             console.error("Failed to fetch fractals", err);
+        } finally {
             setLoading(false);
         }
     };
@@ -40,9 +51,12 @@ function Selection() { // No props needed anymore
     };
 
     const handleCreateSubmit = async (data) => {
+        if (!isAuthenticated) {
+            setAuthModalOpen(true);
+            return;
+        }
         try {
             await globalApi.createFractal(data);
-            // Refresh list
             await fetchFractals();
             setCreateModalOpen(false);
         } catch (err) {
@@ -59,7 +73,6 @@ function Selection() { // No props needed anymore
         if (!fractalToDelete) return;
         try {
             await globalApi.deleteFractal(fractalToDelete.id);
-            // Optimistic update or refresh
             setFractals(current => current.filter(f => f.id !== fractalToDelete.id));
             setFractalToDelete(null);
         } catch (err) {
@@ -78,21 +91,10 @@ function Selection() { // No props needed anymore
 
     const getHighestLevelType = () => {
         if (!fractals || fractals.length === 0) return 'UltimateGoal';
-
-        const hierarchy = [
-            'UltimateGoal',
-            'LongTermGoal',
-            'MidTermGoal',
-            'ShortTermGoal',
-            'ImmediateGoal'
-        ];
-
+        const hierarchy = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal'];
         for (const type of hierarchy) {
-            if (fractals.some(f => f.type === type)) {
-                return type;
-            }
+            if (fractals.some(f => f.type === type)) return type;
         }
-
         return 'UltimateGoal';
     };
 
@@ -107,14 +109,65 @@ function Selection() { // No props needed anymore
 
     return (
         <div className="fractal-selection-container">
+            {/* Top Center Display */}
             <div style={{
                 display: 'flex',
+                flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginBottom: '60px',
-                marginTop: '40px'
+                marginTop: '40px',
+                position: 'relative'
             }}>
-                {/* The Goal Node Circle - Highest Level Color */}
+                {/* Profile Controls (Logged In Only) */}
+                {isAuthenticated && (
+                    <div style={{
+                        marginBottom: '30px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                        zIndex: 10
+                    }}>
+                        <div style={{
+                            fontSize: '12px',
+                            color: '#888',
+                            fontWeight: '800',
+                            letterSpacing: '2px',
+                            textTransform: 'uppercase'
+                        }}>
+                            Welcome, <span style={{ color: 'white' }}>{user?.username}</span>
+                        </div>
+                        <button
+                            onClick={logout}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                padding: '6px 20px',
+                                borderRadius: '4px',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                                e.target.style.background = 'rgba(255,255,255,0.1)';
+                                e.target.style.borderColor = 'white';
+                            }}
+                            onMouseOut={(e) => {
+                                e.target.style.background = 'transparent';
+                                e.target.style.borderColor = 'rgba(255,255,255,0.2)';
+                            }}
+                        >
+                            LOGOUT
+                        </button>
+                    </div>
+                )}
+
+                {/* The Goal Node Circle */}
                 <div style={{
                     width: '280px',
                     height: '280px',
@@ -125,9 +178,9 @@ function Selection() { // No props needed anymore
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    zIndex: 0
+                    zIndex: 0,
+                    transition: 'background-color 0.5s ease'
                 }}>
-                    {/* The App Name */}
                     <h1 style={{
                         color: headerTextColor,
                         fontWeight: 800,
@@ -139,13 +192,36 @@ function Selection() { // No props needed anymore
                         textAlign: 'center',
                         zIndex: 1
                     }}>
-                        Fractal Goals
+                        FRACTAL GOALS
                     </h1>
                 </div>
+
+                {/* Login Link (Logged Out Only) */}
+                {!isAuthenticated && (
+                    <div
+                        onClick={() => setAuthModalOpen(true)}
+                        style={{
+                            marginTop: '30px',
+                            color: '#888',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            letterSpacing: '1.5px',
+                            cursor: 'pointer',
+                            textTransform: 'uppercase',
+                            transition: 'color 0.2s ease',
+                            zIndex: 10
+                        }}
+                        onMouseOver={(e) => e.target.style.color = 'white'}
+                        onMouseOut={(e) => e.target.style.color = '#888'}
+                    >
+                        LOGIN / SIGNUP
+                    </div>
+                )}
             </div>
 
+            {/* Fractal Grid */}
             <div className="fractal-selection-grid">
-                {fractals.map(fractal => (
+                {isAuthenticated && fractals.map(fractal => (
                     <div
                         key={fractal.id}
                         className="fractal-card"
@@ -159,42 +235,15 @@ function Selection() { // No props needed anymore
                             textAlign: 'center'
                         }}
                     >
-                        {/* Centered Content */}
-                        <div style={{
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            width: '100%'
-                        }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
                             <h3 style={{ margin: '0 0 8px 0' }}>{fractal.name}</h3>
-
-                            {/* Type Badge */}
-                            <div style={{
-                                fontSize: '12px',
-                                color: getGoalColor(fractal.type),
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                fontWeight: '500'
-                            }}>
-                                {getTypeDisplayName(fractal.type) || fractal.type || 'Unknown Type'}
+                            <div style={{ fontSize: '12px', color: getGoalColor(fractal.type), textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
+                                {getTypeDisplayName(fractal.type)}
                             </div>
                         </div>
-
-                        {/* Timestamps at Bottom */}
-                        <div style={{
-                            fontSize: '11px',
-                            color: '#666',
-                            marginTop: 'auto',
-                            width: '100%'
-                        }}>
+                        <div style={{ fontSize: '11px', color: '#666', marginTop: 'auto', width: '100%' }}>
                             <div>Created: {formatDate(fractal.created_at)}</div>
-                            {fractal.updated_at && fractal.updated_at !== fractal.created_at && (
-                                <div>Updated: {formatDate(fractal.updated_at)}</div>
-                            )}
                         </div>
-
                         <button
                             className="delete-btn"
                             onClick={(e) => handleDeleteClick(e, fractal)}
@@ -206,28 +255,32 @@ function Selection() { // No props needed anymore
                     </div>
                 ))}
 
-                <div className="fractal-card add-fractal-card" onClick={() => setCreateModalOpen(true)}>
-                    <div className="add-icon">+</div>
-                    <h3>New Fractal</h3>
-                </div>
+                {isAuthenticated && (
+                    <div className="fractal-card add-fractal-card" onClick={() => setCreateModalOpen(true)}>
+                        <div className="add-icon">+</div>
+                        <h3>New Fractal</h3>
+                    </div>
+                )}
             </div>
 
-            {/* Create Fractal Modal */}
+            {/* Modals */}
             <GoalModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setCreateModalOpen(false)}
                 onSubmit={handleCreateSubmit}
-                parent={null} // Indicates creating a root
+                parent={null}
             />
-
-            {/* Delete Confirmation Modal */}
             <DeleteConfirmModal
                 isOpen={!!fractalToDelete}
                 onClose={() => setFractalToDelete(null)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Fractal Tree?"
-                message={`Are you sure you want to delete "${fractalToDelete?.name}"? This action cannot be undone.`}
+                message={`Are you sure you want to delete "${fractalToDelete?.name}"?`}
                 requireMatchingText="delete"
+            />
+            <AuthModal
+                isOpen={isAuthModalOpen}
+                onClose={() => setAuthModalOpen(false)}
             />
         </div>
     );

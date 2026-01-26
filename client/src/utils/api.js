@@ -10,6 +10,27 @@ import axios from 'axios';
 // Use environment variable for API base URL, fallback to localhost:8001
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
+// Add interceptor to include token in all requests
+axios.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+/**
+ * Authentication API endpoints
+ */
+export const authApi = {
+    signup: (data) => axios.post(`${API_BASE}/auth/signup`, data),
+    login: (data) => axios.post(`${API_BASE}/auth/login`, data),
+    getMe: () => axios.get(`${API_BASE}/auth/me`),
+};
+
 /**
  * Global API endpoints (not scoped to a specific fractal)
  */
@@ -637,5 +658,6 @@ export const legacyApi = {
 export default {
     global: globalApi,
     fractal: fractalApi,
+    auth: authApi,
     legacy: legacyApi,
 };

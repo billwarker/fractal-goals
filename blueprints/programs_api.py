@@ -7,6 +7,7 @@ from validators import (
     ProgramCreateSchema, ProgramUpdateSchema
 )
 from services.programs import ProgramService
+from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,17 @@ programs_bp = Blueprint('programs', __name__, url_prefix='/api')
 # ============================================================================
 
 @programs_bp.route('/<root_id>/programs', methods=['GET'])
-def get_programs(root_id):
-    """Get all training programs for a fractal."""
+@token_required
+def get_programs(current_user, root_id):
+    """Get all training programs for a fractal if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+             return jsonify({"error": "Fractal not found or access denied"}), 404
+             
         programs = ProgramService.get_programs(session, root_id)
-        if programs is None:
-             return jsonify({"error": "Fractal not found"}), 404
         return jsonify(programs)
     except Exception as e:
         logger.exception("Error getting programs")
@@ -36,14 +40,19 @@ def get_programs(root_id):
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['GET'])
-def get_program(root_id, program_id):
-    """Get a specific training program."""
+@token_required
+def get_program(current_user, root_id, program_id):
+    """Get a specific training program if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         program = ProgramService.get_program(session, root_id, program_id)
         if program is None:
-            return jsonify({"error": "Program or Fractal not found"}), 404
+            return jsonify({"error": "Program not found"}), 404
         return jsonify(program)
     except Exception as e:
         logger.exception("Error getting program")
@@ -53,12 +62,17 @@ def get_program(root_id, program_id):
 
 
 @programs_bp.route('/<root_id>/programs', methods=['POST'])
+@token_required
 @validate_request(ProgramCreateSchema)
-def create_program(root_id, validated_data):
-    """Create a new training program."""
+def create_program(current_user, root_id, validated_data):
+    """Create a new training program if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         result = ProgramService.create_program(session, root_id, validated_data)
         session.commit()
         return jsonify(result), 201
@@ -73,12 +87,17 @@ def create_program(root_id, validated_data):
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['PUT'])
+@token_required
 @validate_request(ProgramUpdateSchema)
-def update_program(root_id, program_id, validated_data):
-    """Update a training program."""
+def update_program(current_user, root_id, program_id, validated_data):
+    """Update a training program if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         result = ProgramService.update_program(session, root_id, program_id, validated_data)
         if not result:
             return jsonify({"error": "Program not found"}), 404
@@ -93,11 +112,16 @@ def update_program(root_id, program_id, validated_data):
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['DELETE'])
-def delete_program(root_id, program_id):
-    """Delete a training program."""
+@token_required
+def delete_program(current_user, root_id, program_id):
+    """Delete a training program if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         result = ProgramService.delete_program(session, root_id, program_id)
         session.commit()
         return jsonify({
@@ -113,11 +137,16 @@ def delete_program(root_id, program_id):
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/session-count', methods=['GET'])
-def get_program_session_count(root_id, program_id):
-    """Get the count of sessions associated with a program."""
+@token_required
+def get_program_session_count(current_user, root_id, program_id):
+    """Get the count of sessions associated with a program if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         count = ProgramService.get_program_session_count(session, root_id, program_id)
         return jsonify({"session_count": count})
     except ValueError as e:
@@ -128,11 +157,16 @@ def get_program_session_count(root_id, program_id):
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days', methods=['POST'])
-def add_block_day(root_id, program_id, block_id):
-    """Add a configured day to a program block (and optionally cascade)."""
+@token_required
+def add_block_day(current_user, root_id, program_id, block_id):
+    """Add a configured day to a program block if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         data = request.get_json()
         count = ProgramService.add_block_day(session, root_id, program_id, block_id, data)
         session.commit()
@@ -201,19 +235,18 @@ def copy_block_day(root_id, program_id, block_id, day_id):
         session.close()
 
 @programs_bp.route('/<root_id>/programs/active-days', methods=['GET'])
-def get_active_program_days(root_id):
-    """
-    Get program days from active programs where current date falls within the block's date range.
-    Returns days that have at least one scheduled session with a template.
-    """
+@token_required
+def get_active_program_days(current_user, root_id):
+    """Get active program days if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         days = ProgramService.get_active_program_days(session, root_id)
-        if days is None:
-             # Should practically not happen with get_active_program_days logic unless error
-             return jsonify([]), 200
-        return jsonify(days)
+        return jsonify(days or [])
     except Exception as e:
         import traceback
         traceback.print_exc()

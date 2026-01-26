@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import AppRouter from './AppRouter.jsx'
+import { AuthProvider } from './contexts/AuthContext.jsx'
 import { ActivitiesProvider } from './contexts/ActivitiesContext.jsx'
 
 import { SessionsProvider } from './contexts/SessionsContext.jsx'
@@ -43,13 +44,15 @@ createRoot(document.getElementById('root')).render(
         <DebugProvider>
           <QueryDevtools />
           <TimezoneProvider>
-            <ActivitiesProvider>
-              <SessionsProvider>
-                <GoalsProvider>
-                  <AppRouter />
-                </GoalsProvider>
-              </SessionsProvider>
-            </ActivitiesProvider>
+            <AuthProvider>
+              <ActivitiesProvider>
+                <SessionsProvider>
+                  <GoalsProvider>
+                    <AppRouter />
+                  </GoalsProvider>
+                </SessionsProvider>
+              </ActivitiesProvider>
+            </AuthProvider>
           </TimezoneProvider>
         </DebugProvider>
       </BrowserRouter>

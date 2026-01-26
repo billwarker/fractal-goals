@@ -10,6 +10,7 @@ from models import (
     ActivityDefinition,
     validate_root_goal
 )
+from blueprints.auth_api import token_required
 from services.events import event_bus, Event, Events
 
 # Create blueprint
@@ -21,15 +22,16 @@ timers_bp = Blueprint('timers', __name__, url_prefix='/api')
 # ============================================================================
 
 @timers_bp.route('/<root_id>/activity-instances', methods=['GET', 'POST'])
-def activity_instances(root_id):
-    """Get all activity instances (GET) or create a new one (POST)."""
+@token_required
+def activity_instances(current_user, root_id):
+    """Get all activity instances (GET) or create a new one (POST) if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         if request.method == 'POST':
             # Create new activity instance
@@ -96,17 +98,16 @@ def activity_instances(root_id):
 
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/start', methods=['POST'])
-def start_activity_timer(root_id, instance_id):
-    """Start the timer for an activity instance."""
+@token_required
+def start_activity_timer(current_user, root_id, instance_id):
+    """Start the timer for an activity instance if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        print(f"[START TIMER] Instance ID: {instance_id}")
-        
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
         from sqlalchemy.orm import joinedload
@@ -178,15 +179,16 @@ def start_activity_timer(root_id, instance_id):
 
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/stop', methods=['POST'])
-def stop_activity_timer(root_id, instance_id):
-    """Stop the timer for an activity instance and calculate duration."""
+@token_required
+def stop_activity_timer(current_user, root_id, instance_id):
+    """Stop the timer for an activity instance if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
         # Get the activity instance
@@ -268,17 +270,16 @@ def parse_iso_datetime(iso_string):
 
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
-def update_activity_instance(root_id, instance_id):
-    """Update an activity instance manually (e.g. editing times)."""
+@token_required
+def update_activity_instance(current_user, root_id, instance_id):
+    """Update an activity instance manually if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        print(f"[UPDATE INSTANCE] Instance ID: {instance_id}")
-        print(f"[UPDATE INSTANCE] Request data: {request.get_json()}")
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         data = request.get_json() or {}
         

@@ -135,6 +135,32 @@ def parse_date_string(value: str) -> date:
 
 
 # =============================================================================
+# AUTH SCHEMAS
+# =============================================================================
+
+class UserSignupSchema(BaseModel):
+    """Schema for user registration."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    username: str = Field(..., min_length=3, max_length=80)
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    password: str = Field(..., min_length=8)
+    
+    @field_validator('username')
+    @classmethod
+    def sanitize_username(cls, v: str) -> str:
+        return sanitize_string(v)
+
+
+class UserLoginSchema(BaseModel):
+    """Schema for user login."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    username_or_email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=1)
+
+
+# =============================================================================
 # GOAL SCHEMAS
 # =============================================================================
 

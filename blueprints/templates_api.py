@@ -12,8 +12,8 @@ from validators import (
     validate_request,
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema
 )
-
-logger = logging.getLogger(__name__)
+from blueprints.auth_api import token_required
+from services.events import event_bus, Event, Events
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
@@ -23,14 +23,15 @@ templates_bp = Blueprint('templates', __name__, url_prefix='/api')
 # ============================================================================
 
 @templates_bp.route('/<root_id>/session-templates', methods=['GET'])
-def get_session_templates(root_id):
-    """Get all session templates for a fractal."""
+@token_required
+def get_session_templates(current_user, root_id):
+    """Get all session templates for a fractal if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         templates = session.query(SessionTemplate).filter_by(root_id=root_id).all()
         result = [template.to_dict() for template in templates]
@@ -41,14 +42,15 @@ def get_session_templates(root_id):
 
 
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['GET'])
-def get_session_template(root_id, template_id):
-    """Get a specific session template."""
+@token_required
+def get_session_template(current_user, root_id, template_id):
+    """Get a specific session template if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
         if not template:
@@ -61,15 +63,16 @@ def get_session_template(root_id, template_id):
 
 
 @templates_bp.route('/<root_id>/session-templates', methods=['POST'])
+@token_required
 @validate_request(SessionTemplateCreateSchema)
-def create_session_template(root_id, validated_data):
-    """Create a new session template."""
+def create_session_template(current_user, root_id, validated_data):
+    """Create a new session template if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # template_data is optional now - validation ensures name is present
         template_data = validated_data.get('template_data')
@@ -97,15 +100,16 @@ def create_session_template(root_id, validated_data):
 
 
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['PUT'])
+@token_required
 @validate_request(SessionTemplateUpdateSchema)
-def update_session_template(root_id, template_id, validated_data):
-    """Update a session template."""
+def update_session_template(current_user, root_id, template_id, validated_data):
+    """Update a session template if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
         if not template:
@@ -132,14 +136,15 @@ def update_session_template(root_id, template_id, validated_data):
 
 
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['DELETE'])
-def delete_session_template(root_id, template_id):
-    """Delete a session template."""
+@token_required
+def delete_session_template(current_user, root_id, template_id):
+    """Delete a session template if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
         if not template:

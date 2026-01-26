@@ -13,6 +13,7 @@ from validators import (
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
     ActivityGoalsSetSchema, GroupReorderSchema
 )
+from blueprints.auth_api import token_required
 from services.events import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
@@ -26,14 +27,15 @@ activities_bp = Blueprint('activities', __name__, url_prefix='/api')
 # ============================================================================
 
 @activities_bp.route('/<root_id>/activity-groups', methods=['GET'])
-def get_activity_groups(root_id):
+@token_required
+def get_activity_groups(current_user, root_id):
     """Get all activity groups for a fractal."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-             return jsonify({"error": "Fractal not found"}), 404
+             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         groups = session.query(ActivityGroup).filter_by(root_id=root_id).order_by(ActivityGroup.sort_order, ActivityGroup.created_at).all()
         return jsonify([g.to_dict() for g in groups])
@@ -41,15 +43,16 @@ def get_activity_groups(root_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activity-groups', methods=['POST'])
+@token_required
 @validate_request(ActivityGroupCreateSchema)
-def create_activity_group(root_id, validated_data):
+def create_activity_group(current_user, root_id, validated_data):
     """Create a new activity group."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-             return jsonify({"error": "Fractal not found"}), 404
+             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Calculate order
         max_order = session.query(func.max(ActivityGroup.sort_order)).filter_by(root_id=root_id).scalar()
@@ -178,14 +181,15 @@ def reorder_activity_groups(root_id, validated_data):
 # ============================================================================
 
 @activities_bp.route('/<root_id>/activities', methods=['GET'])
-def get_activities(root_id):
+@token_required
+def get_activities(current_user, root_id):
     """Get all activity definitions for a fractal."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-             return jsonify({"error": "Fractal not found"}), 404
+             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         activities = session.query(ActivityDefinition).filter_by(root_id=root_id).order_by(ActivityDefinition.name).all()
         return jsonify([a.to_dict() for a in activities])
@@ -193,14 +197,15 @@ def get_activities(root_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activities', methods=['POST'])
-def create_activity(root_id):
+@token_required
+def create_activity(current_user, root_id):
     """Create a new activity definition with metrics."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-             return jsonify({"error": "Fractal not found"}), 404
+             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         data = request.get_json()
         if not data.get('name'):
@@ -282,14 +287,15 @@ def create_activity(root_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activities/<activity_id>', methods=['PUT'])
-def update_activity(root_id, activity_id):
+@token_required
+def update_activity(current_user, root_id, activity_id):
     """Update an activity definition and its metrics."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id)
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Find the activity
         activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
@@ -431,7 +437,8 @@ def update_activity(root_id, activity_id):
         session.close()
 
 @activities_bp.route('/<root_id>/activities/<activity_id>', methods=['DELETE'])
-def delete_activity(root_id, activity_id):
+@token_required
+def delete_activity(current_user, root_id, activity_id):
     """Delete an activity definition."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -468,7 +475,8 @@ def delete_activity(root_id, activity_id):
 # ============================================================================
 
 @activities_bp.route('/<root_id>/activities/<activity_id>/goals', methods=['GET'])
-def get_activity_goals(root_id, activity_id):
+@token_required
+def get_activity_goals(current_user, root_id, activity_id):
     """Get all goals associated with an activity."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -484,7 +492,8 @@ def get_activity_goals(root_id, activity_id):
 
 
 @activities_bp.route('/<root_id>/activities/<activity_id>/goals', methods=['POST'])
-def set_activity_goals(root_id, activity_id):
+@token_required
+def set_activity_goals(current_user, root_id, activity_id):
     """Set goals associated with an activity (replaces existing associations)."""
     from models import Goal, activity_goal_associations
     
@@ -539,7 +548,8 @@ def set_activity_goals(root_id, activity_id):
 
 
 @activities_bp.route('/<root_id>/activities/<activity_id>/goals/<goal_id>', methods=['DELETE'])
-def remove_activity_goal(root_id, activity_id, goal_id):
+@token_required
+def remove_activity_goal(current_user, root_id, activity_id, goal_id):
     """Remove a goal association from an activity."""
     from models import activity_goal_associations
     
@@ -581,7 +591,8 @@ def remove_activity_goal(root_id, activity_id, goal_id):
 
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/activities', methods=['GET'])
-def get_goal_activities(root_id, goal_id):
+@token_required
+def get_goal_activities(current_user, root_id, goal_id):
     """Get all activities associated with a goal (including those from linked groups)."""
     from models import Goal, ActivityGroup
     
@@ -613,7 +624,8 @@ def get_goal_activities(root_id, goal_id):
 # ============================================================================
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups', methods=['GET'])
-def get_goal_activity_groups(root_id, goal_id):
+@token_required
+def get_goal_activity_groups(current_user, root_id, goal_id):
     """Get all activity groups linked to a goal."""
     from models import Goal
     
@@ -631,7 +643,8 @@ def get_goal_activity_groups(root_id, goal_id):
 
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['POST'])
-def link_goal_activity_group(root_id, goal_id, group_id):
+@token_required
+def link_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Link an entire activity group to a goal (includes all current and future activities)."""
     from models import Goal, ActivityGroup, goal_activity_group_associations
     
@@ -677,7 +690,8 @@ def link_goal_activity_group(root_id, goal_id, group_id):
 
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['DELETE'])
-def unlink_goal_activity_group(root_id, goal_id, group_id):
+@token_required
+def unlink_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Unlink an activity group from a goal."""
     from models import goal_activity_group_associations
     

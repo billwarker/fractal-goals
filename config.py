@@ -55,8 +55,10 @@ class Config:
     LOG_FILE = os.getenv('LOG_FILE', 'server.log')
     
     # Frontend API URL (for documentation/reference)
-    VITE_API_URL = os.getenv('VITE_API_URL', 'http://localhost:8001/api')
-    
+    # Secret Key for JWT
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default-jwt-secret-keep-it-safe')
+    JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
+
     @classmethod
     def get_database_url(cls):
         """

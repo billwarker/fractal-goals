@@ -7,28 +7,24 @@ from flask import Blueprint, request, jsonify
 from models import (
     get_engine, get_session, VisualizationAnnotation, validate_root_goal, utc_now
 )
+from blueprints.auth_api import token_required
 import json
 
 annotations_bp = Blueprint('annotations_api', __name__)
 
 
 @annotations_bp.route('/api/roots/<root_id>/annotations', methods=['GET'])
-def get_annotations(root_id):
-    """
-    Get all annotations for a fractal root.
-    
-    Query params:
-    - visualization_type: Filter by visualization type (optional)
-    - visualization_context: Filter by context JSON (optional, exact match)
-    """
+@token_required
+def get_annotations(current_user, root_id):
+    """Get all annotations for a fractal root if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
     
     try:
-        # Validate root exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Root goal not found"}), 404
+            return jsonify({"error": "Root goal not found or access denied"}), 404
         
         query = db_session.query(VisualizationAnnotation).filter(
             VisualizationAnnotation.root_id == root_id,
@@ -89,27 +85,17 @@ def get_annotations(root_id):
 
 
 @annotations_bp.route('/api/roots/<root_id>/annotations', methods=['POST'])
-def create_annotation(root_id):
-    """
-    Create a new visualization annotation.
-    
-    Request body:
-    {
-        "visualization_type": "heatmap",
-        "visualization_context": {"time_range": 12},  // optional
-        "selected_points": ["2024-01-15", "2024-01-16"],
-        "selection_bounds": {"x1": 0, "y1": 0, "x2": 100, "y2": 100},  // optional
-        "content": "Note about these data points"
-    }
-    """
+@token_required
+def create_annotation(current_user, root_id):
+    """Create a new visualization annotation if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
     
     try:
-        # Validate root exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Root goal not found"}), 404
+            return jsonify({"error": "Root goal not found or access denied"}), 404
         
         data = request.get_json()
         if not data:
@@ -148,12 +134,18 @@ def create_annotation(root_id):
 
 
 @annotations_bp.route('/api/roots/<root_id>/annotations/<annotation_id>', methods=['GET'])
-def get_annotation(root_id, annotation_id):
-    """Get a single annotation by ID."""
+@token_required
+def get_annotation(current_user, root_id, annotation_id):
+    """Get a single annotation by ID if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
     
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         annotation = db_session.query(VisualizationAnnotation).filter(
             VisualizationAnnotation.id == annotation_id,
             VisualizationAnnotation.root_id == root_id,
@@ -172,21 +164,18 @@ def get_annotation(root_id, annotation_id):
 
 
 @annotations_bp.route('/api/roots/<root_id>/annotations/<annotation_id>', methods=['PUT'])
-def update_annotation(root_id, annotation_id):
-    """
-    Update an existing annotation.
-    
-    Request body (all fields optional):
-    {
-        "content": "Updated note",
-        "selected_points": [...],
-        "selection_bounds": {...}
-    }
-    """
+@token_required
+def update_annotation(current_user, root_id, annotation_id):
+    """Update an existing annotation if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
     
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         annotation = db_session.query(VisualizationAnnotation).filter(
             VisualizationAnnotation.id == annotation_id,
             VisualizationAnnotation.root_id == root_id,
@@ -223,12 +212,18 @@ def update_annotation(root_id, annotation_id):
 
 
 @annotations_bp.route('/api/roots/<root_id>/annotations/<annotation_id>', methods=['DELETE'])
-def delete_annotation(root_id, annotation_id):
-    """Soft delete an annotation."""
+@token_required
+def delete_annotation(current_user, root_id, annotation_id):
+    """Soft delete an annotation if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
     
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         annotation = db_session.query(VisualizationAnnotation).filter(
             VisualizationAnnotation.id == annotation_id,
             VisualizationAnnotation.root_id == root_id,

@@ -19,6 +19,7 @@ from validators import (
     FractalCreateSchema,
     parse_date_string
 )
+from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 
 # Create blueprint
@@ -356,12 +357,19 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
 # ============================================================================
 
 @goals_bp.route('/fractals', methods=['GET'])
-def get_all_fractals():
-    """Get all fractals (root goals) for the selection page."""
+@token_required
+def get_all_fractals(current_user):
+    """Get all fractals (root goals) for the selection page, filtered by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        roots = get_all_root_goals(db_session)
+        # Filter root goals by owner_id
+        roots = db_session.query(Goal).filter(
+            Goal.parent_id == None,
+            Goal.owner_id == current_user.id,
+            Goal.deleted_at == None
+        ).all()
+        
         result = []
         
         for root in roots:
@@ -392,19 +400,21 @@ def get_all_fractals():
 
 
 @goals_bp.route('/fractals', methods=['POST'])
+@token_required
 @validate_request(FractalCreateSchema)
-def create_fractal(validated_data):
-    """Create a new fractal (root goal)."""
+def create_fractal(current_user, validated_data):
+    """Create a new fractal (root goal) owned by current user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Create root goal (type already validated by schema)
+        # Create root goal
         new_fractal = Goal(
             type=validated_data.get('type', 'UltimateGoal'),
-            name=validated_data['name'],  # Already sanitized
+            name=validated_data['name'],
             description=validated_data.get('description', ''),
             relevance_statement=validated_data.get('relevance_statement'),
-            parent_id=None  # Root goal has no parent
+            parent_id=None,
+            owner_id=current_user.id
         )
         
         db_session.add(new_fractal)
@@ -422,14 +432,15 @@ def create_fractal(validated_data):
 
 
 @goals_bp.route('/fractals/<root_id>', methods=['DELETE'])
-def delete_fractal(root_id):
-    """Delete an entire fractal and all its data."""
+@token_required
+def delete_fractal(current_user, root_id):
+    """Delete an entire fractal if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        root = db_session.query(Goal).filter_by(id=root_id, parent_id=None, owner_id=current_user.id).first()
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Also delete all sessions for this fractal
         sessions = db_session.query(Session).filter_by(root_id=root_id).all()
@@ -450,13 +461,9 @@ def delete_fractal(root_id):
 
 
 @goals_bp.route('/<root_id>/goals', methods=['GET'])
-def get_fractal_goals(root_id):
-    """
-    Get the complete goal tree for a specific fractal.
-    
-    Optimized to use selectinload for the entire hierarchy (7 levels)
-    and eagerly load associations needed for SMART status calculation.
-    """
+@token_required
+def get_fractal_goals(current_user, root_id):
+    """Get the complete goal tree for a specific fractal if owned by user."""
     from sqlalchemy.orm import selectinload
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -471,6 +478,7 @@ def get_fractal_goals(root_id):
         root = db_session.query(Goal).options(*options).filter(
             Goal.id == root_id, 
             Goal.parent_id == None,
+            Goal.owner_id == current_user.id,
             Goal.deleted_at == None
         ).first()
 
@@ -492,7 +500,8 @@ def get_fractal_goals(root_id):
 
 
 @goals_bp.route('/<root_id>/goals/selection', methods=['GET'])
-def get_active_goals_for_selection(root_id):
+@token_required
+def get_active_goals_for_selection(current_user, root_id):
     """
     Get active ShortTermGoals and their active ImmediateGoals for session creation.
     Excludes completed goals.
@@ -500,9 +509,10 @@ def get_active_goals_for_selection(root_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        # Verify ownership
+        root = db_session.query(Goal).filter_by(id=root_id, parent_id=None, owner_id=current_user.id).first()
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Query ShortTermGoals directly using root_id index
         # Filter for active (not completed) goals only
@@ -548,15 +558,17 @@ def get_active_goals_for_selection(root_id):
 
 
 @goals_bp.route('/<root_id>/goals', methods=['POST'])
+@token_required
 @validate_request(GoalCreateSchema)
-def create_fractal_goal(root_id, validated_data):
+def create_fractal_goal(current_user, root_id, validated_data):
     """Create a new goal within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        # Verify ownership
+        root = db_session.query(Goal).filter_by(id=root_id, parent_id=None, owner_id=current_user.id).first()
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Parse deadline if provided (already validated by schema)
         deadline = None

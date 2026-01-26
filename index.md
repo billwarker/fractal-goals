@@ -12,25 +12,29 @@
 **Fractal Goals** is a hierarchical goal tracking and practice session management system. It uses a fractal pattern where each goal can have children, creating a tree structure from ultimate life goals down to nano-level tasks. The system includes practice session tracking with customizable activities, metrics, timers, and reusable templates.
 
 **Tech Stack:**
-- **Backend:** Flask + SQLAlchemy + Pydantic validation (port 8001)
+- **Backend:** Flask + SQLAlchemy + JWT Auth + Pydantic validation (port 8001)
 - **Frontend:** React 19.2.0 + Vite + React Router + ReactFlow (port 5173)
 - **Database:** SQLite (development) / PostgreSQL (production) with Alembic migrations
+- **Authentication:** JWT-based user accounts with `scrypt` password hashing and ownership-based data isolation
 - **Migrations:** Alembic for database schema versioning
 
 ## Recent Updates
+- Implemented JWT-based Authentication system with Login/Signup modals
+- Enforced data isolation by linking fractal roots to users via `owner_id`
+- Secured **ALL** API blueprints using `@token_required` decorator
+- Created `AuthContext` for global frontend user/session management
 - Refactored Program logic into `ProgramService`
-- Implemented Program Day and Block completion logic
-- Added granular program events: `PROGRAM_DAY_COMPLETED`, `PROGRAM_BLOCK_COMPLETED`, `PROGRAM_COMPLETED`
-- Enforced SINGLE active program constraint
-- Implemented smart navigation redirect to active program
-- Fixed `ActivityBuilder` goal loading issue using `useFractalTreeQuery`
-- Fixed `activities_api` 500 error when updating activities
-- Added event emission for Activity Goal Association changes (`ACTIVITY_UPDATED` event)
-- Fixed `AttributeError` in `ActivityInstance.to_dict` causing sessions not to load in Production
 
 ---
 
 ## Core Features
+
+### 0. Authentication & User Accounts
+- **JWT-Based Auth**: Secure signup and login using JSON Web Tokens.
+- **Data Isolation**: All data is scoped to the user. Users can only see and modify fractal roots (and descendant data) that they own.
+- **Auth Guard**: Frontend components and backend API endpoints are protected; unauthenticated users are redirected to the Login/Signup modal.
+- **Session Persistence**: User sessions persist across page refreshes via `localStorage` and automatic token renewal logic.
+- **Ownership Verification**: Backend verification ensures that even if a user knows an ID, they cannot access data they don't own.
 
 ### 1. Hierarchical Goal Management
 - 7-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal

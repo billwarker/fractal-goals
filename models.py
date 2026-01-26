@@ -11,6 +11,7 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref
 from datetime import datetime, timezone
 import uuid
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
 def utc_now():
     return datetime.now(timezone.utc)
@@ -33,6 +34,38 @@ def _safe_load_json(data, default=None):
         return default
 
 Base = declarative_base()
+
+class User(Base):
+    """
+    Represents a user in the system.
+    """
+    __tablename__ = 'users'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String(80), unique=True, nullable=False, index=True)
+    email = Column(String(120), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    
+    # Relationships
+    goals = relationship("Goal", back_populates="owner", cascade="all, delete-orphan")
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "is_active": self.is_active,
+            "created_at": format_utc(self.created_at)
+        }
 
 # Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
 session_goals = Table(
@@ -95,6 +128,10 @@ class Goal(Base):
     
     # Root goal reference (for performance queries)
     root_id = Column(String, nullable=True, index=True)
+    
+    # User ownership
+    owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
+    owner = relationship("User", back_populates="goals")
     
     # SMART goal fields
     relevance_statement = Column(Text, nullable=True)  # "How does this goal help achieve [parent]?"
@@ -200,6 +237,7 @@ class Goal(Base):
                 "type": self.type,
                 "parent_id": self.parent_id,
                 "root_id": self.root_id,
+                "owner_id": self.owner_id,
                 "description": self.description,
                 "deadline": self.deadline.isoformat() if self.deadline else None,
                 "completed": self.completed,
@@ -1148,14 +1186,15 @@ def get_root_id_for_goal(db_session, goal_id):
         count += 1
     return curr.id
 
-def validate_root_goal(db_session, root_id):
+def validate_root_goal(db_session, root_id, owner_id=None):
     """
     Validate that a root_id exists and is actually a root goal (has no parent).
+    If owner_id is provided, also validates ownership.
     """
-    goal = get_goal_by_id(db_session, root_id)
-    if goal and goal.parent_id is None:
-        return goal
-    return None
+    query = db_session.query(Goal).filter(Goal.id == root_id, Goal.parent_id == None, Goal.deleted_at == None)
+    if owner_id:
+        query = query.filter(Goal.owner_id == owner_id)
+    return query.first()
 
 
 # =============================================================================

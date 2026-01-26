@@ -23,6 +23,7 @@ from validators import (
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
+from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 
 # Create blueprint
@@ -44,18 +45,23 @@ sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
 # ============================================================================
 
 @sessions_bp.route('/practice-sessions', methods=['GET'])
-def get_all_sessions_endpoint():
-    """Get all sessions for grid view (Global)."""
+@token_required
+def get_all_sessions_endpoint(current_user):
+    """Get all sessions for grid view (Global), filtered by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Use selectinload (not joinedload) to avoid Cartesian product with multiple collections
-        sessions = db_session.query(Session).options(
+        # Join with Goal to check ownership of the root_id
+        sessions = db_session.query(Session).join(Goal, Goal.id == Session.root_id).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances)
-        ).filter(Session.deleted_at == None).order_by(Session.created_at.desc()).all()
-        # Don't include image data in list view for performance (prevents multi-MB responses)
+        ).filter(
+            Session.deleted_at == None,
+            Goal.parent_id == None,
+            Goal.owner_id == current_user.id
+        ).order_by(Session.created_at.desc()).all()
+        # Don't include image data in list view
         result = [s.to_dict(include_image_data=False) for s in sessions]
         return jsonify(result)
     finally:
@@ -63,24 +69,15 @@ def get_all_sessions_endpoint():
 
 
 @sessions_bp.route('/<root_id>/sessions', methods=['GET'])
-def get_fractal_sessions(root_id):
-    """
-    Get sessions for a specific fractal with pagination support.
-    
-    Query parameters:
-    - limit: Number of sessions to return (default: 10, max: 50)
-    - offset: Number of sessions to skip (default: 0)
-    
-    Returns:
-    - sessions: Array of session objects
-    - pagination: {limit, offset, total, has_more}
-    """
+@token_required
+def get_fractal_sessions(current_user, root_id):
+    """Get sessions for a specific fractal if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Parse pagination parameters
         limit = min(int(request.args.get('limit', 10)), 50)  # Max 50 per request
@@ -118,15 +115,15 @@ def get_fractal_sessions(root_id):
 
 
 @sessions_bp.route('/<root_id>/sessions', methods=['POST'])
-def create_fractal_session(root_id):
+@token_required
+def create_fractal_session(current_user, root_id):
     """Create a new session within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get request data
         data = request.get_json()
@@ -261,15 +258,15 @@ def create_fractal_session(root_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['PUT'])
-def update_session(root_id, session_id):
+@token_required
+def update_session(current_user, root_id, session_id):
     """Update a session's details."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the session
         session = db_session.query(Session).filter(
@@ -374,17 +371,23 @@ def update_session(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['GET'])
-def get_session_endpoint(root_id, session_id):
-    """Get a session by ID."""
+@token_required
+def get_session_endpoint(current_user, root_id, session_id):
+    """Get a session by ID if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Check ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         # Use selectinload for collections to avoid Cartesian product
         session = db_session.query(Session).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances)
-        ).filter(Session.id == session_id, Session.deleted_at == None).first()
+        ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
         
         if not session:
             return jsonify({"error": "Session not found"}), 404
@@ -395,15 +398,15 @@ def get_session_endpoint(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['DELETE'])
-def delete_session_endpoint(root_id, session_id):
+@token_required
+def delete_session_endpoint(current_user, root_id, session_id):
     """Delete a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the session
         session = db_session.query(Session).filter(
@@ -442,15 +445,16 @@ def delete_session_endpoint(root_id, session_id):
 # ============================================================================
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['GET'])
-def get_session_activities(root_id, session_id):
+@token_required
+def get_session_activities(current_user, root_id, session_id):
     """Get all activity instances for a session in display order."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Validate session exists
         session = db_session.query(Session).filter(
@@ -483,15 +487,16 @@ def get_session_activities(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['POST'])
-def add_activity_to_session(root_id, session_id):
+@token_required
+def add_activity_to_session(current_user, root_id, session_id):
     """Add a new activity instance to a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Validate session exists
         session = db_session.query(Session).filter(
@@ -545,11 +550,16 @@ def add_activity_to_session(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/reorder', methods=['POST'])
-def reorder_activities(root_id, session_id):
+@token_required
+def reorder_activities(current_user, root_id, session_id):
     """Reorder activities in a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         data = request.get_json()
         activity_ids = data.get('activity_ids', [])
         
@@ -574,11 +584,16 @@ def reorder_activities(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['PUT'])
-def update_activity_instance_in_session(root_id, session_id, instance_id):
+@token_required
+def update_activity_instance_in_session(current_user, root_id, session_id, instance_id):
     """Update activity instance in session context."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         data = request.get_json()
         instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
         if not instance:
@@ -614,15 +629,16 @@ def update_activity_instance_in_session(root_id, session_id, instance_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['DELETE'])
-def remove_activity_from_session(root_id, session_id, instance_id):
+@token_required
+def remove_activity_from_session(current_user, root_id, session_id, instance_id):
     """Remove an activity instance from a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(
@@ -660,15 +676,16 @@ def remove_activity_from_session(root_id, session_id, instance_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics', methods=['PUT'])
-def update_activity_metrics(root_id, session_id, instance_id):
+@token_required
+def update_activity_metrics(current_user, root_id, session_id, instance_id):
     """Update metric values for an activity instance."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        # Validate root goal exists and is owned by user
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
         instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(
@@ -751,11 +768,16 @@ def update_activity_metrics(root_id, session_id, instance_id):
 # ============================================================================
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/goals', methods=['GET'])
-def get_session_goals(root_id, session_id):
+@token_required
+def get_session_goals(current_user, root_id, session_id):
     """Get all goals associated with a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         session = get_session_by_id(db_session, session_id)
         if not session:
             return jsonify({"error": "Session not found"}), 404
@@ -785,11 +807,16 @@ def get_session_goals(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/goals', methods=['POST'])
-def add_goal_to_session(root_id, session_id):
+@token_required
+def add_goal_to_session(current_user, root_id, session_id):
     """Associate a goal with a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         session = get_session_by_id(db_session, session_id)
         if not session:
             return jsonify({"error": "Session not found"}), 404
@@ -826,11 +853,16 @@ def add_goal_to_session(root_id, session_id):
 
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/goals/<goal_id>', methods=['DELETE'])
-def remove_goal_from_session(root_id, session_id, goal_id):
+@token_required
+def remove_goal_from_session(current_user, root_id, session_id, goal_id):
     """Remove a goal association from a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         db_session.execute(
             session_goals.delete().where(
                 session_goals.c.session_id == session_id,
