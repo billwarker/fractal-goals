@@ -995,150 +995,171 @@ const ProgramDetail = () => {
                                 return (
                                     <div key={block.id} style={{
                                         background: '#1e1e1e',
-                                        borderRadius: '8px',
-                                        padding: '20px',
-                                        borderLeft: `4px solid ${block.color || '#3A86FF'}`
+                                        borderRadius: '12px',
+                                        padding: '24px',
+                                        borderLeft: `4px solid ${block.color || '#3A86FF'}`,
+                                        display: 'flex',
+                                        gap: '40px',
+                                        marginBottom: '16px'
                                     }}>
-                                        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                                    <h3 style={{ margin: 0, color: 'white', fontSize: '16px' }}>{block.name}</h3>
+                                        {/* Main content: Info + Days */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            {/* Block Info Section */}
+                                            <div style={{ marginBottom: '24px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                    <h3 style={{ margin: 0, color: 'white', fontSize: '18px', fontWeight: 600 }}>{block.name}</h3>
                                                     {isBlockActive(block) && <ActiveBlockBadge />}
                                                 </div>
-                                                <div style={{ color: '#666', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <div style={{ color: '#666', fontSize: '12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginBottom: '16px' }}>
                                                     {formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days
                                                     {isBlockActive(block) && (
-                                                        <>
-                                                            <span>•</span>
-                                                            <span style={{ color: block.color || '#3A86FF', fontWeight: 600 }}>
-                                                                {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Remaining
-                                                            </span>
-                                                        </>
+                                                        <span style={{ color: block.color || '#3A86FF', fontWeight: 600, marginLeft: '4px' }}>
+                                                            • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Left
+                                                        </span>
                                                     )}
                                                 </div>
-                                                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                                     {blockAttachedGoals.map(g => {
                                                         const goalColor = getGoalColor(g.type);
                                                         const isCompleted = g.completed || g.attributes?.completed;
                                                         return (
                                                             <div key={g.id} style={{
-                                                                background: isCompleted ? '#1a2e1a' : '#2a2a2a',
-                                                                border: `1.5px solid ${isCompleted ? '#4caf50' : goalColor}`,
+                                                                background: 'transparent',
+                                                                border: `1px solid ${isCompleted ? '#4caf50' : goalColor}`,
                                                                 color: isCompleted ? '#4caf50' : goalColor,
-                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                                                                padding: '4px 10px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '11px',
+                                                                fontWeight: 500,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px',
                                                                 textDecoration: isCompleted ? 'line-through' : 'none',
-                                                                opacity: isCompleted ? 0.85 : 1
+                                                                opacity: isCompleted ? 0.7 : 1,
+                                                                whiteSpace: 'nowrap'
                                                             }}>
                                                                 {isCompleted && <span>✓</span>}
                                                                 <span>{g.name}</span>
-                                                                {g.deadline && <span style={{ opacity: 0.7, fontSize: 10 }}>{formatDate(g.deadline, 'MMM D')}</span>}
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button
-                                                    onClick={() => handleAttachGoalClick(block.id)}
-                                                    style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
-                                                >
-                                                    Attach Goal
-                                                </button>
-                                                <button
-                                                    onClick={() => handleEditBlockClick(block)}
-                                                    style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
-                                                >
-                                                    Edit Block
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteBlock(block.id)}
-                                                    style={{ background: '#d32f2f', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                                                >
-                                                    Delete Block
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAddDayClick(block.id)}
-                                                    style={{ background: '#3A86FF', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
-                                                >
-                                                    + Add Day
-                                                </button>
+
+                                            {/* Days Grid Section */}
+                                            <div style={{
+                                                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px'
+                                            }}>
+                                                {(() => {
+                                                    const seenKeys = new Set();
+                                                    const sortedDays = [...(block.days || [])].sort((a, b) => {
+                                                        if (!a.date && b.date) return -1;
+                                                        if (a.date && !b.date) return 1;
+                                                        return 0;
+                                                    });
+
+                                                    const uniqueDays = sortedDays.filter(day => {
+                                                        const templateIds = (day.templates || []).map(t => t.id).sort().join(',');
+                                                        const key = `${day.name}-${templateIds}`;
+                                                        if (seenKeys.has(key)) return false;
+                                                        seenKeys.add(key);
+                                                        return true;
+                                                    });
+
+                                                    if (uniqueDays.length === 0) {
+                                                        return <div style={{ color: '#444', fontSize: '13px', fontStyle: 'italic', gridColumn: '1 / -1' }}>No days added yet. Click "+ Add Day" to start your plan.</div>;
+                                                    }
+
+                                                    return uniqueDays.map(day => (
+                                                        <div key={day.id}
+                                                            onClick={() => handleEditDay(block.id, day)}
+                                                            style={{
+                                                                background: '#242424',
+                                                                padding: '16px',
+                                                                borderRadius: '8px',
+                                                                minHeight: '100px',
+                                                                cursor: 'pointer',
+                                                                border: '1px solid #333',
+                                                                transition: 'all 0.2s',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: '12px'
+                                                            }}
+                                                            onMouseOver={e => {
+                                                                e.currentTarget.style.borderColor = '#444';
+                                                                e.currentTarget.style.background = '#2a2a2a';
+                                                            }}
+                                                            onMouseOut={e => {
+                                                                e.currentTarget.style.borderColor = '#333';
+                                                                e.currentTarget.style.background = '#242424';
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                                <div>
+                                                                    <div style={{ color: '#eee', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                                                                        {day.name}
+                                                                    </div>
+                                                                    {(() => {
+                                                                        const mapping = day.day_of_week;
+                                                                        if (Array.isArray(mapping) && mapping.length > 0) {
+                                                                            const dayMap = {
+                                                                                'Monday': 'Mon', 'Tuesday': 'Tues', 'Wednesday': 'Wed', 'Thursday': 'Thurs',
+                                                                                'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
+                                                                            };
+                                                                            const dayStr = mapping.length === 7 ? 'Daily' : mapping.map(d => dayMap[d] || d.substring(0, 3)).join(' | ');
+                                                                            return <div style={{ color: '#777', fontSize: '10px', fontWeight: 500 }}>{dayStr}</div>;
+                                                                        } else if (day.date) {
+                                                                            return <div style={{ color: '#777', fontSize: '10px', fontWeight: 500 }}>{moment(day.date).format('dddd')}</div>;
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                </div>
+                                                                {(() => {
+                                                                    const blockStart = moment(block.start_date).startOf('day');
+                                                                    const blockEnd = moment(block.end_date).endOf('day');
+                                                                    const completedCount = sessions.filter(s => {
+                                                                        if (s.program_day_id !== day.id || !s.completed) return false;
+                                                                        const sessDate = moment(s.session_start || s.created_at);
+                                                                        return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
+                                                                    }).length;
+                                                                    if (completedCount > 0) {
+                                                                        return (
+                                                                            <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                                ✓ {completedCount}
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
+                                                            </div>
+
+                                                            {/* Day Templates (Sessions) */}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                {day.templates?.length > 0 ? day.templates.map(template => (
+                                                                    <div key={template.id} style={{
+                                                                        fontSize: '11px',
+                                                                        color: '#bbb',
+                                                                        background: '#333',
+                                                                        padding: '4px 8px',
+                                                                        borderRadius: '4px',
+                                                                        borderLeft: '2px solid #555'
+                                                                    }}>
+                                                                        {template.name}
+                                                                    </div>
+                                                                )) : (<div style={{ fontSize: '10px', color: '#444', fontStyle: 'italic' }}>Rest</div>)}
+                                                            </div>
+                                                        </div>
+                                                    ));
+                                                })()}
                                             </div>
                                         </div>
 
-                                        <div style={{
-                                            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px'
-                                        }}>
-                                            {block.days?.filter(d => !d.date).map(day => (
-                                                <div key={day.id}
-                                                    onClick={() => handleEditDay(block.id, day)}
-                                                    style={{
-                                                        background: '#2a2a2a',
-                                                        padding: '10px',
-                                                        borderRadius: '6px',
-                                                        minHeight: '80px',
-                                                        cursor: 'pointer',
-                                                        border: '1px solid transparent',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={e => {
-                                                        e.currentTarget.style.borderColor = '#444';
-                                                        e.currentTarget.style.background = '#303030';
-                                                    }}
-                                                    onMouseOut={e => {
-                                                        e.currentTarget.style.borderColor = 'transparent';
-                                                        e.currentTarget.style.background = '#2a2a2a';
-                                                    }}
-                                                >
-                                                    <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                        <div style={{ color: '#888', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                            {day.name}
-                                                        </div>
-                                                        {(() => {
-                                                            const blockStart = moment(block.start_date).startOf('day');
-                                                            const blockEnd = moment(block.end_date).endOf('day');
-                                                            const completedCount = sessions.filter(s => {
-                                                                if (s.program_day_id !== day.id || !s.completed) return false;
-                                                                const sessDate = moment(s.session_start || s.created_at);
-                                                                return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
-                                                            }).length;
-                                                            if (completedCount > 0) {
-                                                                return (
-                                                                    <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                        ✓ {completedCount}
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return <div style={{ color: '#555', fontSize: '10px' }}>none</div>;
-                                                        })()}
-                                                    </div>
-                                                    {day.date && (
-                                                        <div style={{ color: '#666', fontSize: '10px', marginTop: '-4px', marginBottom: '6px' }}>
-                                                            {moment(day.date).format('dddd')}
-                                                        </div>
-                                                    )}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                            {day.templates?.length > 0 ? day.templates.map(template => (
-                                                                <div key={template.id} style={{
-                                                                    fontSize: '11px',
-                                                                    color: day.is_completed ? '#81c784' : '#ddd',
-                                                                    background: day.is_completed ? '#1b5e20' : '#383838',
-                                                                    padding: '4px 6px',
-                                                                    borderRadius: '4px',
-                                                                    border: day.is_completed ? '1px solid #2e7d32' : '1px solid transparent'
-                                                                }}>
-                                                                    {template.name}
-                                                                </div>
-                                                            )) : (<div style={{ fontSize: '11px', color: '#555', fontStyle: 'italic' }}>Rest</div>)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {(!block.days || block.days.length === 0) && (
-                                                <div style={{ gridColumn: '1 / -1', color: '#555', fontSize: '13px', fontStyle: 'italic', padding: '10px 0' }}>
-                                                    No days configured.
-                                                </div>
-                                            )}
+                                        {/* Actions Section */}
+                                        <div style={{ flex: '0 0 120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <button onClick={() => handleAttachGoalClick(block.id)} style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', width: '100%' }}>Attach Goal</button>
+                                            <button onClick={() => handleEditBlockClick(block)} style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', width: '100%' }}>Edit Block</button>
+                                            <button onClick={() => handleDeleteBlock(block.id)} style={{ background: '#d32f2f', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>Delete Block</button>
+                                            <button onClick={() => handleAddDayClick(block.id)} style={{ background: '#3A86FF', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500, width: '100%' }}>+ Add Day</button>
                                         </div>
                                     </div>
                                 );

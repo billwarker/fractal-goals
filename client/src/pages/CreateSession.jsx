@@ -79,11 +79,29 @@ function CreateSession() {
 
             setTemplates(templatesRes.data);
             const allProgramDays = programDaysRes.data || [];
-            setProgramDays(allProgramDays);
+
+            // Deduplicate program days to avoid showing multiple instances of the same training day
+            const seenKeys = new Set();
+            const uniqueProgramDays = allProgramDays
+                .sort((a, b) => {
+                    // Prioritize template days (no specific date)
+                    if (!a.date && b.date) return -1;
+                    if (a.date && !b.date) return 1;
+                    return 0;
+                })
+                .filter(day => {
+                    const templateIds = (day.sessions || []).map(s => s.template_id).sort().join(',');
+                    const key = `${day.program_id}-${day.block_id}-${day.day_name}-${templateIds}`;
+                    if (seenKeys.has(key)) return false;
+                    seenKeys.add(key);
+                    return true;
+                });
+
+            setProgramDays(uniqueProgramDays);
 
             // Group program days by program name
             const grouped = {};
-            allProgramDays.forEach(day => {
+            uniqueProgramDays.forEach(day => {
                 const programName = day.program_name;
                 if (!grouped[programName]) {
                     grouped[programName] = {
