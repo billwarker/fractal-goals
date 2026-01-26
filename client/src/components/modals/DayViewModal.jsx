@@ -43,16 +43,14 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
     if (!isOpen || !date || !program) return null;
 
-    // Unified Scheduled Items (Legacy Days + Planned Sessions)
-    const scheduledItems = [];
-
-    // 1. Legacy Days (Instance Copies)
+    // 1. Program Days (Legacy Days / Instance Copies)
+    const scheduledProgramDays = [];
     if (program.blocks) {
         program.blocks.forEach(block => {
             if (block.days) {
                 block.days.forEach(day => {
                     if (day.date === date) {
-                        scheduledItems.push({
+                        scheduledProgramDays.push({
                             ...day,
                             blockName: block.name,
                             blockId: block.id,
@@ -65,15 +63,13 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         });
     }
 
-    // 2. Sessions (Planned & Completed handling)
+    const scheduledSessions = [];
     const completedSessions = [];
 
     // Helper to get local date string from a datetime
     const getLocalDateString = (dateTimeStr) => {
         if (!dateTimeStr) return null;
-        // If it's already just a date (YYYY-MM-DD), return it
         if (dateTimeStr.length === 10) return dateTimeStr;
-        // Otherwise parse and convert to local date
         const d = new Date(dateTimeStr);
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -84,25 +80,14 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     if (sessions) {
         sessions.forEach(session => {
             const start = session.session_start || session.start_time;
-            // Convert to local date string for comparison
             const sessionLocalDate = getLocalDateString(start);
 
             if (sessionLocalDate === date) {
-                // Check Completion - use explicit completed flag, not just session_end
                 const isCompleted = session.completed || session.attributes?.completed;
                 if (isCompleted) {
                     completedSessions.push(session);
                 } else {
-                    // It's a Planned Session (Scheduled Day)
-                    scheduledItems.push({
-                        id: session.id,
-                        name: session.name,
-                        blockName: session.program_info?.block_name || 'Scheduled',
-                        blockColor: session.program_info?.block_color || '#3A86FF',
-                        notes: session.attributes?.notes || '',
-                        type: 'session',
-                        program_info: session.program_info
-                    });
+                    scheduledSessions.push(session);
                 }
             }
         });
@@ -171,7 +156,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             {formatDate(date)}
                         </h2>
                         <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
-                            {scheduledItems.length} program days scheduled • {goalsDueOnDate.length} goals due
+                            {scheduledSessions.length + scheduledProgramDays.length} scheduled • {completedSessions.length} completed • {goalsDueOnDate.length} goals due
                         </div>
                         {blocksContainingDate.length > 0 && (
                             <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
@@ -201,10 +186,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                 {/* Content */}
                 <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
 
-                    {/* Scheduled Program Days */}
-                    {scheduledItems.length > 0 ? (
+                    {/* Program Days */}
+                    {scheduledProgramDays.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                            {scheduledItems.map((day, idx) => (
+                            {scheduledProgramDays.map((day, idx) => (
                                 <div key={idx} style={{
                                     background: '#252525',
                                     borderRadius: '8px',
@@ -218,18 +203,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                             </div>
                                             <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{day.name}</div>
                                         </div>
-                                        {/* Unschedule Button */}
                                         <button
                                             onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
-                                            style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                color: '#666',
-                                                cursor: 'pointer',
-                                                fontSize: '16px',
-                                                padding: '4px',
-                                                lineHeight: 1
-                                            }}
+                                            style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: '16px', padding: '4px', lineHeight: 1 }}
                                             title="Unschedule Day"
                                         >
                                             ✕
@@ -243,7 +219,55 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                 </div>
                             ))}
                         </div>
-                    ) : (
+                    )}
+
+                    {/* Scheduled Sessions Section */}
+                    {scheduledSessions.length > 0 && (
+                        <div style={{ marginBottom: '24px' }}>
+                            <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                                Scheduled Sessions
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {scheduledSessions.map(session => (
+                                    <div key={session.id} style={{
+                                        background: '#252525',
+                                        borderRadius: '8px',
+                                        padding: '12px 16px',
+                                        border: '1px solid #333',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div>
+                                            <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
+                                                {session.name || 'Untitled Session'}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => onUnscheduleDay && onUnscheduleDay({ ...session, type: 'session' })}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#666',
+                                                cursor: 'pointer',
+                                                fontSize: '18px',
+                                                fontWeight: 300,
+                                                padding: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                            title="Cancel Session"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {scheduledProgramDays.length === 0 && scheduledSessions.length === 0 && (
                         <div style={{
                             textAlign: 'center',
                             padding: '30px 20px',
@@ -254,7 +278,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             border: '1px dashed #333'
                         }}>
                             <div style={{ fontSize: '24px', marginBottom: '10px' }}>📅</div>
-                            <div style={{ fontSize: '14px', marginBottom: '4px' }}>No program days scheduled for this date</div>
+                            <div style={{ fontSize: '14px', marginBottom: '4px' }}>No program days or sessions scheduled for this date</div>
                             <div style={{ fontSize: '12px', color: '#555' }}>Add a day to a block to schedule activities</div>
                         </div>
                     )}
@@ -393,7 +417,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         </div>
 
                         {/* Add Block Day Section (Disabled if day already scheduled) */}
-                        {scheduledItems.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
+                        {scheduledProgramDays.length === 0 && scheduledSessions.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
                             <div style={{ marginTop: '0' }}>
                                 <button
                                     onClick={() => setShowAddDaySection(!showAddDaySection)}

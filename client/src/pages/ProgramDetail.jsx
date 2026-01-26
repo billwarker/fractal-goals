@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { GOAL_COLORS, getGoalColor, getGoalTextColor } from '../utils/goalColors';
-import { getLocalISOString } from '../utils/dateUtils';
+import { getLocalISOString, localToISO } from '../utils/dateUtils';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -382,7 +382,7 @@ const ProgramDetail = () => {
 
             await fractalApi.createSession(rootId, {
                 name: templateDay ? templateDay.name : 'Ad-hoc Session',
-                session_start: getLocalISOString(), // Full datetime of when session is created
+                session_start: date ? localToISO(`${date} 12:00:00`, Intl.DateTimeFormat().resolvedOptions().timeZone) : getLocalISOString(),
                 parent_ids: Array.from(parentIds),
                 session_data: {
                     program_context: {
@@ -549,7 +549,7 @@ const ProgramDetail = () => {
 
     // Helper Map for Template Lookups
     const programDaysMap = new Map();
-    program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockColor: b.color })));
+    program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockId: b.id, blockColor: b.color })));
 
     // Helper to get local date string from a datetime
     const getLocalDateString = (dateTimeStr) => {
@@ -711,31 +711,55 @@ const ProgramDetail = () => {
 
     // Calculate active block and its metrics
     const activeBlock = program?.blocks?.find(block => isBlockActive(block));
-    const blockMetrics = activeBlock ? {
-        name: activeBlock.name,
-        color: activeBlock.color || '#3A86FF',
-        completedSessions: sessions.filter(s => {
-            if (!s.completed) return false;
-            const sessDate = moment(s.session_start || s.created_at);
-            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
-                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
-        }).length,
-        scheduledSessions: sessions.filter(s => {
-            const sessDate = moment(s.session_start || s.created_at);
-            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
-                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
-        }).length,
-        goalsMet: (activeBlock.goal_ids || []).filter(id => {
-            const goal = getGoalDetails(id);
-            return goal && (goal.completed || goal.attributes?.completed);
-        }).length,
-        totalGoals: (activeBlock.goal_ids || []).length,
-        totalDuration: sessions.filter(s => {
-            const sessDate = moment(s.session_start || s.created_at);
-            return sessDate.isSameOrAfter(moment(activeBlock.start_date).startOf('day')) &&
-                sessDate.isSameOrBefore(moment(activeBlock.end_date).endOf('day'));
-        }).reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0)
-    } : null;
+    const blockMetrics = activeBlock ? (() => {
+        const blockStart = moment(activeBlock.start_date).startOf('day');
+        const blockEnd = moment(activeBlock.end_date).endOf('day');
+
+        // Filter sessions that logically belong to this block
+        const blockSessions = sessions.filter(s => {
+            let pDayId = s.program_day_id;
+            if (!pDayId && s.attributes) {
+                try {
+                    const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
+                    pDayId = attr?.program_context?.day_id;
+                } catch (e) { }
+            }
+
+            // Strictly only count sessions linked to a day within this block
+            if (pDayId) {
+                return programDaysMap.get(pDayId)?.blockId === activeBlock.id;
+            }
+
+            return false;
+        });
+
+        // Determine which goals to track for this block's metrics
+        let blockGoalIdsValue = activeBlock.goal_ids || [];
+
+        // If no goals specifically attached to the block, fall back to program goals due in this block
+        if (blockGoalIdsValue.length === 0) {
+            const programGoalIds = program.goal_ids || [];
+            blockGoalIdsValue = programGoalIds.filter(id => {
+                const goal = getGoalDetails(id);
+                if (!goal || !goal.deadline) return false;
+                const deadline = moment(goal.deadline);
+                return deadline.isSameOrAfter(blockStart) && deadline.isSameOrBefore(blockEnd);
+            });
+        }
+
+        return {
+            name: activeBlock.name,
+            color: activeBlock.color || '#3A86FF',
+            completedSessions: blockSessions.filter(s => s.completed).length,
+            scheduledSessions: blockSessions.length,
+            goalsMet: blockGoalIdsValue.filter(id => {
+                const goal = getGoalDetails(id);
+                return goal && (goal.completed || goal.attributes?.completed);
+            }).length,
+            totalGoals: blockGoalIdsValue.length,
+            totalDuration: blockSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0)
+        };
+    })() : null;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', paddingTop: '60px' }}>
