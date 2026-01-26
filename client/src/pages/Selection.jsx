@@ -119,10 +119,39 @@ function Selection() {
                 marginTop: '40px',
                 position: 'relative'
             }}>
+                {/* The Goal Node Circle */}
+                <div style={{
+                    width: '280px',
+                    height: '280px',
+                    borderRadius: '50%',
+                    backgroundColor: headerColor,
+                    border: '5px solid white',
+                    boxShadow: '0 0 50px rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 0,
+                    transition: 'background-color 0.5s ease'
+                }}>
+                    <h1 style={{
+                        color: headerTextColor,
+                        fontWeight: 800,
+                        fontSize: '28px',
+                        margin: 0,
+                        textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
+                        letterSpacing: '2px',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        zIndex: 1
+                    }}>
+                        FRACTAL GOALS
+                    </h1>
+                </div>
+
                 {/* Profile Controls (Logged In Only) */}
                 {isAuthenticated && (
                     <div style={{
-                        marginBottom: '30px',
+                        marginTop: '30px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -167,35 +196,6 @@ function Selection() {
                     </div>
                 )}
 
-                {/* The Goal Node Circle */}
-                <div style={{
-                    width: '280px',
-                    height: '280px',
-                    borderRadius: '50%',
-                    backgroundColor: headerColor,
-                    border: '5px solid white',
-                    boxShadow: '0 0 50px rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 0,
-                    transition: 'background-color 0.5s ease'
-                }}>
-                    <h1 style={{
-                        color: headerTextColor,
-                        fontWeight: 800,
-                        fontSize: '28px',
-                        margin: 0,
-                        textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
-                        letterSpacing: '2px',
-                        textTransform: 'uppercase',
-                        textAlign: 'center',
-                        zIndex: 1
-                    }}>
-                        FRACTAL GOALS
-                    </h1>
-                </div>
-
                 {/* Login Link (Logged Out Only) */}
                 {!isAuthenticated && (
                     <div
@@ -214,7 +214,7 @@ function Selection() {
                         onMouseOver={(e) => e.target.style.color = 'white'}
                         onMouseOut={(e) => e.target.style.color = '#888'}
                     >
-                        LOGIN / SIGNUP
+                        LOG IN
                     </div>
                 )}
             </div>
