@@ -1022,35 +1022,39 @@ const ProgramDetail = () => {
             {/* Main Content */}
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                 {/* Left Panel */}
-                <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', overflowY: 'auto', padding: '24px' }}>
-                    <div style={{ marginBottom: '32px' }}>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Description</h3>
-                        <p style={{ color: '#ddd', lineHeight: '1.5', fontSize: '14px' }}>
-                            {program.description || 'No description provided.'}
-                        </p>
-                    </div>
+                <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', display: 'flex', flexDirection: 'column' }}>
+                    {/* Fixed Top Section */}
+                    <div style={{ padding: '24px', borderBottom: '1px solid #333' }}>
+                        <div style={{ marginBottom: '24px' }}>
+                            <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Description</h3>
+                            <p style={{ color: '#ddd', lineHeight: '1.5', fontSize: '14px', margin: 0 }}>
+                                {program.description || 'No description provided.'}
+                            </p>
+                        </div>
 
-                    {/* Metrics Section */}
-                    {activeBlock && (
-                        <div style={{ marginBottom: '32px' }}>
-                            <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>{blockMetrics.name}</span>
-                                    <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
-                                        • {blockMetrics.daysRemaining} Days Remaining
-                                    </span>
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                        {/* Metrics Section */}
+                        {activeBlock && (
+                            <div>
+                                <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>{blockMetrics.name}</span>
+                                        <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
+                                            • {blockMetrics.daysRemaining} Days Remaining
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
+                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
+                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
-                    <div style={{ marginBottom: '32px' }}>
+                    {/* Scrollable Bottom Section */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
                         <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {programGoalSeeds.length === 0 ? (
@@ -1058,7 +1062,6 @@ const ProgramDetail = () => {
                             ) : programGoalSeeds.map(goal => renderGoalItem(goal))}
                         </div>
                     </div>
-
                 </div>
 
                 {/* Right Panel */}
