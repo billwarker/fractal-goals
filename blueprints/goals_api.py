@@ -10,7 +10,6 @@ from models import (
     get_session,
     Goal, Session,
     get_all_root_goals, get_goal_by_id, get_session_by_id,
-    build_goal_tree,
     validate_root_goal
 )
 from validators import (
@@ -21,6 +20,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
+from services.serializers import serialize_goal
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -38,7 +38,7 @@ def get_goals():
     try:
         roots = get_all_root_goals(db_session)
         # Build complete trees for each root
-        result = [build_goal_tree(db_session, root) for root in roots]
+        result = [serialize_goal(root) for root in roots]
         return jsonify(result)
     finally:
         db_session.close()
@@ -105,7 +105,7 @@ def create_goal(validated_data):
         }, source='goals_api.create_goal'))
         
         # Return the goal with its tree
-        result = build_goal_tree(db_session, new_goal)
+        result = serialize_goal(new_goal)
         return jsonify(result), 201
         
     except Exception as e:
@@ -163,7 +163,7 @@ def get_goal_endpoint(goal_id: str):
     try:
         goal = get_goal_by_id(db_session, goal_id)
         if goal:
-            return jsonify(goal.to_dict(include_children=False))
+            return jsonify(serialize_goal(goal, include_children=False))
             
         return jsonify({"error": "Goal not found"}), 404
     finally:
@@ -213,7 +213,7 @@ def update_goal_endpoint(goal_id: str):
                 'updated_fields': list(data.keys())
             }, source='goals_api.update_goal'))
             
-            return jsonify(goal.to_dict(include_children=False))
+            return jsonify(serialize_goal(goal, include_children=False))
         
         return jsonify({"error": "Goal not found"}), 404
         
@@ -339,7 +339,7 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
                     'root_id': goal.root_id
                 }, source='goals_api.update_completion'))
             
-            result = build_goal_tree(db_session, goal)
+            result = serialize_goal(goal)
             return jsonify(result)
         
         return jsonify({"error": "Goal not found"}), 404
@@ -421,7 +421,7 @@ def create_fractal(current_user, validated_data):
         db_session.commit()
         db_session.refresh(new_fractal)
         
-        return jsonify(new_fractal.to_dict(include_children=False)), 201
+        return jsonify(serialize_goal(new_fractal, include_children=False)), 201
         
     except Exception as e:
         db_session.rollback()
@@ -489,7 +489,7 @@ def get_fractal_goals(current_user, root_id):
                 return jsonify({"error": "Fractal not found"}), 404
         
         # Build complete tree for this fractal
-        result = build_goal_tree(db_session, root)
+        result = serialize_goal(root)
         return jsonify(result)
         
     except Exception as e:
@@ -533,7 +533,7 @@ def get_active_goals_for_selection(current_user, root_id):
         for stg in st_goals:
             # Manually find active children to avoid loading entire tree or deleted items
             active_children = [
-                child.to_dict(include_children=False) 
+                serialize_goal(child, include_children=False) 
                 for child in stg.children 
                 if child.type == 'ImmediateGoal' and not child.completed and not child.deleted_at
             ]
@@ -609,7 +609,7 @@ def create_fractal_goal(current_user, root_id, validated_data):
         }, source='goals_api.create_fractal_goal'))
         
         # Return the created goal
-        return jsonify(new_goal.to_dict(include_children=False)), 201
+        return jsonify(serialize_goal(new_goal, include_children=False)), 201
         
     except Exception as e:
         db_session.rollback()
@@ -637,7 +637,7 @@ def get_fractal_goal(root_id, goal_id):
             return jsonify({"error": "Goal not found"}), 404
         
         # Return goal data
-        result = build_goal_tree(db_session, goal)
+        result = serialize_goal(goal)
         return jsonify(result)
         
     finally:
@@ -748,7 +748,7 @@ def update_fractal_goal(root_id, goal_id):
             'updated_fields': list(data.keys())
         }, source='goals_api.update_fractal_goal'))
         
-        return jsonify(goal.to_dict(include_children=False)), 200
+        return jsonify(serialize_goal(goal, include_children=False)), 200
         
     except Exception as e:
         db_session.rollback()

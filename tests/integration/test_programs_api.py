@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 
 @pytest.fixture
-def sample_program(client, sample_ultimate_goal):
+def sample_program(authed_client, sample_ultimate_goal):
     """Create a sample program for testing."""
     root_id = sample_ultimate_goal.id
     start_date = datetime.utcnow()
@@ -31,7 +31,7 @@ def sample_program(client, sample_ultimate_goal):
         'selectedGoals': []
     }
     
-    response = client.post(
+    response = authed_client.post(
         f'/api/{root_id}/programs',
         data=json.dumps(payload),
         content_type='application/json'
@@ -43,7 +43,7 @@ def sample_program(client, sample_ultimate_goal):
 class TestProgramCRUD:
     """Test Program CRUD operations."""
 
-    def test_create_program(self, client, sample_ultimate_goal):
+    def test_create_program(self, authed_client, sample_ultimate_goal):
         """Test creating a new training program."""
         root_id = sample_ultimate_goal.id
         start_date = datetime.utcnow()
@@ -56,7 +56,7 @@ class TestProgramCRUD:
             'weeklySchedule': []
         }
         
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/programs',
             data=json.dumps(payload),
             content_type='application/json'
@@ -67,10 +67,10 @@ class TestProgramCRUD:
         assert data['name'] == 'New Program'
         assert data['root_id'] == root_id
 
-    def test_get_programs(self, client, sample_ultimate_goal, sample_program):
+    def test_get_programs(self, authed_client, sample_ultimate_goal, sample_program):
         """Test listing programs."""
         root_id = sample_ultimate_goal.id
-        response = client.get(f'/api/{root_id}/programs')
+        response = authed_client.get(f'/api/{root_id}/programs')
         
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -78,19 +78,19 @@ class TestProgramCRUD:
         assert len(data) >= 1
         assert any(p['id'] == sample_program['id'] for p in data)
 
-    def test_get_specific_program(self, client, sample_ultimate_goal, sample_program):
+    def test_get_specific_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test retrieving a specific program."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['id'] == program_id
         assert data['name'] == sample_program['name']
 
-    def test_update_program(self, client, sample_ultimate_goal, sample_program):
+    def test_update_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test updating a program."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
@@ -100,7 +100,7 @@ class TestProgramCRUD:
             'description': 'Updated description'
         }
         
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/programs/{program_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -111,23 +111,23 @@ class TestProgramCRUD:
         assert data['name'] == 'Updated Program Name'
         assert data['description'] == 'Updated description'
 
-    def test_delete_program(self, client, sample_ultimate_goal, sample_program):
+    def test_delete_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test deleting a program."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         
-        response = client.delete(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.delete(f'/api/{root_id}/programs/{program_id}')
         assert response.status_code == 200
         
         # Verify deletion
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         assert response.status_code == 404
 
 @pytest.mark.integration
 class TestProgramStructure:
     """Test Program Blocks, Days, and Sessions."""
 
-    def test_update_program_structure(self, client, sample_ultimate_goal, sample_program):
+    def test_update_program_structure(self, authed_client, sample_ultimate_goal, sample_program):
         """Test updating program structure (Shadow Sync)."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
@@ -140,10 +140,10 @@ class TestProgramStructure:
         
         new_schedule = [
             {
-                'id': sample_program['blocks'][0]['id'], # Keep existing block
+                'id': sample_program.get('weekly_schedule', [{}])[0].get('id'), # Keep existing block
                 'name': 'Week 1 Updated',
-                'startDate': sample_program['blocks'][0]['start_date'], # Assuming output format
-                'endDate': sample_program['blocks'][0]['end_date'],
+                'startDate': sample_program.get('weekly_schedule', [{}])[0].get('startDate'), # Assuming output format
+                'endDate': sample_program.get('weekly_schedule', [{}])[0].get('endDate'),
                 'color': 'blue'
             },
             {
@@ -165,7 +165,7 @@ class TestProgramStructure:
         # programs_api.py sync_program_structure expects 'weeklySchedule' list of dicts with 'startDate'.
         
         # Let's fetch clean program first to get current structure
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         program_data = json.loads(response.data)
         
         # The API returns 'blocks' list in the program object.
@@ -177,7 +177,7 @@ class TestProgramStructure:
             'weeklySchedule': new_schedule
         }
         
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/programs/{program_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -190,12 +190,12 @@ class TestProgramStructure:
         assert len(data['blocks']) == 2
         assert any(b['name'] == 'Week 2' for b in data['blocks'])
 
-    def test_add_block_day_endpoint(self, client, sample_ultimate_goal, sample_program, sample_session_template):
+    def test_add_block_day_endpoint(self, authed_client, sample_ultimate_goal, sample_program, sample_session_template):
         """Test adding a day configuration manually (legacy/specific endpoint)."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         # Get the first block ID
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         program_data = json.loads(response.data)
         block_id = program_data['blocks'][0]['id']
         
@@ -205,7 +205,7 @@ class TestProgramStructure:
             'template_id': sample_session_template.id
         }
         
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
             data=json.dumps(payload),
             content_type='application/json'
@@ -214,7 +214,7 @@ class TestProgramStructure:
         assert response.status_code == 201
         
         # Verify day added
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         data = json.loads(response.data)
         block = next(b for b in data['blocks'] if b['id'] == block_id)
         # Check sessions inside days
@@ -222,18 +222,21 @@ class TestProgramStructure:
         # We need to check if any day has sessions
         has_session = False
         for day in block['days']:
-            if any(s['session_template_id'] == sample_session_template.id for s in day['sessions']):
+            # Check for template in either 'templates' list or 'sessions' list (legacy/new)
+            in_templates = any(t['id'] == sample_session_template.id for t in day.get('templates', []))
+            in_sessions = any(s.get('template_id') == sample_session_template.id or s.get('session_template_id') == sample_session_template.id for s in day.get('sessions', []))
+            if in_templates or in_sessions:
                 has_session = True
                 break
         assert has_session
 
-    def test_attach_goal_to_block(self, client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+    def test_attach_goal_to_block(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
         """Test attaching a goal to a specific block."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         short_term_goal = sample_goal_hierarchy['short_term']
         
-        response = client.get(f'/api/{root_id}/programs/{program_id}')
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         program_data = json.loads(response.data)
         block_id = program_data['blocks'][0]['id']
         
@@ -244,7 +247,7 @@ class TestProgramStructure:
             'deadline': deadline
         }
         
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
             data=json.dumps(payload),
             content_type='application/json'

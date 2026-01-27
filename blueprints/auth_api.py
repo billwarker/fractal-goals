@@ -7,6 +7,7 @@ import models
 from models import get_engine, get_session, User
 from config import config
 from validators import validate_request, UserSignupSchema, UserLoginSchema
+from services.serializers import serialize_user
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -72,7 +73,7 @@ def signup(validated_data):
         db_session.commit()
         db_session.refresh(new_user)
         
-        return jsonify(new_user.to_dict()), 201
+        return jsonify(serialize_user(new_user)), 201
     except Exception as e:
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -104,7 +105,7 @@ def login(validated_data):
         
         return jsonify({
             'token': token,
-            'user': user.to_dict()
+            'user': serialize_user(user)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -115,4 +116,4 @@ def login(validated_data):
 @token_required
 def get_me(current_user):
     """Get current user info."""
-    return jsonify(current_user.to_dict())
+    return jsonify(serialize_user(current_user))

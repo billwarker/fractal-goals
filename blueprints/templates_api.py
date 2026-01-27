@@ -14,6 +14,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services.events import event_bus, Event, Events
+from services.serializers import serialize_session_template
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
@@ -34,7 +35,7 @@ def get_session_templates(current_user, root_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         templates = session.query(SessionTemplate).filter_by(root_id=root_id).all()
-        result = [template.to_dict() for template in templates]
+        result = [serialize_session_template(template) for template in templates]
         return jsonify(result)
         
     finally:
@@ -56,7 +57,7 @@ def get_session_template(current_user, root_id, template_id):
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
-        return jsonify(template.to_dict())
+        return jsonify(serialize_session_template(template))
         
     finally:
         session.close()
@@ -89,7 +90,7 @@ def create_session_template(current_user, root_id, validated_data):
         session.add(new_template)
         session.commit()
         
-        return jsonify(new_template.to_dict()), 201
+        return jsonify(serialize_session_template(new_template)), 201
         
     except Exception as e:
         session.rollback()
@@ -125,7 +126,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
         
         session.commit()
         
-        return jsonify(template.to_dict())
+        return jsonify(serialize_session_template(template))
         
     except Exception as e:
         session.rollback()

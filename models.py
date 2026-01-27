@@ -58,14 +58,7 @@ class User(Base):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "username": self.username,
-            "email": self.email,
-            "is_active": self.is_active,
-            "created_at": format_utc(self.created_at)
-        }
+
 
 # Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
 session_goals = Table(
@@ -193,74 +186,7 @@ class Goal(Base):
         viewonly=True
     )
 
-    def calculate_smart_status(self):
-        """Calculate SMART criteria status for this goal."""
-        targets = _safe_load_json(self.targets, [])
-        if not isinstance(targets, list):
-            targets = []
-        
-        # Achievable: has associated activities OR has associated activity groups OR completed via children
-        # If track_activities is False, we consider it achievable by default (user's responsibility)
-        if self.track_activities:
-            has_activities = len(self.associated_activities) > 0 if self.associated_activities else False
-            has_groups = len(self.associated_activity_groups) > 0 if self.associated_activity_groups else False
-            is_achievable = has_activities or has_groups or self.completed_via_children
-            is_measurable = len(targets) > 0 or self.completed_via_children
-        else:
-            is_achievable = True
-            is_measurable = True
-        
-        return {
-            "specific": bool(self.description and self.description.strip()),
-            "measurable": is_measurable,
-            "achievable": is_achievable,
-            "relevant": bool(self.relevance_statement and self.relevance_statement.strip()),
-            "time_bound": self.deadline is not None
-        }
-    
-    def is_smart_goal(self):
-        """Check if this goal meets all SMART criteria."""
-        status = self.calculate_smart_status()
-        return all(status.values())
-    
-    def to_dict(self, include_children=True):
-        """Convert goal to dictionary format compatible with frontend."""
-        smart_status = self.calculate_smart_status()
-        
-        result = {
-            "name": self.name,
-            "id": self.id,
-            "description": self.description,
-            "deadline": self.deadline.isoformat() if self.deadline else None,
-            "attributes": {
-                "id": self.id,
-                "type": self.type,
-                "parent_id": self.parent_id,
-                "root_id": self.root_id,
-                "owner_id": self.owner_id,
-                "description": self.description,
-                "deadline": self.deadline.isoformat() if self.deadline else None,
-                "completed": self.completed,
-                "completed_at": format_utc(self.completed_at),
-                "created_at": format_utc(self.created_at),
-                "updated_at": format_utc(self.updated_at),
-                "targets": _safe_load_json(self.targets, []),
-                "relevance_statement": self.relevance_statement,
-                "completed_via_children": self.completed_via_children,
-                "allow_manual_completion": self.allow_manual_completion,
-                "track_activities": self.track_activities,
-                "is_smart": all(smart_status.values()),
-                "smart_status": smart_status,
-                "associated_activity_ids": [a.id for a in self.associated_activities] if self.associated_activities else [],
-                "associated_activity_group_ids": [g.id for g in self.associated_activity_groups] if self.associated_activity_groups else [],
-            },
-            "children": []
-        }
-        
-        if include_children:
-            result["children"] = [child.to_dict() for child in self.children]
-            
-        return result
+    # Business logic methods calculate_smart_status, is_smart_goal and to_dict moved to services/serializers.py
     
     def __repr__(self):
         return f"<{self.type}(id={self.id}, name={self.name})>"
@@ -345,176 +271,10 @@ class Session(Base):
     program_day = relationship("ProgramDay", back_populates="completed_sessions")
     template = relationship("SessionTemplate")
     
-    def get_short_term_goals(self, db_session):
-        """Get all ShortTermGoals associated with this session."""
-        from sqlalchemy import select
-        stmt = select(Goal).join(session_goals).where(
-            session_goals.c.session_id == self.id,
-            session_goals.c.goal_type == 'short_term'
-        )
-        return db_session.execute(stmt).scalars().all()
-    
-    def get_immediate_goals(self, db_session):
-        """Get all ImmediateGoals associated with this session."""
-        from sqlalchemy import select
-        stmt = select(Goal).join(session_goals).where(
-            session_goals.c.session_id == self.id,
-            session_goals.c.goal_type == 'immediate'
-        )
-        return db_session.execute(stmt).scalars().all()
-    
-    def get_program_info(self):
-        """Get full program context for this session."""
-        if not self.program_day:
-            return None
-        
-        day = self.program_day
-        block = day.block
-        program = block.program
-        
-        return {
-            "program_id": program.id,
-            "program_name": program.name,
-            "block_id": block.id,
-            "block_name": block.name,
-            "block_color": block.color,
-            "day_id": day.id,
-            "day_name": day.name,
-            "day_number": day.day_number,
-            "day_date": day.date.isoformat() if day.date else None
-        }
-    
-    def to_dict(self, include_image_data=False):
-        """
-        Convert session to dictionary format compatible with frontend.
-        
-        Args:
-            include_image_data: If True, include full image data in notes.
-                               If False (default), notes only include has_image flag.
-                               This prevents multi-MB responses on list endpoints.
-        """
+    # Methods get_short_term_goals, get_immediate_goals, get_program_info, and to_dict moved/deprecated. 
+    # Use services/serializers.py for serialization.
 
 
-        result = {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "root_id": self.root_id,
-            "session_start": format_utc(self.session_start),
-            "session_end": format_utc(self.session_end),
-            "duration_minutes": self.duration_minutes,
-            "total_duration_seconds": self.total_duration_seconds,
-            "template_id": self.template_id,
-            "program_day_id": self.program_day_id,
-            "completed": self.completed,
-            "completed_at": format_utc(self.completed_at),
-            "created_at": format_utc(self.created_at),
-            "updated_at": format_utc(self.updated_at),
-            "attributes": {
-                "id": self.id,
-                "type": "Session",
-                "session_start": format_utc(self.session_start),
-                "session_end": format_utc(self.session_end),
-                "duration_minutes": self.duration_minutes,
-                "total_duration_seconds": self.total_duration_seconds,
-                "template_id": self.template_id,
-                "completed": self.completed,
-                "completed_at": format_utc(self.completed_at),
-                "created_at": format_utc(self.created_at),
-                "updated_at": format_utc(self.updated_at),
-            }
-        }
-        
-        # Parse session data from attributes
-        attrs = _safe_load_json(self.attributes, {})
-        if attrs:
-            # Legacy field mapping: the frontend expects session_data to be the dict itself
-            result["attributes"]["session_data"] = attrs
-            
-            # Merge other attributes into result['attributes']
-            for k, v in attrs.items():
-                if k not in result["attributes"]:
-                    result["attributes"][k] = v
-
-            # Hydrate "exercises" from database ActivityInstances
-            if "sections" in attrs:
-                instance_map = {inst.id: inst for inst in self.activity_instances}
-                for section in attrs["sections"]:
-                    if "activity_ids" in section:
-                        activity_ids = section["activity_ids"]
-                        exercises = []
-                        for inst_id in activity_ids:
-                            if inst_id in instance_map:
-                                inst = instance_map[inst_id]
-                                ex = inst.to_dict()
-                                ex['type'] = 'activity'
-                                ex['instance_id'] = inst.id
-                                ex['name'] = ex.get('definition_name', 'Unknown Activity')
-                                ex['activity_id'] = inst.activity_definition_id
-                                ex['has_sets'] = len(ex.get('sets', [])) > 0
-                                ex['metrics'] = ex.get('metric_values', [])
-                                exercises.append(ex)
-                        section["exercises"] = exercises
-        
-        # Get associated goals with type information
-        short_term_goals = []
-        immediate_goals = []
-        
-        for goal in self.goals:
-            goal_data = {
-                "id": goal.id,
-                "name": goal.name,
-                "type": goal.type,
-                "parent_id": goal.parent_id,
-                "description": goal.description,
-                "completed": goal.completed
-            }
-            
-            if goal.type == 'ShortTermGoal':
-                short_term_goals.append(goal_data)
-            elif goal.type == 'ImmediateGoal':
-                immediate_goals.append(goal_data)
-        
-        # Legacy: maintain goal_ids for backward compatibility
-        result["attributes"]["goal_ids"] = [g.id for g in self.goals]
-        result["attributes"]["parent_ids"] = [g.id for g in self.goals if g.type == 'ShortTermGoal']
-        
-        # New: separate goal data by type for enhanced display
-        result["short_term_goals"] = short_term_goals
-        result["immediate_goals"] = immediate_goals
-        
-        # Add program info if linked to program day
-        program_info = self.get_program_info()
-        if program_info:
-            result["program_info"] = program_info
-        
-        # Collect all notes for this session
-        all_notes = {}
-        
-        # 1. Notes directly linked to session via session_id
-        if hasattr(self, 'notes_list') and self.notes_list:
-            for n in self.notes_list:
-                if n.deleted_at is None:
-                    all_notes[n.id] = n
-
-        # 2. Notes linked via activity instances (in case session_id wasn't set on them)
-        if hasattr(self, 'activity_instances'):
-            for ai in self.activity_instances:
-                if hasattr(ai, 'notes_list') and ai.notes_list:
-                    for n in ai.notes_list:
-                        if n.deleted_at is None:
-                            all_notes[n.id] = n
-        
-        # Convert to dict list (pass include_image parameter to avoid bloated responses)
-        notes_data = [n.to_dict(include_image=include_image_data) for n in all_notes.values()]
-        
-        # Sort by creation time (descending)
-        notes_data.sort(key=lambda x: x['created_at'], reverse=True)
-        
-        result["notes"] = notes_data
-        result["notes_count"] = len(notes_data)
-        
-        return result
 
 
 class ActivityGroup(Base):
@@ -537,16 +297,7 @@ class ActivityGroup(Base):
         viewonly=True
     )
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "root_id": self.root_id,
-            "name": self.name,
-            "description": self.description,
-            "sort_order": self.sort_order,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "associated_goal_ids": [g.id for g in self.associated_goals] if self.associated_goals else []
-        }
+
 
 
 class ActivityDefinition(Base):
@@ -578,21 +329,7 @@ class ActivityDefinition(Base):
         viewonly=True
     )
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "group_id": self.group_id,
-            "has_sets": self.has_sets,
-            "has_metrics": self.has_metrics,
-            "metrics_multiplicative": self.metrics_multiplicative,
-            "has_splits": self.has_splits,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "metric_definitions": [m.to_dict() for m in self.metric_definitions],
-            "split_definitions": [s.to_dict() for s in self.split_definitions],
-            "associated_goal_ids": [g.id for g in self.associated_goals] if self.associated_goals else []
-        }
+
 
 class MetricDefinition(Base):
     __tablename__ = 'metric_definitions'
@@ -610,15 +347,7 @@ class MetricDefinition(Base):
     is_multiplicative = Column(Boolean, default=True)   # Include in product calculations
     sort_order = Column(Integer, default=0)  # UI display order
 
-    def to_dict(self):
-        return {
-            "id": self.id, 
-            "name": self.name, 
-            "unit": self.unit, 
-            "is_active": self.is_active,
-            "is_top_set_metric": self.is_top_set_metric,
-            "is_multiplicative": self.is_multiplicative
-        }
+
 
 class SplitDefinition(Base):
     __tablename__ = 'split_definitions'
@@ -632,12 +361,7 @@ class SplitDefinition(Base):
     deleted_at = Column(DateTime, nullable=True)  # Soft delete support
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "order": self.order
-        }
+
 
 class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
@@ -669,26 +393,7 @@ class ActivityInstance(Base):
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
     )
 
-    def to_dict(self):
-        data_dict = _safe_load_json(self.data, {})
-        metric_values_list = [m.to_dict() for m in self.metric_values]
-        return {
-            "id": self.id,
-            "session_id": self.session_id,
-            "practice_session_id": self.practice_session_id,  # Legacy support
-            "activity_definition_id": self.activity_definition_id,
-            "definition_name": self.definition.name if self.definition else "Unknown",
-            "created_at": format_utc(self.created_at),
-            "time_start": format_utc(self.time_start),
-            "time_stop": format_utc(self.time_stop),
-            "duration_seconds": self.duration_seconds,
-            "completed": self.completed,
-            "notes": self.notes,
-            "sets": data_dict.get('sets', []),
-            "data": data_dict,
-            "metric_values": metric_values_list,
-            "metrics": metric_values_list  # Frontend alias for consistency
-        }
+
 
 class MetricValue(Base):
     __tablename__ = 'metric_values'
@@ -705,17 +410,7 @@ class MetricValue(Base):
     definition = relationship("MetricDefinition")
     split = relationship("SplitDefinition")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.definition.name if self.definition else "",
-            "metric_definition_id": self.metric_definition_id,
-            "metric_id": self.metric_definition_id, # Frontend alias
-            "value": self.value,
-            "unit": self.definition.unit if self.definition else "",
-            "split_id": self.split_definition_id,
-            "split_name": self.split.name if self.split else None
-        }
+
 
 
 class Note(Base):
@@ -762,34 +457,7 @@ class Note(Base):
     activity_instance = relationship("ActivityInstance", backref="notes_list")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     
-    def to_dict(self, include_image=False):
-        """
-        Convert note to dictionary.
-        
-        Args:
-            include_image: If True, include the full image_data. 
-                          If False (default), only include has_image flag.
-                          This is important for performance on list endpoints.
-        """
-        result = {
-            "id": self.id,
-            "root_id": self.root_id,
-            "context_type": self.context_type,
-            "context_id": self.context_id,
-            "session_id": self.session_id,
-            "activity_instance_id": self.activity_instance_id,
-            "activity_definition_id": self.activity_definition_id,
-            "set_index": self.set_index,
-            "content": self.content,
-            "has_image": self.image_data is not None and len(self.image_data) > 0,
-            "created_at": format_utc(self.created_at),
-            "updated_at": format_utc(self.updated_at)
-        }
-        
-        if include_image:
-            result["image_data"] = self.image_data
-        
-        return result
+
 
 
 class VisualizationAnnotation(Base):
@@ -833,18 +501,7 @@ class VisualizationAnnotation(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
     
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "root_id": self.root_id,
-            "visualization_type": self.visualization_type,
-            "visualization_context": self.visualization_context,
-            "selected_points": self.selected_points or [],
-            "selection_bounds": self.selection_bounds,
-            "content": self.content,
-            "created_at": format_utc(self.created_at),
-            "updated_at": format_utc(self.updated_at)
-        }
+
 
 
 class EventLog(Base):
@@ -867,18 +524,7 @@ class EventLog(Base):
     source = Column(String, nullable=True)       # Where the event originated
     timestamp = Column(DateTime, default=utc_now)
     
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "root_id": self.root_id,
-            "event_type": self.event_type,
-            "entity_type": self.entity_type,
-            "entity_id": self.entity_id,
-            "description": self.description,
-            "payload": self.payload,
-            "source": self.source,
-            "timestamp": format_utc(self.timestamp)
-        }
+
 
 class SessionTemplate(Base):
     __tablename__ = 'session_templates'
@@ -892,8 +538,7 @@ class SessionTemplate(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     template_data = Column(JSON_TYPE, nullable=False)
     
-    def to_dict(self):
-        return {"id": self.id, "name": self.name, "template_data": self.template_data or {}}
+
 
 
 class Program(Base):
@@ -916,31 +561,7 @@ class Program(Base):
     # Relationships
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
     
-    def to_dict(self):
-        # Build weekly_schedule from relational blocks (Source of Truth)
-        # Transform snake_case keys (DB) to camelCase (Frontend legacy compatibility)
-        schedule_from_db = []
-        if self.blocks:
-            for b in self.blocks:
-                bd = b.to_dict()
-                bd['startDate'] = bd.pop('start_date', None)
-                bd['endDate'] = bd.pop('end_date', None)
-                schedule_from_db.append(bd)
 
-        return {
-            "id": self.id,
-            "root_id": self.root_id,
-            "name": self.name,
-            "description": self.description,
-            "start_date": format_utc(self.start_date),
-            "end_date": format_utc(self.end_date),
-            "created_at": format_utc(self.created_at),
-            "updated_at": format_utc(self.updated_at),
-            "is_active": self.is_active,
-            "goal_ids": _safe_load_json(self.goal_ids, []),
-            "weekly_schedule": schedule_from_db,
-            "blocks": [b.to_dict() for b in self.blocks]
-        }
 
 class ProgramBlock(Base):
     __tablename__ = 'program_blocks'
@@ -959,18 +580,7 @@ class ProgramBlock(Base):
     program = relationship("Program", back_populates="blocks")
     days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "program_id": self.program_id,
-            "name": self.name,
-            "start_date": self.start_date.isoformat() if self.start_date else None,
-            "end_date": self.end_date.isoformat() if self.end_date else None,
-            "color": self.color,
-            "goal_ids": _safe_load_json(self.goal_ids, []),
-            # Include nested days for UI
-            "days": [d.to_dict() for d in self.days]
-        }
+
 
 class ProgramDay(Base):
     __tablename__ = 'program_days'
@@ -1003,21 +613,7 @@ class ProgramDay(Base):
         # Day is complete if all required templates have been done
         return required_template_ids.issubset(completed_template_ids)
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "block_id": self.block_id,
-            "date": self.date.isoformat() if self.date else None,
-            "day_number": self.day_number,
-            "day_of_week": _safe_load_json(self.day_of_week),
-            "name": self.name,
-            "notes": self.notes,
-            "is_completed": self.is_completed,
-            # Include templates
-            "templates": [{"id": t.id, "name": t.name, "description": t.description} for t in self.templates if not t.deleted_at],
-            # Include completed sessions summary
-            "completed_sessions": [{"id": s.id, "name": s.name, "created_at": format_utc(s.created_at)} for s in self.completed_sessions if not s.deleted_at]
-        }
+
 
 
 # Database Helper Functions
@@ -1170,13 +766,7 @@ def delete_session(db_session, session_id):
         return True
     return False
 
-def build_goal_tree(db_session, goal):
-    """
-    Build a tree dictionary from a goal.
-    If the goal hasn't had its hierarchy eagerly loaded, this will trigger N+1 queries.
-    The caller should ideally use get_fractal_goals optimized query.
-    """
-    return goal.to_dict(include_children=True)
+# build_goal_tree deprecated. Use services.serializers.serialize_goal instead.
 
 # Common 'root_id' finder
 def get_root_id_for_goal(db_session, goal_id):
@@ -1219,6 +809,4 @@ def delete_practice_session(db_session, session_id):
     """DEPRECATED: Use delete_session instead."""
     return delete_session(db_session, session_id)
 
-def build_practice_session_tree(db_session, session):
-    """DEPRECATED: Use session.to_dict() instead."""
-    return session.to_dict()
+# build_practice_session_tree deprecated. Use services.serializers.serialize_session instead.

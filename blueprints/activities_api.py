@@ -15,6 +15,9 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services.events import event_bus, Event, Events
+from services.serializers import (
+    serialize_activity_group, serialize_activity_definition
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,7 @@ def get_activity_groups(current_user, root_id):
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
         groups = session.query(ActivityGroup).filter_by(root_id=root_id).order_by(ActivityGroup.sort_order, ActivityGroup.created_at).all()
-        return jsonify([g.to_dict() for g in groups])
+        return jsonify([serialize_activity_group(g) for g in groups])
     finally:
         session.close()
 
@@ -74,7 +77,7 @@ def create_activity_group(current_user, root_id, validated_data):
             'root_id': root_id
         }, source='activities_api.create_activity_group'))
         
-        return jsonify(new_group.to_dict()), 201
+        return jsonify(serialize_activity_group(new_group)), 201
     except Exception as e:
         session.rollback()
         logger.exception("Error creating activity group")
@@ -108,7 +111,7 @@ def update_activity_group(root_id, group_id, validated_data):
             'updated_fields': list(validated_data.keys())
         }, source='activities_api.update_activity_group'))
         
-        return jsonify(group.to_dict())
+        return jsonify(serialize_activity_group(group))
     except Exception as e:
         session.rollback()
         logger.exception("Error updating activity group")
@@ -192,7 +195,7 @@ def get_activities(current_user, root_id):
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
         activities = session.query(ActivityDefinition).filter_by(root_id=root_id).order_by(ActivityDefinition.name).all()
-        return jsonify([a.to_dict() for a in activities])
+        return jsonify([serialize_activity_definition(a) for a in activities])
     finally:
         session.close()
 
@@ -220,7 +223,7 @@ def create_activity(current_user, root_id):
 
         if existing_activity:
             # If it exists, return it instead of creating a duplicate
-            return jsonify(existing_activity.to_dict()), 200
+            return jsonify(serialize_activity_definition(existing_activity)), 200
         
         # Create Activity
         new_activity = ActivityDefinition(
@@ -278,7 +281,7 @@ def create_activity(current_user, root_id):
             'root_id': root_id
         }, source='activities_api.create_activity'))
         
-        return jsonify(new_activity.to_dict()), 201
+        return jsonify(serialize_activity_definition(new_activity)), 201
 
     except Exception as e:
         session.rollback()
@@ -428,7 +431,7 @@ def update_activity(current_user, root_id, activity_id):
             'updated_fields': list(data.keys())
         }, source='activities_api.update_activity'))
         
-        return jsonify(activity.to_dict()), 200
+        return jsonify(serialize_activity_definition(activity)), 200
     
     except Exception as e:
         session.rollback()
@@ -538,7 +541,7 @@ def set_activity_goals(current_user, root_id, activity_id):
             'updated_fields': ['associated_goals']
         }, source='activities_api.set_activity_goals'))
         
-        return jsonify(activity.to_dict()), 200
+        return jsonify(serialize_activity_definition(activity)), 200
         
     except Exception as e:
         session.rollback()

@@ -11,6 +11,7 @@ import logging
 
 from models import get_engine, get_session, Note, Session, ActivityInstance, ActivityDefinition, format_utc, validate_root_goal
 from validators import validate_request, NoteCreateSchema, NoteUpdateSchema
+from services.serializers import serialize_note, serialize_activity_instance
 from blueprints.auth_api import token_required
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def get_session_notes(current_user, root_id, session_id):
             Note.deleted_at == None
         ).order_by(Note.created_at.desc()).all()
         
-        return jsonify([n.to_dict() for n in notes])
+        return jsonify([serialize_note(n) for n in notes])
     except Exception as e:
         logger.error(f"Error fetching session notes: {e}")
         return jsonify({"error": str(e)}), 500
@@ -64,7 +65,7 @@ def get_activity_instance_notes(current_user, root_id, instance_id):
             Note.deleted_at == None
         ).order_by(Note.created_at.desc()).all()
         
-        return jsonify([n.to_dict() for n in notes])
+        return jsonify([serialize_note(n) for n in notes])
     except Exception as e:
         logger.error(f"Error fetching activity instance notes: {e}")
         return jsonify({"error": str(e)}), 500
@@ -111,7 +112,7 @@ def get_previous_session_notes(current_user, root_id, session_id):
         # Group notes by session
         results = []
         for session in previous_sessions:
-            session_notes = [n.to_dict() for n in notes if n.session_id == session.id]
+            session_notes = [serialize_note(n) for n in notes if n.session_id == session.id]
             if session_notes:  # Only include sessions that have notes
                 results.append({
                     'session_id': session.id,
@@ -155,7 +156,7 @@ def get_activity_definition_notes(current_user, root_id, activity_id):
         # Enrich with session info for context
         results = []
         for note in notes:
-            data = note.to_dict()
+            data = serialize_note(note)
             if note.session:
                 data['session_name'] = note.session.name
                 data['session_date'] = format_utc(note.session.session_start or note.session.created_at)
@@ -207,12 +208,12 @@ def get_activity_history(current_user, root_id, activity_id):
             for n in notes:
                 if n.activity_instance_id not in notes_by_instance:
                     notes_by_instance[n.activity_instance_id] = []
-                notes_by_instance[n.activity_instance_id].append(n.to_dict())
+                notes_by_instance[n.activity_instance_id].append(serialize_note(n))
         
         # Include session info and notes
         results = []
         for inst in instances:
-            data = inst.to_dict()
+            data = serialize_activity_instance(inst)
             if inst.session:
                 data['session_name'] = inst.session.name
                 data['session_date'] = format_utc(inst.session.session_start or inst.session.created_at)
@@ -268,7 +269,7 @@ def create_note(current_user, root_id, validated_data):
         db.commit()
         
         logger.info(f"Created note {note.id} for {validated_data['context_type']} {note.context_id}")
-        return jsonify(note.to_dict()), 201
+        return jsonify(serialize_note(note)), 201
         
     except Exception as e:
         db.rollback()
@@ -302,7 +303,7 @@ def update_note(current_user, root_id, note_id, validated_data):
         
         db.commit()
         logger.info(f"Updated note {note_id}")
-        return jsonify(note.to_dict())
+        return jsonify(serialize_note(note))
         
     except Exception as e:
         db.rollback()

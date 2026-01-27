@@ -11,6 +11,7 @@ from models import (
     validate_root_goal, _safe_load_json
 )
 from services import event_bus, Event, Events
+from services.serializers import serialize_program, serialize_program_block
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class ProgramService:
                     end_date=end_dt,
                     color=block_data.get('color')
                 )
-                session.add(block)
+                program.blocks.append(block)
             
             processed_block_ids.add(block.id)
 
@@ -74,7 +75,7 @@ class ProgramService:
             return None
         
         programs = session.query(Program).filter_by(root_id=root_id).all()
-        return [program.to_dict() for program in programs]
+        return [serialize_program(program) for program in programs]
 
     @staticmethod
     def get_program(session, root_id: str, program_id: str) -> Optional[Dict]:
@@ -86,7 +87,7 @@ class ProgramService:
         if not program:
             return None
         
-        return program.to_dict()
+        return serialize_program(program)
 
     @staticmethod
     def create_program(session, root_id: str, validated_data: Dict) -> Dict:
@@ -133,7 +134,7 @@ class ProgramService:
             'root_id': root_id
         }, source='ProgramService.create_program'))
         
-        return new_program.to_dict()
+        return serialize_program(new_program)
 
     @staticmethod
     def update_program(session, root_id: str, program_id: str, validated_data: Dict) -> Optional[Dict]:
@@ -172,7 +173,7 @@ class ProgramService:
             'updated_fields': list(validated_data.keys())
         }, source='ProgramService.update_program'))
         
-        return program.to_dict()
+        return serialize_program(program)
 
     @staticmethod
     def delete_program(session, root_id: str, program_id: str) -> Dict:
@@ -446,7 +447,7 @@ class ProgramService:
                 except ValueError:
                      raise ValueError("Invalid date format")
         
-        return block.to_dict()
+        return serialize_program_block(block)
 
     @staticmethod
     def check_program_day_completion(session, session_id: str) -> bool:

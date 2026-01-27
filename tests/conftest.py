@@ -11,7 +11,7 @@ import os
 import sys
 import pytest
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import json
 
@@ -118,18 +118,77 @@ def db_session(app):
     session.close()
 
 
-# ============================================================================
+@pytest.fixture(scope='function')
+def test_user(db_session):
+    """Create a test user."""
+    from models import User
+    
+    user = User(
+        id=str(uuid.uuid4()),
+        username="testuser",
+        email="test@example.com"
+    )
+    user.set_password("password123")
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+@pytest.fixture(scope='function')
+def auth_headers(client, test_user):
+    """Return auth headers for the test user."""
+    from config import config
+    import jwt
+    import datetime
+    
+    # Generate token
+    token = jwt.encode({
+        'user_id': test_user.id,
+        'exp': datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24)
+    }, config.JWT_SECRET_KEY, algorithm="HS256")
+    
+    return {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+
+@pytest.fixture(scope='function')
+def authed_client(client, auth_headers):
+    """Client that automatically sends auth headers."""
+    class AuthedClient:
+        def __init__(self, client, headers):
+            self.client = client
+            self.headers = headers
+            
+        def get(self, *args, **kwargs):
+            return self.client.get(*args, headers=self.headers, **kwargs)
+            
+        def post(self, *args, **kwargs):
+            return self.client.post(*args, headers=self.headers, **kwargs)
+            
+        def put(self, *args, **kwargs):
+            return self.client.put(*args, headers=self.headers, **kwargs)
+            
+        def patch(self, *args, **kwargs):
+            return self.client.patch(*args, headers=self.headers, **kwargs)
+            
+        def delete(self, *args, **kwargs):
+            return self.client.delete(*args, headers=self.headers, **kwargs)
+            
+    return AuthedClient(client, auth_headers)
+
 # Sample Data Fixtures
 # ============================================================================
 
 @pytest.fixture
-def sample_ultimate_goal(db_session):
+def sample_ultimate_goal(db_session, test_user):
     """Create a sample UltimateGoal for testing."""
     goal = UltimateGoal(
         id=str(uuid.uuid4()),
         name="Master Software Engineering",
         description="Become a world-class software engineer",
         created_at=datetime.utcnow(),
+        owner_id=test_user.id,
         root_id=None  # Will be set to self
     )
     goal.root_id = goal.id
@@ -258,7 +317,6 @@ def sample_practice_session(db_session, sample_goal_hierarchy):
         id=str(uuid.uuid4()),
         name="Morning Workout",
         description="Strength training session",
-        parent_id=sample_goal_hierarchy['short_term'].id,
         root_id=sample_goal_hierarchy['ultimate'].id,
         session_start=datetime.utcnow(),
         created_at=datetime.utcnow(),
@@ -274,7 +332,7 @@ def sample_activity_instance(db_session, sample_practice_session, sample_activit
     """Create a sample ActivityInstance for testing."""
     instance = ActivityInstance(
         id=str(uuid.uuid4()),
-        practice_session_id=sample_practice_session.id,
+        session_id=sample_practice_session.id,
         activity_definition_id=sample_activity_definition.id,
         root_id=sample_practice_session.root_id,
         created_at=datetime.utcnow(),

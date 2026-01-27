@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from models import EventLog, get_scoped_session, validate_root_goal
 from blueprints.auth_api import token_required
 from sqlalchemy import select, desc
+from services.serializers import serialize_event_log
 import logging
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ def get_logs(current_user, root_id):
         event_types = [t for t in db_session.execute(types_stmt).scalars().all()]
         
         return jsonify({
-            "logs": [log.to_dict() for log in results],
+            "logs": [serialize_event_log(log) for log in results],
             "event_types": sorted(event_types),
             "pagination": {
                 "limit": limit,

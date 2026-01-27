@@ -12,6 +12,7 @@ from models import (
 )
 from blueprints.auth_api import token_required
 from services.events import event_bus, Event, Events
+from services.serializers import serialize_activity_instance
 
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
@@ -50,7 +51,7 @@ def activity_instances(current_user, root_id):
             # Check if instance already exists
             existing = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
             if existing:
-                return jsonify(existing.to_dict())
+                return jsonify(serialize_activity_instance(existing))
             
             # Create new instance
             instance = ActivityInstance(
@@ -75,7 +76,7 @@ def activity_instances(current_user, root_id):
                 'root_id': root_id
             }, source='timers_api.activity_instances'))
             
-            return jsonify(instance.to_dict()), 201
+            return jsonify(serialize_activity_instance(instance)), 201
         
         else:  # GET
             # Get all sessions for this fractal
@@ -88,7 +89,7 @@ def activity_instances(current_user, root_id):
                 ActivityInstance.deleted_at == None
             ).all()
             
-            return jsonify([inst.to_dict() for inst in instances])
+            return jsonify([serialize_activity_instance(inst) for inst in instances])
         
     except Exception as e:
         db_session.rollback()
@@ -163,7 +164,7 @@ def start_activity_timer(current_user, root_id, instance_id):
         print(f"[START TIMER] Committed successfully")
         print(f"[START TIMER] Instance time_start after commit: {instance.time_start}")
         
-        result = instance.to_dict()
+        result = serialize_activity_instance(instance)
         print(f"[START TIMER] Returning: {result}")
         
         return jsonify(result)
@@ -227,7 +228,7 @@ def stop_activity_timer(current_user, root_id, instance_id):
             'updated_fields': ['time_stop', 'duration_seconds']
         }, source='timers_api.stop_activity_timer'))
         
-        return jsonify(instance.to_dict())
+        return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
         db_session.rollback()
@@ -367,7 +368,7 @@ def update_activity_instance(current_user, root_id, instance_id):
         
         print(f"[UPDATE INSTANCE] Successfully updated instance")
         
-        return jsonify(instance.to_dict())
+        return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
         print(f"[UPDATE INSTANCE ERROR] Unexpected error: {str(e)}")

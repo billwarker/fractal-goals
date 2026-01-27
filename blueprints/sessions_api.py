@@ -25,6 +25,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
+from services.serializers import serialize_session, serialize_activity_instance, serialize_goal
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
@@ -62,7 +63,7 @@ def get_all_sessions_endpoint(current_user):
             Goal.owner_id == current_user.id
         ).order_by(Session.created_at.desc()).all()
         # Don't include image data in list view
-        result = [s.to_dict(include_image_data=False) for s in sessions]
+        result = [serialize_session(s, include_image_data=False) for s in sessions]
         return jsonify(result)
     finally:
         db_session.close()
@@ -98,7 +99,7 @@ def get_fractal_sessions(current_user, root_id):
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
         # Don't include image data in list view for performance (prevents multi-MB responses)
-        result = [s.to_dict(include_image_data=False) for s in sessions]
+        result = [serialize_session(s, include_image_data=False) for s in sessions]
         
         return jsonify({
             "sessions": result,
@@ -116,7 +117,8 @@ def get_fractal_sessions(current_user, root_id):
 
 @sessions_bp.route('/<root_id>/sessions', methods=['POST'])
 @token_required
-def create_fractal_session(current_user, root_id):
+@validate_request(SessionCreateSchema)
+def create_fractal_session(current_user, root_id, validated_data):
     """Create a new session within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -125,8 +127,8 @@ def create_fractal_session(current_user, root_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        # Get request data
-        data = request.get_json()
+        # Get request data - already validated by decorator
+        data = validated_data
         
         # Parse dates - Strict ISO-8601
         def parse_datetime(dt_str):
@@ -246,7 +248,7 @@ def create_fractal_session(current_user, root_id):
         }, source='sessions_api.create_session'))
 
         # Return the created session
-        result = new_session.to_dict()
+        result = serialize_session(new_session)
         return jsonify(result), 201
         
     except Exception as e:
@@ -259,7 +261,8 @@ def create_fractal_session(current_user, root_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['PUT'])
 @token_required
-def update_session(current_user, root_id, session_id):
+@validate_request(SessionUpdateSchema)
+def update_session(current_user, root_id, session_id, validated_data):
     """Update a session's details."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -278,8 +281,8 @@ def update_session(current_user, root_id, session_id):
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
-        # Get update data from request
-        data = request.get_json()
+        # Get update data - already validated by decorator
+        data = validated_data
         
         # Update fields if provided
         if 'name' in data:
@@ -359,7 +362,7 @@ def update_session(current_user, root_id, session_id):
                 logger.error(f"Error emitting SESSION_COMPLETED event: {event_error}")
         
         # Return updated session
-        result = session.to_dict()
+        result = serialize_session(session)
         return jsonify(result)
         
     except Exception as e:
@@ -392,7 +395,7 @@ def get_session_endpoint(current_user, root_id, session_id):
         if not session:
             return jsonify({"error": "Session not found"}), 404
         # Include full image data for single session detail view
-        return jsonify(session.to_dict(include_image_data=True))
+        return jsonify(serialize_session(session, include_image_data=True))
     finally:
         db_session.close()
 
@@ -477,7 +480,7 @@ def get_session_activities(current_user, root_id, session_id):
             ActivityInstance.deleted_at == None
         ).order_by(ActivityInstance.created_at).all()
         
-        return jsonify([inst.to_dict() for inst in instances])
+        return jsonify([serialize_activity_instance(inst) for inst in instances])
         
     except Exception as e:
         logger.exception("An error occurred")
@@ -488,7 +491,8 @@ def get_session_activities(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['POST'])
 @token_required
-def add_activity_to_session(current_user, root_id, session_id):
+@validate_request(ActivityInstanceCreateSchema)
+def add_activity_to_session(current_user, root_id, session_id, validated_data):
     """Add a new activity instance to a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -508,7 +512,7 @@ def add_activity_to_session(current_user, root_id, session_id):
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
-        data = request.get_json()
+        data = validated_data
         activity_definition_id = data.get('activity_definition_id')
         instance_id = data.get('instance_id') or str(uuid.uuid4())
         
@@ -539,7 +543,7 @@ def add_activity_to_session(current_user, root_id, session_id):
             'root_id': root_id
         }, source='sessions_api.add_activity_to_session'))
         
-        return jsonify(instance.to_dict()), 201
+        return jsonify(serialize_activity_instance(instance)), 201
         
     except Exception as e:
         db_session.rollback()
@@ -551,7 +555,8 @@ def add_activity_to_session(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/reorder', methods=['POST'])
 @token_required
-def reorder_activities(current_user, root_id, session_id):
+@validate_request(ActivityReorderSchema)
+def reorder_activities(current_user, root_id, session_id, validated_data):
     """Reorder activities in a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -560,7 +565,7 @@ def reorder_activities(current_user, root_id, session_id):
         root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
-        data = request.get_json()
+        data = validated_data
         activity_ids = data.get('activity_ids', [])
         
         session = get_session_by_id(db_session, session_id)
@@ -585,7 +590,8 @@ def reorder_activities(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['PUT'])
 @token_required
-def update_activity_instance_in_session(current_user, root_id, session_id, instance_id):
+@validate_request(ActivityInstanceUpdateSchema)
+def update_activity_instance_in_session(current_user, root_id, session_id, instance_id, validated_data):
     """Update activity instance in session context."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -594,7 +600,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
         root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
-        data = request.get_json()
+        data = validated_data
         instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
         if not instance:
             return jsonify({"error": "Instance not found"}), 404
@@ -619,7 +625,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
             'updated_fields': list(data.keys())
         }, source='sessions_api.update_activity_instance'))
         
-        return jsonify(instance.to_dict())
+        return jsonify(serialize_activity_instance(instance))
     except Exception as e:
         db_session.rollback()
         logger.exception("An error occurred")
@@ -753,7 +759,7 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id):
             'metrics_count': len(metrics)
         }, source='sessions_api.update_activity_metrics'))
         
-        return jsonify(instance.to_dict())
+        return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
         db_session.rollback()
@@ -796,7 +802,7 @@ def get_session_goals(current_user, root_id, session_id):
         
         goals_list = []
         for goal, goal_type in results:
-            goal_dict = goal.to_dict(include_children=False)
+            goal_dict = serialize_goal(goal, include_children=False)
             goal_dict['association_type'] = goal_type
             goals_list.append(goal_dict)
         
@@ -808,7 +814,8 @@ def get_session_goals(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/goals', methods=['POST'])
 @token_required
-def add_goal_to_session(current_user, root_id, session_id):
+@validate_request(SessionGoalAssociationSchema)
+def add_goal_to_session(current_user, root_id, session_id, validated_data):
     """Associate a goal with a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -821,7 +828,7 @@ def add_goal_to_session(current_user, root_id, session_id):
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
-        data = request.get_json()
+        data = validated_data
         goal_id = data.get('goal_id')
         goal_type = data.get('goal_type', 'short_term')  # 'short_term' or 'immediate'
         

@@ -8,6 +8,7 @@ from models import (
     get_engine, get_session, VisualizationAnnotation, validate_root_goal, utc_now
 )
 from blueprints.auth_api import token_required
+from services.serializers import serialize_visualization_annotation
 import json
 
 annotations_bp = Blueprint('annotations_api', __name__)
@@ -75,7 +76,7 @@ def get_annotations(current_user, root_id):
             annotations = filtered_annotations
         
         return jsonify({
-            "data": [a.to_dict() for a in annotations]
+            "data": [serialize_visualization_annotation(a) for a in annotations]
         })
         
     except Exception as e:
@@ -122,7 +123,7 @@ def create_annotation(current_user, root_id):
         db_session.commit()
         
         return jsonify({
-            "data": annotation.to_dict(),
+            "data": serialize_visualization_annotation(annotation),
             "message": "Annotation created successfully"
         }), 201
         
@@ -155,7 +156,7 @@ def get_annotation(current_user, root_id, annotation_id):
         if not annotation:
             return jsonify({"error": "Annotation not found"}), 404
         
-        return jsonify({"data": annotation.to_dict()})
+        return jsonify({"data": serialize_visualization_annotation(annotation)})
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -200,7 +201,7 @@ def update_annotation(current_user, root_id, annotation_id):
         db_session.commit()
         
         return jsonify({
-            "data": annotation.to_dict(),
+            "data": serialize_visualization_annotation(annotation),
             "message": "Annotation updated successfully"
         })
         

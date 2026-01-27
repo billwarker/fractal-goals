@@ -20,6 +20,10 @@ from models import (
     ActivityGroup, ActivityDefinition, MetricDefinition,
     ActivityInstance, MetricValue
 )
+from services.serializers import (
+    serialize_goal, serialize_session, serialize_activity_instance, 
+    serialize_metric_value, serialize_activity_definition
+)
 
 
 @pytest.mark.unit
@@ -79,7 +83,7 @@ class TestGoalHierarchy:
     
     def test_goal_to_dict(self, sample_ultimate_goal):
         """Test goal serialization to dictionary."""
-        goal_dict = sample_ultimate_goal.to_dict()
+        goal_dict = serialize_goal(sample_ultimate_goal)
         
         assert goal_dict['id'] == sample_ultimate_goal.id
         assert goal_dict['name'] == sample_ultimate_goal.name
@@ -98,7 +102,6 @@ class TestPracticeSession:
         session = PracticeSession(
             id=str(uuid.uuid4()),
             name="Test Session",
-            parent_id=sample_goal_hierarchy['short_term'].id,
             root_id=sample_goal_hierarchy['ultimate'].id,
             session_start=datetime.utcnow(),
             created_at=datetime.utcnow()
@@ -107,7 +110,7 @@ class TestPracticeSession:
         db_session.commit()
         
         assert session.id is not None
-        assert session.type == "PracticeSession"
+
         assert session.session_start is not None
     
     def test_session_duration_calculation(self, db_session, sample_practice_session):
@@ -126,7 +129,7 @@ class TestPracticeSession:
     
     def test_session_to_dict_hydration(self, sample_practice_session):
         """Test session to_dict includes hydrated activity data."""
-        session_dict = sample_practice_session.to_dict()
+        session_dict = serialize_session(sample_practice_session)
         
         assert 'id' in session_dict
         assert 'name' in session_dict
@@ -170,7 +173,7 @@ class TestActivityDefinition:
     
     def test_activity_to_dict(self, sample_activity_definition):
         """Test activity definition serialization."""
-        activity_dict = sample_activity_definition.to_dict()
+        activity_dict = serialize_activity_definition(sample_activity_definition)
         
         assert activity_dict['id'] == sample_activity_definition.id
         assert activity_dict['name'] == sample_activity_definition.name
@@ -216,7 +219,7 @@ class TestActivityInstance:
     
     def test_activity_instance_to_dict(self, sample_activity_instance):
         """Test activity instance serialization."""
-        instance_dict = sample_activity_instance.to_dict()
+        instance_dict = serialize_activity_instance(sample_activity_instance)
         
         assert instance_dict['id'] == sample_activity_instance.id
         assert 'practice_session_id' in instance_dict
@@ -267,7 +270,7 @@ class TestMetricValue:
         db_session.add(metric_value)
         db_session.commit()
         
-        value_dict = metric_value.to_dict()
+        value_dict = serialize_metric_value(metric_value)
         
         assert value_dict['id'] == metric_value.id
         assert value_dict['value'] == 10.0

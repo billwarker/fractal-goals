@@ -16,6 +16,7 @@ import json
 from services.events import event_bus, Event, Events
 import models
 from models import get_session, Goal, Session, ActivityInstance
+from services.serializers import serialize_activity_instance
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def handle_session_completed(event: Event):
             activity_id = inst.activity_definition_id
             if activity_id not in instances_by_activity:
                 instances_by_activity[activity_id] = []
-            instances_by_activity[activity_id].append(inst.to_dict())
+            instances_by_activity[activity_id].append(serialize_activity_instance(inst))
         
         # Evaluate targets for each linked goal
         # Evaluate targets for each linked goal

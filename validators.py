@@ -23,7 +23,7 @@ from datetime import datetime, date
 from typing import Optional, List, Any, Dict
 from functools import wraps
 from flask import request, jsonify
-from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError, ConfigDict
 import re
 import logging
 
@@ -343,6 +343,12 @@ class SessionCreateSchema(BaseModel):
             return v
         return sanitize_string(v)
 
+    @model_validator(mode='after')
+    def check_goal_association(self) -> 'SessionCreateSchema':
+        if not any([self.parent_id, self.parent_ids, self.goal_ids]):
+             raise ValueError("Session must be associated with at least one goal (parent_id, parent_ids, or goal_ids)")
+        return self
+
 
 class SessionUpdateSchema(BaseModel):
     """Schema for updating an existing session."""
@@ -592,7 +598,7 @@ class SessionTemplateCreateSchema(BaseModel):
     
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    template_data: Optional[Dict[str, Any]] = None
+    template_data: Dict[str, Any] = Field(...)
     
     @field_validator('name')
     @classmethod
