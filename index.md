@@ -24,6 +24,7 @@
 - Secured **ALL** API blueprints using `@token_required` decorator
 - Created `AuthContext` for global frontend user/session management
 - Refactored Program logic into `ProgramService`
+- **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
 
 ---
 
@@ -781,10 +782,12 @@ Detailed view of a single program/template.
 **Features:**
 - Calendar and blocks view modes
 - **Calendar View updates:**
+  - **Hierarchical Representation**: Session templates are now nested under their parent program days in the calendar view for better clarity.
+  - **Smart Completion Logic**: Program days are marked with a checkmark only when all associated session templates have been completed via linked sessions.
+  - **Template Level Tracking**: Individual templates in the calendar get checkmarks and session counts (e.g., "Practice Session ✓ 2") when multiple sessions are performed.
+  - **Visual indents**: Nested templates are indented and styled distinctly from parent program days.
   - Toggle between "Select Dates to Add Block" mode and Day View mode
   - Comprehensive Day View Modal showing schedule, templates, and goals due
-  - Set goal deadlines directly from Day View
-  - Dynamic calendar events (hiding planned templates if session matches, showing all goal deadlines)
 - **Block Interaction:**
   - Create and edit training blocks with custom colors and date ranges
   - User-controlled day creation (days not auto-populated)

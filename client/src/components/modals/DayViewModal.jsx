@@ -189,35 +189,74 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                     {/* Program Days */}
                     {scheduledProgramDays.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                            {scheduledProgramDays.map((day, idx) => (
-                                <div key={idx} style={{
-                                    background: '#252525',
-                                    borderRadius: '8px',
-                                    padding: '16px',
-                                    borderLeft: `4px solid ${day.blockColor || '#3A86FF'}`
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                        <div>
-                                            <div style={{ color: day.blockColor || '#3A86FF', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
-                                                {day.blockName}
+                            {scheduledProgramDays.map((day, idx) => {
+                                const sessionsByTemplate = {};
+                                completedSessions.forEach(s => {
+                                    if (s.template_id) {
+                                        if (!sessionsByTemplate[s.template_id]) sessionsByTemplate[s.template_id] = [];
+                                        sessionsByTemplate[s.template_id].push(s);
+                                    }
+                                });
+
+                                const templates = day.templates || [];
+                                const isPDCompleted = templates.length > 0 &&
+                                    templates.every(t => sessionsByTemplate[t.id]?.length > 0);
+
+                                return (
+                                    <div key={idx} style={{
+                                        background: isPDCompleted ? '#1a2e1a' : '#252525',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        borderLeft: `4px solid ${isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF')}`,
+                                        position: 'relative'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                            <div>
+                                                <div style={{ color: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF'), fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                                                    {day.blockName} {isPDCompleted && '✓'}
+                                                </div>
+                                                <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{day.name}</div>
                                             </div>
-                                            <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{day.name}</div>
+                                            <button
+                                                onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
+                                                style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: '16px', padding: '4px', lineHeight: 1 }}
+                                                title="Unschedule Day"
+                                            >
+                                                ✕
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
-                                            style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: '16px', padding: '4px', lineHeight: 1 }}
-                                            title="Unschedule Day"
-                                        >
-                                            ✕
-                                        </button>
+
+                                        {/* Templates List */}
+                                        {templates.length > 0 && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                                                {templates.map(t => {
+                                                    const sCount = sessionsByTemplate[t.id]?.length || 0;
+                                                    const isDone = sCount > 0;
+                                                    return (
+                                                        <div key={t.id} style={{
+                                                            fontSize: '13px',
+                                                            color: isDone ? '#8bc34a' : '#aaa',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '8px'
+                                                        }}>
+                                                            <span>{isDone ? '✓' : '○'}</span>
+                                                            <span>{t.name}</span>
+                                                            {sCount > 1 && <span style={{ fontSize: '11px', background: '#333', padding: '2px 6px', borderRadius: '4px' }}>{sCount}</span>}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {day.notes && (
+                                            <div style={{ color: '#aaa', fontSize: '13px', marginTop: '12px', whiteSpace: 'pre-wrap' }}>
+                                                {day.notes}
+                                            </div>
+                                        )}
                                     </div>
-                                    {day.notes && (
-                                        <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px', whiteSpace: 'pre-wrap' }}>
-                                            {day.notes}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 

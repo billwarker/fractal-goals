@@ -473,10 +473,10 @@ class ProgramService:
         if not p_day:
             return False
 
-        # Mark Day as Completed
-        # (Assuming simply finishing the session completes the day. 
-        # Future: link specific templates if needed, but for now 1 session = 1 day completion usually)
-        if not p_day.is_completed:
+        # Check if the day is now complete based on all templates
+        is_now_complete = p_day.check_completion()
+        
+        if is_now_complete and not p_day.is_completed:
             p_day.is_completed = True
             logger.info(f"Program Day Completed: {p_day.name} ({p_day.id})")
             

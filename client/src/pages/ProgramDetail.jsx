@@ -545,18 +545,10 @@ const ProgramDetail = () => {
         }
     };
 
-    const calendarEvents = [];
-
-    // Helper Map for Template Lookups
-    const programDaysMap = new Map();
-    program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockId: b.id, blockColor: b.color })));
-
-    // Helper to get local date string from a datetime
+    // Helper to get local date string from a datetime (YYYY-MM-DD)
     const getLocalDateString = (dateTimeStr) => {
         if (!dateTimeStr) return null;
-        // If it's already just a date (YYYY-MM-DD), return it
-        if (dateTimeStr.length === 10) return dateTimeStr;
-        // Otherwise parse and convert to local date
+        if (typeof dateTimeStr === 'string' && dateTimeStr.length === 10) return dateTimeStr;
         const d = new Date(dateTimeStr);
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -564,10 +556,47 @@ const ProgramDetail = () => {
         return `${year}-${month}-${day}`;
     };
 
-    // Render Sessions as Calendar Events (The "Scheduled" Reality)
+    const calendarEvents = [];
+
+    // Helper Map for Template Lookups
+    const programDaysMap = new Map();
+    program.blocks?.forEach(b => b.days?.forEach(d => programDaysMap.set(d.id, { ...d, blockId: b.id, blockColor: b.color })));
+
+    // Grouping structure: { dateStr: { groupsByName: { [name]: { pDay, sessions: [], templatesByName: { [tName]: { templates: [], sessions: [] } } } }, unlinkedSessions: [] } }
+    const dateGroups = {};
+
+    // 1. Initialize Date Groups with Scheduled Days
+    program.blocks?.forEach(block => {
+        block.days?.forEach(day => {
+            if (day.date) {
+                const dateStr = getLocalDateString(day.date);
+                if (!dateGroups[dateStr]) dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
+
+                const name = day.name || 'Untitled Day';
+                if (!dateGroups[dateStr].groupsByName[name]) {
+                    dateGroups[dateStr].groupsByName[name] = {
+                        name,
+                        pDay: day,
+                        blockColor: block.color,
+                        sessions: [],
+                        templatesByName: {}
+                    };
+                }
+                const group = dateGroups[dateStr].groupsByName[name];
+                (day.templates || []).forEach(t => {
+                    if (!group.templatesByName[t.name]) group.templatesByName[t.name] = { templates: [], sessions: [] };
+                    group.templatesByName[t.name].templates.push(t);
+                });
+            }
+        });
+    });
+
+    // 2. Link Sessions to Date Groups (Merge into named groups)
     sessions.forEach(session => {
+        const dateStr = getLocalDateString(session.session_start || session.created_at);
+        if (!dateGroups[dateStr]) dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
+
         let pDayId = session.program_day_id;
-        // Fallback: check session.attributes used by createSession
         if (!pDayId && session.attributes) {
             try {
                 const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
@@ -575,38 +604,135 @@ const ProgramDetail = () => {
             } catch (e) { }
         }
 
-        if (pDayId && programDaysMap.has(pDayId)) {
-            const pDay = programDaysMap.get(pDayId);
-            const isCompleted = session.session_end && moment(session.session_end).isValid();
+        const pDayTemplate = pDayId ? programDaysMap.get(pDayId) : null;
 
-            // Main Event - Show the scheduled day as a visible event
-            // Use local date to prevent timezone shift issues
-            const eventDate = getLocalDateString(session.session_start);
-
-            calendarEvents.push({
-                id: `session-event-${session.id}`,
-                title: (isCompleted ? "✓ " : "📋 ") + pDay.name,
-                start: eventDate,
-                allDay: true,
-                backgroundColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
-                borderColor: isCompleted ? '#2e7d32' : (pDay.blockColor || '#3A86FF'),
-                textColor: 'white',
-                classNames: ['scheduled-day-event'],
-                extendedProps: {
-                    type: 'scheduled_day',
-                    sessionId: session.id,
-                    programDayId: pDayId,
-                    dayName: pDay.name
+        if (pDayTemplate) {
+            const name = pDayTemplate.name;
+            if (!dateGroups[dateStr].groupsByName[name]) {
+                dateGroups[dateStr].groupsByName[name] = {
+                    name,
+                    pDay: pDayTemplate,
+                    blockColor: pDayTemplate.blockColor,
+                    sessions: [],
+                    templatesByName: {}
+                };
+                (pDayTemplate.templates || []).forEach(t => {
+                    if (!dateGroups[dateStr].groupsByName[name].templatesByName[t.name]) {
+                        dateGroups[dateStr].groupsByName[name].templatesByName[t.name] = { templates: [], sessions: [] };
+                    }
+                    dateGroups[dateStr].groupsByName[name].templatesByName[t.name].templates.push(t);
+                });
+            }
+            dateGroups[dateStr].groupsByName[name].sessions.push(session);
+        } else {
+            // Check if this session name matches any existing Day group's template names on this date
+            let claimed = false;
+            for (const group of Object.values(dateGroups[dateStr].groupsByName)) {
+                if (group.templatesByName[session.name]) {
+                    group.sessions.push(session);
+                    claimed = true;
+                    break;
                 }
-            });
+            }
+            if (!claimed) dateGroups[dateStr].unlinkedSessions.push(session);
         }
     });
+
+    // 3. Generate Calendar Events from consolidated data
+    Object.entries(dateGroups).forEach(([dateStr, data]) => {
+        Object.values(data.groupsByName).forEach(group => {
+            // Distribute sessions among templates in the group
+            group.sessions.forEach(s => {
+                const tName = s.name;
+                if (group.templatesByName[tName]) {
+                    group.templatesByName[tName].sessions.push(s);
+                } else {
+                    // Fallback: if session has template_id, find template with that ID in the group
+                    const matchingT = Object.values(group.templatesByName)
+                        .flatMap(gt => gt.templates)
+                        .find(t => t.id === s.template_id);
+                    if (matchingT) {
+                        group.templatesByName[matchingT.name].sessions.push(s);
+                    }
+                }
+            });
+
+            const templatePairs = Object.values(group.templatesByName);
+            const isPDCompleted = templatePairs.length > 0 &&
+                templatePairs.every(pair => pair.sessions.length > 0);
+
+            // Main Program Day Event
+            calendarEvents.push({
+                id: `pday-${dateStr}-${group.name}`,
+                title: (isPDCompleted ? "✓ " : "📋 ") + group.name,
+                start: dateStr,
+                allDay: true,
+                backgroundColor: isPDCompleted ? '#2e7d32' : (group.blockColor || '#37474F'),
+                borderColor: isPDCompleted ? '#2e7d32' : 'transparent',
+                textColor: 'white',
+                classNames: ['program-day-event'],
+                extendedProps: {
+                    type: 'program_day',
+                    pDayId: group.pDay?.id,
+                    isCompleted: isPDCompleted,
+                    sortOrder: 0
+                }
+            });
+
+            // Consolidated Session Template Events
+            templatePairs.forEach(pair => {
+                const tName = pair.templates[0]?.name || 'Untitled Template';
+                const sCount = pair.sessions.length;
+                const isTemplateCompleted = sCount > 0;
+
+                let displayTitle = tName;
+                if (isTemplateCompleted) {
+                    displayTitle = `✓ ${tName}`;
+                    if (sCount > 1) {
+                        displayTitle += ` (${sCount})`;
+                    }
+                }
+
+                calendarEvents.push({
+                    id: `template-${dateStr}-${group.name}-${tName}`,
+                    title: displayTitle,
+                    start: dateStr,
+                    allDay: true,
+                    backgroundColor: isTemplateCompleted ? '#1b5e20' : '#424242',
+                    borderColor: 'transparent',
+                    textColor: isTemplateCompleted ? '#c8e6c9' : '#bdbdbd',
+                    classNames: ['template-event'],
+                    extendedProps: {
+                        type: 'template',
+                        templateId: pair.templates[0]?.id,
+                        isCompleted: isTemplateCompleted,
+                        count: sCount,
+                        sortOrder: 1
+                    }
+                });
+            });
+        });
+
+        // Render remaining Unlinked Sessions
+        data.unlinkedSessions.forEach(s => {
+            calendarEvents.push({
+                id: `session-${s.id}`,
+                title: `✓ ${s.name}`,
+                start: dateStr,
+                allDay: true,
+                backgroundColor: '#2e7d32',
+                borderColor: 'transparent',
+                textColor: 'white',
+                extendedProps: { type: 'session', sortOrder: 2, ...s }
+            });
+        });
+    });
+
+    // 4. Add Block Backgrounds
     sortedBlocks.forEach(block => {
         if (!block.start_date || !block.end_date) return;
-
-        // Block Event (Background)
         calendarEvents.push({
-            id: block.id,
+            id: `block-bg-${block.id}`,
             title: block.name,
             start: block.start_date,
             end: moment(block.end_date).add(1, 'days').format('YYYY-MM-DD'),
@@ -615,74 +741,17 @@ const ProgramDetail = () => {
             textColor: 'white',
             allDay: true,
             display: 'background',
-            extendedProps: block
+            extendedProps: { type: 'block_background', ...block }
         });
-
-        // Goal Events logic moved outside to ensure all goals with deadlines are shown
-
-
-        // Day Events
-        if (block.days) {
-            block.days.forEach(day => {
-                if (day.date) {
-                    calendarEvents.push({
-                        id: `day-${day.id}`,
-                        title: day.name + (day.is_completed ? ' ✅' : ''),
-                        start: day.date,
-                        allDay: true,
-                        backgroundColor: 'transparent',
-                        borderColor: 'transparent',
-                        textColor: day.is_completed ? '#4caf50' : 'rgba(255,255,255,0.9)',
-                        classNames: ['day-label-event']
-                    });
-
-                    const hasCompletedSessions = day.completed_sessions && day.completed_sessions.length > 0;
-
-                    // Add events for Templates (The Plan) - only if there are NO completed sessions
-                    if (day.templates && !hasCompletedSessions) {
-                        day.templates.forEach(t => {
-                            calendarEvents.push({
-                                id: `template-${day.id}-${t.id}`,
-                                title: t.name,
-                                start: day.date,
-                                allDay: true,
-                                backgroundColor: '#37474F',
-                                borderColor: 'transparent',
-                                textColor: '#CFD8DC',
-                                extendedProps: { type: 'template', ...t }
-                            });
-                        });
-                    }
-
-                    // Add events for Completed Sessions (The Reality) - always show if they exist
-                    if (hasCompletedSessions) {
-                        day.completed_sessions.forEach(s => {
-                            calendarEvents.push({
-                                id: `session-${s.id}`,
-                                title: `✓ ${s.name}`,
-                                start: s.created_at ? getLocalDateString(s.created_at) : day.date,
-                                allDay: true,
-                                backgroundColor: '#2e7d32',
-                                borderColor: '#4caf50',
-                                textColor: 'white',
-                                extendedProps: { type: 'session', ...s }
-                            });
-                        });
-                    }
-                }
-            });
-        }
     });
 
-    // Add Goal Events (only for goals attached to this program or its blocks)
-    // Collect all goal IDs that are attached to this program
+    // 5. Add Goal Events
     const attachedGoalIds = new Set([
         ...(program.goal_ids || []),
         ...sortedBlocks.flatMap(b => b.goal_ids || [])
     ]);
 
     goals.forEach(goal => {
-        // Only show goals that are attached to this program AND have a deadline
         if (goal.deadline && attachedGoalIds.has(goal.id)) {
             const goalType = goal.attributes?.type || goal.type;
             const isCompleted = goal.completed || goal.attributes?.completed;
@@ -696,8 +765,7 @@ const ProgramDetail = () => {
                 backgroundColor: isCompleted ? '#2e7d32' : getGoalColor(goalType),
                 borderColor: isCompleted ? '#4caf50' : getGoalColor(goalType),
                 textColor: isCompleted ? 'white' : getGoalTextColor(goalType),
-                extendedProps: { type: 'goal', ...goal },
-                // Use classNames for styling
+                extendedProps: { type: 'goal', sortOrder: 3, ...goal },
                 classNames: isCompleted ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event']
             });
         }
@@ -774,6 +842,8 @@ const ProgramDetail = () => {
                     .fc-day-today { background-color: #2a2a2a !important; }
                     .fc-theme-standard td, .fc-theme-standard th { border-color: #333; }
                     .clickable-goal-event { cursor: pointer; }
+                    .program-day-event { font-weight: 600 !important; border-radius: 4px !important; }
+                    .template-event { font-size: 0.85em !important; opacity: 0.9; border-radius: 3px !important; }
                 `}
             </style>
 
@@ -973,6 +1043,7 @@ const ProgramDetail = () => {
                                 events={calendarEvents}
                                 height="100%"
                                 dayMaxEvents={5}
+                                eventOrder="sortOrder"
                                 selectable={true}
                                 select={handleDateSelect}
                                 eventClick={handleEventClick}
@@ -1117,15 +1188,20 @@ const ProgramDetail = () => {
                                                                 {(() => {
                                                                     const blockStart = moment(block.start_date).startOf('day');
                                                                     const blockEnd = moment(block.end_date).endOf('day');
-                                                                    const completedCount = sessions.filter(s => {
+                                                                    const daySessions = sessions.filter(s => {
                                                                         if (s.program_day_id !== day.id || !s.completed) return false;
                                                                         const sessDate = moment(s.session_start || s.created_at);
                                                                         return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
-                                                                    }).length;
-                                                                    if (completedCount > 0) {
+                                                                    });
+
+                                                                    const completedTemplateIds = new Set(daySessions.filter(s => s.template_id).map(s => s.template_id));
+                                                                    const templates = day.templates || [];
+                                                                    const isFullComplete = templates.length > 0 && templates.every(t => completedTemplateIds.has(t.id));
+
+                                                                    if (daySessions.length > 0) {
                                                                         return (
-                                                                            <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                                ✓ {completedCount}
+                                                                            <div style={{ color: isFullComplete ? '#4caf50' : '#888', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                                {isFullComplete && '✓'} {daySessions.length}
                                                                             </div>
                                                                         );
                                                                     }
@@ -1135,18 +1211,40 @@ const ProgramDetail = () => {
 
                                                             {/* Day Templates (Sessions) */}
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                                {day.templates?.length > 0 ? day.templates.map(template => (
-                                                                    <div key={template.id} style={{
-                                                                        fontSize: '11px',
-                                                                        color: '#bbb',
-                                                                        background: '#333',
-                                                                        padding: '4px 8px',
-                                                                        borderRadius: '4px',
-                                                                        borderLeft: '2px solid #555'
-                                                                    }}>
-                                                                        {template.name}
-                                                                    </div>
-                                                                )) : (<div style={{ fontSize: '10px', color: '#444', fontStyle: 'italic' }}>Rest</div>)}
+                                                                {(() => {
+                                                                    const blockStart = moment(block.start_date).startOf('day');
+                                                                    const blockEnd = moment(block.end_date).endOf('day');
+                                                                    const daySessions = sessions.filter(s => {
+                                                                        if (s.program_day_id !== day.id || !s.completed) return false;
+                                                                        const sessDate = moment(s.session_start || s.created_at);
+                                                                        return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
+                                                                    });
+
+                                                                    if (day.templates?.length > 0) {
+                                                                        return day.templates.map(template => {
+                                                                            const tSessions = daySessions.filter(s => s.template_id === template.id);
+                                                                            const sCount = tSessions.length;
+                                                                            const isDone = sCount > 0;
+
+                                                                            return (
+                                                                                <div key={template.id} style={{
+                                                                                    fontSize: '11px',
+                                                                                    color: isDone ? '#c8e6c9' : '#bbb',
+                                                                                    background: isDone ? '#1b5e20' : '#333',
+                                                                                    padding: '4px 8px',
+                                                                                    borderRadius: '4px',
+                                                                                    borderLeft: isDone ? '2px solid #4caf50' : '2px solid #555',
+                                                                                    display: 'flex',
+                                                                                    justifyContent: 'space-between'
+                                                                                }}>
+                                                                                    <span>{isDone ? '✓ ' : ''}{template.name}</span>
+                                                                                    {sCount > 1 && <span>{sCount}</span>}
+                                                                                </div>
+                                                                            );
+                                                                        });
+                                                                    }
+                                                                    return <div style={{ fontSize: '10px', color: '#444', fontStyle: 'italic' }}>Rest</div>;
+                                                                })()}
                                                             </div>
                                                         </div>
                                                     ));
