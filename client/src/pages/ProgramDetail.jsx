@@ -753,31 +753,29 @@ const ProgramDetail = () => {
             extendedProps: { type: 'block_background', ...block }
         });
     });
+    const getDescendants = (id, allGoals, visited = new Set()) => {
+        if (visited.has(id)) return [];
+        visited.add(id);
+        const g = allGoals.find(x => x.id === id);
+        if (!g || !g.children) return [];
+        let desc = [];
+        g.children.forEach(c => {
+            desc.push(c.id);
+            desc = desc.concat(getDescendants(c.id, allGoals, visited));
+        });
+        return desc;
+    };
 
-    // 4. Calculate Expanded Attached Goals (including all descendants)
     const attachedGoalIds = new Set();
-    const taskSeeds = [
+    const taskSeedsForExpansion = [
         ...(program.goal_ids || []),
         ...sortedBlocks.flatMap(b => b.goal_ids || [])
     ];
-
-    const getDescendants = (goalId, allGoals, visited = new Set()) => {
-        if (visited.has(goalId)) return [];
-        visited.add(goalId);
-        const goal = allGoals.find(g => g.id === goalId);
-        if (!goal || !goal.children) return [];
-        let descendants = [];
-        goal.children.forEach(child => {
-            descendants.push(child.id);
-            descendants = descendants.concat(getDescendants(child.id, allGoals, visited));
-        });
-        return descendants;
-    };
-
-    taskSeeds.forEach(seedId => {
-        attachedGoalIds.add(seedId);
-        getDescendants(seedId, goals).forEach(id => attachedGoalIds.add(id));
+    taskSeedsForExpansion.forEach(sid => {
+        attachedGoalIds.add(sid);
+        getDescendants(sid, goals).forEach(id => attachedGoalIds.add(id));
     });
+
 
     // 5. Add Goal Events to Calendar
     goals.forEach(goal => {
@@ -906,20 +904,15 @@ const ProgramDetail = () => {
             return pDayId && programDaysMap.has(pDayId);
         });
 
-        const programGoalIds = new Set(program.goal_ids || []);
-        program.blocks?.forEach(b => {
-            (b.goal_ids || []).forEach(id => programGoalIds.add(id));
-        });
-
         return {
             completedSessions: programSessions.filter(s => s.completed).length,
             scheduledSessions: Array.from(programDaysMap.values()).reduce((sum, d) => sum + (d.templates?.length || 0), 0),
             totalDuration: programSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0),
-            goalsMet: Array.from(programGoalIds).filter(id => {
+            goalsMet: Array.from(attachedGoalIds).filter(id => {
                 const goal = getGoalDetails(id);
                 return goal && (goal.completed || goal.attributes?.completed);
             }).length,
-            totalGoals: programGoalIds.size,
+            totalGoals: attachedGoalIds.size,
             daysRemaining: Math.max(0, moment(program.end_date).startOf('day').diff(moment().startOf('day'), 'days'))
         };
     })() : null;
@@ -949,12 +942,20 @@ const ProgramDetail = () => {
         });
 
         // Determine which goals to track for this block's metrics
-        let blockGoalIdsValue = activeBlock.goal_ids || [];
+        let blockGoalIdsValue = [];
+        const activeBlockGoalIds = activeBlock.goal_ids || [];
 
-        // If no goals specifically attached to the block, fall back to program goals due in this block
-        if (blockGoalIdsValue.length === 0) {
-            const programGoalIds = program.goal_ids || [];
-            blockGoalIdsValue = programGoalIds.filter(id => {
+        if (activeBlockGoalIds.length > 0) {
+            // Include active block's goals and all their descendants
+            const blockSpecificSet = new Set();
+            activeBlockGoalIds.forEach(id => {
+                blockSpecificSet.add(id);
+                getDescendants(id, goals).forEach(gid => blockSpecificSet.add(gid));
+            });
+            blockGoalIdsValue = Array.from(blockSpecificSet);
+        } else {
+            // Fallback: all program-attached goals (including descendants) that fall in this block
+            blockGoalIdsValue = Array.from(attachedGoalIds).filter(id => {
                 const goal = getGoalDetails(id);
                 if (!goal || !goal.deadline) return false;
                 const deadline = moment(goal.deadline);
