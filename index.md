@@ -795,7 +795,7 @@ Detailed view of a single program/template.
   - Active block indicators
   - **Metrics Section:** Left sidebar displays simple text metrics strictly for the active block. Metrics are calculated by filtering sessions associated with the block's days (via `program_day_id` or `program_context`) and goals attached to the block (or program goals due within the block's timeframe as a fallback).
   - **Block Goal Display:** All goals associated with a block (manually attached or falling within the block's date range) are displayed as interactive badges next to the block name in the blocks view.
-  - **Program Day Tracking:** Every program day card in the block panel shows a checkmark and the count of completed sessions for that day *within the current block*, or "none" if not yet practiced.
+  - **Program Day Tracking:** Every program day card in the block panel shows a green-highlighted count of completed sessions for that day *within the current block*, with a trailing checkmark for full template completion.
   - **Days Remaining:** Active blocks in the blocks view now display a "Days Remaining" metric highlighted in the block's specific color.
   - **Smart Calendar Goals:** Completed goals on the calendar now move to their actual completion date (instead of the original deadline) for better historical tracking.
 - **Scheduling (New Architecture):**

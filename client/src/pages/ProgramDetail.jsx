@@ -1237,8 +1237,8 @@ const ProgramDetail = () => {
 
                                                                     if (daySessions.length > 0) {
                                                                         return (
-                                                                            <div style={{ color: isFullComplete ? '#4caf50' : '#888', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                                {isFullComplete && '✓'} {daySessions.length}
+                                                                            <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                                {daySessions.length} {isFullComplete && '✓'}
                                                                             </div>
                                                                         );
                                                                     }
