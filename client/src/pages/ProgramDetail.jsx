@@ -919,7 +919,8 @@ const ProgramDetail = () => {
                 const goal = getGoalDetails(id);
                 return goal && (goal.completed || goal.attributes?.completed);
             }).length,
-            totalGoals: programGoalIds.size
+            totalGoals: programGoalIds.size,
+            daysRemaining: Math.max(0, moment(program.end_date).startOf('day').diff(moment().startOf('day'), 'days'))
         };
     })() : null;
 
@@ -1066,6 +1067,9 @@ const ProgramDetail = () => {
                             <div style={{ marginBottom: '24px' }}>
                                 <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Metrics</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
+                                    <div style={{ color: '#3A86FF', fontWeight: 600, fontSize: '16px', marginBottom: '4px' }}>
+                                        {programMetrics.daysRemaining} Days Remaining
+                                    </div>
                                     <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
                                     <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(programMetrics.totalDuration)}</div>
                                     <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
