@@ -893,6 +893,36 @@ const ProgramDetail = () => {
     // Find generic block for attach modal deadline constraints
     const attachBlock = sortedBlocks.find(b => b.id === attachBlockId);
 
+    // Calculate overall program metrics
+    const programMetrics = program ? (() => {
+        const programSessions = sessions.filter(s => {
+            let pDayId = s.program_day_id;
+            if (!pDayId && s.attributes) {
+                try {
+                    const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
+                    pDayId = attr?.program_context?.day_id;
+                } catch (e) { }
+            }
+            return pDayId && programDaysMap.has(pDayId);
+        });
+
+        const programGoalIds = new Set(program.goal_ids || []);
+        program.blocks?.forEach(b => {
+            (b.goal_ids || []).forEach(id => programGoalIds.add(id));
+        });
+
+        return {
+            completedSessions: programSessions.filter(s => s.completed).length,
+            scheduledSessions: Array.from(programDaysMap.values()).reduce((sum, d) => sum + (d.templates?.length || 0), 0),
+            totalDuration: programSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0),
+            goalsMet: Array.from(programGoalIds).filter(id => {
+                const goal = getGoalDetails(id);
+                return goal && (goal.completed || goal.attributes?.completed);
+            }).length,
+            totalGoals: programGoalIds.size
+        };
+    })() : null;
+
     // Calculate active block and its metrics
     const activeBlock = program?.blocks?.find(block => isBlockActive(block));
     const blockMetrics = activeBlock ? (() => {
@@ -982,8 +1012,14 @@ const ProgramDetail = () => {
                     </button>
                     <div>
                         <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, color: 'white' }}>{program.name}</h1>
-                        <div style={{ fontSize: '14px', color: '#888', marginTop: '4px' }}>
-                            {formatDate(program.start_date)} - {formatDate(program.end_date)}
+                        <div style={{ fontSize: '14px', color: '#888', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
+                            {program.description && (
+                                <>
+                                    <span>•</span>
+                                    <span style={{ color: '#aaa' }}>{program.description}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1025,14 +1061,19 @@ const ProgramDetail = () => {
                 <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', display: 'flex', flexDirection: 'column' }}>
                     {/* Fixed Top Section */}
                     <div style={{ padding: '24px', borderBottom: '1px solid #333' }}>
-                        <div style={{ marginBottom: '24px' }}>
-                            <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Description</h3>
-                            <p style={{ color: '#ddd', lineHeight: '1.5', fontSize: '14px', margin: 0 }}>
-                                {program.description || 'No description provided.'}
-                            </p>
-                        </div>
+                        {/* Program Metrics Section */}
+                        {programMetrics && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Metrics</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(programMetrics.totalDuration)}</div>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* Metrics Section */}
+                        {/* Current Block Metrics Section */}
                         {activeBlock && (
                             <div>
                                 <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
