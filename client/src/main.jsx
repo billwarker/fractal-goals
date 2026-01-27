@@ -37,26 +37,54 @@ const QueryDevtools = () => {
   return <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />;
 };
 
+import { Toaster } from 'react-hot-toast';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary.jsx';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <DebugProvider>
-          <QueryDevtools />
-          <TimezoneProvider>
-            <AuthProvider>
-              <ActivitiesProvider>
-                <SessionsProvider>
-                  <GoalsProvider>
-                    <AppRouter />
-                  </GoalsProvider>
-                </SessionsProvider>
-              </ActivitiesProvider>
-            </AuthProvider>
-          </TimezoneProvider>
-        </DebugProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <GlobalErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <DebugProvider>
+            <QueryDevtools />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: '#333',
+                  color: '#fff',
+                },
+                success: {
+                  duration: 3000,
+                  iconTheme: {
+                    primary: '#4caf50',
+                    secondary: '#fff',
+                  },
+                },
+                error: {
+                  duration: 5000,
+                  iconTheme: {
+                    primary: '#ff5252',
+                    secondary: '#fff',
+                  },
+                },
+              }}
+            />
+            <TimezoneProvider>
+              <AuthProvider>
+                <ActivitiesProvider>
+                  <SessionsProvider>
+                    <GoalsProvider>
+                      <AppRouter />
+                    </GoalsProvider>
+                  </SessionsProvider>
+                </ActivitiesProvider>
+              </AuthProvider>
+            </TimezoneProvider>
+          </DebugProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </GlobalErrorBoundary>
   </StrictMode>,
 )
 

@@ -14,17 +14,21 @@ import AttachGoalModal from '../components/modals/AttachGoalModal';
 import DayViewModal from '../components/modals/DayViewModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import GoalDetailModal from '../components/GoalDetailModal';
+import { toast } from 'react-hot-toast';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import { getChildType } from '../utils/goalHelpers';
+
 import { useProgramData } from '../hooks/useProgramData';
+import { useProgramLogic } from '../hooks/useProgramLogic';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
 
     // Data Hook (manages program, goals, sessions, etc.)
+    // Data Hook (manages program, goals, sessions, etc.)
     const {
-        program, setProgram,
+        program,
         loading,
         goals, setGoals,
         activities,
@@ -34,6 +38,10 @@ const ProgramDetail = () => {
         refreshData,
         getGoalDetails
     } = useProgramData(rootId, programId);
+
+    const actions = useProgramLogic(rootId, program, refreshData);
+
+
 
     const [showEditBuilder, setShowEditBuilder] = useState(false);
 
@@ -83,21 +91,11 @@ const ProgramDetail = () => {
 
     const handleSaveProgram = async (programData) => {
         try {
-            const apiData = {
-                name: programData.name,
-                description: programData.description || '',
-                start_date: programData.startDate,
-                end_date: programData.endDate,
-                selectedGoals: programData.selectedGoals,
-                weeklySchedule: Array.isArray(program.weekly_schedule) ? program.weekly_schedule : []
-            };
-
-            await fractalApi.updateProgram(rootId, program.id, apiData);
-            refreshData();
+            await actions.saveProgram(programData);
             setShowEditBuilder(false);
         } catch (err) {
             console.error('Failed to update program:', err);
-            alert('Failed to update program: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to update program: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -147,53 +145,14 @@ const ProgramDetail = () => {
     };
 
     const handleSaveBlock = async (blockData) => {
-        const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
-        let updatedSchedule;
-
-        if (blockData.id) {
-            // Update existing block
-            updatedSchedule = currentSchedule.map(block =>
-                block.id === blockData.id
-                    ? {
-                        ...block,
-                        name: blockData.name,
-                        startDate: blockData.startDate,
-                        endDate: blockData.endDate,
-                        color: blockData.color
-                    }
-                    : block
-            );
-        } else {
-            // Create new block
-            const newBlock = {
-                id: Date.now().toString(),
-                name: blockData.name,
-                startDate: blockData.startDate,
-                endDate: blockData.endDate,
-                color: blockData.color,
-                weeklySchedule: { daily: [] }
-            };
-            updatedSchedule = [...currentSchedule, newBlock];
-        }
-
         try {
-            const apiData = {
-                name: program.name,
-                description: program.description || '',
-                start_date: program.start_date,
-                end_date: program.end_date,
-                selectedGoals: program.goal_ids || [],
-                weeklySchedule: updatedSchedule
-            };
-
-            await fractalApi.updateProgram(rootId, program.id, apiData);
-            refreshData();
+            await actions.saveBlock(blockData);
             setShowBlockModal(false);
             setBlockModalData(null);
-            setBlockCreationMode(false); // Turn off block creation mode after creating a block
+            setBlockCreationMode(false);
         } catch (err) {
             console.error('Failed to save training block:', err);
-            alert('Failed to save training block');
+            toast.error('Failed to save training block');
         }
     };
 
@@ -202,24 +161,11 @@ const ProgramDetail = () => {
             return;
         }
 
-        const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
-        const updatedSchedule = currentSchedule.filter(block => block.id !== blockId);
-
         try {
-            const apiData = {
-                name: program.name,
-                description: program.description || '',
-                start_date: program.start_date,
-                end_date: program.end_date,
-                selectedGoals: program.goal_ids || [],
-                weeklySchedule: updatedSchedule
-            };
-
-            await fractalApi.updateProgram(rootId, program.id, apiData);
-            refreshData();
+            await actions.deleteBlock(blockId);
         } catch (err) {
             console.error('Failed to delete block:', err);
-            alert('Failed to delete block');
+            toast.error('Failed to delete block');
         }
     };
 
@@ -237,35 +183,28 @@ const ProgramDetail = () => {
 
     const handleSaveDay = async (dayData) => {
         try {
-            if (dayModalInitialData) {
-                // Update
-                await fractalApi.updateBlockDay(rootId, program.id, selectedBlockId, dayModalInitialData.id, dayData);
-            } else {
-                // Create
-                await fractalApi.addBlockDay(rootId, program.id, selectedBlockId, dayData);
-            }
-            refreshData();
+            // The hook handles update vs create logic if we pass dayModalInitialData.id
+            // Hook signature: saveDay(blockId, dayId, dayData)
+            const dayId = dayModalInitialData ? dayModalInitialData.id : null;
+            await actions.saveDay(selectedBlockId, dayId, dayData);
             setShowDayModal(false);
         } catch (err) {
             console.error('Failed to save day:', err);
-            alert('Failed to save day: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to save day: ' + (err.response?.data?.error || err.message));
         }
     };
 
     const handleCopyDay = async (dayId, copyData) => {
-        const res = await fractalApi.copyBlockDay(rootId, program.id, selectedBlockId, dayId, copyData);
-        refreshData();
-        return res;
+        return actions.copyDay(selectedBlockId, dayId, copyData);
     };
 
     const handleDeleteDay = async (dayId) => {
         try {
-            await fractalApi.deleteBlockDay(rootId, program.id, selectedBlockId, dayId);
-            refreshData();
+            await actions.deleteDay(selectedBlockId, dayId);
             setShowDayModal(false);
         } catch (err) {
             console.error('Failed to delete day:', err);
-            alert('Failed to delete day');
+            toast.error('Failed to delete day');
         }
     };
 
@@ -279,23 +218,11 @@ const ProgramDetail = () => {
     const executeUnscheduleDay = async () => {
         if (!itemToUnschedule) return;
 
-        const item = itemToUnschedule;
         try {
-            if (item.type === 'session') {
-                await fractalApi.deleteSession(rootId, item.id);
-                refreshData();
-            } else {
-                // Legacy Program Day (Instance)
-                if (!item.blockId) {
-                    console.error("Cannot delete day without blockId");
-                    return;
-                }
-                await fractalApi.deleteBlockDay(rootId, program.id, item.blockId, item.id);
-                refreshData();
-            }
+            await actions.unscheduleDay(itemToUnschedule);
         } catch (err) {
             console.error('Failed to unschedule day:', err);
-            alert('Failed to unschedule day: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to unschedule day: ' + (err.response?.data?.error || err.message));
         } finally {
             setUnscheduleConfirmOpen(false);
             setItemToUnschedule(null);
@@ -305,80 +232,24 @@ const ProgramDetail = () => {
     // Handler for scheduling a day (creates a Planned Session linked to the Template Day)
     const handleScheduleDay = async (blockId, date, templateDay) => {
         try {
-            // Determine Parent Goals (Block Goals > Program Goals > Root Fallback)
-            const block = program.blocks.find(b => b.id === blockId);
-            const parentIds = new Set([
-                ...(block?.goal_ids || []),
-                ...(program.goal_ids || [])
-            ]);
-
-            // Fallback to rootId if no specific goals targeted, to satisfy backend requirement
-            if (parentIds.size === 0) {
-                parentIds.add(rootId);
-            }
-
-            await fractalApi.createSession(rootId, {
-                name: templateDay ? templateDay.name : 'Ad-hoc Session',
-                session_start: date ? localToISO(`${date} 12:00:00`, Intl.DateTimeFormat().resolvedOptions().timeZone) : getLocalISOString(),
-                parent_ids: Array.from(parentIds),
-                session_data: {
-                    program_context: {
-                        day_id: templateDay ? templateDay.id : null,
-                        block_id: blockId,
-                        program_id: program.id
-                    }
-                }
-            });
-            await refreshData(); // Refresh sessions to update calendar
-            // Sync program data to be safe (though templates shouldn't change, side effects might occur)
-            await refreshData();
-            // no need to fetchProgramData if we rely on sessions for calendar, 
-            // but might be good to sync if side effects exist
-
+            await actions.scheduleDay(blockId, date, templateDay);
             setShowDayViewModal(false);
             setSelectedDate(null);
         } catch (err) {
             console.error('Failed to schedule day:', err);
-            alert('Failed to schedule day: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to schedule day: ' + (err.response?.data?.error || err.message));
         }
     };
 
     // Handler for scheduling an existing block day (assigning a date)
     const handleScheduleBlockDay = async (blockId, dayId, date) => {
         try {
-            // Update the day's date
-            // We need to fetch the existing day first to preserve other fields, 
-            // but the API might handle partial updates? 
-            // Looking at the API, updateBlockDay usually expects full object or merges.
-            // Let's assume we can just send the date update or we might need the day object.
-            // The safest is to find the day in our local state, clone it, update date, and send.
-
-            let dayToUpdate = null;
-            program.blocks.some(b => {
-                if (b.id === blockId && b.days) {
-                    const found = b.days.find(d => d.id === dayId);
-                    if (found) {
-                        dayToUpdate = found;
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            if (!dayToUpdate) {
-                throw new Error("Day not found in local state");
-            }
-
-            const updatedDay = { ...dayToUpdate, date: date };
-            // Remove block_id/id from payload if API doesn't want them in body (usually safe to include or exclude)
-
-            await fractalApi.updateBlockDay(rootId, program.id, blockId, dayId, updatedDay);
-            refreshData();
+            await actions.scheduleBlockDay(blockId, dayId, date);
             setShowDayViewModal(false);
             setSelectedDate(null);
         } catch (err) {
             console.error('Failed to schedule block day:', err);
-            alert('Failed to schedule block day: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to schedule block day: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -390,13 +261,11 @@ const ProgramDetail = () => {
 
     const handleSaveAttachedGoal = async ({ goal_id, deadline }) => {
         try {
-            await fractalApi.attachGoalToBlock(rootId, program.id, attachBlockId, { goal_id, deadline });
-            await refreshData();
-            await refreshData();
+            await actions.attachGoal(attachBlockId, { goal_id, deadline });
             setShowAttachModal(false);
         } catch (err) {
             console.error('Failed to attach goal:', err);
-            alert('Failed to attach goal: ' + (err.response?.data?.error || err.message));
+            toast.error('Failed to attach goal: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -436,7 +305,7 @@ const ProgramDetail = () => {
             refreshData(); // Refresh goals list
         } catch (err) {
             console.error('Failed to set goal deadline:', err);
-            alert('Failed to set goal deadline');
+            toast.error('Failed to set goal deadline');
         }
     };
     const handleGoalUpdate = async (goalId, payload) => {

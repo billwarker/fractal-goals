@@ -1,80 +1,122 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
+// Helper to flatten goal tree
+const collectGoals = (goal, collected = []) => {
+    if (!goal) return collected;
+    collected.push(goal);
+    if (goal.children && Array.isArray(goal.children)) {
+        goal.children.forEach(c => collectGoals(c, collected));
+    }
+    return collected;
+};
+
 export function useProgramData(rootId, programId) {
-    const [program, setProgram] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [goals, setGoals] = useState([]); // Flat list of all goals
-    const [treeData, setTreeData] = useState(null); // Tree structure
-    const [activities, setActivities] = useState([]);
-    const [activityGroups, setActivityGroups] = useState([]);
-    const [sessions, setSessions] = useState([]);
+    const queryClient = useQueryClient();
 
-    // Helper to flatten goal tree
-    const collectGoals = useCallback((goal, collected = []) => {
-        if (!goal) return collected;
-        collected.push(goal);
-        if (goal.children && Array.isArray(goal.children)) {
-            goal.children.forEach(c => collectGoals(c, collected));
-        }
-        return collected;
-    }, []);
+    // 1. Program Query
+    const programQuery = useQuery({
+        queryKey: ['program', rootId, programId],
+        queryFn: () => fractalApi.getProgram(rootId, programId),
+        select: (res) => res.data,
+        enabled: !!rootId && !!programId,
+    });
 
-    const fetchData = useCallback(async () => {
-        if (!rootId || !programId) return;
+    // 2. Goals (Tree) Query
+    const goalsQuery = useQuery({
+        queryKey: ['goals-tree', rootId],
+        queryFn: () => fractalApi.getGoal(rootId, rootId),
+        select: (res) => res.data,
+        enabled: !!rootId,
+    });
 
-        try {
-            setLoading(true);
-            const [progRes, goalsRes, actsRes, actGroupsRes, sessionsRes] = await Promise.all([
-                fractalApi.getProgram(rootId, programId),
-                fractalApi.getGoal(rootId, rootId), // Use getGoal to fetch tree
-                fractalApi.getActivities(rootId),
-                fractalApi.getActivityGroups(rootId),
-                fractalApi.getSessions(rootId, { limit: 1000 }) // Fetch more sessions to be safe
-            ]);
+    // 3. Activities Query
+    const activitiesQuery = useQuery({
+        queryKey: ['activities', rootId],
+        queryFn: () => fractalApi.getActivities(rootId),
+        select: (res) => res.data || [],
+        enabled: !!rootId,
+    });
 
-            setProgram(progRes.data);
+    // 4. Activity Groups Query
+    const groupsQuery = useQuery({
+        queryKey: ['activity-groups', rootId],
+        queryFn: () => fractalApi.getActivityGroups(rootId),
+        select: (res) => res.data || [],
+        enabled: !!rootId,
+    });
 
-            // Handle Goals Tree
-            const tree = goalsRes.data;
-            setTreeData(tree);
-            const allGoals = collectGoals(tree);
-            // Ensure unique goals if tree traversal has duplicates (unlikely if tree is strict)
-            // But just in case, or if collectGoals is used recursively properly.
-            // Wait, recursive `collected.push(goal)` with same array reference works.
-            setGoals(allGoals);
+    // 5. Sessions Query
+    const sessionsQuery = useQuery({
+        queryKey: ['sessions', rootId, 'all'], // 'all' to differentiate from paginated lists if needed
+        queryFn: () => fractalApi.getSessions(rootId, { limit: 1000 }),
+        select: (res) => res.data.sessions || res.data || [],
+        enabled: !!rootId,
+    });
 
-            setActivities(actsRes.data || []);
-            setActivityGroups(actGroupsRes.data || []);
+    // Derived State: Flattened Goals
+    const flattenedGoals = useMemo(() => {
+        if (!goalsQuery.data) return [];
+        return collectGoals(goalsQuery.data);
+    }, [goalsQuery.data]);
 
-            const sessionsData = sessionsRes.data.sessions || sessionsRes.data || [];
-            setSessions(sessionsData);
+    // Aggregate Loading State
+    const isLoading =
+        programQuery.isLoading ||
+        goalsQuery.isLoading ||
+        activitiesQuery.isLoading ||
+        groupsQuery.isLoading ||
+        sessionsQuery.isLoading;
 
-        } catch (err) {
-            console.error("Error fetching program data", err);
-        } finally {
-            setLoading(false);
-        }
-    }, [rootId, programId, collectGoals]);
+    const isError =
+        programQuery.isError ||
+        goalsQuery.isError ||
+        activitiesQuery.isError ||
+        groupsQuery.isError ||
+        sessionsQuery.isError;
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    // Refresh Function (invalidates all queries)
+    const refreshData = useCallback(async () => {
+        await Promise.all([
+            queryClient.invalidateQueries(['program', rootId, programId]),
+            queryClient.invalidateQueries(['goals-tree', rootId]),
+            queryClient.invalidateQueries(['activities', rootId]),
+            queryClient.invalidateQueries(['activity-groups', rootId]),
+            queryClient.invalidateQueries(['sessions', rootId])
+        ]);
+    }, [queryClient, rootId, programId]);
 
+    // Helper: Get Goal Details
     const getGoalDetails = useCallback((goalId) => {
-        if (!goals) return null;
-        return goals.find(g => g.id === goalId || (g.attributes && g.attributes.id === goalId));
-    }, [goals]);
+        if (!flattenedGoals) return null;
+        return flattenedGoals.find(g => g.id === goalId || (g.attributes && g.attributes.id === goalId));
+    }, [flattenedGoals]);
 
     return {
-        program, setProgram,
-        loading,
-        goals, setGoals,
-        treeData, setTreeData,
-        activities,
-        activityGroups,
-        sessions, setSessions,
-        refreshData: fetchData,
-        getGoalDetails
+        // Data
+        program: programQuery.data || null,
+        goals: flattenedGoals,
+        treeData: goalsQuery.data || null,
+        activities: activitiesQuery.data || [],
+        activityGroups: groupsQuery.data || [],
+        sessions: sessionsQuery.data || [],
+
+        // State
+        loading: isLoading,
+        error: isError,
+
+        // Actions
+        refreshData,
+        getGoalDetails,
+
+        // Export raw queries if needed for fine-grained loading states
+        queries: {
+            program: programQuery,
+            goals: goalsQuery,
+            activities: activitiesQuery,
+            groups: groupsQuery,
+            sessions: sessionsQuery
+        }
     };
 }
