@@ -941,7 +941,8 @@ const ProgramDetail = () => {
                 return goal && (goal.completed || goal.attributes?.completed);
             }).length,
             totalGoals: blockGoalIdsValue.length,
-            totalDuration: blockSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0)
+            totalDuration: blockSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0),
+            daysRemaining: Math.max(0, moment(activeBlock.end_date).startOf('day').diff(moment().startOf('day'), 'days'))
         };
     })() : null;
 
@@ -1034,10 +1035,17 @@ const ProgramDetail = () => {
                         <div style={{ marginBottom: '32px' }}>
                             <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                                <div><span style={{ color: '#888' }}>Block:</span> <span style={{ color: blockMetrics.color, fontWeight: 600 }}>{blockMetrics.name}</span></div>
-                                <div><span style={{ color: '#888' }}>Sessions:</span> {blockMetrics.completedSessions} completed / {blockMetrics.scheduledSessions} scheduled</div>
-                                <div><span style={{ color: '#888' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
-                                <div><span style={{ color: '#888' }}>Goals met:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>{blockMetrics.name}</span>
+                                    <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
+                                        • {blockMetrics.daysRemaining} Days Remaining
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
+                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1151,7 +1159,7 @@ const ProgramDetail = () => {
                                                         <span>{formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days</span>
                                                         {isBlockActive(block) && (
                                                             <span style={{ color: block.color || '#3A86FF', fontWeight: 600 }}>
-                                                                • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Left
+                                                                • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Remaining
                                                             </span>
                                                         )}
                                                     </div>
