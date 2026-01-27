@@ -25,6 +25,7 @@
 - Created `AuthContext` for global frontend user/session management
 - Refactored Program logic into `ProgramService`
 - **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
+- **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.
 
 ---
 

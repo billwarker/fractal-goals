@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { GOAL_COLORS, getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import { getLocalISOString, localToISO } from '../utils/dateUtils';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import ProgramSidebar from '../components/programs/ProgramSidebar';
+import ProgramCalendarView from '../components/programs/ProgramCalendarView';
+import ProgramBlockView from '../components/programs/ProgramBlockView';
 import moment from 'moment';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockModal from '../components/modals/ProgramBlockModal';
@@ -16,16 +16,25 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import { getChildType } from '../utils/goalHelpers';
+import { useProgramData } from '../hooks/useProgramData';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
-    const [program, setProgram] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [goals, setGoals] = useState([]);
-    const [activities, setActivities] = useState([]);
-    const [activityGroups, setActivityGroups] = useState([]);
-    const [sessions, setSessions] = useState([]);
+
+    // Data Hook (manages program, goals, sessions, etc.)
+    const {
+        program, setProgram,
+        loading,
+        goals, setGoals,
+        activities,
+        activityGroups,
+        sessions, setSessions,
+        treeData,
+        refreshData,
+        getGoalDetails
+    } = useProgramData(rootId, programId);
+
     const [showEditBuilder, setShowEditBuilder] = useState(false);
 
     // View Mode
@@ -56,85 +65,8 @@ const ProgramDetail = () => {
     // Goal Detail Modal State (for calendar clicks)
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState(null);
-    const [treeData, setTreeData] = useState(null);
     const [modalMode, setModalMode] = useState('view'); // 'view', 'edit', 'create'
     const [selectedParent, setSelectedParent] = useState(null);
-
-    useEffect(() => {
-        if (rootId && programId) {
-            fetchProgramData();
-            fetchProgramData();
-            fetchGoals();
-            fetchActivities();
-            fetchActivityGroups();
-            fetchSessions();
-        }
-    }, [rootId, programId]);
-
-    const fetchProgramData = async () => {
-        try {
-            const res = await fractalApi.getProgram(rootId, programId);
-            setProgram(res.data);
-        } catch (err) {
-            console.error('Failed to fetch program:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchGoals = async () => {
-        try {
-            const res = await fractalApi.getGoal(rootId, rootId);
-            setTreeData(res.data);
-            const allGoals = collectGoals(res.data);
-            setGoals(allGoals);
-        } catch (err) {
-            console.error('Failed to fetch goals:', err);
-        }
-    };
-
-    const fetchActivities = async () => {
-        try {
-            const res = await fractalApi.getActivities(rootId);
-            setActivities(res.data);
-        } catch (err) {
-            console.error('Failed to fetch activities:', err);
-        }
-    };
-
-    const fetchActivityGroups = async () => {
-        try {
-            const res = await fractalApi.getActivityGroups(rootId);
-            setActivityGroups(res.data);
-        } catch (err) {
-            console.error('Failed to fetch activity groups:', err);
-        }
-    };
-
-    const fetchSessions = async () => {
-        try {
-            const res = await fractalApi.getSessions(rootId, { limit: 50 });
-            // Handle paginated response format
-            const sessionsData = res.data.sessions || res.data;
-            setSessions(sessionsData);
-        } catch (err) {
-            console.error('Failed to fetch sessions:', err);
-        }
-    };
-
-    const collectGoals = (goal, collected = []) => {
-        if (goal) {
-            collected.push(goal);
-            if (goal.children && Array.isArray(goal.children)) {
-                goal.children.forEach(child => collectGoals(child, collected));
-            }
-        }
-        return collected;
-    };
-
-    const getGoalDetails = (goalId) => {
-        return goals.find(g => g.id === goalId);
-    };
 
     const formatDate = (dateString, format = 'MMM D, YYYY') => {
         if (!dateString) return '';
@@ -161,7 +93,7 @@ const ProgramDetail = () => {
             };
 
             await fractalApi.updateProgram(rootId, program.id, apiData);
-            fetchProgramData();
+            refreshData();
             setShowEditBuilder(false);
         } catch (err) {
             console.error('Failed to update program:', err);
@@ -255,7 +187,7 @@ const ProgramDetail = () => {
             };
 
             await fractalApi.updateProgram(rootId, program.id, apiData);
-            fetchProgramData();
+            refreshData();
             setShowBlockModal(false);
             setBlockModalData(null);
             setBlockCreationMode(false); // Turn off block creation mode after creating a block
@@ -284,7 +216,7 @@ const ProgramDetail = () => {
             };
 
             await fractalApi.updateProgram(rootId, program.id, apiData);
-            fetchProgramData();
+            refreshData();
         } catch (err) {
             console.error('Failed to delete block:', err);
             alert('Failed to delete block');
@@ -312,7 +244,7 @@ const ProgramDetail = () => {
                 // Create
                 await fractalApi.addBlockDay(rootId, program.id, selectedBlockId, dayData);
             }
-            fetchProgramData();
+            refreshData();
             setShowDayModal(false);
         } catch (err) {
             console.error('Failed to save day:', err);
@@ -322,14 +254,14 @@ const ProgramDetail = () => {
 
     const handleCopyDay = async (dayId, copyData) => {
         const res = await fractalApi.copyBlockDay(rootId, program.id, selectedBlockId, dayId, copyData);
-        fetchProgramData();
+        refreshData();
         return res;
     };
 
     const handleDeleteDay = async (dayId) => {
         try {
             await fractalApi.deleteBlockDay(rootId, program.id, selectedBlockId, dayId);
-            fetchProgramData();
+            refreshData();
             setShowDayModal(false);
         } catch (err) {
             console.error('Failed to delete day:', err);
@@ -351,7 +283,7 @@ const ProgramDetail = () => {
         try {
             if (item.type === 'session') {
                 await fractalApi.deleteSession(rootId, item.id);
-                fetchSessions();
+                refreshData();
             } else {
                 // Legacy Program Day (Instance)
                 if (!item.blockId) {
@@ -359,7 +291,7 @@ const ProgramDetail = () => {
                     return;
                 }
                 await fractalApi.deleteBlockDay(rootId, program.id, item.blockId, item.id);
-                fetchProgramData();
+                refreshData();
             }
         } catch (err) {
             console.error('Failed to unschedule day:', err);
@@ -397,9 +329,9 @@ const ProgramDetail = () => {
                     }
                 }
             });
-            await fetchSessions(); // Refresh sessions to update calendar
+            await refreshData(); // Refresh sessions to update calendar
             // Sync program data to be safe (though templates shouldn't change, side effects might occur)
-            await fetchProgramData();
+            await refreshData();
             // no need to fetchProgramData if we rely on sessions for calendar, 
             // but might be good to sync if side effects exist
 
@@ -441,7 +373,7 @@ const ProgramDetail = () => {
             // Remove block_id/id from payload if API doesn't want them in body (usually safe to include or exclude)
 
             await fractalApi.updateBlockDay(rootId, program.id, blockId, dayId, updatedDay);
-            fetchProgramData();
+            refreshData();
             setShowDayViewModal(false);
             setSelectedDate(null);
         } catch (err) {
@@ -459,8 +391,8 @@ const ProgramDetail = () => {
     const handleSaveAttachedGoal = async ({ goal_id, deadline }) => {
         try {
             await fractalApi.attachGoalToBlock(rootId, program.id, attachBlockId, { goal_id, deadline });
-            await fetchProgramData();
-            await fetchGoals();
+            await refreshData();
+            await refreshData();
             setShowAttachModal(false);
         } catch (err) {
             console.error('Failed to attach goal:', err);
@@ -500,8 +432,8 @@ const ProgramDetail = () => {
     const handleSetGoalDeadline = async (goalId, deadline) => {
         try {
             await fractalApi.updateGoal(rootId, goalId, { deadline });
-            fetchProgramData(); // Refresh to show updated goal deadlines
-            fetchGoals(); // Refresh goals list
+            refreshData(); // Refresh to show updated goal deadlines
+            refreshData(); // Refresh goals list
         } catch (err) {
             console.error('Failed to set goal deadline:', err);
             alert('Failed to set goal deadline');
@@ -510,7 +442,7 @@ const ProgramDetail = () => {
     const handleGoalUpdate = async (goalId, payload) => {
         try {
             await fractalApi.updateGoal(rootId, goalId, payload);
-            fetchGoals(); // Refresh goals
+            refreshData(); // Refresh goals
         } catch (err) {
             console.error('Failed to update goal:', err);
         }
@@ -519,7 +451,7 @@ const ProgramDetail = () => {
     const handleGoalCompletion = async (goalId, currentStatus) => {
         try {
             await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
-            fetchGoals(); // Refresh goals
+            refreshData(); // Refresh goals
         } catch (err) {
             console.error('Failed to toggle goal completion:', err);
         }
@@ -530,7 +462,7 @@ const ProgramDetail = () => {
         try {
             await fractalApi.deleteGoal(rootId, goal.id);
             setShowGoalModal(false);
-            fetchGoals();
+            refreshData();
         } catch (err) {
             console.error('Failed to delete goal:', err);
         }
@@ -548,7 +480,7 @@ const ProgramDetail = () => {
             await fractalApi.createGoal(rootId, payload);
             setModalMode('view');
             setShowGoalModal(false);
-            fetchGoals();
+            refreshData();
         } catch (err) {
             console.error('Failed to create goal:', err);
         }
@@ -811,82 +743,7 @@ const ProgramDetail = () => {
         });
     });
 
-    // Recursive Goal Renderer for Sidebar
-    const renderGoalItem = (goal, depth = 0) => {
-        const goalType = goal.type || goal.attributes?.type;
-        const color = getGoalColor(goalType);
-        const isCompleted = goal.completed || goal.attributes?.completed;
 
-        return (
-            <div key={goal.id} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
-                <div
-                    onClick={() => {
-                        setSelectedGoal(goal);
-                        setShowGoalModal(true);
-                    }}
-                    style={{
-                        background: isCompleted ? '#1a2e1a' : '#252525',
-                        borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
-                        padding: '10px',
-                        borderRadius: '0 4px 4px 0',
-                        position: 'relative',
-                        marginBottom: '8px',
-                        cursor: 'pointer',
-                        transition: 'transform 0.1s ease-in-out',
-                    }}
-                    onMouseOver={e => e.currentTarget.style.transform = 'translateX(4px)'}
-                    onMouseOut={e => e.currentTarget.style.transform = 'translateX(0)'}
-                >
-                    {isCompleted && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            background: '#4caf50',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            color: 'white'
-                        }}>✓</div>
-                    )}
-                    <div style={{ color: isCompleted ? '#4caf50' : color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
-                        {goalType?.replace(/([A-Z])/g, ' $1').trim()}
-                    </div>
-                    <div style={{
-                        color: isCompleted ? '#8bc34a' : 'white',
-                        fontSize: '13px',
-                        fontWeight: 400,
-                        textDecoration: isCompleted ? 'line-through' : 'none',
-                        opacity: isCompleted ? 0.9 : 1
-                    }}>
-                        {goal.name}
-                    </div>
-                    {goal.deadline && (
-                        <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
-                            {isCompleted ? (
-                                <>Completed: {formatDate(goal.completed_at || goal.attributes?.completed_at)}</>
-                            ) : (
-                                <>Deadline: {formatDate(goal.deadline)}</>
-                            )}
-                        </div>
-                    )}
-                </div>
-                {goal.children && goal.children.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {goal.children.map(child => {
-                            // Find child in flat goals to ensure we have latest data
-                            const fullChild = getGoalDetails(child.id);
-                            return fullChild ? renderGoalItem(fullChild, depth + 1) : null;
-                        })}
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     // Find generic block for attach modal deadline constraints
     const attachBlock = sortedBlocks.find(b => b.id === attachBlockId);
@@ -1059,366 +916,45 @@ const ProgramDetail = () => {
 
             {/* Main Content */}
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                {/* Left Panel */}
-                <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', display: 'flex', flexDirection: 'column' }}>
-                    {/* Fixed Top Section */}
-                    <div style={{ padding: '24px', borderBottom: '1px solid #333' }}>
-                        {/* Program Metrics Section */}
-                        {programMetrics && (
-                            <div style={{ marginBottom: '24px' }}>
-                                <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Metrics</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                                    <div style={{ color: '#3A86FF', fontWeight: 600, fontSize: '16px', marginBottom: '4px' }}>
-                                        {programMetrics.daysRemaining} Days Remaining
-                                    </div>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(programMetrics.totalDuration)}</div>
-                                    <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Current Block Metrics Section */}
-                        {activeBlock && (
-                            <div>
-                                <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                                        <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>{blockMetrics.name}</span>
-                                        <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
-                                            • {blockMetrics.daysRemaining} Days Remaining
-                                        </span>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
-                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds(blockMetrics.totalDuration)}</div>
-                                        <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Scrollable Bottom Section */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {programGoalSeeds.length === 0 ? (
-                                <div style={{ color: '#666', fontStyle: 'italic', fontSize: '13px' }}>No goals associated</div>
-                            ) : programGoalSeeds.map(goal => renderGoalItem(goal))}
-                        </div>
-                    </div>
-                </div>
+                <ProgramSidebar
+                    programMetrics={programMetrics}
+                    activeBlock={activeBlock}
+                    blockMetrics={blockMetrics}
+                    programGoalSeeds={programGoalSeeds}
+                    onGoalClick={(goal) => {
+                        setSelectedGoal(goal);
+                        setShowGoalModal(true);
+                    }}
+                    getGoalDetails={getGoalDetails}
+                />
 
                 {/* Right Panel */}
                 <div style={{ flex: 1, padding: '24px', background: '#121212', overflowY: 'auto' }}>
                     {viewMode === 'calendar' ? (
-                        <div style={{ height: 'calc(100vh - 200px)', minHeight: '500px', background: '#1e1e1e', padding: '20px', borderRadius: '12px', position: 'relative' }}>
-                            {/* Block creation controls - positioned at top right of calendar area */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '20px',
-                                right: '20px',
-                                zIndex: 10,
-                                display: 'flex',
-                                gap: '8px',
-                                alignItems: 'center'
-                            }}>
-                                <button
-                                    onClick={() => setBlockCreationMode(!blockCreationMode)}
-                                    style={{
-                                        background: blockCreationMode ? '#3A86FF' : 'transparent',
-                                        border: `1px solid ${blockCreationMode ? '#3A86FF' : '#444'}`,
-                                        borderRadius: '4px',
-                                        color: blockCreationMode ? 'white' : '#888',
-                                        padding: '6px 12px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: 500,
-                                        transition: 'all 0.2s',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    {blockCreationMode ? '✓ Block Creation Mode' : 'Select Dates to Add Block'}
-                                </button>
-                                <button
-                                    onClick={handleAddBlockClick}
-                                    style={{
-                                        background: '#3A86FF',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        padding: '6px 12px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: 500,
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    + Add Block
-                                </button>
-                            </div>
-                            <FullCalendar
-                                plugins={[dayGridPlugin, interactionPlugin]}
-                                initialView="dayGridMonth"
-                                headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-                                initialDate={program.start_date ? new Date(program.start_date) : new Date()}
-                                events={calendarEvents}
-                                height="100%"
-                                dayMaxEvents={5}
-                                eventOrder="sortOrder"
-                                selectable={true}
-                                select={handleDateSelect}
-                                eventClick={handleEventClick}
-                            />
-                        </div>
+                        <ProgramCalendarView
+                            program={program}
+                            calendarEvents={calendarEvents}
+                            blockCreationMode={blockCreationMode}
+                            setBlockCreationMode={setBlockCreationMode}
+                            onAddBlockClick={handleAddBlockClick}
+                            onDateSelect={handleDateSelect}
+                            onEventClick={handleEventClick}
+                        />
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h2 style={{ color: 'white', fontSize: '18px' }}>Blocks</h2>
-                            </div>
-
-                            {sortedBlocks.length === 0 ? (
-                                <div style={{ color: '#666', fontStyle: 'italic' }}>No blocks defined. Switch to Calendar to add blocks.</div>
-                            ) : sortedBlocks.map(block => {
-                                const start = moment(block.start_date);
-                                const end = moment(block.end_date);
-                                const durationDays = end.diff(start, 'days') + 1;
-
-                                return (
-                                    <div key={block.id} style={{
-                                        background: '#1e1e1e',
-                                        borderRadius: '12px',
-                                        padding: '24px',
-                                        borderLeft: `4px solid ${block.color || '#3A86FF'}`,
-                                        display: 'flex',
-                                        gap: '40px',
-                                        marginBottom: '16px'
-                                    }}>
-                                        {/* Main content: Info + Days */}
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            {/* Block Info Section */}
-                                            <div style={{ marginBottom: '24px' }}>
-                                                {/* Row 1: Name, Badge, Dates, Days Remaining */}
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                                                    <h3 style={{ margin: 0, color: 'white', fontSize: '18px', fontWeight: 600 }}>{block.name}</h3>
-                                                    {isBlockActive(block) && <ActiveBlockBadge />}
-
-                                                    <div style={{ color: '#666', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <span>{formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days</span>
-                                                        {isBlockActive(block) && (
-                                                            <span style={{ color: block.color || '#3A86FF', fontWeight: 600 }}>
-                                                                • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Remaining
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Row 2: Goal Badges */}
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                                                    {(() => {
-                                                        const blockStart = moment(block.start_date).startOf('day');
-                                                        const blockEnd = moment(block.end_date).endOf('day');
-
-                                                        const associatedGoals = goals.filter(g => {
-                                                            if (block.goal_ids?.includes(g.id)) return true;
-                                                            if (g.deadline) {
-                                                                const d = moment(g.deadline);
-                                                                return d.isSameOrAfter(blockStart) && d.isSameOrBefore(blockEnd);
-                                                            }
-                                                            return false;
-                                                        });
-
-                                                        associatedGoals.sort((a, b) => {
-                                                            if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
-                                                            if (a.deadline) return -1;
-                                                            if (b.deadline) return 1;
-                                                            return a.name.localeCompare(b.name);
-                                                        });
-
-                                                        return associatedGoals.map(g => {
-                                                            const goalType = g.attributes?.type || g.type;
-                                                            const goalColor = getGoalColor(goalType);
-                                                            const isCompleted = g.completed || g.attributes?.completed;
-                                                            return (
-                                                                <div key={g.id} style={{
-                                                                    background: 'transparent',
-                                                                    border: `1px solid ${goalColor}`,
-                                                                    color: goalColor,
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 500,
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '6px',
-                                                                    textDecoration: isCompleted ? 'line-through' : 'none',
-                                                                    opacity: isCompleted ? 0.7 : 1,
-                                                                    whiteSpace: 'nowrap',
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedGoal(g);
-                                                                        setShowGoalModal(true);
-                                                                    }}
-                                                                    title={g.name}
-                                                                >
-                                                                    {isCompleted && <span>✓</span>}
-                                                                    <span>{g.name}</span>
-                                                                </div>
-                                                            );
-                                                        });
-                                                    })()}
-                                                </div>
-                                            </div>
-
-                                            {/* Days Grid Section */}
-                                            <div style={{
-                                                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px'
-                                            }}>
-                                                {(() => {
-                                                    const seenKeys = new Set();
-                                                    const sortedDays = [...(block.days || [])].sort((a, b) => {
-                                                        if (!a.date && b.date) return -1;
-                                                        if (a.date && !b.date) return 1;
-                                                        return 0;
-                                                    });
-
-                                                    const uniqueDays = sortedDays.filter(day => {
-                                                        const templateIds = (day.templates || []).map(t => t.id).sort().join(',');
-                                                        const key = `${day.name}-${templateIds}`;
-                                                        if (seenKeys.has(key)) return false;
-                                                        seenKeys.add(key);
-                                                        return true;
-                                                    });
-
-                                                    if (uniqueDays.length === 0) {
-                                                        return <div style={{ color: '#444', fontSize: '13px', fontStyle: 'italic', gridColumn: '1 / -1' }}>No days added yet. Click "+ Add Day" to start your plan.</div>;
-                                                    }
-
-                                                    return uniqueDays.map(day => (
-                                                        <div key={day.id}
-                                                            onClick={() => handleEditDay(block.id, day)}
-                                                            style={{
-                                                                background: '#242424',
-                                                                padding: '16px',
-                                                                borderRadius: '8px',
-                                                                minHeight: '100px',
-                                                                cursor: 'pointer',
-                                                                border: '1px solid #333',
-                                                                transition: 'all 0.2s',
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: '12px'
-                                                            }}
-                                                            onMouseOver={e => {
-                                                                e.currentTarget.style.borderColor = '#444';
-                                                                e.currentTarget.style.background = '#2a2a2a';
-                                                            }}
-                                                            onMouseOut={e => {
-                                                                e.currentTarget.style.borderColor = '#333';
-                                                                e.currentTarget.style.background = '#242424';
-                                                            }}
-                                                        >
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                                <div>
-                                                                    <div style={{ color: '#eee', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
-                                                                        {day.name}
-                                                                    </div>
-                                                                    {(() => {
-                                                                        const mapping = day.day_of_week;
-                                                                        if (Array.isArray(mapping) && mapping.length > 0) {
-                                                                            const dayMap = {
-                                                                                'Monday': 'Mon', 'Tuesday': 'Tues', 'Wednesday': 'Wed', 'Thursday': 'Thurs',
-                                                                                'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
-                                                                            };
-                                                                            const dayStr = mapping.length === 7 ? 'Daily' : mapping.map(d => dayMap[d] || d.substring(0, 3)).join(' | ');
-                                                                            return <div style={{ color: '#777', fontSize: '10px', fontWeight: 500 }}>{dayStr}</div>;
-                                                                        } else if (day.date) {
-                                                                            return <div style={{ color: '#777', fontSize: '10px', fontWeight: 500 }}>{moment(day.date).format('dddd')}</div>;
-                                                                        }
-                                                                        return null;
-                                                                    })()}
-                                                                </div>
-                                                                {(() => {
-                                                                    const blockStart = moment(block.start_date).startOf('day');
-                                                                    const blockEnd = moment(block.end_date).endOf('day');
-                                                                    const daySessions = sessions.filter(s => {
-                                                                        if (s.program_day_id !== day.id || !s.completed) return false;
-                                                                        const sessDate = moment(s.session_start || s.created_at);
-                                                                        return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
-                                                                    });
-
-                                                                    const completedTemplateIds = new Set(daySessions.filter(s => s.template_id).map(s => s.template_id));
-                                                                    const templates = day.templates || [];
-                                                                    const isFullComplete = templates.length > 0 && templates.every(t => completedTemplateIds.has(t.id));
-
-                                                                    if (daySessions.length > 0) {
-                                                                        return (
-                                                                            <div style={{ color: '#4caf50', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                                {daySessions.length} {isFullComplete && '✓'}
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                })()}
-                                                            </div>
-
-                                                            {/* Day Templates (Sessions) */}
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                                {(() => {
-                                                                    const blockStart = moment(block.start_date).startOf('day');
-                                                                    const blockEnd = moment(block.end_date).endOf('day');
-                                                                    const daySessions = sessions.filter(s => {
-                                                                        if (s.program_day_id !== day.id || !s.completed) return false;
-                                                                        const sessDate = moment(s.session_start || s.created_at);
-                                                                        return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
-                                                                    });
-
-                                                                    if (day.templates?.length > 0) {
-                                                                        return day.templates.map(template => {
-                                                                            const tSessions = daySessions.filter(s => s.template_id === template.id);
-                                                                            const sCount = tSessions.length;
-                                                                            const isDone = sCount > 0;
-
-                                                                            return (
-                                                                                <div key={template.id} style={{
-                                                                                    fontSize: '11px',
-                                                                                    color: isDone ? '#c8e6c9' : '#bbb',
-                                                                                    background: isDone ? '#1b5e20' : '#333',
-                                                                                    padding: '4px 8px',
-                                                                                    borderRadius: '4px',
-                                                                                    borderLeft: isDone ? '2px solid #4caf50' : '2px solid #555',
-                                                                                    display: 'flex',
-                                                                                    justifyContent: 'space-between'
-                                                                                }}>
-                                                                                    <span>{isDone ? '✓ ' : ''}{template.name}</span>
-                                                                                    {sCount > 1 && <span>{sCount}</span>}
-                                                                                </div>
-                                                                            );
-                                                                        });
-                                                                    }
-                                                                    return <div style={{ fontSize: '10px', color: '#444', fontStyle: 'italic' }}>Rest</div>;
-                                                                })()}
-                                                            </div>
-                                                        </div>
-                                                    ));
-                                                })()}
-                                            </div>
-                                        </div>
-
-                                        {/* Actions Section */}
-                                        <div style={{ flex: '0 0 120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            <button onClick={() => handleAttachGoalClick(block.id)} style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', width: '100%' }}>Attach Goal</button>
-                                            <button onClick={() => handleEditBlockClick(block)} style={{ background: '#333', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', width: '100%' }}>Edit Block</button>
-                                            <button onClick={() => handleDeleteBlock(block.id)} style={{ background: '#d32f2f', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>Delete Block</button>
-                                            <button onClick={() => handleAddDayClick(block.id)} style={{ background: '#3A86FF', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500, width: '100%' }}>+ Add Day</button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <ProgramBlockView
+                            blocks={sortedBlocks}
+                            sessions={sessions}
+                            goals={goals}
+                            onEditDay={handleEditDay}
+                            onAttachGoal={handleAttachGoalClick}
+                            onEditBlock={handleEditBlockClick}
+                            onDeleteBlock={handleDeleteBlock}
+                            onAddDay={handleAddDayClick}
+                            onGoalClick={(goal) => {
+                                setSelectedGoal(goal);
+                                setShowGoalModal(true);
+                            }}
+                        />
                     )}
                 </div>
             </div>

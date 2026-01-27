@@ -1,0 +1,204 @@
+import React from 'react';
+
+function GoalUncompletionModal({
+    goal,
+    goalType,
+    programs = [],
+    treeData,
+    targets = [],
+    activityDefinitions = [],
+    onConfirm,
+    onCancel,
+    completedAt
+}) {
+    // Find programs this goal belongs to
+    const findProgramsForGoal = () => {
+        if (!treeData) return [];
+        const foundPrograms = [];
+        if (programs && programs.length > 0) {
+            foundPrograms.push(...programs);
+        } else if (treeData) {
+            foundPrograms.push({ name: treeData.name || 'Current Program', id: treeData.id });
+        }
+        return foundPrograms;
+    };
+
+    const associatedPrograms = findProgramsForGoal();
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Header */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                paddingBottom: '12px',
+                borderBottom: '1px solid #ff9800'
+            }}>
+                <button
+                    onClick={onCancel}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#888',
+                        fontSize: '18px',
+                        cursor: 'pointer',
+                        padding: '0 4px'
+                    }}
+                >
+                    ←
+                </button>
+                <h3 style={{ margin: 0, fontSize: '16px', color: '#ff9800' }}>
+                    ⚠ Confirm Mark as Incomplete
+                </h3>
+            </div>
+
+            {/* Goal Name */}
+            <div style={{
+                padding: '14px',
+                background: '#3a3020',
+                border: '1px solid #ff9800',
+                borderRadius: '6px'
+            }}>
+                <div style={{ fontSize: '11px', color: '#ff9800', marginBottom: '4px' }}>
+                    Marking as Incomplete:
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                    {goal.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                    Type: {goalType}
+                </div>
+            </div>
+
+            {/* Originally Completed Date */}
+            {completedAt && (
+                <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                        Was completed on:
+                    </label>
+                    <div style={{
+                        padding: '12px',
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        color: '#4caf50'
+                    }}>
+                        📅 {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                </div>
+            )}
+
+            {/* Warning */}
+            <div style={{
+                padding: '12px',
+                background: '#3a2a20',
+                border: '1px solid #ff9800',
+                borderRadius: '4px',
+                fontSize: '13px',
+                color: '#ffcc80'
+            }}>
+                ⚠️ This will remove the completion status and completion date from this goal.
+            </div>
+
+            {/* Associated Programs */}
+            <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                    Programs that will update:
+                </label>
+                {associatedPrograms.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                        No programs found
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {associatedPrograms.map((program, idx) => (
+                            <div key={idx} style={{
+                                padding: '10px 12px',
+                                background: '#252525',
+                                border: '1px solid #555',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                                <span style={{ color: '#ff9800' }}>📁</span>
+                                {program.name}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Associated Targets */}
+            <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                    Targets that will be marked incomplete ({targets.length}):
+                </label>
+                {targets.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                        No targets defined for this goal
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {targets.map(target => {
+                            const activity = activityDefinitions.find(a => a.id === target.activity_id);
+                            return (
+                                <div key={target.id} style={{
+                                    padding: '10px 12px',
+                                    background: '#252525',
+                                    border: '1px solid #555',
+                                    borderRadius: '4px'
+                                }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
+                                        🎯 {target.name || activity?.name || 'Target'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
+                <button
+                    onClick={onCancel}
+                    style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: 'transparent',
+                        border: '1px solid #666',
+                        borderRadius: '4px',
+                        color: 'ccc',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                    }}
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={onConfirm}
+                    style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: '#ff9800',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    Mark Incomplete
+                </button>
+            </div>
+        </div>
+    );
+}
+
+export default GoalUncompletionModal;

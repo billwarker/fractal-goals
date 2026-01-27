@@ -7,6 +7,12 @@ import { fractalApi } from '../utils/api';
 import TargetManager from './goalDetail/TargetManager';
 import ActivityAssociator from './goalDetail/ActivityAssociator';
 import GoalSessionList from './goalDetail/GoalSessionList';
+import GoalCompletionModal from './goals/GoalCompletionModal';
+import GoalUncompletionModal from './goals/GoalUncompletionModal';
+import GoalHeader from './goals/GoalHeader';
+import GoalSmartSection from './goals/GoalSmartSection';
+import GoalChildrenList from './goals/GoalChildrenList';
+import { useGoalForm } from '../hooks/useGoalForm';
 
 /**
  * GoalDetailModal Component
@@ -48,22 +54,28 @@ function GoalDetailModal({
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
     // Normalize activityGroups to always be an array (handles null case) - use state so we can update it
+    // Normalize activityGroups to always be an array (handles null case) - use state so we can update it
     const [activityGroups, setActivityGroups] = useState(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
     const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [deadline, setDeadline] = useState('');
-    const [relevanceStatement, setRelevanceStatement] = useState('');
-    const [completedViaChildren, setCompletedViaChildren] = useState(false);
-    const [trackActivities, setTrackActivities] = useState(true);
-    const [allowManualCompletion, setAllowManualCompletion] = useState(true);
+
+    // Use extracted form hook
+    const {
+        name, setName,
+        description, setDescription,
+        deadline, setDeadline,
+        relevanceStatement, setRelevanceStatement,
+        completedViaChildren, setCompletedViaChildren,
+        trackActivities, setTrackActivities,
+        allowManualCompletion, setAllowManualCompletion,
+        targets, setTargets,
+        resetForm
+    } = useGoalForm(goal, mode, isOpen);
 
     // Local completion state for optimistic UI
     const [localCompleted, setLocalCompleted] = useState(false);
     const [localCompletedAt, setLocalCompletedAt] = useState(null);
 
     // Target editing state
-    const [targets, setTargets] = useState([]);
     const [targetToEdit, setTargetToEdit] = useState(null);
 
     // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator', 'activity-builder'
@@ -88,53 +100,16 @@ function GoalDetailModal({
     const depGoalCompleted = goal?.attributes?.completed;
     const depGoalCompletedAt = goal?.attributes?.completed_at;
 
+    // Reset local completion state when goal changes
     useEffect(() => {
         if (mode === 'create') {
-            // Initialize empty form for create mode
-            setName('');
-            setDescription('');
-            setDeadline('');
-            setRelevanceStatement('');
             setLocalCompleted(false);
             setLocalCompletedAt(null);
-            setTargets([]);
-            setCompletedViaChildren(false);
-            setTrackActivities(true);
-            setAllowManualCompletion(true);
             setIsEditing(true);  // Start in edit mode for creation
             setViewState('goal');
         } else if (goal) {
-            setName(goal.name || '');
-            setDescription(goal.attributes?.description || goal.description || '');
-            // Format deadline for date input (needs YYYY-MM-DD format)
-            const rawDeadline = goal.attributes?.deadline || goal.deadline || '';
-            if (rawDeadline) {
-                // Handle various datetime formats - extract just the date portion
-                const dateOnly = rawDeadline.split('T')[0].split(' ')[0];
-                setDeadline(dateOnly);
-            } else {
-                setDeadline('');
-            }
-            setRelevanceStatement(goal.attributes?.relevance_statement || '');
             setLocalCompleted(goal.attributes?.completed || false);
             setLocalCompletedAt(goal.attributes?.completed_at || null);
-            setCompletedViaChildren(goal.attributes?.completed_via_children || false);
-            setTrackActivities(goal.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true);
-            setAllowManualCompletion(goal.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true);
-
-            // Parse targets
-            let parsedTargets = [];
-            if (goal.attributes?.targets) {
-                try {
-                    parsedTargets = typeof goal.attributes.targets === 'string'
-                        ? JSON.parse(goal.attributes.targets)
-                        : goal.attributes.targets;
-                } catch (e) {
-                    console.error('Error parsing targets:', e);
-                    parsedTargets = [];
-                }
-            }
-            setTargets(parsedTargets);
             setIsEditing(mode === 'edit');
             setViewState('goal');
         }
@@ -225,33 +200,11 @@ function GoalDetailModal({
             if (onClose) onClose();
             return;
         }
+        resetForm();
+        // Also reset local UI state
         if (goal) {
-            setName(goal.name || '');
-            setDescription(goal.attributes?.description || goal.description || '');
-            // Format deadline for date input (needs YYYY-MM-DD format)
-            const rawDeadline = goal.attributes?.deadline || goal.deadline || '';
-            if (rawDeadline) {
-                const dateOnly = rawDeadline.split('T')[0].split(' ')[0];
-                setDeadline(dateOnly);
-            } else {
-                setDeadline('');
-            }
-            setRelevanceStatement(goal.attributes?.relevance_statement || '');
-            setCompletedViaChildren(goal.attributes?.completed_via_children || false);
-            setTrackActivities(goal.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true);
-            setAllowManualCompletion(goal.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true);
-
-            let parsedTargets = [];
-            if (goal.attributes?.targets) {
-                try {
-                    parsedTargets = typeof goal.attributes.targets === 'string'
-                        ? JSON.parse(goal.attributes.targets)
-                        : goal.attributes.targets;
-                } catch (e) {
-                    parsedTargets = [];
-                }
-            }
-            setTargets(parsedTargets);
+            setLocalCompleted(goal.attributes?.completed || false);
+            setLocalCompletedAt(goal.attributes?.completed_at || null);
         }
         setIsEditing(false);
     };
@@ -317,407 +270,19 @@ function GoalDetailModal({
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
 
     // ============ COMPLETION CONFIRMATION VIEW ============
-    const renderCompletionConfirm = () => {
-        const completionDate = new Date();
-
-        // Find programs this goal belongs to (traverse up the tree to find program)
-        const findProgramsForGoal = () => {
-            if (!treeData) return [];
-
-            // For now, the root of the tree is typically the program
-            // We'll show the root as the associated program
-            const foundPrograms = [];
-            if (programs && programs.length > 0) {
-                foundPrograms.push(...programs);
-            } else if (treeData) {
-                // Fallback: use the root node name as the program
-                foundPrograms.push({ name: treeData.name || 'Current Program', id: treeData.id });
-            }
-            return foundPrograms;
-        };
-
-        const associatedPrograms = findProgramsForGoal();
-
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #4caf50'
-                }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: '#4caf50' }}>
-                        ✓ Confirm Goal Completion
-                    </h3>
-                </div>
-
-                {/* Goal Name */}
-                <div style={{
-                    padding: '14px',
-                    background: '#2a3a2a',
-                    border: '1px solid #4caf50',
-                    borderRadius: '6px'
-                }}>
-                    <div style={{ fontSize: '11px', color: '#4caf50', marginBottom: '4px' }}>
-                        Completing Goal:
-                    </div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-                        {goal.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        Type: {goalType}
-                    </div>
-                </div>
-
-                {/* Completion Date */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Will be marked as completed:
-                    </label>
-                    <div style={{
-                        padding: '12px',
-                        background: '#2a2a2a',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        color: 'white'
-                    }}>
-                        📅 {completionDate.toLocaleDateString()} at {completionDate.toLocaleTimeString()}
-                    </div>
-                </div>
-
-                {/* Associated Programs */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Programs that will log this completion:
-                    </label>
-                    {associatedPrograms.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No programs found
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {associatedPrograms.map((program, idx) => (
-                                <div key={idx} style={{
-                                    padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
-                                    <span style={{ color: '#66bb6a' }}>📁</span>
-                                    {program.name}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Associated Targets */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Targets associated with this goal ({targets.length}):
-                    </label>
-                    {targets.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No targets defined for this goal
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.map(target => {
-                                const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                                return (
-                                    <div key={target.id} style={{
-                                        padding: '10px 12px',
-                                        background: '#252525',
-                                        border: '1px solid #555',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
-                                            🎯 {target.name || activity?.name || 'Target'}
-                                        </div>
-                                        {target.metrics && target.metrics.length > 0 && (
-                                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                                                {target.metrics.map(metric => {
-                                                    const metricDef = activity?.metric_definitions?.find(m => m.id === metric.metric_id);
-                                                    return (
-                                                        <span key={metric.metric_id} style={{
-                                                            padding: '2px 8px',
-                                                            background: '#333',
-                                                            borderRadius: '4px',
-                                                            fontSize: '11px',
-                                                            color: '#ccc'
-                                                        }}>
-                                                            {metricDef?.name || 'Metric'}: {metric.value} {metricDef?.unit || ''}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLocalCompleted(true);
-                            setLocalCompletedAt(completionDate.toISOString());
-                            onToggleCompletion(goalId, false);  // false = currently not completed
-                            setViewState('goal');
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: '#4caf50',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        ✓ Complete Goal
-                    </button>
-                </div>
-            </div>
-        );
+    // ============ CONFIRMATION HANDLERS ============
+    const handleCompletionConfirm = (completionDate) => {
+        setLocalCompleted(true);
+        setLocalCompletedAt(completionDate.toISOString());
+        onToggleCompletion(goalId, false); // false = currently not completed
+        setViewState('goal');
     };
 
-    // ============ UNCOMPLETION CONFIRMATION VIEW ============
-    const renderUncompletionConfirm = () => {
-        // Find programs this goal belongs to
-        const findProgramsForGoal = () => {
-            if (!treeData) return [];
-            const foundPrograms = [];
-            if (programs && programs.length > 0) {
-                foundPrograms.push(...programs);
-            } else if (treeData) {
-                foundPrograms.push({ name: treeData.name || 'Current Program', id: treeData.id });
-            }
-            return foundPrograms;
-        };
-
-        const associatedPrograms = findProgramsForGoal();
-
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #ff9800'
-                }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: '#ff9800' }}>
-                        ⚠ Confirm Mark as Incomplete
-                    </h3>
-                </div>
-
-                {/* Goal Name */}
-                <div style={{
-                    padding: '14px',
-                    background: '#3a3020',
-                    border: '1px solid #ff9800',
-                    borderRadius: '6px'
-                }}>
-                    <div style={{ fontSize: '11px', color: '#ff9800', marginBottom: '4px' }}>
-                        Marking as Incomplete:
-                    </div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
-                        {goal.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        Type: {goalType}
-                    </div>
-                </div>
-
-                {/* Originally Completed Date */}
-                {localCompletedAt && (
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                            Was completed on:
-                        </label>
-                        <div style={{
-                            padding: '12px',
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            color: '#4caf50'
-                        }}>
-                            📅 {new Date(localCompletedAt).toLocaleDateString()} at {new Date(localCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Warning */}
-                <div style={{
-                    padding: '12px',
-                    background: '#3a2a20',
-                    border: '1px solid #ff9800',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    color: '#ffcc80'
-                }}>
-                    ⚠️ This will remove the completion status and completion date from this goal.
-                </div>
-
-                {/* Associated Programs */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Programs that will update:
-                    </label>
-                    {associatedPrograms.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No programs found
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {associatedPrograms.map((program, idx) => (
-                                <div key={idx} style={{
-                                    padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
-                                    <span style={{ color: '#ff9800' }}>📁</span>
-                                    {program.name}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Associated Targets */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
-                        Targets that will be marked incomplete ({targets.length}):
-                    </label>
-                    {targets.length === 0 ? (
-                        <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
-                            No targets defined for this goal
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {targets.map(target => {
-                                const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                                return (
-                                    <div key={target.id} style={{
-                                        padding: '10px 12px',
-                                        background: '#252525',
-                                        border: '1px solid #555',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
-                                            🎯 {target.name || activity?.name || 'Target'}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
-                    <button
-                        onClick={() => setViewState('goal')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLocalCompleted(false);
-                            setLocalCompletedAt(null);
-                            onToggleCompletion(goalId, true);  // true = currently completed
-                            setViewState('goal');
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            background: '#ff9800',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        Mark Incomplete
-                    </button>
-                </div>
-            </div>
-        );
+    const handleUncompletionConfirm = () => {
+        setLocalCompleted(false);
+        setLocalCompletedAt(null);
+        onToggleCompletion(goalId, true); // true = currently completed
+        setViewState('goal');
     };
 
     // ============ GOAL CONTENT (VIEW/EDIT) ============
@@ -748,108 +313,18 @@ function GoalDetailModal({
 
         return (
             <>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    paddingBottom: '16px',
-                    marginBottom: '16px',
-                    borderBottom: `2px solid ${goalColor}`
-                }}>
-                    {/* Top Row: Name and Close Button */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: goalColor, lineHeight: '1.2' }}>
-                            {mode === 'create' ? (name || 'New Goal') : (name || goal.name)}
-                        </div>
-                        {onClose && (
-                            <button
-                                onClick={onClose}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#888',
-                                    fontSize: '24px',
-                                    cursor: 'pointer',
-                                    padding: '0',
-                                    lineHeight: 1,
-                                    height: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                            >
-                                ×
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Second Row: Badges and Status */}
-                    {/* Second Row: Badges and Status */}
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-
-                        {/* Group 1: Status Badges */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {mode === 'create' && (
-                                <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                    + Create
-                                </span>
-                            )}
-                            <div style={{
-                                padding: '4px 10px',
-                                background: goalColor,
-                                color: textColor,
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                fontWeight: 'bold'
-                            }}>
-                                {getTypeDisplayName(goalType)}
-                            </div>
-                            {mode !== 'create' && (
-                                <SMARTIndicator goal={goalForSmart} goalType={goalType} />
-                            )}
-                            {mode === 'create' && parentGoal && (
-                                <span style={{ color: '#888', fontSize: '12px' }}>
-                                    under "{parentGoal.name}"
-                                </span>
-                            )}
-                            {mode !== 'create' && isCompleted && (
-                                <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                                    ✓ Completed
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Divider - only show if we have dates and we're not in create mode */}
-                        {mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline) && (
-                            <div style={{ width: '1px', height: '16px', background: '#444' }} />
-                        )}
-
-                        {/* Group 2: Dates */}
-                        {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                {goal?.attributes?.created_at && (
-                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
-                                        <span style={{ color: '#ccc', fontWeight: '500' }}>
-                                            {new Date(goal.attributes.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
-                                    </div>
-                                )}
-                                {(deadline || goal?.attributes?.deadline) && (
-                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
-                                        <span style={{ color: '#ccc', fontWeight: '500' }}>
-                                            {deadline
-                                                ? new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                                : (goal?.attributes?.deadline ? new Date(goal.attributes.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'None')
-                                            }
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <GoalHeader
+                    mode={mode}
+                    name={name}
+                    goal={goalForSmart}
+                    goalType={goalType}
+                    goalColor={goalColor}
+                    textColor={textColor}
+                    parentGoal={parentGoal}
+                    isCompleted={isCompleted}
+                    onClose={onClose}
+                    deadline={deadline}
+                />
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
@@ -1215,30 +690,15 @@ function GoalDetailModal({
                             )}
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
-                                Description
-                            </label>
-                            <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                {goal.attributes?.description || goal.description ||
-                                    <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
-                            </div>
-                        </div>
-
-                        {/* Relevance Statement - View Mode */}
-                        {((parentGoalName && (goal.attributes?.parent_id || mode === 'create')) || goalType === 'UltimateGoal') && (goal.attributes?.relevance_statement || relevanceStatement) && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
-                                    {goalType === 'UltimateGoal'
-                                        ? "Why does this Ultimate Goal matter to you?"
-                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?</span>
-                                    }
-                                </label>
-                                <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                    {goal.attributes?.relevance_statement || relevanceStatement}
-                                </div>
-                            </div>
-                        )}
+                        <GoalSmartSection
+                            goal={goal}
+                            goalColor={goalColor}
+                            parentGoalName={parentGoalName}
+                            parentGoalColor={parentGoalColor}
+                            mode={mode}
+                            goalType={goalType}
+                            relevanceStatement={relevanceStatement}
+                        />
 
                         {/* Associated Programs */}
                         {programs && (() => {
@@ -1324,50 +784,13 @@ function GoalDetailModal({
                         )}
 
                         {/* Associated Children Section */}
-                        {(() => {
-                            const node = findGoalById(treeData, goalId);
-                            const children = node?.children || [];
-                            if (children.length === 0) return null;
-
-                            return (
-                                <div style={{ borderTop: '1px solid #333', paddingTop: '14px', marginTop: '4px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
-                                        Associated {getTypeDisplayName(childType)}s
-                                    </label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {children.map(child => {
-                                            const childId = child.attributes?.id || child.id;
-                                            const childCompleted = child.attributes?.completed || child.completed;
-                                            const childColor = getGoalColor(childType);
-                                            return (
-                                                <div
-                                                    key={childId}
-                                                    style={{
-                                                        padding: '10px 12px',
-                                                        background: '#252525',
-                                                        borderLeft: `3px solid ${childColor}`,
-                                                        borderRadius: '4px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        opacity: childCompleted ? 0.7 : 1
-                                                    }}
-                                                >
-                                                    <span style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
-                                                        {child.name}
-                                                    </span>
-                                                    {childCompleted && (
-                                                        <span style={{ color: '#4caf50', fontSize: '11px', fontWeight: 'bold' }}>
-                                                            ✓ Done
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                        {/* Associated Children Section */}
+                        <GoalChildrenList
+                            treeData={treeData}
+                            goalId={goalId}
+                            goalColor={goalColor}
+                            childType={childType}
+                        />
 
                         {/* Sessions List */}
                         <GoalSessionList
@@ -1389,9 +812,32 @@ function GoalDetailModal({
     // ============ DETERMINE WHICH CONTENT TO RENDER ============
     let content;
     if (viewState === 'complete-confirm') {
-        content = renderCompletionConfirm();
+        content = (
+            <GoalCompletionModal
+                goal={goal}
+                goalType={goalType}
+                programs={programs}
+                treeData={treeData}
+                targets={targets}
+                activityDefinitions={activityDefinitions}
+                onConfirm={handleCompletionConfirm}
+                onCancel={() => setViewState('goal')}
+            />
+        );
     } else if (viewState === 'uncomplete-confirm') {
-        content = renderUncompletionConfirm();
+        content = (
+            <GoalUncompletionModal
+                goal={goal}
+                goalType={goalType}
+                programs={programs}
+                treeData={treeData}
+                targets={targets}
+                activityDefinitions={activityDefinitions}
+                completedAt={localCompletedAt}
+                onConfirm={handleUncompletionConfirm}
+                onCancel={() => setViewState('goal')}
+            />
+        );
     } else if (viewState === 'target-manager') {
         content = (
             <TargetManager
