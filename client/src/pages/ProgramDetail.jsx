@@ -1065,7 +1065,6 @@ const ProgramDetail = () => {
                                 const start = moment(block.start_date);
                                 const end = moment(block.end_date);
                                 const durationDays = end.diff(start, 'days') + 1;
-                                const blockAttachedGoals = block.goal_ids?.map(id => getGoalDetails(id)).filter(Boolean) || [];
 
                                 return (
                                     <div key={block.id} style={{
@@ -1081,9 +1080,71 @@ const ProgramDetail = () => {
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             {/* Block Info Section */}
                                             <div style={{ marginBottom: '24px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
                                                     <h3 style={{ margin: 0, color: 'white', fontSize: '18px', fontWeight: 600 }}>{block.name}</h3>
                                                     {isBlockActive(block) && <ActiveBlockBadge />}
+
+                                                    {/* Goal Badges inline with title */}
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        {(() => {
+                                                            const blockStart = moment(block.start_date).startOf('day');
+                                                            const blockEnd = moment(block.end_date).endOf('day');
+
+                                                            const associatedGoals = goals.filter(g => {
+                                                                // 1. Manually attached to block
+                                                                if (block.goal_ids?.includes(g.id)) return true;
+
+                                                                // 2. Deadline falls within block range
+                                                                if (g.deadline) {
+                                                                    const d = moment(g.deadline);
+                                                                    return d.isSameOrAfter(blockStart) && d.isSameOrBefore(blockEnd);
+                                                                }
+                                                                return false;
+                                                            });
+
+                                                            // Sort by deadline then name
+                                                            associatedGoals.sort((a, b) => {
+                                                                if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
+                                                                if (a.deadline) return -1;
+                                                                if (b.deadline) return 1;
+                                                                return a.name.localeCompare(b.name);
+                                                            });
+
+                                                            return associatedGoals.map(g => {
+                                                                const goalType = g.attributes?.type || g.type;
+                                                                const goalColor = getGoalColor(goalType);
+                                                                const isCompleted = g.completed || g.attributes?.completed;
+                                                                return (
+                                                                    <div key={g.id} style={{
+                                                                        background: 'transparent',
+                                                                        border: `1px solid ${goalColor}`,
+                                                                        color: goalColor,
+                                                                        padding: '4px 10px',
+                                                                        borderRadius: '6px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 500,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '6px',
+                                                                        textDecoration: isCompleted ? 'line-through' : 'none',
+                                                                        opacity: isCompleted ? 0.7 : 1,
+                                                                        whiteSpace: 'nowrap',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedGoal(g);
+                                                                            setShowGoalModal(true);
+                                                                        }}
+                                                                        title={g.name}
+                                                                    >
+                                                                        {isCompleted && <span>✓</span>}
+                                                                        <span>{g.name}</span>
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
+                                                    </div>
                                                 </div>
                                                 <div style={{ color: '#666', fontSize: '12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginBottom: '16px' }}>
                                                     {formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days
@@ -1092,32 +1153,6 @@ const ProgramDetail = () => {
                                                             • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Left
                                                         </span>
                                                     )}
-                                                </div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                    {blockAttachedGoals.map(g => {
-                                                        const goalColor = getGoalColor(g.type);
-                                                        const isCompleted = g.completed || g.attributes?.completed;
-                                                        return (
-                                                            <div key={g.id} style={{
-                                                                background: 'transparent',
-                                                                border: `1px solid ${isCompleted ? '#4caf50' : goalColor}`,
-                                                                color: isCompleted ? '#4caf50' : goalColor,
-                                                                padding: '4px 10px',
-                                                                borderRadius: '6px',
-                                                                fontSize: '11px',
-                                                                fontWeight: 500,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '6px',
-                                                                textDecoration: isCompleted ? 'line-through' : 'none',
-                                                                opacity: isCompleted ? 0.7 : 1,
-                                                                whiteSpace: 'nowrap'
-                                                            }}>
-                                                                {isCompleted && <span>✓</span>}
-                                                                <span>{g.name}</span>
-                                                            </div>
-                                                        );
-                                                    })}
                                                 </div>
                                             </div>
 
