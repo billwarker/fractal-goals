@@ -219,6 +219,30 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
                             {errors.name && <div style={{ color: '#f44336', fontSize: '12px', marginTop: '4px' }}>{errors.name}</div>}
                         </div>
 
+                        {/* Program Description */}
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontWeight: 500 }}>
+                                Description
+                            </label>
+                            <textarea
+                                value={programData.description}
+                                onChange={(e) => setProgramData({ ...programData, description: e.target.value })}
+                                placeholder="What is this program about? (Optional)"
+                                rows={3}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    background: '#2a2a2a',
+                                    border: '1px solid #444',
+                                    borderRadius: '6px',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    resize: 'vertical',
+                                    fontFamily: 'inherit'
+                                }}
+                            />
+                        </div>
+
                         {/* Goal Selection */}
                         <div>
                             <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontWeight: 500 }}>
