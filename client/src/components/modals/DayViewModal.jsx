@@ -63,6 +63,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         });
     }
 
+    // Sessions for this date
     const scheduledSessions = [];
     const completedSessions = [];
 
@@ -93,10 +94,41 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         });
     }
 
+    const claimedSessionIds = new Set();
+    const scheduledProgramDayData = scheduledProgramDays.map(pDay => {
+        const templates = pDay.templates || [];
+        const daySessions = [];
+
+        [...scheduledSessions, ...completedSessions].forEach(s => {
+            if (claimedSessionIds.has(s.id)) return;
+
+            const isPreciseMatch = s.program_day_id === pDay.id;
+            const isFuzzyMatch = templates.some(t => t.name === s.name);
+
+            if (isPreciseMatch || isFuzzyMatch) {
+                daySessions.push(s);
+                claimedSessionIds.add(s.id);
+            }
+        });
+
+        return { ...pDay, sessions: daySessions };
+    });
+
+    const looseScheduledSessions = scheduledSessions.filter(s => !claimedSessionIds.has(s.id));
+    const looseCompletedSessions = completedSessions.filter(s => !claimedSessionIds.has(s.id));
+
     // Find goals due on this date
     const goalsDueOnDate = goals ? goals.filter(g => {
         if (!g.deadline) return false;
         return g.deadline.split('T')[0] === date;
+    }) : [];
+
+    // Find goals completed on this date
+    const goalsCompletedOnDate = goals ? goals.filter(g => {
+        const isCompleted = g.completed || g.attributes?.completed;
+        const completionDate = g.completed_at || g.attributes?.completed_at;
+        if (!isCompleted || !completionDate) return false;
+        return getLocalDateString(completionDate) === date;
     }) : [];
 
     const formatDate = (dateString) => {
@@ -156,7 +188,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             {formatDate(date)}
                         </h2>
                         <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
-                            {scheduledSessions.length + scheduledProgramDays.length} scheduled • {completedSessions.length} completed • {goalsDueOnDate.length} goals due
+                            {scheduledSessions.length + scheduledProgramDays.length} scheduled • {completedSessions.length} completed • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
                         </div>
                         {blocksContainingDate.length > 0 && (
                             <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
@@ -187,20 +219,25 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                 <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
 
                     {/* Program Days */}
-                    {scheduledProgramDays.length > 0 && (
+                    {scheduledProgramDayData.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                            {scheduledProgramDays.map((day, idx) => {
+                            {scheduledProgramDayData.map((day, idx) => {
+                                const templates = day.templates || [];
                                 const sessionsByTemplate = {};
-                                completedSessions.forEach(s => {
-                                    if (s.template_id) {
-                                        if (!sessionsByTemplate[s.template_id]) sessionsByTemplate[s.template_id] = [];
-                                        sessionsByTemplate[s.template_id].push(s);
+                                const unlinkedDaySessions = [];
+
+                                day.sessions.forEach(s => {
+                                    const matchingT = templates.find(t => t.id === s.template_id || t.name === s.name);
+                                    if (matchingT) {
+                                        if (!sessionsByTemplate[matchingT.id]) sessionsByTemplate[matchingT.id] = [];
+                                        sessionsByTemplate[matchingT.id].push(s);
+                                    } else {
+                                        unlinkedDaySessions.push(s);
                                     }
                                 });
 
-                                const templates = day.templates || [];
                                 const isPDCompleted = templates.length > 0 &&
-                                    templates.every(t => sessionsByTemplate[t.id]?.length > 0);
+                                    templates.every(t => sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed));
 
                                 return (
                                     <div key={idx} style={{
@@ -228,24 +265,63 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                         {/* Templates List */}
                                         {templates.length > 0 && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                                                 {templates.map(t => {
-                                                    const sCount = sessionsByTemplate[t.id]?.length || 0;
-                                                    const isDone = sCount > 0;
+                                                    const tSessions = sessionsByTemplate[t.id] || [];
+                                                    const completedTSessions = tSessions.filter(s => s.completed || s.attributes?.completed);
+                                                    const isDone = completedTSessions.length > 0;
+
                                                     return (
-                                                        <div key={t.id} style={{
-                                                            fontSize: '13px',
-                                                            color: isDone ? '#8bc34a' : '#aaa',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '8px'
-                                                        }}>
-                                                            <span>{isDone ? '✓' : '○'}</span>
-                                                            <span>{t.name}</span>
-                                                            {sCount > 1 && <span style={{ fontSize: '11px', background: '#333', padding: '2px 6px', borderRadius: '4px' }}>{sCount}</span>}
+                                                        <div key={t.id}>
+                                                            <div style={{
+                                                                fontSize: '13px',
+                                                                color: isDone ? '#8bc34a' : '#aaa',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px',
+                                                                marginBottom: tSessions.length > 0 ? '6px' : '0'
+                                                            }}>
+                                                                <span>{isDone ? '✓' : '○'}</span>
+                                                                <span style={{ fontWeight: 500 }}>{t.name}</span>
+                                                                {completedTSessions.length > 1 && <span style={{ fontSize: '11px', background: '#333', padding: '2px 6px', borderRadius: '4px' }}>{completedTSessions.length}</span>}
+                                                            </div>
+
+                                                            {/* Sessions under this template */}
+                                                            {tSessions.length > 0 && (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '24px' }}>
+                                                                    {tSessions.map(s => (
+                                                                        <div key={s.id} style={{
+                                                                            fontSize: '12px',
+                                                                            color: (s.completed || s.attributes?.completed) ? '#888' : '#666',
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column'
+                                                                        }}>
+                                                                            <div style={{ color: '#aaa' }}>
+                                                                                {moment.utc(s.session_start || s.start_time).local().format('h:mm A')} - {s.name}
+                                                                            </div>
+                                                                            {(s.completed || s.attributes?.completed) && (
+                                                                                <div style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
+                                                                                    Duration: {s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
+                                            </div>
+                                        )}
+
+                                        {/* Unlinked Sessions for this day */}
+                                        {unlinkedDaySessions.length > 0 && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', borderTop: '1px solid #333', paddingTop: '12px' }}>
+                                                {unlinkedDaySessions.map(s => (
+                                                    <div key={s.id} style={{ fontSize: '12px', color: '#aaa' }}>
+                                                        ✓ {s.name} ({s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'})
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
 
@@ -261,13 +337,13 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                     )}
 
                     {/* Scheduled Sessions Section */}
-                    {scheduledSessions.length > 0 && (
+                    {looseScheduledSessions.length > 0 && (
                         <div style={{ marginBottom: '24px' }}>
                             <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
                                 Scheduled Sessions
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {scheduledSessions.map(session => (
+                                {looseScheduledSessions.map(session => (
                                     <div key={session.id} style={{
                                         background: '#252525',
                                         borderRadius: '8px',
@@ -306,7 +382,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         </div>
                     )}
 
-                    {scheduledProgramDays.length === 0 && scheduledSessions.length === 0 && (
+                    {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && (
                         <div style={{
                             textAlign: 'center',
                             padding: '30px 20px',
@@ -323,13 +399,13 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                     )}
 
                     {/* Completed Sessions Section */}
-                    {completedSessions.length > 0 && (
+                    {looseCompletedSessions.length > 0 && (
                         <div style={{ marginBottom: '24px' }}>
                             <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
                                 Completed Sessions
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {completedSessions.map(session => (
+                                {looseCompletedSessions.map(session => (
                                     <div key={session.id} style={{
                                         background: '#252525',
                                         borderRadius: '8px',
@@ -348,26 +424,54 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         </div>
                     )}
 
-                    {/* Goals Due Section */}
-                    {goalsDueOnDate.length > 0 && (
+                    {/* Goals Section */}
+                    {(goalsDueOnDate.length > 0 || goalsCompletedOnDate.length > 0) && (
                         <div style={{ marginBottom: '24px' }}>
                             <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                                Goals Due
+                                Goals
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {goalsDueOnDate.map(goal => (
-                                    <div key={goal.id} style={{
+                                {/* Completed Goals */}
+                                {goalsCompletedOnDate.map(goal => (
+                                    <div key={`comp-${goal.id}`} style={{
                                         padding: '12px',
-                                        background: '#252525',
+                                        background: '#1a2e1a',
                                         borderRadius: '6px',
-                                        borderLeft: `3px solid ${getGoalColor(goal.type)}`
+                                        borderLeft: `3px solid #4caf50`,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
                                     }}>
-                                        <div style={{ color: 'white', fontSize: '14px' }}>{goal.name}</div>
-                                        <div style={{ color: getGoalColor(goal.type), fontSize: '11px', marginTop: '4px' }}>
-                                            {goal.type || 'Goal'}
+                                        <div>
+                                            <div style={{ color: 'white', fontSize: '14px' }}>✅ {goal.name}</div>
+                                            <div style={{ color: '#8bc34a', fontSize: '11px', marginTop: '4px' }}>
+                                                {goal.type || 'Goal'} • Met on this date
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Due Goals (not already shown in completed) */}
+                                {goalsDueOnDate.filter(g => !goalsCompletedOnDate.some(cg => cg.id === g.id)).map(goal => {
+                                    const isCompleted = goal.completed || goal.attributes?.completed;
+                                    const completionDate = goal.completed_at || goal.attributes?.completed_at;
+
+                                    return (
+                                        <div key={`due-${goal.id}`} style={{
+                                            padding: '12px',
+                                            background: isCompleted ? '#1a2e1a' : '#252525',
+                                            borderRadius: '6px',
+                                            borderLeft: `3px solid ${isCompleted ? '#4caf50' : getGoalColor(goal.type)}`
+                                        }}>
+                                            <div style={{ color: 'white', fontSize: '14px' }}>
+                                                {isCompleted ? '✅' : '🎯'} {goal.name}
+                                            </div>
+                                            <div style={{ color: isCompleted ? '#8bc34a' : getGoalColor(goal.type), fontSize: '11px', marginTop: '4px' }}>
+                                                {goal.type || 'Goal'} • {isCompleted ? `Completed ${completionDate ? 'on ' + getLocalDateString(completionDate) : ''}` : 'Due today'}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -456,7 +560,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         </div>
 
                         {/* Add Block Day Section (Disabled if day already scheduled) */}
-                        {scheduledProgramDays.length === 0 && scheduledSessions.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
+                        {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
                             <div style={{ marginTop: '0' }}>
                                 <button
                                     onClick={() => setShowAddDaySection(!showAddDaySection)}

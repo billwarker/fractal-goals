@@ -976,7 +976,11 @@ const ProgramDetail = () => {
                                         </div>
                                         {goal.deadline && (
                                             <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
-                                                {isCompleted ? 'Completed' : 'Deadline'}: {formatDate(goal.deadline)}
+                                                {isCompleted ? (
+                                                    <>Completed: {formatDate(goal.completed_at || goal.attributes?.completed_at)}</>
+                                                ) : (
+                                                    <>Deadline: {formatDate(goal.deadline)}</>
+                                                )}
                                             </div>
                                         )}
                                     </div>
