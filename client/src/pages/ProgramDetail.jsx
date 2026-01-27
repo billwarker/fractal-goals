@@ -745,12 +745,32 @@ const ProgramDetail = () => {
         });
     });
 
-    // 5. Add Goal Events
-    const attachedGoalIds = new Set([
+    // 4. Calculate Expanded Attached Goals (including all descendants)
+    const attachedGoalIds = new Set();
+    const taskSeeds = [
         ...(program.goal_ids || []),
         ...sortedBlocks.flatMap(b => b.goal_ids || [])
-    ]);
+    ];
 
+    const getDescendants = (goalId, allGoals, visited = new Set()) => {
+        if (visited.has(goalId)) return [];
+        visited.add(goalId);
+        const goal = allGoals.find(g => g.id === goalId);
+        if (!goal || !goal.children) return [];
+        let descendants = [];
+        goal.children.forEach(child => {
+            descendants.push(child.id);
+            descendants = descendants.concat(getDescendants(child.id, allGoals, visited));
+        });
+        return descendants;
+    };
+
+    taskSeeds.forEach(seedId => {
+        attachedGoalIds.add(seedId);
+        getDescendants(seedId, goals).forEach(id => attachedGoalIds.add(id));
+    });
+
+    // 5. Add Goal Events to Calendar
     goals.forEach(goal => {
         if (goal.deadline && attachedGoalIds.has(goal.id)) {
             const goalType = goal.attributes?.type || goal.type;
@@ -762,17 +782,96 @@ const ProgramDetail = () => {
                 title: isCompleted ? `✅ ${goal.name}` : `🎯 ${goal.name}`,
                 start: (isCompleted && completionDate) ? getLocalDateString(completionDate) : goal.deadline,
                 allDay: true,
-                backgroundColor: isCompleted ? '#2e7d32' : getGoalColor(goalType),
-                borderColor: isCompleted ? '#4caf50' : getGoalColor(goalType),
-                textColor: isCompleted ? 'white' : getGoalTextColor(goalType),
+                backgroundColor: getGoalColor(goalType),
+                borderColor: getGoalColor(goalType),
+                textColor: getGoalTextColor(goalType),
                 extendedProps: { type: 'goal', sortOrder: 3, ...goal },
                 classNames: isCompleted ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event']
             });
         }
     });
 
-    // Program Goals (for Modal and Sidebar)
-    const programGoals = program.goal_ids?.map(id => getGoalDetails(id)).filter(Boolean) || [];
+    // Program Goals (Seeds for Sidebar)
+    const programGoalIds = program.goal_ids || [];
+    const allProgramGoals = programGoalIds.map(id => getGoalDetails(id)).filter(Boolean);
+
+    // Filter out goals that are descendants of other goals already in the program's goal list
+    // to avoid duplication in the sidebar while maintaining the hierarchy.
+    const programGoalSeeds = allProgramGoals.filter(g => {
+        return !programGoalIds.some(otherId => {
+            if (g.id === otherId) return false;
+            return getDescendants(otherId, goals).includes(g.id);
+        });
+    });
+
+    // Recursive Goal Renderer for Sidebar
+    const renderGoalItem = (goal, depth = 0) => {
+        const goalType = goal.type || goal.attributes?.type;
+        const color = getGoalColor(goalType);
+        const isCompleted = goal.completed || goal.attributes?.completed;
+
+        return (
+            <div key={goal.id} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
+                <div
+                    style={{
+                        background: isCompleted ? '#1a2e1a' : '#252525',
+                        borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
+                        padding: '10px',
+                        borderRadius: '0 4px 4px 0',
+                        position: 'relative',
+                        marginBottom: '8px'
+                    }}
+                >
+                    {isCompleted && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: '#4caf50',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            color: 'white'
+                        }}>✓</div>
+                    )}
+                    <div style={{ color: isCompleted ? '#4caf50' : color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+                        {goalType?.replace(/([A-Z])/g, ' $1').trim()}
+                    </div>
+                    <div style={{
+                        color: isCompleted ? '#8bc34a' : 'white',
+                        fontSize: '13px',
+                        fontWeight: 400,
+                        textDecoration: isCompleted ? 'line-through' : 'none',
+                        opacity: isCompleted ? 0.9 : 1
+                    }}>
+                        {goal.name}
+                    </div>
+                    {goal.deadline && (
+                        <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
+                            {isCompleted ? (
+                                <>Completed: {formatDate(goal.completed_at || goal.attributes?.completed_at)}</>
+                            ) : (
+                                <>Deadline: {formatDate(goal.deadline)}</>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {goal.children && goal.children.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {goal.children.map(child => {
+                            // Find child in flat goals to ensure we have latest data
+                            const fullChild = getGoalDetails(child.id);
+                            return fullChild ? renderGoalItem(fullChild, depth + 1) : null;
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // Find generic block for attach modal deadline constraints
     const attachBlock = sortedBlocks.find(b => b.id === attachBlockId);
@@ -929,63 +1028,9 @@ const ProgramDetail = () => {
                     <div style={{ marginBottom: '32px' }}>
                         <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {programGoals.length === 0 ? (
+                            {programGoalSeeds.length === 0 ? (
                                 <div style={{ color: '#666', fontStyle: 'italic', fontSize: '13px' }}>No goals associated</div>
-                            ) : programGoals.map(goal => {
-                                const goalType = goal.type || goal.attributes?.type;
-                                const color = getGoalColor(goalType);
-                                const isCompleted = goal.completed || goal.attributes?.completed;
-
-                                return (
-                                    <div
-                                        key={goal.id}
-                                        style={{
-                                            background: isCompleted ? '#1a2e1a' : '#252525',
-                                            borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
-                                            padding: '10px',
-                                            borderRadius: '0 4px 4px 0',
-                                            position: 'relative'
-                                        }}
-                                    >
-                                        {isCompleted && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '8px',
-                                                right: '8px',
-                                                background: '#4caf50',
-                                                borderRadius: '50%',
-                                                width: '18px',
-                                                height: '18px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '10px'
-                                            }}>✓</div>
-                                        )}
-                                        <div style={{ color: isCompleted ? '#4caf50' : color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
-                                            {goalType?.replace(/([A-Z])/g, ' $1').trim()}
-                                        </div>
-                                        <div style={{
-                                            color: isCompleted ? '#8bc34a' : 'white',
-                                            fontSize: '13px',
-                                            fontWeight: 400,
-                                            textDecoration: isCompleted ? 'line-through' : 'none',
-                                            opacity: isCompleted ? 0.9 : 1
-                                        }}>
-                                            {goal.name}
-                                        </div>
-                                        {goal.deadline && (
-                                            <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
-                                                {isCompleted ? (
-                                                    <>Completed: {formatDate(goal.completed_at || goal.attributes?.completed_at)}</>
-                                                ) : (
-                                                    <>Deadline: {formatDate(goal.deadline)}</>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                            ) : programGoalSeeds.map(goal => renderGoalItem(goal))}
                         </div>
                     </div>
 
@@ -1320,7 +1365,7 @@ const ProgramDetail = () => {
                 isOpen={showAttachModal}
                 onClose={() => setShowAttachModal(false)}
                 onSave={handleSaveAttachedGoal}
-                goals={programGoals}
+                goals={allProgramGoals}
                 block={attachBlock}
             />
             <DayViewModal
@@ -1331,7 +1376,7 @@ const ProgramDetail = () => {
                 }}
                 date={selectedDate}
                 program={program}
-                goals={programGoals}
+                goals={goals.filter(g => attachedGoalIds.has(g.id))}
                 onSetGoalDeadline={handleSetGoalDeadline}
                 blocks={sortedBlocks}
                 onScheduleDay={handleScheduleDay}
