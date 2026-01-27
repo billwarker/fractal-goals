@@ -1797,14 +1797,16 @@ function GoalDetailModal({
                     onClick={(e) => e.stopPropagation()}
                     style={{
                         background: '#1e1e1e',
-                        border: `2px solid ${goalColor}`,
+                        border: '1px solid #333',
+                        borderTop: `4px solid ${goalColor}`,
                         borderRadius: '8px',
                         padding: '24px',
                         maxWidth: '700px',
                         width: '90%',
                         maxHeight: '90vh',
                         overflowY: 'auto',
-                        color: 'white'
+                        color: 'white',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
                     }}
                 >
                     {content}

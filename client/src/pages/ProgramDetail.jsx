@@ -15,6 +15,7 @@ import DayViewModal from '../components/modals/DayViewModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
+import { getChildType } from '../utils/goalHelpers';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
@@ -55,6 +56,9 @@ const ProgramDetail = () => {
     // Goal Detail Modal State (for calendar clicks)
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState(null);
+    const [treeData, setTreeData] = useState(null);
+    const [modalMode, setModalMode] = useState('view'); // 'view', 'edit', 'create'
+    const [selectedParent, setSelectedParent] = useState(null);
 
     useEffect(() => {
         if (rootId && programId) {
@@ -81,6 +85,7 @@ const ProgramDetail = () => {
     const fetchGoals = async () => {
         try {
             const res = await fractalApi.getGoal(rootId, rootId);
+            setTreeData(res.data);
             const allGoals = collectGoals(res.data);
             setGoals(allGoals);
         } catch (err) {
@@ -481,48 +486,6 @@ const ProgramDetail = () => {
         }
     };
 
-    const handleGoalUpdate = async (goalId, updates) => {
-        try {
-            await fractalApi.updateGoal(rootId, goalId, updates);
-            await fetchGoals(); // Refresh goals (deadlines/names)
-            // No need to fetchProgramData unless we think goals affect program top-level props (unlikely)
-            // But we should update local selectedGoal if needed, though mostly GoalDetail handles its own optimistic filtering?
-            // Actually GoalDetailModal manages its own form state but we should update the source.
-            // also update selectedGoal in case modal stays open? 
-            // The modal uses the `goal` prop. If `goals` updates, `selectedGoal` (ref from `goals`) might need update?
-            // `goals` is an array of objects. `goals.find` returns a reference. 
-            // After `fetchGoals`, `goals` is a NEW array with NEW objects.
-            // So `selectedGoal` will be stale. We need to update it.
-            const res = await fractalApi.getGoal(rootId, rootId); // or just reuse fetchGoals logic
-            const allGoals = collectGoals(res.data);
-            setGoals(allGoals);
-            const updated = allGoals.find(g => g.id === goalId);
-            if (updated) setSelectedGoal(updated);
-
-        } catch (err) {
-            console.error("Failed to update goal:", err);
-            alert("Failed to update goal");
-        }
-    };
-
-    const handleGoalCompletion = async (goalId, currentStatus) => {
-        try {
-            // GoalDetailModal passes the CURRENT status, so we need to toggle it
-            await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
-
-            // Re-fetch to update UI
-            const res = await fractalApi.getGoal(rootId, rootId);
-            const allGoals = collectGoals(res.data);
-            setGoals(allGoals);
-
-            // Update selected goal if open
-            const updated = allGoals.find(g => g.id === goalId);
-            if (updated) setSelectedGoal(updated);
-        } catch (err) {
-            console.error("Failed to toggle completion:", err);
-            alert("Failed to toggle completion");
-        }
-    };
 
 
     if (loading) return <div style={{ padding: '40px', color: 'white' }}>Loading...</div>;
@@ -542,6 +505,52 @@ const ProgramDetail = () => {
         } catch (err) {
             console.error('Failed to set goal deadline:', err);
             alert('Failed to set goal deadline');
+        }
+    };
+    const handleGoalUpdate = async (goalId, payload) => {
+        try {
+            await fractalApi.updateGoal(rootId, goalId, payload);
+            fetchGoals(); // Refresh goals
+        } catch (err) {
+            console.error('Failed to update goal:', err);
+        }
+    };
+
+    const handleGoalCompletion = async (goalId, currentStatus) => {
+        try {
+            await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
+            fetchGoals(); // Refresh goals
+        } catch (err) {
+            console.error('Failed to toggle goal completion:', err);
+        }
+    };
+
+    const handleDeleteGoal = async (goal) => {
+        if (!window.confirm(`Are you sure you want to delete "${goal.name}" and all its children?`)) return;
+        try {
+            await fractalApi.deleteGoal(rootId, goal.id);
+            setShowGoalModal(false);
+            fetchGoals();
+        } catch (err) {
+            console.error('Failed to delete goal:', err);
+        }
+    };
+
+    const handleAddChildGoal = (parentGoal) => {
+        const parentId = parentGoal.id || parentGoal.attributes?.id;
+        setSelectedParent(parentGoal);
+        setModalMode('create');
+        setShowGoalModal(true);
+    };
+
+    const handleCreateGoal = async (payload) => {
+        try {
+            await fractalApi.createGoal(rootId, payload);
+            setModalMode('view');
+            setShowGoalModal(false);
+            fetchGoals();
+        } catch (err) {
+            console.error('Failed to create goal:', err);
         }
     };
 
@@ -813,14 +822,22 @@ const ProgramDetail = () => {
         return (
             <div key={goal.id} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
                 <div
+                    onClick={() => {
+                        setSelectedGoal(goal);
+                        setShowGoalModal(true);
+                    }}
                     style={{
                         background: isCompleted ? '#1a2e1a' : '#252525',
                         borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
                         padding: '10px',
                         borderRadius: '0 4px 4px 0',
                         position: 'relative',
-                        marginBottom: '8px'
+                        marginBottom: '8px',
+                        cursor: 'pointer',
+                        transition: 'transform 0.1s ease-in-out',
                     }}
+                    onMouseOver={e => e.currentTarget.style.transform = 'translateX(4px)'}
+                    onMouseOut={e => e.currentTarget.style.transform = 'translateX(0)'}
                 >
                     {isCompleted && (
                         <div style={{
@@ -1393,17 +1410,28 @@ const ProgramDetail = () => {
                 confirmText="Unschedule"
             />
 
+
             <GoalDetailModal
                 isOpen={showGoalModal}
-                onClose={() => setShowGoalModal(false)}
+                onClose={() => {
+                    setShowGoalModal(false);
+                    setModalMode('view');
+                }}
                 goal={selectedGoal}
                 onUpdate={handleGoalUpdate}
                 onToggleCompletion={handleGoalCompletion}
+                onDelete={handleDeleteGoal}
+                onAddChild={handleAddChildGoal}
                 rootId={rootId}
-                programs={[program]} // Pass current program as array for association context
+                treeData={treeData}
+                sessions={sessions}
+                programs={[program]}
                 activityDefinitions={activities}
                 activityGroups={activityGroups}
                 displayMode="modal"
+                mode={modalMode}
+                onCreate={handleCreateGoal}
+                parentGoal={selectedParent}
             />
         </div >
     );
