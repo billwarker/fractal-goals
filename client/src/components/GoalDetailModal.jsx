@@ -13,6 +13,7 @@ import GoalHeader from './goals/GoalHeader';
 import GoalSmartSection from './goals/GoalSmartSection';
 import GoalChildrenList from './goals/GoalChildrenList';
 import { useGoalForm } from '../hooks/useGoalForm';
+import styles from './GoalDetailModal.module.css';
 
 /**
  * GoalDetailModal Component
@@ -328,56 +329,38 @@ function GoalDetailModal({
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                    <div className={styles.editContainer}>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label} style={{ color: goalColor }}>
                                 Name
                             </label>
                             <input
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '15px',
-                                    fontWeight: 'bold'
-                                }}
+                                className={styles.input}
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label} style={{ color: goalColor }}>
                                 Description
                             </label>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 rows={3}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    resize: 'vertical'
-                                }}
+                                className={styles.textarea}
                             />
                         </div>
 
                         {/* Relevance Statement - SMART "R" Criterion */}
                         {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.label} style={{ color: goalColor }}>
                                     Relevance (SMART)
                                 </label>
-                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
+                                <div className={styles.relevanceInfo}>
                                     {goalType === 'UltimateGoal'
                                         ? "Why does this Ultimate Goal matter to you?"
                                         : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span></span>
@@ -388,51 +371,33 @@ function GoalDetailModal({
                                     onChange={(e) => setRelevanceStatement(e.target.value)}
                                     rows={2}
                                     placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
+                                    className={styles.textarea}
                                     style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        background: '#2a2a2a',
-                                        border: relevanceStatement?.trim() ? '1px solid #4caf50' : '1px solid #555',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '13px',
-                                        resize: 'vertical'
+                                        border: relevanceStatement?.trim() ? '1px solid #4caf50' : null
                                     }}
                                 />
                             </div>
                         )}
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label} style={{ color: goalColor }}>
                                 Deadline
                             </label>
                             <input
                                 type="date"
                                 value={deadline}
                                 onChange={(e) => setDeadline(e.target.value)}
-                                style={{
-                                    padding: '8px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
+                                className={styles.inputDate}
                             />
                         </div>
 
                         {/* How is progress measured? */}
-                        <div style={{
-                            padding: '12px',
-                            background: '#333',
-                            borderRadius: '6px',
-                            marginBottom: '10px'
-                        }}>
-                            <label style={{ display: 'block', marginBottom: '10px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                        <div className={styles.progressBox}>
+                            <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
                                 How is progress measured? (Select all that apply)
                             </label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                            <div className={styles.checkboxGroup}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={trackActivities}
@@ -441,7 +406,7 @@ function GoalDetailModal({
                                     Activities & Targets
                                 </label>
                                 {isAboveShortTermGoal(goalType) && (
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                    <label className={styles.checkboxLabel}>
                                         <input
                                             type="checkbox"
                                             checked={completedViaChildren}
@@ -450,7 +415,7 @@ function GoalDetailModal({
                                         Completed via Children
                                     </label>
                                 )}
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={allowManualCompletion}
@@ -460,53 +425,23 @@ function GoalDetailModal({
                                 </label>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                            <div className={styles.infoList}>
                                 {trackActivities && (
-                                    <div style={{
-                                        padding: '6px 10px',
-                                        background: 'rgba(76, 175, 80, 0.1)',
-                                        border: '1px solid rgba(76, 175, 80, 0.3)',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
-                                        color: '#4caf50',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}>
+                                    <div className={styles.infoItem}>
                                         <span style={{ fontSize: '13px' }}>✓</span>
                                         <span>Goal is complete when target(s) are achieved.</span>
                                     </div>
                                 )}
 
                                 {completedViaChildren && (
-                                    <div style={{
-                                        padding: '6px 10px',
-                                        background: 'rgba(76, 175, 80, 0.1)',
-                                        border: '1px solid rgba(76, 175, 80, 0.3)',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
-                                        color: '#4caf50',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}>
+                                    <div className={styles.infoItem}>
                                         <span style={{ fontSize: '13px' }}>✓</span>
                                         <span>Goal is complete when all child goals are done (Delegated).</span>
                                     </div>
                                 )}
 
                                 {allowManualCompletion && (
-                                    <div style={{
-                                        padding: '6px 10px',
-                                        background: 'rgba(76, 175, 80, 0.1)',
-                                        border: '1px solid rgba(76, 175, 80, 0.3)',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
-                                        color: '#4caf50',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}>
+                                    <div className={styles.infoItem}>
                                         <span style={{ fontSize: '13px' }}>✓</span>
                                         <span>Goal can be marked as complete by the user.</span>
                                     </div>
@@ -557,48 +492,31 @@ function GoalDetailModal({
                         )}
 
                         {/* Edit Actions */}
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #333' }}>
+                        <div className={styles.editActions}>
                             <button
                                 onClick={handleCancel}
-                                style={{
-                                    padding: '8px 14px',
-                                    background: 'transparent',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    color: '#ccc',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                }}
+                                className={styles.btnCancel}
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
+                                className={styles.btnSave}
                                 style={{
-                                    padding: '8px 14px',
                                     background: goalColor,
-                                    border: 'none',
-                                    borderRadius: '4px',
                                     color: textColor,
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 600
                                 }}
                             >
                                 {mode === 'create' ? 'Create' : 'Save'}
                             </button>
                         </div>
-                    </div>
+                    </div >
                 ) : (
                     /* ============ VIEW MODE ============ */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+                    <div className={styles.viewContainer}>
 
                         {/* Action Buttons - 2x2 Grid */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '6px'
-                        }}>
+                        <div className={styles.actionGrid}>
                             {onToggleCompletion && (
                                 <button
                                     onClick={() => {
@@ -609,14 +527,12 @@ function GoalDetailModal({
                                         }
                                     }}
                                     disabled={!isCompleted && !allowManualCompletion}
+                                    className={styles.btnAction}
                                     style={{
-                                        padding: '8px 10px',
                                         background: isCompleted ? '#4caf50' : 'transparent',
                                         border: `1px solid ${isCompleted ? '#4caf50' : (allowManualCompletion ? '#666' : '#444')}`,
-                                        borderRadius: '4px',
                                         color: isCompleted ? 'white' : (allowManualCompletion ? '#ccc' : '#888'),
                                         cursor: (isCompleted || allowManualCompletion) ? 'pointer' : 'default',
-                                        fontSize: '11px',
                                         fontWeight: isCompleted ? 'bold' : 'normal',
                                         opacity: (!isCompleted && !allowManualCompletion) ? 0.8 : 1
                                     }}
@@ -638,14 +554,11 @@ function GoalDetailModal({
                                         if (displayMode === 'modal' && onClose) onClose();
                                         onAddChild(goal);
                                     }}
+                                    className={styles.btnAction}
                                     style={{
-                                        padding: '8px 10px',
                                         background: 'transparent',
                                         border: `1px solid ${getGoalColor(childType)}`,
-                                        borderRadius: '4px',
                                         color: getGoalColor(childType),
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
                                         fontWeight: 'bold'
                                     }}
                                 >
@@ -655,14 +568,11 @@ function GoalDetailModal({
 
                             <button
                                 onClick={() => setIsEditing(true)}
+                                className={styles.btnAction}
                                 style={{
-                                    padding: '8px 10px',
                                     background: goalColor,
                                     border: 'none',
-                                    borderRadius: '4px',
                                     color: textColor,
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
                                     fontWeight: 600
                                 }}
                             >
@@ -675,14 +585,11 @@ function GoalDetailModal({
                                         if (displayMode === 'modal' && onClose) onClose();
                                         onDelete(goal);
                                     }}
+                                    className={`${styles.btnAction} ${styles.btnDelete}`}
                                     style={{
-                                        padding: '8px 10px',
                                         background: 'transparent',
                                         border: '1px solid #d32f2f',
-                                        borderRadius: '4px',
                                         color: '#d32f2f',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
                                     }}
                                 >
                                     Delete Goal
@@ -714,10 +621,10 @@ function GoalDetailModal({
 
                             return (
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor }}>
                                         Associated Programs
                                     </label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div className={styles.associatedPrograms}>
                                         {associatedPrograms.map(prog => (
                                             <div
                                                 key={prog.id}
@@ -725,16 +632,7 @@ function GoalDetailModal({
                                                     if (displayMode === 'modal' && onClose) onClose();
                                                     navigate(`/${rootId}/programs/${prog.id}`);
                                                 }}
-                                                style={{
-                                                    padding: '8px 10px',
-                                                    background: '#153d5a',
-                                                    border: '1px solid #1e5a85',
-                                                    borderRadius: '4px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    cursor: 'pointer'
-                                                }}
+                                                className={styles.programLink}
                                             >
                                                 <span style={{ fontSize: '14px' }}>📁</span>
                                                 <span style={{ fontSize: '13px', color: 'white' }}>{prog.name}</span>
@@ -942,25 +840,12 @@ function GoalDetailModal({
         };
 
         content = (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className={styles.editContainer}>
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid #4caf50'
-                }}>
+                <div className={styles.activityBuilderHeader}>
                     <button
                         onClick={() => setViewState('activity-associator')}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
+                        className={styles.backButton}
                     >
                         ←
                     </button>
@@ -971,7 +856,7 @@ function GoalDetailModal({
 
                 {/* Activity Name */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                    <label className={styles.sectionLabel}>
                         Activity Name *
                     </label>
                     <input
@@ -979,21 +864,13 @@ function GoalDetailModal({
                         value={newActivityName}
                         onChange={(e) => setNewActivityName(e.target.value)}
                         placeholder="e.g. Scale Practice"
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '14px'
-                        }}
+                        className={styles.input}
                     />
                 </div>
 
                 {/* Description */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                    <label className={styles.sectionLabel}>
                         Description
                     </label>
                     <textarea
@@ -1001,36 +878,19 @@ function GoalDetailModal({
                         onChange={(e) => setNewActivityDescription(e.target.value)}
                         placeholder="Optional description..."
                         rows={2}
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '13px',
-                            resize: 'vertical'
-                        }}
+                        className={styles.textarea}
                     />
                 </div>
 
                 {/* Group Selection */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                    <label className={styles.sectionLabel}>
                         Activity Group
                     </label>
                     <select
                         value={newActivityGroupId}
                         onChange={(e) => setNewActivityGroupId(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '13px'
-                        }}
+                        className={styles.select}
                     >
                         <option value="">(No Group)</option>
                         {activityGroups && activityGroups.map(group => (
@@ -1042,8 +902,8 @@ function GoalDetailModal({
                 </div>
 
                 {/* Flags */}
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                <div className={styles.checkboxGroup}>
+                    <label className={styles.checkboxLabel} style={{ color: '#ccc' }}>
                         <input
                             type="checkbox"
                             checked={newActivityHasSets}
@@ -1051,7 +911,7 @@ function GoalDetailModal({
                         />
                         Track Sets
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                    <label className={styles.checkboxLabel} style={{ color: '#ccc' }}>
                         <input
                             type="checkbox"
                             checked={newActivityHasMetrics}
@@ -1064,12 +924,12 @@ function GoalDetailModal({
                 {/* Metrics Section */}
                 {newActivityHasMetrics && (
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
+                        <label className={styles.label} style={{ color: '#aaa' }}>
                             Metrics (needed for targets)
                         </label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {newActivityMetrics.map((metric, idx) => (
-                                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <div key={idx} className={styles.metricRow}>
                                     <input
                                         type="text"
                                         value={metric.name}
@@ -1079,15 +939,7 @@ function GoalDetailModal({
                                             setNewActivityMetrics(updated);
                                         }}
                                         placeholder="Metric name (e.g. Speed)"
-                                        style={{
-                                            flex: 1,
-                                            padding: '8px',
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontSize: '13px'
-                                        }}
+                                        className={styles.metricInput}
                                     />
                                     <input
                                         type="text"
@@ -1098,15 +950,7 @@ function GoalDetailModal({
                                             setNewActivityMetrics(updated);
                                         }}
                                         placeholder="Unit (e.g. bpm)"
-                                        style={{
-                                            width: '80px',
-                                            padding: '8px',
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            fontSize: '13px'
-                                        }}
+                                        className={styles.unitInput}
                                     />
                                     {newActivityMetrics.length > 1 && (
                                         <button
@@ -1114,14 +958,7 @@ function GoalDetailModal({
                                                 const updated = newActivityMetrics.filter((_, i) => i !== idx);
                                                 setNewActivityMetrics(updated);
                                             }}
-                                            style={{
-                                                padding: '8px',
-                                                background: '#d32f2f',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                cursor: 'pointer'
-                                            }}
+                                            className={styles.removeButton}
                                         >
                                             ×
                                         </button>
@@ -1131,15 +968,7 @@ function GoalDetailModal({
                             {newActivityMetrics.length < 3 && (
                                 <button
                                     onClick={() => setNewActivityMetrics([...newActivityMetrics, { name: '', unit: '' }])}
-                                    style={{
-                                        padding: '8px',
-                                        background: '#333',
-                                        border: '1px dashed #666',
-                                        borderRadius: '4px',
-                                        color: '#aaa',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                    }}
+                                    className={styles.addMetricButton}
                                 >
                                     + Add Metric
                                 </button>
@@ -1149,38 +978,26 @@ function GoalDetailModal({
                 )}
 
                 {/* Info about auto-association */}
-                <div style={{ fontSize: '11px', color: '#4caf50', fontStyle: 'italic', padding: '8px', background: '#1a2a1a', borderRadius: '4px' }}>
+                <div className={styles.autoAssociationInfo}>
                     This activity will be automatically associated with this goal.
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
+                <div className={styles.editActions}>
                     <button
                         onClick={() => setViewState('activity-associator')}
-                        style={{
-                            padding: '8px 16px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '13px'
-                        }}
+                        className={styles.btnCancel}
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleCreateActivity}
                         disabled={isCreatingActivity || !newActivityName.trim()}
+                        className={styles.btnSave}
                         style={{
-                            padding: '8px 16px',
                             background: isCreatingActivity || !newActivityName.trim() ? '#444' : '#4caf50',
-                            border: 'none',
-                            borderRadius: '4px',
                             color: isCreatingActivity || !newActivityName.trim() ? '#888' : 'white',
                             cursor: isCreatingActivity || !newActivityName.trim() ? 'not-allowed' : 'pointer',
-                            fontSize: '13px',
-                            fontWeight: 'bold'
                         }}
                     >
                         {isCreatingActivity ? 'Creating...' : 'Create Activity'}
@@ -1198,21 +1015,8 @@ function GoalDetailModal({
     if (displayMode === 'panel') {
         return (
             <>
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: 'hidden'
-                }}>
-                    <div style={{
-                        padding: '16px',
-                        paddingBottom: '24px',
-                        color: 'white',
-                        flex: 1,
-                        minHeight: 0,
-                        overflowY: 'auto'
-                    }}>
+                <div className={styles.panelContainer}>
+                    <div className={styles.panelContent}>
                         {content}
                     </div>
                 </div>
@@ -1224,35 +1028,14 @@ function GoalDetailModal({
     return (
         <>
             <div
-                className="modal-overlay"
+                className={styles.modalOverlay}
                 onClick={onClose}
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}
             >
                 <div
                     onClick={(e) => e.stopPropagation()}
+                    className={styles.modalContent}
                     style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
                         borderTop: `4px solid ${goalColor}`,
-                        borderRadius: '8px',
-                        padding: '24px',
-                        maxWidth: '700px',
-                        width: '90%',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        color: 'white',
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
                     }}
                 >
                     {content}

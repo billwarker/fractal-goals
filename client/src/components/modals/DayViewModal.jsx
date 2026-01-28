@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGoalColor } from '../../utils/goalColors';
+import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
 /**
@@ -145,61 +146,24 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     };
 
     return (
-        <div
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0,0,0,0.85)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1100,
-                padding: '20px'
-            }}
-            onClick={onClose}
-        >
-            <div
-                style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #444',
-                    borderRadius: '12px',
-                    width: '100%',
-                    maxWidth: '600px',
-                    maxHeight: '80vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                }}
-                onClick={e => e.stopPropagation()}
-            >
+        <div className={styles.modalOverlay} onClick={onClose}>
+            <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div style={{
-                    padding: '20px',
-                    borderBottom: '1px solid #333',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start'
-                }}>
+                <div className={styles.header}>
                     <div>
-                        <h2 style={{ margin: 0, color: 'white', fontSize: '20px', fontWeight: 600 }}>
+                        <h2 className={styles.headerTitle}>
                             {formatDate(date)}
                         </h2>
-                        <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
+                        <div className={styles.headerMeta}>
                             {scheduledSessions.length + scheduledProgramDays.length} scheduled • {completedSessions.length} completed • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
                         </div>
                         {blocksContainingDate.length > 0 && (
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+                            <div className={styles.headerTags}>
                                 {blocksContainingDate.map(block => (
-                                    <span key={block.id} style={{
-                                        fontSize: '11px',
+                                    <span key={block.id} className={styles.tag} style={{
                                         background: block.color + '33', // 20% opacity
                                         color: block.color || '#3A86FF',
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        border: `1px solid ${block.color || '#3A86FF'}`
+                                        borderColor: block.color || '#3A86FF'
                                     }}>
                                         {block.name}
                                     </span>
@@ -209,18 +173,18 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                     </div>
                     <button
                         onClick={onClose}
-                        style={{ background: 'transparent', border: 'none', color: '#888', fontSize: '24px', cursor: 'pointer', lineHeight: 1 }}
+                        className={styles.closeButton}
                     >
                         ×
                     </button>
                 </div>
 
                 {/* Content */}
-                <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+                <div className={styles.contentArea}>
 
                     {/* Program Days */}
                     {scheduledProgramDayData.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                        <div className={styles.sectionContainer}>
                             {scheduledProgramDayData.map((day, idx) => {
                                 const templates = day.templates || [];
                                 const sessionsByTemplate = {};
@@ -240,23 +204,18 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                     templates.every(t => sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed));
 
                                 return (
-                                    <div key={idx} style={{
-                                        background: isPDCompleted ? '#1a2e1a' : '#252525',
-                                        borderRadius: '8px',
-                                        padding: '16px',
-                                        borderLeft: `4px solid ${isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF')}`,
-                                        position: 'relative'
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                    <div key={idx} className={`${styles.programDayCard} ${isPDCompleted ? styles.programDayCardCompleted : ''}`}
+                                        style={{ borderLeftColor: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF') }}>
+                                        <div className={styles.programDayHeader}>
                                             <div>
-                                                <div style={{ color: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF'), fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                                                <div className={styles.programDayBlockName} style={{ color: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF') }}>
                                                     {day.blockName} {isPDCompleted && '✓'}
                                                 </div>
-                                                <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{day.name}</div>
+                                                <div className={styles.programDayTitle}>{day.name}</div>
                                             </div>
                                             <button
                                                 onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
-                                                style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: '16px', padding: '4px', lineHeight: 1 }}
+                                                className={styles.removeButton}
                                                 title="Unschedule Day"
                                             >
                                                 ✕
@@ -265,7 +224,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                         {/* Templates List */}
                                         {templates.length > 0 && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                                            <div className={styles.templateList}>
                                                 {templates.map(t => {
                                                     const tSessions = sessionsByTemplate[t.id] || [];
                                                     const completedTSessions = tSessions.filter(s => s.completed || s.attributes?.completed);
@@ -273,34 +232,23 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                                     return (
                                                         <div key={t.id}>
-                                                            <div style={{
-                                                                fontSize: '13px',
-                                                                color: isDone ? '#8bc34a' : '#aaa',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '8px',
-                                                                marginBottom: tSessions.length > 0 ? '6px' : '0'
-                                                            }}>
+                                                            <div className={`${styles.templateHeader} ${isDone ? styles.templateHeaderDone : styles.templateHeaderPending}`}
+                                                                style={{ marginBottom: tSessions.length > 0 ? '6px' : '0' }}>
                                                                 <span>{isDone ? '✓' : '○'}</span>
                                                                 <span style={{ fontWeight: 500 }}>{t.name}</span>
-                                                                {completedTSessions.length > 1 && <span style={{ fontSize: '11px', background: '#333', padding: '2px 6px', borderRadius: '4px' }}>{completedTSessions.length}</span>}
+                                                                {completedTSessions.length > 1 && <span className={styles.sessionCountBadge}>{completedTSessions.length}</span>}
                                                             </div>
 
                                                             {/* Sessions under this template */}
                                                             {tSessions.length > 0 && (
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '24px' }}>
+                                                                <div className={styles.templateSessions}>
                                                                     {tSessions.map(s => (
-                                                                        <div key={s.id} style={{
-                                                                            fontSize: '12px',
-                                                                            color: (s.completed || s.attributes?.completed) ? '#888' : '#666',
-                                                                            display: 'flex',
-                                                                            flexDirection: 'column'
-                                                                        }}>
-                                                                            <div style={{ color: '#aaa' }}>
+                                                                        <div key={s.id} className={styles.sessionItem}>
+                                                                            <div className={s.completed || s.attributes?.completed ? styles.sessionLinkCompleted : styles.sessionLink}>
                                                                                 {moment.utc(s.session_start || s.start_time).local().format('h:mm A')} - {s.name}
                                                                             </div>
                                                                             {(s.completed || s.attributes?.completed) && (
-                                                                                <div style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
+                                                                                <div className={styles.sessionDuration}>
                                                                                     Duration: {s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
                                                                                 </div>
                                                                             )}
@@ -316,7 +264,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                         {/* Unlinked Sessions for this day */}
                                         {unlinkedDaySessions.length > 0 && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', borderTop: '1px solid #333', paddingTop: '12px' }}>
+                                            <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
                                                     <div key={s.id} style={{ fontSize: '12px', color: '#aaa' }}>
                                                         ✓ {s.name} ({s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'})
@@ -326,7 +274,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         )}
 
                                         {day.notes && (
-                                            <div style={{ color: '#aaa', fontSize: '13px', marginTop: '12px', whiteSpace: 'pre-wrap' }}>
+                                            <div className={styles.dayNotes}>
                                                 {day.notes}
                                             </div>
                                         )}
@@ -338,44 +286,26 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                     {/* Scheduled Sessions Section */}
                     {looseScheduledSessions.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
-                            <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                        <div className={styles.sectionContainer}>
+                            <h3 className={styles.sectionTitle}>
                                 Scheduled Sessions
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div className={styles.listContainer}>
                                 {looseScheduledSessions.map(session => (
-                                    <div key={session.id} style={{
-                                        background: '#252525',
-                                        borderRadius: '8px',
-                                        padding: '12px 16px',
-                                        border: '1px solid #333',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}>
-                                        <div>
-                                            <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
+                                    <div key={session.id} className={styles.card}>
+                                        <div className={styles.cardFlex}>
+                                            <div className={styles.cardTitle}>
                                                 {session.name || 'Untitled Session'}
                                             </div>
+                                            <button
+                                                onClick={() => onUnscheduleDay && onUnscheduleDay({ ...session, type: 'session' })}
+                                                className={styles.removeButton}
+                                                style={{ fontSize: '18px', fontWeight: 300 }}
+                                                title="Cancel Session"
+                                            >
+                                                ✕
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => onUnscheduleDay && onUnscheduleDay({ ...session, type: 'session' })}
-                                            style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                color: '#666',
-                                                cursor: 'pointer',
-                                                fontSize: '18px',
-                                                fontWeight: 300,
-                                                padding: '4px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}
-                                            title="Cancel Session"
-                                        >
-                                            ✕
-                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -383,39 +313,26 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                     )}
 
                     {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && (
-                        <div style={{
-                            textAlign: 'center',
-                            padding: '30px 20px',
-                            color: '#666',
-                            background: '#1a1a1a',
-                            borderRadius: '8px',
-                            marginBottom: '24px',
-                            border: '1px dashed #333'
-                        }}>
-                            <div style={{ fontSize: '24px', marginBottom: '10px' }}>📅</div>
-                            <div style={{ fontSize: '14px', marginBottom: '4px' }}>No program days or sessions scheduled for this date</div>
-                            <div style={{ fontSize: '12px', color: '#555' }}>Add a day to a block to schedule activities</div>
+                        <div className={styles.emptyState}>
+                            <div className={styles.emptyStateIcon}>📅</div>
+                            <div className={styles.emptyStateTitle}>No program days or sessions scheduled for this date</div>
+                            <div className={styles.emptyStateSub}>Add a day to a block to schedule activities</div>
                         </div>
                     )}
 
                     {/* Completed Sessions Section */}
                     {looseCompletedSessions.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
-                            <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                        <div className={styles.sectionContainer}>
+                            <h3 className={styles.sectionTitle}>
                                 Completed Sessions
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div className={styles.listContainer}>
                                 {looseCompletedSessions.map(session => (
-                                    <div key={session.id} style={{
-                                        background: '#252525',
-                                        borderRadius: '8px',
-                                        padding: '12px 16px',
-                                        border: '1px solid #333'
-                                    }}>
-                                        <div style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
+                                    <div key={session.id} className={styles.card}>
+                                        <div className={styles.cardTitle}>
                                             {moment.utc(session.session_end || session.session_start).local().format('h:mm A')} - {session.name || 'Untitled Session'}
                                         </div>
-                                        <div style={{ color: '#888', fontSize: '12px', marginTop: '4px' }}>
+                                        <div className={styles.headerMeta} style={{ fontSize: '12px' }}>
                                             Duration: {session.total_duration_seconds ? moment.duration(session.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
                                         </div>
                                     </div>
@@ -426,25 +343,17 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                     {/* Goals Section */}
                     {(goalsDueOnDate.length > 0 || goalsCompletedOnDate.length > 0) && (
-                        <div style={{ marginBottom: '24px' }}>
-                            <h3 style={{ color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                        <div className={styles.sectionContainer}>
+                            <h3 className={styles.sectionTitle}>
                                 Goals
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div className={styles.listContainer}>
                                 {/* Completed Goals */}
                                 {goalsCompletedOnDate.map(goal => (
-                                    <div key={`comp-${goal.id}`} style={{
-                                        padding: '12px',
-                                        background: '#1a2e1a',
-                                        borderRadius: '6px',
-                                        borderLeft: `3px solid #4caf50`,
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}>
+                                    <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
                                         <div>
                                             <div style={{ color: 'white', fontSize: '14px' }}>✅ {goal.name}</div>
-                                            <div style={{ color: '#8bc34a', fontSize: '11px', marginTop: '4px' }}>
+                                            <div className={styles.goalMeta} style={{ color: '#8bc34a' }}>
                                                 {goal.type || 'Goal'} • Met on this date
                                             </div>
                                         </div>
@@ -457,16 +366,15 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                     const completionDate = goal.completed_at || goal.attributes?.completed_at;
 
                                     return (
-                                        <div key={`due-${goal.id}`} style={{
-                                            padding: '12px',
-                                            background: isCompleted ? '#1a2e1a' : '#252525',
-                                            borderRadius: '6px',
-                                            borderLeft: `3px solid ${isCompleted ? '#4caf50' : getGoalColor(goal.type)}`
-                                        }}>
+                                        <div key={`due-${goal.id}`} className={styles.goalCard}
+                                            style={{
+                                                background: isCompleted ? '#1a2e1a' : '#252525',
+                                                borderLeftColor: isCompleted ? '#4caf50' : getGoalColor(goal.type)
+                                            }}>
                                             <div style={{ color: 'white', fontSize: '14px' }}>
                                                 {isCompleted ? '✅' : '🎯'} {goal.name}
                                             </div>
-                                            <div style={{ color: isCompleted ? '#8bc34a' : getGoalColor(goal.type), fontSize: '11px', marginTop: '4px' }}>
+                                            <div className={styles.goalMeta} style={{ color: isCompleted ? '#8bc34a' : getGoalColor(goal.type) }}>
                                                 {goal.type || 'Goal'} • {isCompleted ? `Completed ${completionDate ? 'on ' + getLocalDateString(completionDate) : ''}` : 'Due today'}
                                             </div>
                                         </div>
@@ -478,48 +386,27 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
 
                     {/* Action Controls */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: 'auto' }}>
+                    <div className={styles.actionsArea}>
                         {/* Set Goal Deadline Button */}
-                        <div style={{ marginTop: '0', paddingTop: '0' }}>
+                        <div>
                             <button
                                 onClick={() => setShowGoalSection(!showGoalSection)}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid #444',
-                                    borderRadius: '6px',
-                                    color: 'white',
-                                    padding: '10px 16px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 500,
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}
+                                className={styles.actionToggle}
                             >
                                 <span>🎯 Set Goal Deadline for This Date</span>
                                 <span>{showGoalSection ? '−' : '+'}</span>
                             </button>
 
                             {showGoalSection && (
-                                <div style={{ marginTop: '12px', padding: '16px', background: '#252525', borderRadius: '6px' }}>
-                                    <div style={{ marginBottom: '12px' }}>
-                                        <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                <div className={styles.actionPanel}>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>
                                             Select Goal
                                         </label>
                                         <select
                                             value={selectedGoalId}
                                             onChange={(e) => setSelectedGoalId(e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px',
-                                                background: '#1e1e1e',
-                                                border: '1px solid #444',
-                                                borderRadius: '4px',
-                                                color: 'white',
-                                                fontSize: '14px'
-                                            }}
+                                            className={styles.select}
                                         >
                                             <option value="">Choose a goal...</option>
                                             {goals && goals.map(goal => {
@@ -541,16 +428,11 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                             }
                                         }}
                                         disabled={!selectedGoalId}
+                                        className={styles.primaryButton}
                                         style={{
-                                            padding: '10px 16px',
                                             background: selectedGoalId ? '#3A86FF' : '#333',
-                                            border: 'none',
-                                            borderRadius: '6px',
                                             color: selectedGoalId ? 'white' : '#666',
                                             cursor: selectedBlockId ? 'pointer' : 'not-allowed',
-                                            fontSize: '14px',
-                                            fontWeight: 500,
-                                            width: '100%'
                                         }}
                                     >
                                         Set Deadline
@@ -561,48 +443,27 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                         {/* Add Block Day Section (Disabled if day already scheduled) */}
                         {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && blocks && blocks.length > 0 && onScheduleDay && (
-                            <div style={{ marginTop: '0' }}>
+                            <div>
                                 <button
                                     onClick={() => setShowAddDaySection(!showAddDaySection)}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px solid #444',
-                                        borderRadius: '6px',
-                                        color: 'white',
-                                        padding: '10px 16px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        fontWeight: 500,
-                                        width: '100%',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}
+                                    className={styles.actionToggle}
                                 >
                                     <span>📅 Schedule Day for This Date</span>
                                     <span>{showAddDaySection ? '−' : '+'}</span>
                                 </button>
 
                                 {showAddDaySection && (
-                                    <div style={{ marginTop: '12px', padding: '16px', background: '#252525', borderRadius: '6px' }}>
+                                    <div className={styles.actionPanel}>
                                         {/* Block Selection */}
                                         {blocksContainingDate.length > 1 && (
-                                            <div style={{ marginBottom: '12px' }}>
-                                                <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                            <div className={styles.formGroup}>
+                                                <label className={styles.label}>
                                                     Select Block
                                                 </label>
                                                 <select
                                                     value={selectedBlockId}
                                                     onChange={(e) => setSelectedBlockId(e.target.value)}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '10px',
-                                                        background: '#1e1e1e',
-                                                        border: '1px solid #444',
-                                                        borderRadius: '4px',
-                                                        color: 'white',
-                                                        fontSize: '14px'
-                                                    }}
+                                                    className={styles.select}
                                                 >
                                                     <option value="">Choose a block...</option>
                                                     {blocksContainingDate.map(block => (
@@ -613,14 +474,14 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         )}
 
                                         {blocksContainingDate.length === 0 && (
-                                            <div style={{ marginBottom: '12px' }}>
+                                            <div className={styles.formGroup}>
                                                 <div style={{ marginBottom: '8px', color: '#888', fontSize: '12px' }}>
                                                     Select a block to add this day to:
                                                 </div>
                                                 <select
                                                     value={selectedBlockId}
                                                     onChange={(e) => setSelectedBlockId(e.target.value)}
-                                                    style={{ width: '100%', padding: '10px', background: '#1e1e1e', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '14px' }}
+                                                    className={styles.select}
                                                 >
                                                     <option value="">Choose a block...</option>
                                                     {blocks.map(block => (
@@ -633,7 +494,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         {/* Day Selection */}
                                         {(blocksContainingDate.length === 1 || selectedBlockId) && (
                                             <div>
-                                                <div style={{ marginBottom: '8px', color: '#888', fontSize: '12px', textTransform: 'uppercase' }}>
+                                                <div className={styles.label}>
                                                     Select a Day to Schedule:
                                                 </div>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
@@ -678,22 +539,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                                         setShowAddDaySection(false);
                                                                     }
                                                                 }}
-                                                                style={{
-                                                                    padding: '10px',
-                                                                    background: '#333',
-                                                                    border: '1px solid #444',
-                                                                    borderRadius: '6px',
-                                                                    color: 'white',
-                                                                    textAlign: 'left',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'background 0.2s',
-                                                                    fontSize: '13px',
-                                                                    display: 'flex',
-                                                                    justifyContent: 'space-between',
-                                                                    alignItems: 'center'
-                                                                }}
-                                                                onMouseOver={(e) => e.currentTarget.style.background = '#444'}
-                                                                onMouseOut={(e) => e.currentTarget.style.background = '#333'}
+                                                                className={styles.optionButton}
                                                             >
                                                                 <div>
                                                                     <div style={{ fontWeight: 600 }}>{day.name || `Day ${day.day_number}`}</div>
@@ -712,18 +558,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                             setShowAddDaySection(false);
                                                         }
                                                     }}
-                                                    style={{
-                                                        padding: '10px',
-                                                        backgroundImage: 'linear-gradient(to right, #3A86FF11, #3A86FF33)',
-                                                        border: '1px dashed #3A86FF',
-                                                        borderRadius: '6px',
-                                                        color: '#3A86FF',
-                                                        textAlign: 'center',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px',
-                                                        fontWeight: 600,
-                                                        width: '100%'
-                                                    }}
+                                                    className={styles.createButton}
                                                 >
                                                     + Create New Day From Scratch
                                                 </button>
@@ -737,24 +572,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                 </div>
 
                 {/* Footer */}
-                <div style={{
-                    padding: '20px',
-                    borderTop: '1px solid #333',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '12px'
-                }}>
+                <div className={styles.footer}>
                     <button
                         onClick={onClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: '1px solid #444',
-                            color: 'white',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
+                        className={styles.closeFooterButton}
                     >
                         Close
                     </button>

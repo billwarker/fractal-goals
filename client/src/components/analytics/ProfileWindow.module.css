@@ -1,0 +1,329 @@
+/* ProfileWindow.module.css */
+
+.windowContainer {
+    /* Main container ref */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    min-width: 0;
+    position: relative;
+    cursor: default;
+    transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.windowContainer.selectable {
+    cursor: pointer;
+}
+
+.windowContainer.selected {
+    border-color: #2196f3;
+    /* 2px handled via props logic? No, just use class */
+    border-width: 2px;
+    box-shadow: 0 0 12px rgba(33, 150, 243, 0.3);
+}
+
+/* Header */
+.header {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #333;
+    background: #252525;
+    align-items: center;
+    min-height: 48px;
+    flex-wrap: nowrap;
+    /* Default */
+    position: relative;
+    z-index: 10;
+}
+
+.header.wrap {
+    flex-wrap: wrap;
+}
+
+/* Header Navigation Group (Back/Top) */
+.navGroup {
+    display: flex;
+    gap: 4px;
+    margin-right: 8px;
+    border-right: 1px solid #444;
+    padding-right: 8px;
+    flex-shrink: 0;
+}
+
+/* Unified Button Styles */
+.navBtn {
+    padding: 6px 8px;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    height: 32px;
+    min-width: 32px;
+}
+
+.navBtn:hover {
+    color: #fff;
+}
+
+/* Level Buttons */
+.levelBtn {
+    padding: 6px 12px;
+    background: #333;
+    border: none;
+    border-radius: 6px;
+    color: #888;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.levelBtn.active {
+    background: #2196f3;
+    color: white;
+}
+
+/* Main Action Area */
+.mainActions {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    align-items: center;
+}
+
+/* Global Actions (Right side) */
+.globalActions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Annotations Button specific */
+.btnAnnotations {
+    composes: navBtn;
+    width: auto;
+    padding: 0 10px;
+}
+
+.btnAnnotations.active {
+    background: #2196f3;
+    color: white;
+}
+
+.btnAnnotations.narrow {
+    width: 32px;
+    padding: 0;
+}
+
+.btnSplit {
+    composes: navBtn;
+}
+
+/* Split Menu */
+.splitMenu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    min-width: 160px;
+}
+
+.splitMenuItem {
+    width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.splitMenuItem:not(:first-child) {
+    border-top: 1px solid #333;
+}
+
+/* Level 1 Renderer */
+.levelLabel {
+    color: #666;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+    text-transform: uppercase;
+}
+
+/* Level 2 Controls */
+.level2Container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.select {
+    padding: 4px 8px;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: white;
+    font-size: 12px;
+}
+
+.controlGroup {
+    display: flex;
+    gap: 4px;
+    border-left: 1px solid #444;
+    padding-left: 8px;
+}
+
+.vizName {
+    color: #ccc;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Empty States */
+.emptyState {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 14px;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.emptyIcon {
+    font-size: 32px;
+    opacity: 0.5;
+}
+
+/* Visualization Content Containers */
+.vizContainer {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+.vizContainerHidden {
+    /* For AnnotatedChartWrapper containers that need overflow: hidden */
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vizContainerHeatmap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    padding: 16px;
+}
+
+.vizTitle {
+    margin: 0;
+    color: #ccc;
+    font-size: 16px;
+}
+
+.statsGrid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Goal Detail Header */
+.goalHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.goalTitle {
+    margin: 0;
+    color: #fff;
+    font-size: 16px;
+}
+
+.goalBadge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: white;
+}
+
+.chartContainer {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+}
+
+.noData {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+}
+
+/* StatCard */
+.statCard {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 140px;
+    min-width: 140px;
+}
+
+.statValue {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.statLabel {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.statSubLabel {
+    font-size: 10px;
+    color: #666;
+}

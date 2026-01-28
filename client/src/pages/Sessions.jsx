@@ -7,6 +7,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar } from '../components/sessions';
 import '../App.css';
+import styles from './Sessions.module.css';
 
 /**
  * Sessions Page - View and manage practice sessions
@@ -312,98 +313,40 @@ function Sessions() {
 
 
     return (
-        <div style={{
-            display: 'flex',
-            height: 'calc(100vh - 60px)',
-            width: '100%',
-            overflow: 'hidden'
-        }}>
+        <div className={styles.pageContainer}>
             {/* Left Panel: Sessions List */}
-            <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                minWidth: 0
-            }}>
+            <div className={styles.leftPanel}>
                 {/* Page Header (Fixed) */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '80px 40px 20px 40px', // Top padding to clear fixed nav
-                    background: 'var(--bg-color)',
-                    borderBottom: '1px solid #333',
-                    zIndex: 10
-                }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                <div className={styles.pageHeader}>
+                    <div className={styles.headerControls}>
                         <button
                             onClick={() => setFilterCompleted('all')}
-                            style={{
-                                padding: '6px 12px',
-                                background: filterCompleted === 'all' ? '#333' : 'transparent',
-                                border: '1px solid #444',
-                                borderRadius: '4px',
-                                color: filterCompleted === 'all' ? 'white' : '#888',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 500
-                            }}
+                            className={`${styles.filterButton} ${filterCompleted === 'all' ? styles.filterButtonActive : ''}`}
                         >
                             All
                         </button>
                         <button
                             onClick={() => setFilterCompleted('incomplete')}
-                            style={{
-                                padding: '6px 12px',
-                                background: filterCompleted === 'incomplete' ? '#333' : 'transparent',
-                                border: '1px solid #444',
-                                borderRadius: '4px',
-                                color: filterCompleted === 'incomplete' ? 'white' : '#888',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 500
-                            }}
+                            className={`${styles.filterButton} ${filterCompleted === 'incomplete' ? styles.filterButtonActive : ''}`}
                         >
                             Incomplete
                         </button>
                         <button
                             onClick={() => setFilterCompleted('completed')}
-                            style={{
-                                padding: '6px 12px',
-                                background: filterCompleted === 'completed' ? '#333' : 'transparent',
-                                border: '1px solid #444',
-                                borderRadius: '4px',
-                                color: filterCompleted === 'completed' ? 'white' : '#888',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 500
-                            }}
+                            className={`${styles.filterButton} ${filterCompleted === 'completed' ? styles.filterButtonActive : ''}`}
                         >
                             Completed
                         </button>
 
                         {/* Divider */}
-                        <div style={{ width: '1px', background: '#333', margin: '0 8px' }}></div>
+                        <div className={styles.divider}></div>
 
                         {/* Sort Controls */}
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '12px', color: '#666', marginRight: '4px' }}>Sort:</span>
+                        <div className={styles.sortGroup}>
+                            <span className={styles.sortLabel}>Sort:</span>
                             <button
                                 onClick={() => handleSortChange('start_date')}
-                                style={{
-                                    padding: '6px 12px',
-                                    background: sortBy === 'start_date' ? '#2196f3' : 'transparent',
-                                    border: sortBy === 'start_date' ? '1px solid #2196f3' : '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: sortBy === 'start_date' ? 'white' : '#888',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}
+                                className={`${styles.sortButton} ${sortBy === 'start_date' ? styles.sortButtonActive : ''}`}
                             >
                                 Date
                                 {sortBy === 'start_date' && (
@@ -412,19 +355,7 @@ function Sessions() {
                             </button>
                             <button
                                 onClick={() => handleSortChange('last_modified')}
-                                style={{
-                                    padding: '6px 12px',
-                                    background: sortBy === 'last_modified' ? '#2196f3' : 'transparent',
-                                    border: sortBy === 'last_modified' ? '1px solid #2196f3' : '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: sortBy === 'last_modified' ? 'white' : '#888',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}
+                                className={`${styles.sortButton} ${sortBy === 'last_modified' ? styles.sortButtonActive : ''}`}
                             >
                                 Modified
                                 {sortBy === 'last_modified' && (
@@ -434,37 +365,16 @@ function Sessions() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className={styles.actionButtons}>
                         <button
                             onClick={() => navigate(`/${rootId}/manage-session-templates`)}
-                            style={{
-                                padding: '6px 16px',
-                                background: '#2196f3',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                            }}
+                            className={styles.primaryButton}
                         >
                             Manage Session Templates
                         </button>
                         <button
                             onClick={() => navigate(`/${rootId}/manage-activities`)}
-                            style={{
-                                padding: '6px 16px',
-                                background: '#333',
-                                border: '1px solid #444',
-                                borderRadius: '4px',
-                                color: '#ccc',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 500
-                            }}
+                            className={styles.secondaryButton}
                         >
                             Manage Activities
                         </button>
@@ -472,14 +382,9 @@ function Sessions() {
                 </div>
 
                 {/* Scrollable Sessions List */}
-                <div style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '20px 40px',
-                    paddingBottom: '40px'
-                }}>
+                <div className={styles.sessionsList}>
                     {filteredSessions.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                        <div className={styles.emptyState}>
                             No sessions found. Start by clicking "+ ADD SESSION" in the navigation.
                         </div>
                     ) : (
@@ -498,41 +403,20 @@ function Sessions() {
                                             setSelectedSessionId(session.id);
                                             setSelectedNoteId(null);
                                         }}
-                                        style={{
-                                            background: selectedSessionId === session.id ? '#1a2a3a' : '#1e1e1e',
-                                            border: selectedSessionId === session.id ? '1px solid #2196f3' : '1px solid #333',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease'
-                                        }}
+                                        className={`${styles.sessionCard} ${selectedSessionId === session.id ? styles.sessionCardSelected : ''}`}
                                     >
                                         {/* Top Level: High-level session info */}
-                                        <div style={{
-                                            padding: '16px',
-                                            background: '#2a2a2a',
-                                            borderBottom: '1px solid #333',
-                                            display: 'grid',
-                                            gridTemplateColumns: '1.5fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr',
-                                            gap: '16px',
-                                            alignItems: 'center'
-                                        }}>
+                                        <div className={styles.cardTopLevel}>
                                             {/* Session Name (Link) */}
                                             <div>
                                                 <Link
                                                     to={`/${rootId}/session/${session.id}`}
-                                                    style={{
-                                                        fontWeight: 600,
-                                                        fontSize: '16px',
-                                                        textDecoration: session.attributes?.completed ? 'line-through' : 'none',
-                                                        color: '#2196f3',
-                                                        cursor: 'pointer'
-                                                    }}
+                                                    className={`${styles.cardHeaderTitle} ${session.attributes?.completed ? styles.cardHeaderTitleCompleted : ''}`}
                                                 >
                                                     {session.name}
                                                 </Link>
                                                 {session.attributes?.description && (
-                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                                                    <div className={styles.cardDescription}>
                                                         {session.attributes.description}
                                                     </div>
                                                 )}
@@ -540,101 +424,85 @@ function Sessions() {
 
                                             {/* Program */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Program</div>
+                                                <div className={styles.fieldLabel}>Program</div>
                                                 {session.program_info ? (
                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                         <Link
                                                             to={`/${rootId}/programs/${session.program_info.program_id}`}
-                                                            style={{ color: '#2196f3', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
+                                                            className={styles.programLink}
                                                         >
                                                             {session.program_info.program_name}
                                                         </Link>
-                                                        <span style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
+                                                        <span className={styles.programSubtext}>
                                                             {session.program_info.block_name} • {session.program_info.day_name}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span style={{ color: '#666', fontSize: '12px' }}>-</span>
+                                                    <span className={styles.fieldValueMuted}>-</span>
                                                 )}
                                             </div>
 
                                             {/* Session Start */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session Start</div>
+                                                <div className={styles.fieldLabel}>Session Start</div>
                                                 {sessionData?.session_start ? (
-                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_start)}</div>
+                                                    <div className={styles.fieldValue}>{formatDate(sessionData.session_start)}</div>
                                                 ) : (
-                                                    <div style={{ fontSize: '12px', color: '#666' }}>-</div>
+                                                    <div className={styles.fieldValueMuted}>-</div>
                                                 )}
                                             </div>
 
                                             {/* Session End */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Session End</div>
+                                                <div className={styles.fieldLabel}>Session End</div>
                                                 {sessionData?.session_end ? (
-                                                    <div style={{ fontSize: '14px' }}>{formatDate(sessionData.session_end)}</div>
+                                                    <div className={styles.fieldValue}>{formatDate(sessionData.session_end)}</div>
                                                 ) : (
-                                                    <div style={{ fontSize: '12px', color: '#666' }}>-</div>
+                                                    <div className={styles.fieldValueMuted}>-</div>
                                                 )}
                                             </div>
 
                                             {/* Last Modified */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Last Modified</div>
-                                                <div style={{ fontSize: '14px' }}>{formatDate(session.attributes?.updated_at)}</div>
+                                                <div className={styles.fieldLabel}>Last Modified</div>
+                                                <div className={styles.fieldValue}>{formatDate(session.attributes?.updated_at)}</div>
                                             </div>
 
                                             {/* Duration */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Duration</div>
-                                                <div style={{ fontSize: '14px', fontWeight: 500 }}>{getDuration(session)}</div>
+                                                <div className={styles.fieldLabel}>Duration</div>
+                                                <div className={styles.fieldValue} style={{ fontWeight: 500 }}>{getDuration(session)}</div>
                                             </div>
 
                                             {/* Template */}
                                             <div>
-                                                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Template</div>
+                                                <div className={styles.fieldLabel}>Template</div>
                                                 {sessionData?.template_name ? (
-                                                    <span style={{
-                                                        background: '#2196f3',
-                                                        padding: '4px 8px',
-                                                        borderRadius: '3px',
-                                                        fontSize: '12px',
-                                                        display: 'inline-block',
-                                                        color: 'white'
-                                                    }}>
+                                                    <span className={styles.templateBadge}>
                                                         {sessionData.template_name}
                                                     </span>
                                                 ) : (
-                                                    <span style={{ color: '#666', fontSize: '12px' }}>None</span>
+                                                    <span className={styles.fieldValueMuted}>None</span>
                                                 )}
                                             </div>
                                         </div>
 
                                         {/* Parent Goals & Immediate Goals Section */}
                                         {(sessionParentGoals.length > 0 || (session.immediate_goals && session.immediate_goals.length > 0)) && (
-                                            <div style={{
-                                                padding: '12px 16px',
-                                                background: '#252525',
-                                                borderBottom: '1px solid #333',
-                                                display: 'flex',
-                                                gap: '32px'
-                                            }}>
+                                            <div className={styles.goalsSection}>
                                                 {/* Short-Term Goals (left side) */}
                                                 {sessionParentGoals.length > 0 && (
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                                                    <div className={styles.goalsColumn}>
+                                                        <div className={styles.fieldLabel} style={{ marginBottom: '8px' }}>
                                                             Short-Term Goals:
                                                         </div>
-                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        <div className={styles.goalsList}>
                                                             {sessionParentGoals.map(goal => (
                                                                 <div
                                                                     key={goal.id}
+                                                                    className={styles.goalTag}
                                                                     style={{
-                                                                        padding: '6px 12px',
-                                                                        background: '#1e1e1e',
                                                                         border: `1px solid ${GOAL_COLORS.ShortTermGoal}`,
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '13px',
                                                                         color: GOAL_COLORS.ShortTermGoal
                                                                     }}
                                                                 >
@@ -647,28 +515,23 @@ function Sessions() {
 
                                                 {/* Immediate Goals (right side) - using new junction table data */}
                                                 {session.immediate_goals && session.immediate_goals.length > 0 && (
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                                                    <div className={styles.goalsColumn}>
+                                                        <div className={styles.fieldLabel} style={{ marginBottom: '8px' }}>
                                                             Immediate Goals:
                                                         </div>
-                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        <div className={styles.goalsList}>
                                                             {session.immediate_goals.map(goal => (
                                                                 <div
                                                                     key={goal.id}
+                                                                    className={`${styles.goalTag} ${goal.completed ? styles.goalTagCompleted : ''}`}
                                                                     style={{
-                                                                        padding: '6px 12px',
-                                                                        background: '#1e1e1e',
                                                                         border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '13px',
-                                                                        color: GOAL_COLORS.ImmediateGoal,
-                                                                        textDecoration: goal.completed ? 'line-through' : 'none',
-                                                                        opacity: goal.completed ? 0.7 : 1
+                                                                        color: GOAL_COLORS.ImmediateGoal
                                                                     }}
                                                                 >
                                                                     {goal.name}
                                                                     {goal.completed && (
-                                                                        <span style={{ marginLeft: '6px', color: '#4caf50' }}>✓</span>
+                                                                        <span className={styles.checkMark}>✓</span>
                                                                     )}
                                                                 </div>
                                                             ))}
@@ -684,29 +547,15 @@ function Sessions() {
                                             if (achievedTargets.length === 0) return null;
 
                                             return (
-                                                <div style={{
-                                                    padding: '12px 16px',
-                                                    background: '#1a2e1a',
-                                                    borderBottom: '1px solid #333',
-                                                    borderLeft: '3px solid #4caf50'
-                                                }}>
-                                                    <div style={{ fontSize: '11px', color: '#81c784', marginBottom: '8px', fontWeight: 600 }}>
+                                                <div className={styles.achievedSection}>
+                                                    <div className={styles.achievedHeader}>
                                                         🎯 Targets Achieved ({achievedTargets.length}):
                                                     </div>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    <div className={styles.goalsList}>
                                                         {achievedTargets.map((achieved, idx) => (
                                                             <div
                                                                 key={idx}
-                                                                style={{
-                                                                    padding: '6px 12px',
-                                                                    background: '#2e7d32',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '12px',
-                                                                    color: 'white',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '6px'
-                                                                }}
+                                                                className={styles.achievedTag}
                                                             >
                                                                 <span>✓</span>
                                                                 <span>{achieved.target.name || 'Target'}</span>
@@ -719,44 +568,22 @@ function Sessions() {
                                         })()}
 
                                         {/* Bottom Level: Session data with horizontal sections */}
-                                        <div style={{ padding: '16px' }}>
+                                        <div className={styles.cardBottomLevel}>
                                             {sessionData?.sections && sessionData.sections.length > 0 ? (
                                                 <>
                                                     {/* Sections Grid - Horizontal Layout */}
-                                                    <div style={{
-                                                        display: 'grid',
-                                                        gridTemplateColumns: `repeat(${sessionData.sections.length}, 1fr)`,
-                                                        gap: '12px',
-                                                        marginBottom: '12px'
-                                                    }}>
+                                                    <div className={styles.sectionsGrid} style={{ gridTemplateColumns: `repeat(${sessionData.sections.length}, 1fr)` }}>
                                                         {sessionData.sections.map((section, sectionIndex) => (
                                                             <div
                                                                 key={sectionIndex}
-                                                                style={{
-                                                                    background: '#252525',
-                                                                    padding: '12px',
-                                                                    borderRadius: '6px',
-                                                                    borderLeft: '3px solid #2196f3',
-                                                                    display: 'flex',
-                                                                    flexDirection: 'column'
-                                                                }}
+                                                                className={styles.sectionColumn}
                                                             >
                                                                 {/* Section Header */}
-                                                                <div style={{
-                                                                    fontWeight: 600,
-                                                                    fontSize: '14px',
-                                                                    marginBottom: '4px',
-                                                                    paddingBottom: '8px',
-                                                                    borderBottom: '1px solid #333'
-                                                                }}>
+                                                                <div className={styles.sectionHeader}>
                                                                     {section.name}
                                                                 </div>
 
-                                                                <div style={{
-                                                                    fontSize: '11px',
-                                                                    color: '#888',
-                                                                    marginBottom: '12px'
-                                                                }}>
+                                                                <div className={styles.sectionDuration}>
                                                                     {(() => {
                                                                         // Calculate section duration from activities
                                                                         let sectionSeconds = 0;
@@ -779,7 +606,7 @@ function Sessions() {
 
                                                                 {/* Exercises - Vertical List */}
                                                                 {section.exercises && section.exercises.length > 0 && (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                    <div className={styles.exercisesList}>
                                                                         {section.exercises.map((exercise, exerciseIndex) => {
                                                                             const actDef = exercise.type === 'activity' ? activities.find(a => a.id === exercise.activity_id) : null;
 
@@ -798,43 +625,23 @@ function Sessions() {
                                                                             return (
                                                                                 <div
                                                                                     key={exerciseIndex}
-                                                                                    style={{
-                                                                                        padding: '8px',
-                                                                                        background: '#1e1e1e',
-                                                                                        borderRadius: '4px',
-                                                                                        fontSize: '13px',
-                                                                                        border: exercise.type === 'activity' ? '1px solid #33691e' : 'none'
-                                                                                    }}
+                                                                                    className={`${styles.exerciseCard} ${exercise.type === 'activity' ? styles.exerciseCardActivity : ''}`}
                                                                                 >
-                                                                                    <div style={{ display: 'flex', alignItems: 'start', gap: '6px' }}>
+                                                                                    <div className={styles.exerciseHeader}>
                                                                                         {exercise.type !== 'activity' && (
-                                                                                            <span style={{ fontSize: '14px', marginTop: '2px', color: exercise.completed ? '#4caf50' : '#666' }}>
+                                                                                            <span className={`${styles.completionIcon} ${exercise.completed ? styles.completionIconCompleted : ''}`}>
                                                                                                 {exercise.completed ? '✓' : '○'}
                                                                                             </span>
                                                                                         )}
                                                                                         <div style={{ flex: 1 }}>
-                                                                                            <div style={{
-                                                                                                display: 'flex',
-                                                                                                justifyContent: 'space-between',
-                                                                                                alignItems: 'center',
-                                                                                                marginBottom: '2px'
-                                                                                            }}>
-                                                                                                <div style={{
-                                                                                                    fontWeight: 500,
-                                                                                                    textDecoration: exercise.completed ? 'line-through' : 'none',
-                                                                                                    color: exercise.completed ? '#888' : 'white'
-                                                                                                }}>
+                                                                                            <div className={styles.exerciseTitleRow}>
+                                                                                                <div className={`${styles.exerciseName} ${exercise.completed ? styles.exerciseNameCompleted : ''}`}>
                                                                                                     {exercise.name}
                                                                                                 </div>
 
                                                                                                 {/* Duration for activities */}
                                                                                                 {exercise.instance_id && exercise.duration_seconds != null && (
-                                                                                                    <div style={{
-                                                                                                        fontSize: '11px',
-                                                                                                        color: '#4caf50',
-                                                                                                        fontWeight: 'bold',
-                                                                                                        fontFamily: 'monospace'
-                                                                                                    }}>
+                                                                                                    <div className={styles.activityDuration}>
                                                                                                         {(() => {
                                                                                                             const mins = Math.floor(exercise.duration_seconds / 60);
                                                                                                             const secs = exercise.duration_seconds % 60;
@@ -846,10 +653,10 @@ function Sessions() {
 
                                                                                             {/* Activity Data Display */}
                                                                                             {exercise.type === 'activity' && (
-                                                                                                <div style={{ marginTop: '4px', fontSize: '12px', color: '#ccc' }}>
+                                                                                                <div className={styles.activityData}>
                                                                                                     {/* Sets View */}
                                                                                                     {exercise.has_sets && exercise.sets && exercise.sets.length > 0 && (
-                                                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px', borderLeft: '2px solid #333', marginTop: '6px' }}>
+                                                                                                        <div className={styles.setsContainer}>
                                                                                                             {exercise.sets.map((set, setIdx) => {
                                                                                                                 const hasSplits = actDef?.has_splits && actDef?.split_definitions?.length > 0;
 
@@ -873,21 +680,21 @@ function Sessions() {
                                                                                                                     });
 
                                                                                                                     return (
-                                                                                                                        <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                                                                                                                            <span style={{ color: '#666', fontSize: '11px', width: '40px', paddingTop: '2px' }}>SET {setIdx + 1}</span>
-                                                                                                                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
+                                                                                                                        <div key={setIdx} className={styles.setRow} style={{ alignItems: 'start' }}>
+                                                                                                                            <span className={`${styles.setLabel} ${styles.setLabelWithTopPadding}`}>SET {setIdx + 1}</span>
+                                                                                                                            <div className={styles.metricsGroup}>
                                                                                                                                 {Object.entries(metricsBySplit).map(([splitId, metrics]) => {
                                                                                                                                     const sInfo = getSplitInfo(splitId);
                                                                                                                                     return (
-                                                                                                                                        <div key={splitId} style={{ background: '#1a1a1a', padding: '6px 8px', borderRadius: '3px', border: '1px solid #333' }}>
-                                                                                                                                            <div style={{ fontSize: '11px', color: '#aaa', fontWeight: 'bold', marginBottom: '4px' }}>{sInfo.name}</div>
-                                                                                                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                                                                                        <div key={splitId} className={styles.splitGroup}>
+                                                                                                                                            <div className={styles.splitHeader}>{sInfo.name}</div>
+                                                                                                                                            <div className={styles.splitMetricsList}>
                                                                                                                                                 {metrics.map(m => {
                                                                                                                                                     const mInfo = getMetricInfo(m.metric_id);
                                                                                                                                                     return (
-                                                                                                                                                        <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
-                                                                                                                                                            <span style={{ color: '#888' }}>{mInfo.name}:</span>
-                                                                                                                                                            <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                                                        <div key={m.metric_id} className={styles.metricItem}>
+                                                                                                                                                            <span className={styles.metricName}>{mInfo.name}:</span>
+                                                                                                                                                            <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
                                                                                                                                                         </div>
                                                                                                                                                     );
                                                                                                                                                 })}
@@ -901,14 +708,14 @@ function Sessions() {
                                                                                                                 } else {
                                                                                                                     // No splits - original horizontal layout
                                                                                                                     return (
-                                                                                                                        <div key={setIdx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                                                                                            <span style={{ color: '#666', fontSize: '11px', width: '40px' }}>SET {setIdx + 1}</span>
+                                                                                                                        <div key={setIdx} className={styles.setRow}>
+                                                                                                                            <span className={styles.setLabel}>SET {setIdx + 1}</span>
                                                                                                                             {metricsToDisplay.map(m => {
                                                                                                                                 const mInfo = getMetricInfo(m.metric_id);
                                                                                                                                 return (
-                                                                                                                                    <div key={m.metric_id} style={{ display: 'flex', gap: '4px' }}>
-                                                                                                                                        <span style={{ color: '#888' }}>{mInfo.name}:</span>
-                                                                                                                                        <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                                    <div key={m.metric_id} className={styles.metricItem}>
+                                                                                                                                        <span className={styles.metricName}>{mInfo.name}:</span>
+                                                                                                                                        <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
                                                                                                                                     </div>
                                                                                                                                 );
                                                                                                                             })}
@@ -921,7 +728,7 @@ function Sessions() {
 
                                                                                                     {/* Single Metrics View */}
                                                                                                     {!exercise.has_sets && actDef?.metric_definitions?.length > 0 && exercise.metrics && (
-                                                                                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                                                                                        <div className={styles.singleMetricsContainer}>
                                                                                                             {exercise.metrics.filter(m => {
                                                                                                                 const mInfo = getMetricInfo(m.metric_id);
                                                                                                                 // If activity has splits, only show metrics with split_id
@@ -935,11 +742,11 @@ function Sessions() {
                                                                                                                 const mInfo = getMetricInfo(m.metric_id);
                                                                                                                 const sInfo = getSplitInfo(m.split_id);
                                                                                                                 return (
-                                                                                                                    <div key={`${m.metric_id}-${m.split_id || 'no-split'}`} style={{ background: '#263238', padding: '2px 8px', borderRadius: '3px', border: '1px solid #37474F' }}>
-                                                                                                                        <span style={{ color: '#aaa', marginRight: '4px' }}>
+                                                                                                                    <div key={`${m.metric_id}-${m.split_id || 'no-split'}`} className={styles.metricBadge}>
+                                                                                                                        <span className={styles.metricBadgeLabel}>
                                                                                                                             {sInfo.name ? `${sInfo.name} - ${mInfo.name}` : mInfo.name}:
                                                                                                                         </span>
-                                                                                                                        <span style={{ fontWeight: 'bold' }}>{m.value} {mInfo.unit}</span>
+                                                                                                                        <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
                                                                                                                     </div>
                                                                                                                 )
                                                                                                             })}
@@ -949,21 +756,12 @@ function Sessions() {
                                                                                             )}
 
                                                                                             {exercise.description && (
-                                                                                                <div style={{
-                                                                                                    fontSize: '11px',
-                                                                                                    color: '#888',
-                                                                                                    marginTop: '4px',
-                                                                                                    marginBottom: '4px'
-                                                                                                }}>
+                                                                                                <div className={styles.description}>
                                                                                                     {exercise.description}
                                                                                                 </div>
                                                                                             )}
                                                                                             {exercise.notes && (
-                                                                                                <div style={{
-                                                                                                    fontSize: '11px',
-                                                                                                    color: '#4caf50',
-                                                                                                    fontStyle: 'italic'
-                                                                                                }}>
+                                                                                                <div className={styles.notes}>
                                                                                                     💡 {exercise.notes}
                                                                                                 </div>
                                                                                             )}
@@ -980,21 +778,16 @@ function Sessions() {
 
                                                     {/* Session Notes */}
                                                     {sessionData.notes && (
-                                                        <div style={{
-                                                            padding: '12px',
-                                                            background: '#252525',
-                                                            borderRadius: '6px',
-                                                            borderLeft: '3px solid #ff9800'
-                                                        }}>
-                                                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+                                                        <div className={styles.sessionNotes}>
+                                                            <div className={styles.sessionNotesHeader}>
                                                                 Session Notes:
                                                             </div>
-                                                            <div style={{ fontSize: '13px' }}>{sessionData.notes}</div>
+                                                            <div className={styles.sessionNotesBody}>{sessionData.notes}</div>
                                                         </div>
                                                     )}
                                                 </>
                                             ) : (
-                                                <p style={{ color: '#666', textAlign: 'center', padding: '20px', margin: 0 }}>
+                                                <p className={styles.emptyState} style={{ padding: '20px', margin: 0 }}>
                                                     No session data available
                                                 </p>
                                             )}
@@ -1005,15 +798,8 @@ function Sessions() {
 
                             {/* Load More Button */}
                             {hasMore && (
-                                <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '20px',
-                                    marginTop: '10px'
-                                }}>
-                                    <span style={{ fontSize: '13px', color: '#888' }}>
+                                <div className={styles.loadMoreContainer}>
+                                    <span className={styles.loadMoreText}>
                                         Showing {sessions.length} of {totalSessions} sessions
                                     </span>
                                     <button
@@ -1022,31 +808,11 @@ function Sessions() {
                                             loadMoreSessions();
                                         }}
                                         disabled={loadingMore}
-                                        style={{
-                                            padding: '10px 24px',
-                                            background: loadingMore ? '#333' : '#2196f3',
-                                            border: 'none',
-                                            borderRadius: '6px',
-                                            color: 'white',
-                                            cursor: loadingMore ? 'not-allowed' : 'pointer',
-                                            fontSize: '14px',
-                                            fontWeight: 500,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}
+                                        className={`${styles.loadMoreButton} ${loadingMore ? styles.loadMoreButtonDisabled : ''}`}
                                     >
                                         {loadingMore ? (
                                             <>
-                                                <span style={{
-                                                    display: 'inline-block',
-                                                    width: '16px',
-                                                    height: '16px',
-                                                    border: '2px solid #666',
-                                                    borderTopColor: 'white',
-                                                    borderRadius: '50%',
-                                                    animation: 'spin 1s linear infinite'
-                                                }} />
+                                                <span className={styles.loadingSpinner} />
                                                 Loading...
                                             </>
                                         ) : (
@@ -1061,13 +827,7 @@ function Sessions() {
             </div>
 
             {/* Right Panel: Notes Sidebar */}
-            <div style={{
-                width: '350px',
-                flexShrink: 0,
-                borderLeft: '1px solid #333',
-                background: '#1a1a1a',
-                overflow: 'hidden'
-            }}>
+            <div className={styles.rightPanel}>
                 <SessionNotesSidebar
                     rootId={rootId}
                     selectedSessionId={selectedSessionId}

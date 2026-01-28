@@ -4,6 +4,7 @@ import { useGoals } from '../contexts/GoalsContext';
 import { fractalApi } from '../utils/api';
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
+import styles from './ActivityBuilder.module.css';
 
 /**
  * Activity Builder Component - Reusable form for creating/editing activities
@@ -288,98 +289,46 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     return (
         <>
             {/* Modal Overlay */}
-            <div
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: '20px'
-                }}
-                onClick={handleCancel}
-            >
+            <div className={styles.overlay} onClick={handleCancel}>
                 {/* Modal Content */}
-                <div
-                    style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        maxWidth: '800px',
-                        width: '100%',
-                        maxHeight: '90vh',
-                        overflow: 'auto',
-                        color: 'white'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <h2 style={{ fontSize: '24px', marginBottom: '20px', fontWeight: 300 }}>
+                <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                    <h2 className={styles.modalTitle}>
                         {editingActivity ? 'Edit Activity' : 'Create Activity'}
                     </h2>
 
                     {error && (
-                        <div style={{ padding: '10px', background: 'rgba(255,0,0,0.1)', color: '#f44336', marginBottom: '20px', borderRadius: '4px' }}>
+                        <div className={styles.errorMessage}>
                             {error}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gap: '15px' }}>
+                        <div className={styles.formGrid}>
                             <div>
-                                <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Activity Name</label>
+                                <label className={styles.label}>Activity Name</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
                                     placeholder="e.g. Scale Practice"
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white'
-                                    }}
+                                    className={styles.input}
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Description</label>
+                                <label className={styles.label}>Description</label>
                                 <textarea
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
                                     placeholder="Optional description"
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '80px',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontFamily: 'inherit',
-                                        resize: 'vertical'
-                                    }}
+                                    className={styles.textarea}
                                 />
                             </div>
 
                             {/* Associated Goals Section - Tree Navigation */}
                             <div>
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        marginBottom: '6px'
-                                    }}
-                                >
+                                <div className={styles.goalHeader}>
                                     <label style={{ fontSize: '12px', color: '#aaa' }}>
                                         Associated Goals ({selectedGoalIds.length})
                                     </label>
@@ -389,15 +338,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                             setShowGoalSelector(!showGoalSelector);
                                             if (!showGoalSelector) setSelectedLevel(null);
                                         }}
-                                        style={{
-                                            padding: '4px 10px',
-                                            background: 'transparent',
-                                            border: '1px solid #4caf50',
-                                            borderRadius: '4px',
-                                            color: '#4caf50',
-                                            cursor: 'pointer',
-                                            fontSize: '11px'
-                                        }}
+                                        className={styles.goalSelectBtn}
                                     >
                                         {showGoalSelector ? 'Done' : 'Select Goals'}
                                     </button>
@@ -405,7 +346,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                                 {/* Selected Goals Display */}
                                 {selectedGoalIds.length > 0 && !showGoalSelector && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                                    <div className={styles.selectedGoalsContainer}>
                                         {selectedGoalIds.map(goalId => {
                                             const goal = allGoals.find(g => g.id === goalId);
                                             if (!goal) return null;
@@ -413,22 +354,17 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                             return (
                                                 <div
                                                     key={goalId}
+                                                    className={styles.selectedGoalTag}
                                                     style={{
-                                                        padding: '4px 8px',
                                                         background: `${goalColor}20`,
                                                         border: `1px solid ${goalColor}`,
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        color: goalColor,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px'
+                                                        color: goalColor
                                                     }}
                                                 >
                                                     {goal.name}
                                                     <span
                                                         onClick={() => setSelectedGoalIds(prev => prev.filter(id => id !== goalId))}
-                                                        style={{ cursor: 'pointer', fontWeight: 'bold' }}
+                                                        className={styles.removeGoalBtn}
                                                     >
                                                         ×
                                                     </span>
@@ -440,14 +376,9 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                                 {/* Goal Level Navigator */}
                                 {showGoalSelector && (
-                                    <div style={{
-                                        background: '#252525',
-                                        padding: '16px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #444'
-                                    }}>
+                                    <div className={styles.goalSelectorArea}>
                                         {/* Level Badges Row */}
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: selectedLevel ? '12px' : '0' }}>
+                                        <div className={styles.levelBadgesRow} style={{ marginBottom: selectedLevel ? '12px' : '0' }}>
                                             {levelsWithGoals.length === 0 ? (
                                                 <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
                                                     No goals available
@@ -464,18 +395,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                             key={level.type}
                                                             type="button"
                                                             onClick={() => setSelectedLevel(isActive ? null : level.type)}
+                                                            className={`${styles.levelBadge} ${isActive ? styles.levelBadgeActive : styles.levelBadgeInactive}`}
                                                             style={{
-                                                                padding: '6px 14px',
                                                                 background: goalColor,
-                                                                border: isActive ? '2px solid white' : '2px solid transparent',
-                                                                borderRadius: '4px',
-                                                                color: textColor,
-                                                                cursor: 'pointer',
-                                                                fontSize: '12px',
-                                                                fontWeight: 'bold',
-                                                                transition: 'all 0.2s',
-                                                                whiteSpace: 'nowrap',
-                                                                opacity: isActive ? 1 : 0.85
+                                                                color: textColor
                                                             }}
                                                         >
                                                             {level.name} ({count})
@@ -487,11 +410,8 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                                         {/* Goals at Selected Level */}
                                         {selectedLevel && (
-                                            <div style={{
-                                                borderTop: '1px solid #444',
-                                                paddingTop: '12px'
-                                            }}>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                            <div className={styles.goalsListLevel}>
+                                                <div className={styles.goalsGrid}>
                                                     {goalsByLevel[selectedLevel]?.map(goal => {
                                                         const goalColor = getGoalColor(goal.type);
                                                         const isSelected = selectedGoalIds.includes(goal.id);
@@ -499,16 +419,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                         return (
                                                             <label
                                                                 key={goal.id}
+                                                                className={styles.goalCheckboxLabel}
                                                                 style={{
-                                                                    padding: '8px 12px',
                                                                     background: isSelected ? `${goalColor}25` : '#333',
-                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid #555',
-                                                                    borderRadius: '6px',
-                                                                    cursor: 'pointer',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '8px',
-                                                                    transition: 'all 0.2s'
+                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid #555'
                                                                 }}
                                                             >
                                                                 <input
@@ -522,11 +436,13 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                                         }
                                                                     }}
                                                                 />
-                                                                <span style={{
-                                                                    fontSize: '13px',
-                                                                    color: isSelected ? goalColor : '#ccc',
-                                                                    fontWeight: isSelected ? 'bold' : 'normal'
-                                                                }}>
+                                                                <span
+                                                                    className={styles.goalName}
+                                                                    style={{
+                                                                        color: isSelected ? goalColor : '#ccc',
+                                                                        fontWeight: isSelected ? 'bold' : 'normal'
+                                                                    }}
+                                                                >
                                                                     {goal.name}
                                                                 </span>
                                                             </label>
@@ -545,18 +461,11 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                             {/* Group Selection */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Activity Group</label>
+                                <label className={styles.label}>Activity Group</label>
                                 <select
                                     value={groupId}
                                     onChange={e => setGroupId(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white'
-                                    }}
+                                    className={styles.select}
                                 >
                                     <option value="">(No Group)</option>
                                     {activityGroups && activityGroups.map(group => (
@@ -568,8 +477,8 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             </div>
 
                             {/* Flags */}
-                            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                            <div className={styles.flagsContainer}>
+                                <label className={styles.flagLabel}>
                                     <input
                                         type="checkbox"
                                         checked={hasSets}
@@ -577,7 +486,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     />
                                     Track Sets
                                 </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                                <label className={styles.flagLabel}>
                                     <input
                                         type="checkbox"
                                         checked={hasSplits}
@@ -585,7 +494,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     />
                                     Track Splits
                                 </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                                <label className={styles.flagLabel}>
                                     <input
                                         type="checkbox"
                                         checked={hasMetrics}
@@ -594,7 +503,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     Enable Metrics
                                 </label>
                                 {metrics.length >= 2 && (
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#ccc', cursor: 'pointer' }}>
+                                    <label className={styles.flagLabel}>
                                         <input
                                             type="checkbox"
                                             checked={metricsMultiplicative}
@@ -608,37 +517,22 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             {/* Splits Section */}
                             {hasSplits && (
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Splits (Min 2, Max 5)</label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                                    <label className={styles.label}>Splits (Min 2, Max 5)</label>
+                                    <div className={styles.splitsContainer}>
                                         {splits.map((split, idx) => (
-                                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <div key={idx} className={styles.splitRow}>
                                                 <input
                                                     type="text"
                                                     value={split.name}
                                                     onChange={e => handleSplitChange(idx, e.target.value)}
                                                     placeholder={`Split #${idx + 1}`}
-                                                    style={{
-                                                        width: '150px',
-                                                        padding: '10px',
-                                                        background: '#2a2a2a',
-                                                        border: '1px solid #444',
-                                                        borderRadius: '4px',
-                                                        color: 'white'
-                                                    }}
+                                                    className={styles.splitInput}
                                                 />
                                                 {splits.length > 2 && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveSplit(idx)}
-                                                        style={{
-                                                            padding: '10px',
-                                                            background: '#d32f2f',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            color: 'white',
-                                                            cursor: 'pointer',
-                                                            width: '40px'
-                                                        }}
+                                                        className={styles.removeSplitBtn}
                                                     >
                                                         ×
                                                     </button>
@@ -647,16 +541,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                     <button
                                                         type="button"
                                                         onClick={handleAddSplit}
-                                                        style={{
-                                                            padding: '10px 16px',
-                                                            background: '#333',
-                                                            border: '1px dashed #666',
-                                                            borderRadius: '4px',
-                                                            color: '#aaa',
-                                                            cursor: 'pointer',
-                                                            fontSize: '13px',
-                                                            whiteSpace: 'nowrap'
-                                                        }}
+                                                        className={styles.addSplitBtn}
                                                     >
                                                         + Add Split
                                                     </button>
@@ -670,52 +555,30 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             {/* Metrics Section */}
                             {hasMetrics && (
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px' }}>Metrics (Max 3)</label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label className={styles.label}>Metrics (Max 3)</label>
+                                    <div className={styles.metricsList}>
                                         {metrics.map((metric, idx) => (
-                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', background: '#252525', borderRadius: '4px', border: '1px solid #333' }}>
-                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <div key={idx} className={styles.metricCard}>
+                                                <div className={styles.metricRow}>
                                                     <input
                                                         type="text"
                                                         value={metric.name}
                                                         onChange={e => handleMetricChange(idx, 'name', e.target.value)}
                                                         placeholder="Metric Name (e.g. Speed)"
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '10px',
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white'
-                                                        }}
+                                                        className={styles.metricInput}
                                                     />
                                                     <input
                                                         type="text"
                                                         value={metric.unit}
                                                         onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
                                                         placeholder="Unit (e.g. bpm)"
-                                                        style={{
-                                                            width: '100px',
-                                                            padding: '10px',
-                                                            background: '#2a2a2a',
-                                                            border: '1px solid #444',
-                                                            borderRadius: '4px',
-                                                            color: 'white'
-                                                        }}
+                                                        className={styles.metricUnitInput}
                                                     />
                                                     {metrics.length > 1 && (
                                                         <button
                                                             type="button"
                                                             onClick={() => handleRemoveMetric(idx)}
-                                                            style={{
-                                                                padding: '10px',
-                                                                background: '#d32f2f',
-                                                                border: 'none',
-                                                                borderRadius: '4px',
-                                                                color: 'white',
-                                                                cursor: 'pointer',
-                                                                width: '40px'
-                                                            }}
+                                                            className={styles.removeSplitBtn}
                                                         >
                                                             ×
                                                         </button>
@@ -723,9 +586,9 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                 </div>
 
                                                 {/* Metric Flags */}
-                                                <div style={{ display: 'flex', gap: '16px', paddingLeft: '4px' }}>
+                                                <div className={styles.metricFlags}>
                                                     {hasSets && (
-                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
+                                                        <label className={styles.subFlagLabel}>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={metric.is_top_set_metric || false}
@@ -735,7 +598,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                         </label>
                                                     )}
                                                     {metricsMultiplicative && (
-                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#aaa', cursor: 'pointer' }}>
+                                                        <label className={styles.subFlagLabel}>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={metric.is_multiplicative !== undefined ? metric.is_multiplicative : true}
@@ -751,15 +614,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                             <button
                                                 type="button"
                                                 onClick={handleAddMetric}
-                                                style={{
-                                                    padding: '10px',
-                                                    background: '#333',
-                                                    border: '1px dashed #666',
-                                                    borderRadius: '4px',
-                                                    color: '#aaa',
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px'
-                                                }}
+                                                className={styles.addMetricBtn}
                                             >
                                                 + Add Metric
                                             </button>
@@ -769,37 +624,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             )}
 
                             {/* Action Buttons */}
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                            <div className={styles.actionsRow}>
                                 <button
                                     type="button"
                                     onClick={handleCancel}
-                                    style={{
-                                        flex: 1,
-                                        padding: '12px',
-                                        background: '#666',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer'
-                                    }}
+                                    className={styles.cancelBtn}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={creating}
-                                    style={{
-                                        flex: 1,
-                                        padding: '12px',
-                                        background: creating ? '#666' : '#4caf50',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontWeight: 'bold',
-                                        cursor: creating ? 'not-allowed' : 'pointer',
-                                        opacity: creating ? 0.5 : 1
-                                    }}
+                                    className={`${styles.submitBtn} ${creating ? styles.submitBtnDisabled : ''}`}
                                 >
                                     {creating ? (editingActivity ? 'Saving...' : 'Creating...') : (editingActivity ? 'Save Activity' : 'Create Activity')}
                                 </button>

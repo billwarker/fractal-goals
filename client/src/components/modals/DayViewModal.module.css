@@ -1,0 +1,439 @@
+/* DayViewModal.module.css */
+
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    padding: var(--spacing-md);
+    backdrop-filter: blur(4px);
+}
+
+.modalContent {
+    background: var(--color-bg-surface, #1e1e1e);
+    border: 1px solid var(--color-border, #444);
+    border-radius: var(--border-radius-lg, 12px);
+    width: 100%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+}
+
+/* Header */
+.header {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border, #333);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: var(--color-bg-surface);
+}
+
+.headerTitle {
+    margin: 0;
+    color: var(--color-text-primary, white);
+    font-size: var(--font-size-xl, 20px);
+    font-weight: 600;
+}
+
+.headerMeta {
+    color: var(--color-text-muted, #888);
+    font-size: var(--font-size-sm, 13px);
+    margin-top: 4px;
+}
+
+.headerTags {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+.tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.closeButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted, #888);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.closeButton:hover {
+    color: var(--color-text-primary, white);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollable Content */
+.contentArea {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Program Day Card */
+.programDayCard {
+    background: #252525;
+    border-radius: 8px;
+    padding: 16px;
+    border-left-width: 4px;
+    border-left-style: solid;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.programDayCardCompleted {
+    background: #1a2e1a;
+    border-left-color: #4caf50;
+}
+
+.programDayHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.programDayBlockName {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.programDayTitle {
+    color: var(--color-text-primary, white);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.removeButton {
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    line-height: 1;
+    border-radius: 4px;
+}
+
+.removeButton:hover {
+    color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+}
+
+/* Templates List */
+.templateList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.templateHeader {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+}
+
+.templateHeaderDone {
+    color: #8bc34a;
+}
+
+.templateHeaderPending {
+    color: #aaa;
+}
+
+.sessionCountBadge {
+    font-size: 11px;
+    background: #333;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.templateSessions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 24px;
+    margin-top: 4px;
+}
+
+.sessionItem {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sessionLink {
+    color: #aaa;
+}
+
+.sessionLinkCompleted {
+    color: #888;
+}
+
+.sessionDuration {
+    font-size: 11px;
+    color: #666;
+    margin-top: 1px;
+}
+
+.unlinkedSessions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    border-top: 1px solid #333;
+    padding-top: 12px;
+}
+
+.dayNotes {
+    color: #aaa;
+    font-size: 13px;
+    margin-top: 12px;
+    white-space: pre-wrap;
+}
+
+/* Section Containers */
+.sectionContainer {
+    margin-bottom: 24px;
+}
+
+.sectionTitle {
+    color: var(--color-text-muted, #888);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.listContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Cards */
+.card {
+    background: #252525;
+    border-radius: 8px;
+    padding: 12px 16px;
+    border: 1px solid #333;
+    transition: transform 0.2s;
+}
+
+.cardFlex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cardTitle {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: 30px 20px;
+    color: #666;
+    background: #1a1a1a;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    border: 1px dashed #333;
+}
+
+.emptyStateIcon {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.emptyStateTitle {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.emptyStateSub {
+    font-size: 12px;
+    color: #555;
+}
+
+/* Goals */
+.goalCard {
+    padding: 12px;
+    background: #252525;
+    border-radius: 6px;
+    border-left: 3px solid;
+}
+
+.goalCardCompleted {
+    background: #1a2e1a;
+    border-left-color: #4caf50;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.goalMeta {
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* Action Controls */
+.actionsArea {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: auto;
+}
+
+.actionToggle {
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: white;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.actionToggle:hover {
+    background: #252525;
+}
+
+.actionPanel {
+    margin-top: 12px;
+    padding: 16px;
+    background: #252525;
+    border-radius: 6px;
+}
+
+.formGroup {
+    margin-bottom: 12px;
+}
+
+.label {
+    display: block;
+    color: #888;
+    font-size: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.select {
+    width: 100%;
+    padding: 10px;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+}
+
+.primaryButton {
+    padding: 10px 16px;
+    background: var(--color-brand-primary, #3A86FF);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    width: 100%;
+    transition: opacity 0.2s;
+}
+
+.primaryButton:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.optionButton {
+    padding: 10px;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: white;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.optionButton:hover {
+    background: #444;
+}
+
+.createButton {
+    padding: 10px;
+    background-image: linear-gradient(to right, rgba(58, 134, 255, 0.07), rgba(58, 134, 255, 0.2));
+    border: 1px dashed var(--color-brand-primary, #3A86FF);
+    border-radius: 6px;
+    color: var(--color-brand-primary, #3A86FF);
+    text-align: center;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    width: 100%;
+}
+
+.createButton:hover {
+    background-image: linear-gradient(to right, rgba(58, 134, 255, 0.15), rgba(58, 134, 255, 0.3));
+}
+
+/* Footer */
+.footer {
+    padding: 20px;
+    border-top: 1px solid #333;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background: var(--color-bg-surface);
+}
+
+.closeFooterButton {
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.closeFooterButton:hover {
+    background: #333;
+}

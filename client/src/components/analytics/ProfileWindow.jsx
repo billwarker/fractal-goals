@@ -11,6 +11,7 @@ import WeeklyBarChart from './WeeklyBarChart';
 import AnnotationsList from './AnnotationsList';
 import { Bar, Line } from 'react-chartjs-2';
 import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
+import styles from './ProfileWindow.module.css';
 
 /**
  * ProfileWindow - A single analytics window that can display various visualizations
@@ -348,82 +349,26 @@ function ProfileWindow({
         annotations: '📝'
     };
 
-    // Unified Navigation Styles
-    const navButtonStyle = {
-        padding: '6px 8px',
-        background: '#333',
-        border: '1px solid #444',
-        borderRadius: '4px',
-        color: '#888',
-        fontSize: '14px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'all 0.2s ease',
-        height: '32px',
-        minWidth: '32px'
-    };
-
-    const levelButtonStyle = (isActive) => ({
-        padding: '6px 12px',
-        background: isActive ? '#2196f3' : '#333',
-        border: 'none',
-        borderRadius: '6px',
-        color: isActive ? 'white' : '#888',
-        fontSize: '12px',
-        fontWeight: 600,
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        whiteSpace: 'nowrap',
-        height: '32px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px'
-    });
-
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
         const hasViz = !!selectedVisualization;
 
         return (
-            <div style={{
-                display: 'flex',
-                gap: '8px',
-                padding: '8px 12px',
-                borderBottom: '1px solid #333',
-                background: '#252525',
-                alignItems: 'center',
-                minHeight: '48px',
-                flexWrap: isVeryNarrow ? 'wrap' : 'nowrap',
-                position: 'relative',
-                zIndex: 10
-            }}>
+            <div className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}>
                 {/* Navigation Controls (Back/Top) */}
                 {hasCategory && (
-                    <div style={{
-                        display: 'flex',
-                        gap: '4px',
-                        marginRight: '8px',
-                        borderRight: '1px solid #444',
-                        paddingRight: '8px',
-                        flexShrink: 0
-                    }}>
+                    <div className={styles.navGroup}>
                         <button
                             onClick={handleTop}
                             title="Top Level (All Categories)"
-                            style={navButtonStyle}
-                            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#888'}
+                            className={styles.navBtn}
                         >
                             🏠
                         </button>
                         <button
                             onClick={handleBack}
                             title="Go Back"
-                            style={navButtonStyle}
-                            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#888'}
+                            className={styles.navBtn}
                         >
                             ⬅️
                         </button>
@@ -431,26 +376,14 @@ function ProfileWindow({
                 )}
 
                 {/* Main Action Area */}
-                <div style={{
-                    display: 'flex',
-                    gap: '4px',
-                    flex: 1,
-                    overflowX: 'auto',
-                    paddingBottom: '2px',
-                    alignItems: 'center'
-                }}>
+                <div className={styles.mainActions}>
                     {!hasCategory && renderLevel0()}
                     {hasCategory && !hasViz && renderLevel1()}
                     {hasCategory && hasViz && renderLevel2()}
                 </div>
 
                 {/* Global Actions (Annotations, Split, Close) */}
-                <div style={{
-                    display: 'flex',
-                    gap: '4px',
-                    marginLeft: 'auto',
-                    flexShrink: 0
-                }}>
+                <div className={styles.globalActions}>
                     {(!hasAnnotationsWindow || selectedCategory === 'annotations') && (
                         <button
                             onClick={(e) => {
@@ -458,13 +391,7 @@ function ProfileWindow({
                                 onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
                             }}
                             title="View Annotations"
-                            style={{
-                                ...navButtonStyle,
-                                background: selectedCategory === 'annotations' ? '#2196f3' : '#333',
-                                color: selectedCategory === 'annotations' ? 'white' : '#888',
-                                width: isNarrow ? '32px' : 'auto',
-                                padding: isNarrow ? '0' : '0 10px'
-                            }}
+                            className={`${styles.btnAnnotations} ${selectedCategory === 'annotations' ? styles.active : ''} ${isNarrow ? styles.narrow : ''}`}
                         >
                             <span>📝</span>
                             {!isNarrow && <span style={{ marginLeft: '4px' }}>Annotations</span>}
@@ -478,22 +405,18 @@ function ProfileWindow({
                                     e.stopPropagation();
                                     setShowSplitMenu(!showSplitMenu);
                                 }}
-                                style={navButtonStyle}
+                                className={styles.btnSplit}
                             >
                                 {isNarrow ? '⊞▾' : '⊞ Split ▾'}
                             </button>
                             {showSplitMenu && (
-                                <div style={{
-                                    position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-                                    background: '#2a2a2a', border: '1px solid #444', borderRadius: '6px',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 100, minWidth: '160px'
-                                }}>
+                                <div className={styles.splitMenu}>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('vertical'); setShowSplitMenu(false); }}
-                                        style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', color: '#ccc', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        className={styles.splitMenuItem}>
                                         <span style={{ fontSize: '16px' }}>◫</span> Split Vertical
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('horizontal'); setShowSplitMenu(false); }}
-                                        style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderTop: '1px solid #333', color: '#ccc', fontSize: '13px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        className={styles.splitMenuItem}>
                                         <span style={{ fontSize: '16px' }}>⬓</span> Split Horizontal
                                     </button>
                                 </div>
@@ -501,7 +424,7 @@ function ProfileWindow({
                         </div>
                     )}
                     {canClose && (
-                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={navButtonStyle}>✕</button>
+                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={styles.navBtn}>✕</button>
                     )}
                 </div>
             </div>
@@ -514,7 +437,7 @@ function ProfileWindow({
                 <button
                     key={category}
                     onClick={() => handleCategoryChange(category)}
-                    style={levelButtonStyle(selectedCategory === category)}
+                    className={`${styles.levelBtn} ${selectedCategory === category ? styles.active : ''}`}
                 >
                     {categoryIcons[category]} {category.charAt(0).toUpperCase() + category.slice(1)}
                 </button>
@@ -524,14 +447,14 @@ function ProfileWindow({
 
     const renderLevel1 = () => (
         <>
-            <span style={{ color: '#666', fontSize: '12px', fontWeight: 600, marginRight: '8px', textTransform: 'uppercase' }}>
+            <span className={styles.levelLabel}>
                 {selectedCategory}:
             </span>
             {visualizations[selectedCategory]?.map(vis => (
                 <button
                     key={vis.id}
                     onClick={() => setSelectedVisualization(vis.id)}
-                    style={levelButtonStyle(selectedVisualization === vis.id)}
+                    className={`${styles.levelBtn} ${selectedVisualization === vis.id ? styles.active : ''}`}
                 >
                     {vis.icon} {vis.name}
                 </button>
@@ -548,12 +471,12 @@ function ProfileWindow({
             ];
             return (
                 <>
-                    <span style={{ color: '#888', fontSize: '12px', marginRight: '8px' }}>Range:</span>
+                    <span className={styles.levelLabel} style={{ marginRight: '8px' }}>Range:</span>
                     {timeRangeOptions.map(option => (
                         <button
                             key={option.value}
                             onClick={() => setHeatmapMonths(option.value)}
-                            style={levelButtonStyle(heatmapMonths === option.value)}
+                            className={`${styles.levelBtn} ${heatmapMonths === option.value ? styles.active : ''}`}
                         >
                             {option.label}
                         </button>
@@ -567,7 +490,7 @@ function ProfileWindow({
             const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
 
             return (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className={styles.level2Container}>
                     <select
                         value={selectedActivity?.id || ''}
                         onChange={(e) => {
@@ -575,10 +498,7 @@ function ProfileWindow({
                             setSelectedActivity(activity || null);
                             setSelectedSplit('all');
                         }}
-                        style={{
-                            padding: '4px 8px', background: '#333', border: '1px solid #444',
-                            borderRadius: '4px', color: 'white', fontSize: '12px'
-                        }}
+                        className={styles.select}
                     >
                         <option value="">Select Activity...</option>
                         {sortedActivities.map(a => (
@@ -590,7 +510,7 @@ function ProfileWindow({
                         <select
                             value={setsHandling}
                             onChange={(e) => setSetsHandling(e.target.value)}
-                            style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                            className={styles.select}
                         >
                             <option value="top">Top Set</option>
                             <option value="average">Avg</option>
@@ -601,7 +521,7 @@ function ProfileWindow({
                         <select
                             value={selectedSplit}
                             onChange={(e) => setSelectedSplit(e.target.value)}
-                            style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                            className={styles.select}
                         >
                             <option value="all">All Splits</option>
                             {currentActivityDef.split_definitions.map(split => (
@@ -616,11 +536,11 @@ function ProfileWindow({
         if (selectedCategory === 'goals' && selectedVisualization === 'goalDetail') {
             const goals = goalAnalytics?.goals || [];
             return (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className={styles.level2Container}>
                     <select
                         value={selectedGoal?.id || ''}
                         onChange={(e) => setSelectedGoal(goals.find(g => g.id === e.target.value) || null)}
-                        style={{ padding: '4px 8px', background: '#333', border: '1px solid #444', borderRadius: '4px', color: 'white', fontSize: '12px' }}
+                        className={styles.select}
                     >
                         <option value="">Select Goal...</option>
                         {goals.map(g => (
@@ -628,9 +548,9 @@ function ProfileWindow({
                         ))}
                     </select>
                     {selectedGoal && (
-                        <div style={{ display: 'flex', gap: '4px', borderLeft: '1px solid #444', paddingLeft: '8px' }}>
-                            <button onClick={() => setSelectedGoalChart('duration')} style={levelButtonStyle(selectedGoalChart === 'duration')}>Time</button>
-                            <button onClick={() => setSelectedGoalChart('activity')} style={levelButtonStyle(selectedGoalChart === 'activity')}>Acts</button>
+                        <div className={styles.controlGroup}>
+                            <button onClick={() => setSelectedGoalChart('duration')} className={`${styles.levelBtn} ${selectedGoalChart === 'duration' ? styles.active : ''}`}>Time</button>
+                            <button onClick={() => setSelectedGoalChart('activity')} className={`${styles.levelBtn} ${selectedGoalChart === 'activity' ? styles.active : ''}`}>Acts</button>
                         </div>
                     )}
                 </div>
@@ -639,7 +559,7 @@ function ProfileWindow({
 
         // Just show the viz name for others
         return (
-            <span style={{ color: '#ccc', fontSize: '12px', fontWeight: 500 }}>
+            <span className={styles.vizName}>
                 {visualizations[selectedCategory]?.find(v => v.id === selectedVisualization)?.name}
             </span>
         );
@@ -655,17 +575,8 @@ function ProfileWindow({
     const renderVisualizationContent = () => {
         if (!selectedCategory) {
             return (
-                <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666',
-                    fontSize: '14px',
-                    flexDirection: 'column',
-                    gap: '12px'
-                }}>
-                    <div style={{ fontSize: '32px', opacity: 0.5 }}>📊</div>
+                <div className={styles.emptyState}>
+                    <div className={styles.emptyIcon}>📊</div>
                     <div>Select a category above to view analytics</div>
                 </div>
             );
@@ -673,17 +584,8 @@ function ProfileWindow({
 
         if (!selectedVisualization && selectedCategory !== 'annotations') {
             return (
-                <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666',
-                    fontSize: '14px',
-                    flexDirection: 'column',
-                    gap: '12px'
-                }}>
-                    <div style={{ fontSize: '32px', opacity: 0.5 }}>
+                <div className={styles.emptyState}>
+                    <div className={styles.emptyIcon}>
                         {selectedCategory === 'goals' ? '🎯' : selectedCategory === 'sessions' ? '⏱️' : '🏋️'}
                     </div>
                     <div>Select a visualization type above</div>
@@ -701,16 +603,9 @@ function ProfileWindow({
             switch (selectedVisualization) {
                 case 'stats':
                     return (
-                        <div style={{
-                            flex: 1,
-                            padding: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px',
-                            overflowY: 'auto'
-                        }}>
-                            <h3 style={{ margin: 0, color: '#ccc', fontSize: '16px' }}>Goal Summary</h3>
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <div className={styles.vizContainer}>
+                            <h3 className={styles.vizTitle}>Goal Summary</h3>
+                            <div className={styles.statsGrid}>
                                 <StatCard value={summary.completed_goals || 0} label="Completed" subLabel={`${summary.completion_rate?.toFixed(1) || 0}% rate`} color="#4caf50" />
                                 <StatCard value={`${summary.avg_goal_age_days || 0}d`} label="Avg Age" subLabel="Days old" color="#2196f3" />
                                 <StatCard value={`${summary.avg_time_to_completion_days || 0}d`} label="Avg to Complete" subLabel="Days" color="#ff9800" />
@@ -720,7 +615,7 @@ function ProfileWindow({
                     );
                 case 'completionTimeline':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                        <div className={styles.vizContainerHidden}>
                             <AnnotatedChartWrapper
                                 chartRef={chartRef}
                                 visualizationType="timeline"
@@ -735,7 +630,7 @@ function ProfileWindow({
                     );
                 case 'timeDistribution':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                        <div className={styles.vizContainerHidden}>
                             <AnnotatedChartWrapper
                                 chartRef={chartRef}
                                 visualizationType="distribution"
@@ -751,46 +646,33 @@ function ProfileWindow({
                 case 'goalDetail':
                     if (!selectedGoal) {
                         return (
-                            <div style={{
-                                flex: 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#666',
-                                fontSize: '14px'
-                            }}>
+                            <div className={styles.emptyState}>
                                 Select a goal above to view details
                             </div>
                         );
                     }
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className={styles.vizContainer}>
                             {/* Goal header */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <h3 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>{selectedGoal.name}</h3>
-                                <span style={{
-                                    padding: '4px 10px',
-                                    background: getGoalTypeColor(selectedGoal.type),
-                                    borderRadius: '4px',
-                                    fontSize: '11px',
-                                    color: 'white'
-                                }}>
+                            <div className={styles.goalHeader}>
+                                <h3 className={styles.goalTitle}>{selectedGoal.name}</h3>
+                                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(selectedGoal.type) }}>
                                     {selectedGoal.type.replace('Goal', '')}
                                 </span>
                             </div>
                             {/* Goal stats */}
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <div className={styles.statsGrid}>
                                 <StatCard value={formatDuration(selectedGoal.total_duration_seconds || 0)} label="Total Time" color="#2196f3" />
                                 <StatCard value={selectedGoal.session_count || 0} label="Sessions" color="#4caf50" />
                                 <StatCard value={`${selectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
                             </div>
                             {/* Chart */}
-                            <div style={{ flex: 1, position: 'relative', minHeight: '200px' }}>
+                            <div className={styles.chartContainer}>
                                 {selectedGoalChart === 'duration' ? (
                                     selectedGoal.session_durations_by_date?.length > 0 ? (
                                         <Line data={getDurationChartData()} options={durationChartOptions} />
                                     ) : (
-                                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                                        <div className={styles.noData}>
                                             No session data available
                                         </div>
                                     )
@@ -798,7 +680,7 @@ function ProfileWindow({
                                     selectedGoal.activity_breakdown?.length > 0 ? (
                                         <Bar data={getActivityChartData()} options={activityChartOptions} />
                                     ) : (
-                                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                                        <div className={styles.noData}>
                                             No activities recorded
                                         </div>
                                     )
@@ -814,16 +696,9 @@ function ProfileWindow({
             switch (selectedVisualization) {
                 case 'stats':
                     return (
-                        <div style={{
-                            flex: 1,
-                            padding: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px',
-                            overflowY: 'auto'
-                        }}>
-                            <h3 style={{ margin: 0, color: '#ccc', fontSize: '16px' }}>Session Summary</h3>
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <div className={styles.vizContainer}>
+                            <h3 className={styles.vizTitle}>Session Summary</h3>
+                            <div className={styles.statsGrid}>
                                 <StatCard value={sessions.length} label="Total Sessions" subLabel="All time" color="#2196f3" />
                                 <StatCard value={completedSessions.length} label="Completed" subLabel={`${sessions.length > 0 ? Math.round((completedSessions.length / sessions.length) * 100) : 0}% rate`} color="#4caf50" />
                                 <StatCard value={formatDuration(totalDuration)} label="Total Time" subLabel="Practiced" color="#ff9800" />
@@ -833,7 +708,7 @@ function ProfileWindow({
                     );
                 case 'heatmap': {
                     return (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '16px' }}>
+                        <div className={styles.vizContainerHeatmap}>
                             {/* Annotated Heatmap with selection support */}
                             <AnnotatedHeatmap
                                 sessions={sessions}
@@ -847,13 +722,13 @@ function ProfileWindow({
                 }
                 case 'streaks':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className={styles.vizContainerHidden}>
                             <StreakTimeline sessions={sessions} />
                         </div>
                     );
                 case 'weeklyChart':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className={styles.vizContainerHidden}>
                             <AnnotatedChartWrapper
                                 chartRef={chartRef}
                                 visualizationType="bar"
@@ -873,14 +748,7 @@ function ProfileWindow({
         if (selectedCategory === 'activities') {
             if (!selectedActivity) {
                 return (
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#666',
-                        fontSize: '14px'
-                    }}>
+                    <div className={styles.emptyState}>
                         Select an activity above to view data
                     </div>
                 );
@@ -889,7 +757,7 @@ function ProfileWindow({
             switch (selectedVisualization) {
                 case 'scatterPlot':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className={styles.vizContainerHidden}>
                             <AnnotatedChartWrapper
                                 chartRef={chartRef}
                                 visualizationType="scatter"
@@ -912,7 +780,7 @@ function ProfileWindow({
                     );
                 case 'lineGraph':
                     return (
-                        <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className={styles.vizContainerHidden}>
                             <AnnotatedChartWrapper
                                 chartRef={chartRef}
                                 visualizationType="line"
@@ -955,7 +823,7 @@ function ProfileWindow({
             });
 
             return (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className={styles.vizContainerHidden}>
                     <AnnotationsList
                         rootId={rootId}
                         visualizationType={sourceVizType}
@@ -984,26 +852,7 @@ function ProfileWindow({
                     onSelect();
                 }
             }}
-            style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                background: '#1a1a1a',
-                // Show selection indicator only when there's an annotations window open
-                border: isVisualizationWindow && isSelected && hasAnnotationsWindow
-                    ? '2px solid #2196f3'
-                    : '1px solid #333',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                minWidth: 0,
-                position: 'relative',
-                cursor: isVisualizationWindow && hasAnnotationsWindow ? 'pointer' : 'default',
-                // Add a subtle glow for selected window when annotations are open
-                boxShadow: isVisualizationWindow && isSelected && hasAnnotationsWindow
-                    ? '0 0 12px rgba(33, 150, 243, 0.3)'
-                    : 'none',
-                transition: 'border 0.2s ease, box-shadow 0.2s ease'
-            }}
+            className={`${styles.windowContainer} ${isVisualizationWindow && hasAnnotationsWindow ? styles.selectable : ''} ${isVisualizationWindow && isSelected && hasAnnotationsWindow ? styles.selected : ''}`}
         >
             {renderUnifiedHeader()}
             {renderVisualizationContent()}
@@ -1014,26 +863,16 @@ function ProfileWindow({
 // StatCard helper component
 function StatCard({ value, label, subLabel, color }) {
     return (
-        <div style={{
-            background: '#252525',
-            border: '1px solid #333',
-            borderRadius: '6px',
-            padding: '16px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            flex: '1 1 140px',
-            minWidth: '140px'
-        }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color }}>
+        <div className={styles.statCard}>
+            <div className={styles.statValue} style={{ color }}>
                 {value}
             </div>
             <div>
-                <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div className={styles.statLabel}>
                     {label}
                 </div>
                 {subLabel && (
-                    <div style={{ fontSize: '10px', color: '#666' }}>
+                    <div className={styles.statSubLabel}>
                         {subLabel}
                     </div>
                 )}

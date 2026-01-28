@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../App.css';
+import styles from './Programming.module.css';
 import AlertModal from '../components/modals/AlertModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 
@@ -131,161 +132,102 @@ function Programming() {
     const totalDuration = currentTemplate.components.reduce((sum, c) => sum + c.duration, 0);
 
     return (
-        <div className="programming-page" style={{ padding: '20px', color: 'white' }}>
-            <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '20px' }}>
+        <div className={styles.container}>
+            <h1 className={styles.header}>
                 Session Programming
             </h1>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+            <div className={styles.mainGrid}>
                 {/* Template Builder */}
                 <div>
-                    <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Template Builder</h2>
+                    <div className={styles.card}>
+                        <h2 className={styles.cardTitle}>Template Builder</h2>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Template Name</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Template Name</label>
                             <input
                                 type="text"
                                 value={currentTemplate.name}
                                 onChange={(e) => setCurrentTemplate({ ...currentTemplate, name: e.target.value })}
                                 placeholder="e.g., Morning Practice Routine"
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white'
-                                }}
+                                className={styles.input}
                             />
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Description</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Description</label>
                             <textarea
                                 value={currentTemplate.description}
                                 onChange={(e) => setCurrentTemplate({ ...currentTemplate, description: e.target.value })}
                                 placeholder="Describe this session template..."
-                                style={{
-                                    width: '100%',
-                                    minHeight: '80px',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontFamily: 'inherit',
-                                    resize: 'vertical'
-                                }}
+                                className={styles.textarea}
                             />
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <span style={{ color: '#aaa' }}>
-                                Total Duration: <strong style={{ color: 'white' }}>{totalDuration} minutes</strong>
+                        <div className={styles.durationRow}>
+                            <span className={styles.durationText}>
+                                Total Duration: <strong className={styles.durationValue}>{totalDuration} minutes</strong>
                             </span>
                             <button
                                 onClick={() => setShowComponentModal(true)}
-                                style={{
-                                    padding: '10px 16px',
-                                    background: '#2196f3',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 'bold'
-                                }}
+                                className={styles.btnAddParams}
                             >
                                 + Add Component
                             </button>
                         </div>
 
                         {/* Components List */}
-                        <div>
-                            <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Components</h3>
+                        <div className={styles.componentsSection}>
+                            <h3 className={styles.componentsHeader}>Components</h3>
                             {currentTemplate.components.length === 0 ? (
-                                <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                                <p className={styles.emptyState}>
                                     No components yet. Click "Add Component" to start building your template.
                                 </p>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div className={styles.componentList}>
                                     {currentTemplate.components.map((component, index) => {
                                         const typeInfo = componentTypes.find(t => t.value === component.type);
                                         return (
                                             <div
                                                 key={component.id}
-                                                style={{
-                                                    background: '#2a2a2a',
-                                                    border: '1px solid #444',
-                                                    borderLeft: `4px solid ${typeInfo?.color || '#666'}`,
-                                                    borderRadius: '4px',
-                                                    padding: '12px',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}
+                                                className={styles.componentItem}
+                                                style={{ borderLeft: `4px solid ${typeInfo?.color || '#666'}` }}
                                             >
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                                        <span style={{
-                                                            background: typeInfo?.color,
-                                                            padding: '2px 8px',
-                                                            borderRadius: '3px',
-                                                            fontSize: '11px',
-                                                            fontWeight: 'bold'
-                                                        }}>
+                                                <div className={styles.componentInfo}>
+                                                    <div className={styles.componentHeader}>
+                                                        <span
+                                                            className={styles.componentBadge}
+                                                            style={{ background: typeInfo?.color }}
+                                                        >
                                                             {typeInfo?.label}
                                                         </span>
                                                         <strong>{component.name}</strong>
-                                                        <span style={{ color: '#888', fontSize: '14px' }}>({component.duration} min)</span>
+                                                        <span className={styles.componentDuration}>({component.duration} min)</span>
                                                     </div>
                                                     {component.description && (
-                                                        <p style={{ margin: 0, color: '#aaa', fontSize: '13px' }}>
+                                                        <p className={styles.componentDescription}>
                                                             {component.description}
                                                         </p>
                                                     )}
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                <div className={styles.itemActions}>
                                                     <button
                                                         onClick={() => handleMoveComponent(index, 'up')}
                                                         disabled={index === 0}
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            background: '#333',
-                                                            border: 'none',
-                                                            borderRadius: '3px',
-                                                            color: 'white',
-                                                            cursor: index === 0 ? 'not-allowed' : 'pointer',
-                                                            opacity: index === 0 ? 0.5 : 1
-                                                        }}
+                                                        className={styles.btnMove}
                                                     >
                                                         ↑
                                                     </button>
                                                     <button
                                                         onClick={() => handleMoveComponent(index, 'down')}
                                                         disabled={index === currentTemplate.components.length - 1}
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            background: '#333',
-                                                            border: 'none',
-                                                            borderRadius: '3px',
-                                                            color: 'white',
-                                                            cursor: index === currentTemplate.components.length - 1 ? 'not-allowed' : 'pointer',
-                                                            opacity: index === currentTemplate.components.length - 1 ? 0.5 : 1
-                                                        }}
+                                                        className={styles.btnMove}
                                                     >
                                                         ↓
                                                     </button>
                                                     <button
                                                         onClick={() => handleRemoveComponent(component.id)}
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            background: '#d32f2f',
-                                                            border: 'none',
-                                                            borderRadius: '3px',
-                                                            color: 'white',
-                                                            cursor: 'pointer'
-                                                        }}
+                                                        className={styles.btnRemove}
                                                     >
                                                         ×
                                                     </button>
@@ -298,35 +240,17 @@ function Programming() {
                         </div>
 
                         {/* Actions */}
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                        <div className={styles.mainActions}>
                             <button
                                 onClick={handleSaveTemplate}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#4caf50',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                }}
+                                className={styles.btnSave}
                             >
                                 Save Template
                             </button>
                             <button
                                 onClick={handleExportJSON}
                                 disabled={currentTemplate.components.length === 0}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: currentTemplate.components.length === 0 ? '#333' : '#2196f3',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: currentTemplate.components.length === 0 ? 'not-allowed' : 'pointer'
-                                }}
+                                className={styles.btnExport}
                             >
                                 Export JSON
                             </button>
@@ -336,56 +260,34 @@ function Programming() {
 
                 {/* Saved Templates */}
                 <div>
-                    <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: '8px', padding: '20px' }}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Saved Templates</h2>
+                    <div className={styles.card}>
+                        <h2 className={styles.cardTitle}>Saved Templates</h2>
 
                         {templates.length === 0 ? (
-                            <p style={{ color: '#666', textAlign: 'center', padding: '20px' }}>
+                            <p className={styles.emptyState}>
                                 No saved templates yet
                             </p>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className={styles.savedTemplatesList}>
                                 {templates.map(template => (
                                     <div
                                         key={template.id}
-                                        style={{
-                                            background: '#2a2a2a',
-                                            border: '1px solid #444',
-                                            borderRadius: '4px',
-                                            padding: '12px'
-                                        }}
+                                        className={styles.savedTemplateItem}
                                     >
-                                        <h3 style={{ fontSize: '16px', margin: '0 0 8px 0' }}>{template.name}</h3>
-                                        <p style={{ margin: '0 0 8px 0', color: '#aaa', fontSize: '13px' }}>
+                                        <h3 className={styles.savedTemplateTitle}>{template.name}</h3>
+                                        <p className={styles.savedTemplateMeta}>
                                             {template.components.length} components • {template.components.reduce((sum, c) => sum + c.duration, 0)} min
                                         </p>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                        <div className={styles.savedTemplateActions}>
                                             <button
                                                 onClick={() => handleLoadTemplate(template)}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '6px',
-                                                    background: '#2196f3',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    color: 'white',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
+                                                className={styles.btnLoad}
                                             >
                                                 Load
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteTemplate(template.id)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    background: '#d32f2f',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    color: 'white',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
+                                                className={styles.btnDelete}
                                             >
                                                 Delete
                                             </button>
@@ -401,64 +303,32 @@ function Programming() {
             {/* Add Component Modal */}
             {showComponentModal && (
                 <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.8)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000
-                    }}
+                    className={styles.modalOverlay}
                     onClick={() => setShowComponentModal(false)}
                 >
                     <div
-                        style={{
-                            background: '#1e1e1e',
-                            border: '1px solid #444',
-                            borderRadius: '8px',
-                            padding: '24px',
-                            maxWidth: '500px',
-                            width: '90%'
-                        }}
+                        className={styles.modalContent}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h2 style={{ margin: '0 0 20px 0' }}>Add Component</h2>
+                        <h2 className={styles.modalTitle}>Add Component</h2>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Component Name</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Component Name</label>
                             <input
                                 type="text"
                                 value={newComponent.name}
                                 onChange={(e) => setNewComponent({ ...newComponent, name: e.target.value })}
                                 placeholder="e.g., Scales Practice"
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white'
-                                }}
+                                className={styles.input}
                             />
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Type</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Type</label>
                             <select
                                 value={newComponent.type}
                                 onChange={(e) => setNewComponent({ ...newComponent, type: e.target.value })}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white'
-                                }}
+                                className={styles.select}
                             >
                                 {componentTypes.map(type => (
                                     <option key={type.value} value={type.value}>{type.label}</option>
@@ -466,72 +336,37 @@ function Programming() {
                             </select>
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Duration (minutes)</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Duration (minutes)</label>
                             <input
                                 type="number"
                                 min="1"
                                 value={newComponent.duration}
                                 onChange={(e) => setNewComponent({ ...newComponent, duration: parseInt(e.target.value) || 1 })}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white'
-                                }}
+                                className={styles.input}
                             />
                         </div>
 
-                        <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: '#aaa' }}>Description (Optional)</label>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.label}>Description (Optional)</label>
                             <textarea
                                 value={newComponent.description}
                                 onChange={(e) => setNewComponent({ ...newComponent, description: e.target.value })}
                                 placeholder="Additional details..."
-                                style={{
-                                    width: '100%',
-                                    minHeight: '80px',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontFamily: 'inherit',
-                                    resize: 'vertical'
-                                }}
+                                className={styles.textarea}
                             />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div className={styles.modalActions}>
                             <button
                                 onClick={handleAddComponent}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#4caf50',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                }}
+                                className={styles.btnAdd}
                             >
                                 Add Component
                             </button>
                             <button
                                 onClick={() => setShowComponentModal(false)}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#666',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                }}
+                                className={styles.btnCancel}
                             >
                                 Cancel
                             </button>
