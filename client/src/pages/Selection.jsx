@@ -7,7 +7,7 @@ import GoalModal from '../components/modals/GoalModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
-import '../App.css';
+import styles from './Selection.module.css'; // Import CSS Module
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -104,92 +104,40 @@ function Selection() {
     const isDarkText = headerTextColor === '#1a1a1a';
 
     if (loading) {
-        return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading fractals...</div>;
+        return <div className={styles.loadingContainer}>Loading fractals...</div>;
     }
 
     return (
-        <div className="fractal-selection-container">
+        <div className={styles.container}>
             {/* Top Center Display */}
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: '60px',
-                marginTop: '40px',
-                position: 'relative'
-            }}>
+            <div className={styles.headerContainer}>
                 {/* The Goal Node Circle */}
-                <div style={{
-                    width: '280px',
-                    height: '280px',
-                    borderRadius: '50%',
-                    backgroundColor: headerColor,
-                    border: '5px solid white',
-                    boxShadow: '0 0 50px rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 0,
-                    transition: 'background-color 0.5s ease'
-                }}>
-                    <h1 style={{
-                        color: headerTextColor,
-                        fontWeight: 800,
-                        fontSize: '28px',
-                        margin: 0,
-                        textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
-                        letterSpacing: '2px',
-                        textTransform: 'uppercase',
-                        textAlign: 'center',
-                        zIndex: 1
-                    }}>
+                <div
+                    className={styles.goalNodeCircle}
+                    style={{
+                        backgroundColor: headerColor,
+                    }}
+                >
+                    <h1
+                        className={styles.title}
+                        style={{
+                            color: headerTextColor,
+                            textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
+                        }}
+                    >
                         FRACTAL GOALS
                     </h1>
                 </div>
 
                 {/* Profile Controls (Logged In Only) */}
                 {isAuthenticated && (
-                    <div style={{
-                        marginTop: '30px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '12px',
-                        zIndex: 10
-                    }}>
-                        <div style={{
-                            fontSize: '12px',
-                            color: '#888',
-                            fontWeight: '800',
-                            letterSpacing: '2px',
-                            textTransform: 'uppercase'
-                        }}>
-                            Welcome, <span style={{ color: 'white' }}>{user?.username}</span>
+                    <div className={styles.profileContainer}>
+                        <div className={styles.welcomeText}>
+                            Welcome, <span className={styles.username}>{user?.username}</span>
                         </div>
                         <button
                             onClick={logout}
-                            style={{
-                                background: 'transparent',
-                                border: '1px solid rgba(255,255,255,0.2)',
-                                padding: '6px 20px',
-                                borderRadius: '4px',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: '800',
-                                letterSpacing: '1.5px',
-                                textTransform: 'uppercase',
-                                transition: 'all 0.2s ease'
-                            }}
-                            onMouseOver={(e) => {
-                                e.target.style.background = 'rgba(255,255,255,0.1)';
-                                e.target.style.borderColor = 'white';
-                            }}
-                            onMouseOut={(e) => {
-                                e.target.style.background = 'transparent';
-                                e.target.style.borderColor = 'rgba(255,255,255,0.2)';
-                            }}
+                            className={styles.logoutBtn}
                         >
                             LOGOUT
                         </button>
@@ -200,19 +148,7 @@ function Selection() {
                 {!isAuthenticated && (
                     <div
                         onClick={() => setAuthModalOpen(true)}
-                        style={{
-                            marginTop: '30px',
-                            color: '#888',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            letterSpacing: '1.5px',
-                            cursor: 'pointer',
-                            textTransform: 'uppercase',
-                            transition: 'color 0.2s ease',
-                            zIndex: 10
-                        }}
-                        onMouseOver={(e) => e.target.style.color = 'white'}
-                        onMouseOut={(e) => e.target.style.color = '#888'}
+                        className={styles.loginLink}
                     >
                         LOG IN
                     </div>
@@ -220,35 +156,29 @@ function Selection() {
             </div>
 
             {/* Fractal Grid */}
-            <div className="fractal-selection-grid">
+            <div className={styles.grid}>
                 {isAuthenticated && fractals.map(fractal => (
                     <div
                         key={fractal.id}
-                        className="fractal-card"
+                        className={styles.card}
                         onClick={() => handleSelectRoot(fractal.id)}
-                        style={{
-                            position: 'relative',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            textAlign: 'center'
-                        }}
                     >
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-                            <h3 style={{ margin: '0 0 8px 0' }}>{fractal.name}</h3>
-                            <div style={{ fontSize: '12px', color: getGoalColor(fractal.type), textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
+                        <div className={styles.cardContent}>
+                            <h3 className={styles.cardTitle}>{fractal.name}</h3>
+                            <div
+                                className={styles.cardType}
+                                style={{ color: getGoalColor(fractal.type) }}
+                            >
                                 {getTypeDisplayName(fractal.type)}
                             </div>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#666', marginTop: 'auto', width: '100%' }}>
+                        <div className={styles.cardFooter}>
                             <div>Created: {formatDate(fractal.created_at)}</div>
                         </div>
                         <button
-                            className="delete-btn"
+                            className={styles.deleteBtn}
                             onClick={(e) => handleDeleteClick(e, fractal)}
                             title="Delete Fractal"
-                            style={{ position: 'absolute', top: '8px', right: '8px' }}
                         >
                             ×
                         </button>
@@ -256,9 +186,11 @@ function Selection() {
                 ))}
 
                 {isAuthenticated && (
-                    <div className="fractal-card add-fractal-card" onClick={() => setCreateModalOpen(true)}>
-                        <div className="add-icon">+</div>
-                        <h3>New Fractal</h3>
+                    <div className={`${styles.card} ${styles.addCard}`} onClick={() => setCreateModalOpen(true)}>
+                        <div className={styles.cardContent}>
+                            <div className={styles.addIcon}>+</div>
+                            <h3 className={styles.cardTitle}>New Fractal</h3>
+                        </div>
                     </div>
                 )}
             </div>

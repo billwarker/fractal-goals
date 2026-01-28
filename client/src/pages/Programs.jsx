@@ -4,7 +4,7 @@ import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
-import '../App.css';
+import styles from './Programs.module.css'; // Import CSS Module
 
 const GOAL_COLORS = {
     Amercement: '#FF6B6B',
@@ -167,117 +167,44 @@ function Programs() {
     };
 
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            width: '100%',
-            overflow: 'hidden'
-        }}>
+        <div className={styles.container}>
             {/* Page Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '80px 40px 20px 40px',
-                background: 'var(--bg-color)',
-                borderBottom: '1px solid #333',
-                zIndex: 10
-            }}>
-                <h1 style={{
-                    margin: 0,
-                    fontSize: '28px',
-                    fontWeight: 300,
-                    color: 'white'
-                }}>
+            <div className={styles.header}>
+                <h1 className={styles.title}>
                     Programs
                 </h1>
 
                 <button
                     onClick={() => setShowBuilder(true)}
-                    style={{
-                        padding: '8px 20px',
-                        background: '#4caf50',
-                        border: 'none',
-                        borderRadius: '6px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = '#45a049'}
-                    onMouseLeave={(e) => e.target.style.background = '#4caf50'}
+                    className={styles.newProgramBtn}
                 >
-                    <span style={{ fontSize: '18px' }}>+</span>
+                    <span className={styles.plusIcon}>+</span>
                     New Program
                 </button>
             </div>
 
             {/* Programs List */}
-            <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '20px 40px',
-                paddingBottom: '40px'
-            }}>
+            <div className={styles.content}>
                 {programs.length === 0 ? (
-                    <div style={{
-                        background: '#1e1e1e',
-                        border: '1px solid #333',
-                        borderRadius: '8px',
-                        padding: '60px 40px',
-                        textAlign: 'center'
-                    }}>
-                        <div style={{
-                            fontSize: '48px',
-                            marginBottom: '20px',
-                            opacity: 0.3
-                        }}>
+                    <div className={styles.emptyState}>
+                        <div className={styles.emptyIcon}>
                             📋
                         </div>
-                        <h2 style={{
-                            fontSize: '24px',
-                            marginBottom: '12px',
-                            fontWeight: 400,
-                            color: 'white'
-                        }}>
+                        <h2 className={styles.emptyTitle}>
                             No Programs Yet
                         </h2>
-                        <p style={{
-                            color: '#aaa',
-                            fontSize: '15px',
-                            lineHeight: '1.6',
-                            maxWidth: '500px',
-                            margin: '0 auto 24px'
-                        }}>
+                        <p className={styles.emptyText}>
                             Create your first training program to organize your sessions into a structured weekly schedule.
                         </p>
                         <button
                             onClick={() => setShowBuilder(true)}
-                            style={{
-                                padding: '12px 24px',
-                                background: '#4caf50',
-                                border: 'none',
-                                borderRadius: '6px',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }}
+                            className={styles.createFirstBtn}
                         >
                             Create Your First Program
                         </button>
                     </div>
                 ) : (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                        gap: '20px'
-                    }}>
+                    <div className={styles.grid}>
                         {programs.map(program => {
                             const progGoals = program.goal_ids?.map(id => getGoalDetails(id)).filter(Boolean) || [];
                             const blocks = program.blocks || []; // Rename for clarity
@@ -286,69 +213,34 @@ function Programs() {
                                 <div
                                     key={program.id}
                                     onClick={() => navigate(`/${rootId}/programs/${program.id}`)}
-                                    style={{
-                                        background: '#1e1e1e',
-                                        border: '1px solid #333',
-                                        borderRadius: '8px',
-                                        padding: '20px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        position: 'relative',
-                                        overflow: 'hidden'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = '#2196f3';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = '#333';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
+                                    className={styles.card}
                                 >
                                     {/* Delete Button - Top Right */}
                                     <button
-                                        className="delete-btn"
+                                        className={styles.deleteBtn}
                                         onClick={(e) => handleDeleteProgram(e, program)}
                                         title="Delete Program"
-                                        style={{ position: 'absolute', top: '8px', right: '8px' }}
                                     >
                                         ×
                                     </button>
 
                                     {/* Program Header */}
-                                    <div style={{ marginBottom: '16px' }}>
-                                        <h3 style={{
-                                            margin: '0 0 8px 0',
-                                            fontSize: '18px',
-                                            fontWeight: 600,
-                                            color: 'white'
-                                        }}>
+                                    <div className={styles.cardHeader}>
+                                        <h3 className={styles.cardTitle}>
                                             {program.name}
                                         </h3>
-                                        <div style={{
-                                            fontSize: '13px',
-                                            color: '#888',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}>
+                                        <div className={styles.dateRange}>
                                             <span>📅</span>
                                             <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
                                         </div>
                                     </div>
 
                                     {/* Goals */}
-                                    <div style={{ marginBottom: '16px' }}>
-                                        <div style={{
-                                            fontSize: '11px',
-                                            color: '#888',
-                                            marginBottom: '8px',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.5px'
-                                        }}>
+                                    <div className={styles.goalsSection}>
+                                        <div className={styles.sectionLabel}>
                                             Selected Goals
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <div className={styles.goalList}>
                                             {(() => {
                                                 const grouped = progGoals.reduce((acc, g) => {
                                                     const goalType = g.attributes?.type || g.type; // Try attributes.type first, fallback to g.type
@@ -361,10 +253,8 @@ function Programs() {
 
                                                 return progGoals.length > 0 ? (
                                                     entries.map(([type, count]) => (
-                                                        <div key={type} style={{
+                                                        <div key={type} className={styles.goalItem} style={{
                                                             color: GOAL_COLORS[type] || '#ccc',
-                                                            fontSize: '13px',
-                                                            fontWeight: 500
                                                         }}>
                                                             {count} {type.replace(/([A-Z])/g, ' $1').trim()}{count !== 1 ? 's' : ''}
                                                         </div>
@@ -377,38 +267,18 @@ function Programs() {
                                     </div>
 
                                     {/* Blocks Summary */}
-                                    <div style={{
-                                        background: '#252525',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        marginBottom: '12px'
-                                    }}>
-                                        <div style={{
-                                            fontSize: '11px',
-                                            color: '#888',
-                                            marginBottom: '8px',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.5px'
-                                        }}>
+                                    <div className={styles.blocksSection}>
+                                        <div className={styles.sectionLabel}>
                                             Blocks
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div className={styles.blockList}>
                                             {blocks.length > 0 ? blocks.map(b => {
                                                 const isActive = isBlockActive(b);
                                                 return (
-                                                    <div key={b.id} style={{
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                        fontSize: '12px',
-                                                        color: '#ccc',
-                                                        borderBottom: '1px solid #333',
-                                                        paddingBottom: '4px',
-                                                        gap: '8px'
-                                                    }}>
+                                                    <div key={b.id} className={styles.blockRow}>
                                                         <span style={{ flex: 1 }}>{b.name}</span>
                                                         {isActive && <ActiveBlockBadge />}
-                                                        <span style={{ color: '#888', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                                        <span className={styles.blockDates}>
                                                             {b.start_date && b.end_date
                                                                 ? `${formatDate(b.start_date)} - ${formatDate(b.end_date)}`
                                                                 : 'Flexible'
@@ -423,13 +293,8 @@ function Programs() {
                                     </div>
 
                                     {/* Stats */}
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        fontSize: '12px',
-                                        color: '#aaa'
-                                    }}>
-                                        <span>Total Blocks: <strong style={{ color: 'white' }}>{blocks.length}</strong></span>
+                                    <div className={styles.statsFooter}>
+                                        <span>Total Blocks: <strong className={styles.statValue}>{blocks.length}</strong></span>
                                     </div>
                                 </div>
                             );

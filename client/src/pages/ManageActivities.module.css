@@ -1,0 +1,229 @@
+/* ManageActivities.module.css */
+
+.container {
+    color: white;
+    /* page-container is global, but we can extend or replace if needed. 
+       For now we kept className="page-container" in other files, 
+       but we can apply local styles too. */
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 80px 40px 20px 40px;
+    border-bottom: 1px solid #333;
+    margin-bottom: 30px;
+}
+
+.title {
+    font-weight: 300;
+    margin: 0;
+    font-size: 28px;
+}
+
+.headerActions {
+    display: flex;
+    gap: 10px;
+}
+
+.createGroupBtn {
+    padding: 6px 16px;
+    background: transparent;
+    border: 1px dashed #666;
+    border-radius: var(--radius-sm);
+    color: #aaa;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.createGroupBtn:hover {
+    border-color: #aaa;
+    color: white;
+}
+
+.createActivityBtn {
+    padding: 6px 16px;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: var(--radius-sm);
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.createActivityBtn:hover {
+    background: #444;
+    color: white;
+}
+
+/* Error Message */
+.errorMessage {
+    padding: 10px;
+    background: rgba(255, 0, 0, 0.1);
+    color: #f44336;
+    margin: 0 40px 20px 40px;
+    border-radius: var(--radius-sm);
+}
+
+/* Content Area */
+.content {
+    padding: 0 40px 40px 40px;
+}
+
+/* Activity Group */
+.groupContainer {
+    margin-bottom: 40px;
+    background: #1a1a1a;
+    border-radius: 12px;
+    border: 1px solid #333;
+    padding: 24px;
+}
+
+.groupHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.groupTitle {
+    font-size: 20px;
+    font-weight: 400;
+    margin: 0 0 6px 0;
+    color: #fff;
+}
+
+.groupDescription {
+    font-size: 13px;
+    color: #888;
+    margin: 0;
+    max-width: 600px;
+}
+
+.groupActions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.moveButtons {
+    display: flex;
+    margin-right: 8px;
+}
+
+.moveBtn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.moveBtn:disabled {
+    cursor: default;
+}
+
+.editGroupBtn {
+    padding: 6px 12px;
+    background: #333;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+}
+
+.editGroupBtn:hover {
+    background: #444;
+    color: white;
+}
+
+.deleteGroupBtn {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: var(--radius-sm);
+    color: #aaa;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.deleteGroupBtn:hover {
+    border-color: #666;
+    color: #ef5350;
+}
+
+/* Grid Layouts */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.emptyGroupState {
+    padding: 30px;
+    text-align: center;
+    color: #555;
+    border: 1px dashed #333;
+    border-radius: 8px;
+}
+
+/* Ungrouped Section */
+.ungroupedSection {
+    margin-top: 40px;
+}
+
+.ungroupedSection.noGroups {
+    margin-top: 0;
+}
+
+.ungroupedTitle {
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Empty Page State */
+.emptyState {
+    text-align: center;
+    padding: 60px 20px;
+    background: #1e1e1e;
+    border: 1px dashed #444;
+    border-radius: 8px;
+}
+
+.emptyStateText {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.createFirstBtn {
+    padding: 12px 24px;
+    background: #4caf50;
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.createFirstBtn:hover {
+    background: #45a049;
+}

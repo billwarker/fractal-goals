@@ -7,7 +7,7 @@ import ActivityCard from '../components/ActivityCard';
 
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
-import '../App.css';
+import styles from './ManageActivities.module.css'; // Import CSS Module
 
 /**
  * Manage Activities Page - Grid view of activity tiles with modal builder
@@ -188,65 +188,22 @@ function ManageActivities() {
     }
 
     return (
-        <div className="page-container" style={{ color: 'white' }}>
+        <div className={`page-container ${styles.container}`}>
             {/* Header with Create Button */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '80px 40px 20px 40px', // Top padding to clear fixed nav
-                borderBottom: '1px solid #333',
-                marginBottom: '30px'
-            }}>
-                <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px' }}>
+            <div className={styles.header}>
+                <h1 className={styles.title}>
                     Manage Activities
                 </h1>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div className={styles.headerActions}>
                     <button
                         onClick={handleCreateGroup}
-                        style={{
-                            padding: '6px 16px',
-                            background: 'transparent',
-                            border: '1px dashed #666',
-                            borderRadius: '4px',
-                            color: '#aaa',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#aaa';
-                            e.currentTarget.style.color = 'white';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#666';
-                            e.currentTarget.style.color = '#aaa';
-                        }}
+                        className={styles.createGroupBtn}
                     >
                         + Create Group
                     </button>
                     <button
                         onClick={handleCreateClick}
-                        style={{
-                            padding: '6px 16px',
-                            background: '#333',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#444';
-                            e.currentTarget.style.color = 'white';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#333';
-                            e.currentTarget.style.color = '#ccc';
-                        }}
+                        className={styles.createActivityBtn}
                     >
                         + Create Activity
                     </button>
@@ -254,13 +211,13 @@ function ManageActivities() {
             </div>
 
             {error && (
-                <div style={{ padding: '10px', background: 'rgba(255,0,0,0.1)', color: '#f44336', margin: '0 40px 20px 40px', borderRadius: '4px' }}>
+                <div className={styles.errorMessage}>
                     {error}
                 </div>
             )}
 
             {/* Groups and Activities Render */}
-            <div style={{ padding: '0 40px 40px 40px' }}>
+            <div className={styles.content}>
 
                 {/* 1. Render Activity Groups */}
                 {activityGroups && activityGroups.map((group, index) => {
@@ -268,33 +225,26 @@ function ManageActivities() {
                     const groupActivities = activities.filter(a => a.group_id === group.id);
 
                     return (
-                        <div key={group.id} style={{
-                            marginBottom: '40px',
-                            background: '#1a1a1a',
-                            borderRadius: '12px',
-                            border: '1px solid #333',
-                            padding: '24px'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div key={group.id} className={styles.groupContainer}>
+                            <div className={styles.groupHeader}>
                                 <div>
-                                    <h2 style={{ fontSize: '20px', fontWeight: 400, margin: '0 0 6px 0', color: '#fff' }}>
+                                    <h2 className={styles.groupTitle}>
                                         {group.name}
                                     </h2>
                                     {group.description && (
-                                        <p style={{ fontSize: '13px', color: '#888', margin: 0, maxWidth: '600px' }}>
+                                        <p className={styles.groupDescription}>
                                             {group.description}
                                         </p>
                                     )}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', marginRight: '8px' }}>
+                                <div className={styles.groupActions}>
+                                    <div className={styles.moveButtons}>
                                         <button
                                             onClick={() => handleMoveGroupUp(index)}
                                             disabled={index === 0}
+                                            className={styles.moveBtn}
                                             style={{
-                                                background: 'transparent', border: 'none', color: index === 0 ? '#444' : '#888',
-                                                cursor: index === 0 ? 'default' : 'pointer', fontSize: '18px', padding: '0 4px',
-                                                display: 'flex', alignItems: 'center'
+                                                color: index === 0 ? '#444' : '#888',
                                             }}
                                             title="Move Up"
                                         >
@@ -303,10 +253,9 @@ function ManageActivities() {
                                         <button
                                             onClick={() => handleMoveGroupDown(index)}
                                             disabled={index === activityGroups.length - 1}
+                                            className={styles.moveBtn}
                                             style={{
-                                                background: 'transparent', border: 'none', color: index === activityGroups.length - 1 ? '#444' : '#888',
-                                                cursor: index === activityGroups.length - 1 ? 'default' : 'pointer', fontSize: '18px', padding: '0 4px',
-                                                display: 'flex', alignItems: 'center'
+                                                color: index === activityGroups.length - 1 ? '#444' : '#888',
                                             }}
                                             title="Move Down"
                                         >
@@ -315,13 +264,13 @@ function ManageActivities() {
                                     </div>
                                     <button
                                         onClick={() => handleEditGroup(group)}
-                                        style={{ padding: '6px 12px', background: '#333', border: 'none', borderRadius: '4px', color: '#ccc', cursor: 'pointer', fontSize: '12px' }}
+                                        className={styles.editGroupBtn}
                                     >
                                         Edit
                                     </button>
                                     <button
                                         onClick={() => handleDeleteGroupClick(group)}
-                                        style={{ padding: '6px 12px', background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#aaa', cursor: 'pointer', fontSize: '12px' }}
+                                        className={styles.deleteGroupBtn}
                                     >
                                         Delete
                                     </button>
@@ -329,11 +278,7 @@ function ManageActivities() {
                             </div>
 
                             {groupActivities.length > 0 ? (
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                                    gap: '20px'
-                                }}>
+                                <div className={styles.grid}>
                                     {groupActivities.map(activity => (
                                         <ActivityCard
                                             key={activity.id}
@@ -347,7 +292,7 @@ function ManageActivities() {
                                     ))}
                                 </div>
                             ) : (
-                                <div style={{ padding: '30px', textAlign: 'center', color: '#555', border: '1px dashed #333', borderRadius: '8px' }}>
+                                <div className={styles.emptyGroupState}>
                                     No activities in this group
                                 </div>
                             )}
@@ -357,17 +302,13 @@ function ManageActivities() {
 
                 {/* 2. Render Ungrouped Activities */}
                 {activities.some(a => !a.group_id) && (
-                    <div style={{ marginTop: activityGroups?.length > 0 ? '40px' : '0' }}>
+                    <div className={`${styles.ungroupedSection} ${activityGroups?.length === 0 ? styles.noGroups : ''}`}>
                         {activityGroups?.length > 0 && (
-                            <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#666', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                            <h3 className={styles.ungroupedTitle}>
                                 Ungrouped Activities
                             </h3>
                         )}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                            gap: '20px'
-                        }}>
+                        <div className={styles.grid}>
                             {activities.filter(a => !a.group_id).map(activity => (
                                 <ActivityCard
                                     key={activity.id}
@@ -385,28 +326,13 @@ function ManageActivities() {
 
                 {/* Empty State (No activities and no groups) */}
                 {activities.length === 0 && (!activityGroups || activityGroups.length === 0) && (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '60px 20px',
-                        background: '#1e1e1e',
-                        border: '1px dashed #444',
-                        borderRadius: '8px'
-                    }}>
-                        <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
+                    <div className={styles.emptyState}>
+                        <p className={styles.emptyStateText}>
                             No activities defined yet
                         </p>
                         <button
                             onClick={handleCreateClick}
-                            style={{
-                                padding: '12px 24px',
-                                background: '#4caf50',
-                                border: 'none',
-                                borderRadius: '6px',
-                                color: 'white',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
-                            }}
+                            className={styles.createFirstBtn}
                         >
                             + Create Activity
                         </button>
