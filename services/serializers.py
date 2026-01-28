@@ -58,6 +58,7 @@ def serialize_activity_instance(instance):
         "session_id": instance.session_id,
         "practice_session_id": instance.practice_session_id,  # Legacy support
         "activity_definition_id": instance.activity_definition_id,
+        "name": instance.definition.name if instance.definition else "Unknown",
         "definition_name": instance.definition.name if instance.definition else "Unknown",
         "created_at": format_utc(instance.created_at),
         "time_start": format_utc(instance.time_start),
@@ -146,46 +147,75 @@ def serialize_session(session, include_image_data=False):
     
     # Parse session data from attributes
     attrs = _safe_load_json(session.attributes, {})
+    
+    # Initialize legacy session_data structure with canonical fields from DB
+    session_data = {
+        "session_start": format_utc(session.session_start),
+        "session_end": format_utc(session.session_end),
+        "duration_minutes": session.duration_minutes,
+        "total_duration_seconds": session.total_duration_seconds,
+        "completed": session.completed,
+    }
+    
+    # Merge existing attributes:
+    # 1. If 'session_data' key exists in attrs, merge its contents
+    # 2. Otherwise merge the attrs themselves (legacy support)
     if attrs:
-        # Legacy field mapping
-        result["attributes"]["session_data"] = attrs
-        
-        # Merge other attributes
+        if "session_data" in attrs and isinstance(attrs["session_data"], dict):
+            session_data.update(attrs["session_data"])
+        else:
+            session_data.update(attrs)
+            
+        # Ensure top-level attributes dict has all keys for flexibility
         for k, v in attrs.items():
             if k not in result["attributes"]:
                 result["attributes"][k] = v
+                
+    result["attributes"]["session_data"] = session_data
 
-        # Hydrate "exercises" from database ActivityInstances
-        if "sections" in attrs:
-            # We assume session.activity_instances is populated
-            instance_map = {inst.id: inst for inst in session.activity_instances}
-            for section in attrs["sections"]:
-                if "activity_ids" in section:
-                    activity_ids = section["activity_ids"]
-                    exercises = []
-                    for inst_id in activity_ids:
-                        if inst_id in instance_map:
-                            inst = instance_map[inst_id]
-                            # Use logic from serialize_activity_instance but modified for this structure
-                            ex = serialize_activity_instance(inst)
-                            ex['type'] = 'activity'
-                            ex['instance_id'] = inst.id
-                            ex['activity_id'] = inst.activity_definition_id
-                            ex['has_sets'] = len(ex.get('sets', [])) > 0
-                            exercises.append(ex)
-                    section["exercises"] = exercises
+    # Hydrate "exercises" from database ActivityInstances
+    if "sections" in attrs:
+        # We assume session.activity_instances is populated
+        instance_map = {inst.id: inst for inst in session.activity_instances}
+        for section in attrs["sections"]:
+            if "activity_ids" in section:
+                activity_ids = section["activity_ids"]
+                exercises = []
+                for inst_id in activity_ids:
+                    if inst_id in instance_map:
+                        inst = instance_map[inst_id]
+                        # Use logic from serialize_activity_instance but modified for this structure
+                        ex = serialize_activity_instance(inst)
+                        ex['type'] = 'activity'
+                        ex['instance_id'] = inst.id
+                        ex['activity_id'] = inst.activity_definition_id
+                        ex['has_sets'] = len(ex.get('sets', [])) > 0
+                        exercises.append(ex)
+                section["exercises"] = exercises
     
-    # Get associated goals with type information
-    # Note: Accessing relationship directly assumes it's loaded
-    if hasattr(session, 'goals'): # Check if loaded
-        # Replicate get_short_term_goals / get_immediate_goals via list filtering since we can't query DB here
-        # This relies on eager loading of `goals` or lazy loading if session is active
-        pass 
-        # Actually, models logic query the junction table with a filter.
-        # Since we are serializing, we might not have the session bound to DB.
-        # Ideally, the passed 'session' object should have what we need.
-        # If the original to_dict query was doing specific DB queries, we should pre-fetch them or handle them in the route.
-        # For now, let's skip the goal hydration if not present, or assume the route attached them.
+    # Hydrate goals based on type
+    if hasattr(session, 'goals') and session.goals:
+        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in session.goals if g.type == 'ShortTermGoal']
+        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in session.goals if g.type == 'ImmediateGoal']
+    else:
+        result["short_term_goals"] = []
+        result["immediate_goals"] = []
+
+    # Add Program Info if associated
+    if hasattr(session, 'program_day') and session.program_day:
+        day = session.program_day
+        block = day.block if hasattr(day, 'block') else None
+        if block:
+            program = block.program if hasattr(block, 'program') else None
+            if program:
+                result["program_info"] = {
+                    "program_id": program.id,
+                    "program_name": program.name,
+                    "block_id": block.id,
+                    "block_name": block.name,
+                    "day_id": day.id,
+                    "day_name": day.name
+                }
     
     return result
 

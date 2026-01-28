@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
-    ActivityDefinition,
+    ActivityDefinition, ProgramDay, ProgramBlock,
     validate_root_goal, get_all_sessions, get_sessions_for_root,
     get_immediate_goals_for_session, get_session_by_id
 )
@@ -95,7 +95,8 @@ def get_fractal_sessions(current_user, root_id):
         sessions = base_query.options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances)
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
+            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
         # Don't include image data in list view for performance (prevents multi-MB responses)
@@ -110,7 +111,10 @@ def get_fractal_sessions(current_user, root_id):
                 "has_more": offset + len(result) < total_count
             }
         })
-        
+    except Exception as e:
+        logger.error(f"Error in get_fractal_sessions: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
     finally:
         db_session.close()
 
@@ -389,7 +393,8 @@ def get_session_endpoint(current_user, root_id, session_id):
         session = db_session.query(Session).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances)
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition),
+            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
         ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
         
         if not session:

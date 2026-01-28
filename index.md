@@ -25,9 +25,12 @@
 - Created `AuthContext` for global frontend user/session management
 - Refactored Program logic into `ProgramService`
 - **Service Layer Refactor**: Implemented `services/serializers.py` to decouple API responses from database models, standardized JSON handling, and enforced strict Pydantic validation across all blueprints.
+- **Session Data & Backend Stability**: Resolved a critical regression where sessions were not appearing in the list due to backend crashes and double-nested `session_data` JSON. Standardized the merge of DB timing columns into the attributes payload and fixed missing imports in the sessions API.
 - **Notes Regression Fix**: Resolved issues with missing notes by updating `serialize_note` to include critical context IDs (`session_id`, `activity_instance_id`, etc.) and ensuring nested notes are included in Session and ProgramDay payloads.
+- **Activity Name Visibility**: Fixed empty activity headers by adding the `name` field to `serialize_activity_instance` and ensuring `ActivityDefinition` is eager-loaded in all session API endpoints.
+- **Session Program Integration**: Restored the `program_info` and `immediate_goals` fields in session responses by implementing relational hydration in `serialize_session`, ensuring the Sessions page correctly displays linked programs and achieved targets.
 - **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
-- **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.
+- **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.\n- **CSS Consolidation**: Migrated 125+ inline styles in the `SessionDetail` feature area to scoped CSS modules, centralized design tokens, and restored visual fidelity for critical UI elements like the "Add Session" button.
 
 ---
 
