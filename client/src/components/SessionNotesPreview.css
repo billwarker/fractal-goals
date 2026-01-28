@@ -5,14 +5,14 @@
 
 .session-notes-preview {
     padding: 16px;
-    background: #1a1a1a;
-    border-top: 1px solid #333;
+    background: var(--color-bg-card-alt);
+    border-top: 1px solid var(--color-border);
 }
 
 .notes-loading,
 .notes-error,
 .notes-empty-state {
-    color: #666;
+    color: var(--color-text-secondary);
     font-size: 13px;
     text-align: center;
     padding: 12px;
@@ -29,9 +29,15 @@
 }
 
 .note-item {
-    background: #252525;
+    background: var(--color-bg-card);
+    border: 1px solid transparent;
     border-radius: 6px;
     padding: 12px;
+}
+
+.note-item.selected {
+    background: var(--color-bg-card-hover);
+    border-color: #2196f3;
 }
 
 .note-header {
@@ -44,12 +50,12 @@
 .note-context-badge {
     font-size: 11px;
     font-weight: 500;
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 /* Session notes */
 .note-context-badge.context-session {
-    color: #999;
+    color: var(--color-text-secondary);
 }
 
 /* Activity notes */
@@ -64,13 +70,13 @@
 
 .note-timestamp {
     font-size: 11px;
-    color: #555;
+    color: var(--color-text-secondary);
     margin-bottom: 6px;
 }
 
 .note-content {
     font-size: 13px;
-    color: #bbb;
+    color: var(--color-text-primary);
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
@@ -81,7 +87,7 @@
 }
 
 .note-image img {
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 /* Notes toggle button styles (used in Sessions.jsx) */
@@ -91,9 +97,9 @@
     gap: 8px;
     padding: 8px 16px;
     background: transparent;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -102,7 +108,7 @@
 }
 
 .notes-toggle-btn:hover {
-    background: #252525;
+    background: var(--color-bg-card-hover);
     border-color: #2196f3;
     color: #2196f3;
 }

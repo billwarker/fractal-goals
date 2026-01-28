@@ -118,13 +118,11 @@ function SessionNotesPreview({ rootId, sessionId }) {
                     return (
                         <div
                             key={note.id}
-                            className="note-item"
+                            className={`note-item ${isSelected ? 'selected' : ''}`}
                             onClick={() => setSelectedNoteId(note.id)}
                             style={{
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
-                                border: isSelected ? '1px solid #2196f3' : '1px solid transparent', // Full border for consistency
-                                background: isSelected ? '#1a2a3a' : '#252525',
                                 borderRadius: '6px',
                                 padding: '16px'
                             }}

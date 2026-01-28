@@ -13,7 +13,7 @@
 .noteItem {
     padding: 8px 0;
     background: transparent;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--color-border);
     position: relative;
     transition: background 0.2s;
 }
@@ -25,12 +25,12 @@
 .noteItemDeleting {
     opacity: 0.5;
     font-style: italic;
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .noteItemTime {
     font-size: 11px;
-    color: #666;
+    color: var(--color-text-secondary);
     margin-bottom: 4px;
     display: flex;
     align-items: center;
@@ -38,20 +38,20 @@
 }
 
 .noteItemSetBadge {
-    background: #333;
+    background: var(--color-bg-input);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 10px;
-    color: #4caf50;
+    color: var(--color-text-primary);
 }
 
 .noteDate {
-    color: #666;
+    color: var(--color-text-secondary);
 }
 
 .noteItemContent {
     font-size: 14px;
-    color: #ddd;
+    color: var(--color-text-primary);
     line-height: 1.4;
     word-break: break-word;
 }
