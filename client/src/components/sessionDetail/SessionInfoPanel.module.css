@@ -3,7 +3,7 @@
 
 .sessionInfoPanel {
     padding: 12px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
 }
 
@@ -18,7 +18,7 @@
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: #fff;
+    color: var(--color-text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -27,7 +27,7 @@
 .sessionInfoToggle {
     background: none;
     border: none;
-    color: #666;
+    color: var(--color-text-muted);
     cursor: pointer;
     padding: 4px 8px;
     font-size: 10px;
@@ -47,7 +47,7 @@
 .sessionInfoDetails {
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
 }
 
 .sessionInfoRow {
@@ -58,11 +58,11 @@
 }
 
 .label {
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .value {
-    color: #aaa;
+    color: var(--color-text-secondary);
 }
 
 .value.duration {
@@ -83,7 +83,7 @@
 .sessionInfoGoals {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
@@ -97,7 +97,7 @@
 
 .goalsLabel {
     font-size: 10px;
-    color: #666;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     display: block;
@@ -112,8 +112,8 @@
 
 .goalBadge {
     padding: 3px 8px;
-    background: rgba(42, 42, 42, 0.8);
-    border: 1px solid;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     font-size: 11px;
     font-weight: 500;

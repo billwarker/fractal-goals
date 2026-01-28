@@ -8,7 +8,7 @@
     position: relative;
     padding: 24px;
     padding-bottom: 120px;
-    color: white;
+    color: var(--color-text-primary);
     box-sizing: border-box;
     /* Added top padding to account for fixed header (60px) + gap */
     padding-top: 84px;
@@ -40,7 +40,7 @@
 .statusMessage {
     text-align: center;
     padding: 40px;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 /* Toast Notification */
@@ -103,7 +103,7 @@
     right: 20px;
     z-index: 999;
     padding: 8px 12px;
-    background: #1e1e1e;
+    background: var(--color-bg-card);
     border-radius: 4px;
     font-size: 12px;
     display: flex;
@@ -115,8 +115,8 @@
 }
 
 .autoSaveDefault {
-    border-color: #888;
-    color: #888;
+    border-color: var(--color-text-muted);
+    color: var(--color-text-muted);
 }
 
 .autoSaveSaved {

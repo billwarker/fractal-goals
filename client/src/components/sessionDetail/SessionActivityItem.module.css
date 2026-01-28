@@ -2,8 +2,8 @@
 /* Migrated from inline styles to maintain pixel-perfect visual fidelity */
 
 .activityCard {
-    background: #2a2a2a;
-    border: 1px solid #333;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     padding: 16px;
     cursor: default;
@@ -11,7 +11,7 @@
 }
 
 .activityCardSelected {
-    background: #333;
+    background: var(--color-bg-card-alt);
     border-color: #4caf50;
     box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
 }
@@ -39,8 +39,8 @@
 }
 
 .reorderButton {
-    background: #333;
-    border: 1px solid #555;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     color: #4caf50;
     cursor: pointer;
@@ -63,7 +63,7 @@
 .dragHandle {
     cursor: grab;
     padding: 4px 8px;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 14px;
     display: flex;
     align-items: center;
@@ -81,13 +81,13 @@
 
 .activityLabel {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
     font-weight: normal;
 }
 
 .activityDescription {
     font-size: 12px;
-    color: #aaa;
+    color: var(--color-text-secondary);
 }
 
 .activityHeaderRight {
@@ -104,31 +104,31 @@
 
 .timerLabel {
     font-size: 9px;
-    color: #888;
+    color: var(--color-text-muted);
     text-transform: uppercase;
 }
 
 .timerInput {
     padding: 4px 6px;
-    background: #333;
-    border: 1px solid #555;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
-    color: #ccc;
+    color: var(--color-text-primary);
     font-size: 11px;
     width: 160px;
     font-family: monospace;
 }
 
 .timerInputDisabled {
-    background: #222;
-    color: #666;
+    background: var(--color-bg-sidebar);
+    color: var(--color-text-muted);
     cursor: not-allowed;
 }
 
 .durationDisplay {
     padding: 4px 8px;
-    background: #1a1a1a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     font-size: 13px;
     font-weight: bold;
@@ -146,7 +146,7 @@
 }
 
 .durationInactive {
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .startButton {
@@ -179,9 +179,9 @@
 
 .resetButton {
     background: transparent;
-    border: 1px solid #666;
+    border: 1px solid var(--color-text-muted);
     border-radius: 4px;
-    color: #888;
+    color: var(--color-text-muted);
     cursor: pointer;
     font-size: 12px;
     padding: 6px 10px;
@@ -215,7 +215,7 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    background: #222;
+    background: var(--color-bg-input);
     padding: 8px;
     border-radius: 4px;
     border: 1px solid transparent;
@@ -230,7 +230,7 @@
 
 .setNumber {
     width: 30px;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 12px;
     font-weight: bold;
 }
@@ -240,14 +240,14 @@
     align-items: center;
     gap: 8px;
     padding: 4px 8px;
-    background: #1a1a1a;
+    background: var(--color-bg-input);
     border-radius: 3px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 .splitLabel {
     font-size: 10px;
-    color: #aaa;
+    color: var(--color-text-secondary);
     font-weight: bold;
     min-width: 50px;
 }
@@ -261,22 +261,22 @@
 
 .metricLabel {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
     white-space: nowrap;
 }
 
 .metricLabelLarge {
     font-size: 13px;
-    color: #aaa;
+    color: var(--color-text-secondary);
     white-space: nowrap;
 }
 
 .metricInput {
     width: 60px;
     padding: 4px;
-    background: #333;
-    border: 1px solid #444;
-    color: white;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
     border-radius: 4px;
     font-size: 13px;
     transition: all 0.2s ease;
@@ -285,7 +285,7 @@
 .metricInput:focus {
     outline: none;
     border-color: #4caf50;
-    background: #3a3a3a;
+    background: var(--color-bg-input);
 }
 
 .metricInputSmall {
@@ -309,27 +309,27 @@
 
 .metricUnit {
     font-size: 10px;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .metricUnitLarge {
     font-size: 12px;
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .removeSetButton {
     margin-left: auto;
     background: none;
     border: none;
-    color: #666;
+    color: var(--color-text-muted);
     cursor: pointer;
 }
 
 .addSetButton {
     margin-top: 10px;
-    background: #333;
-    border: 1px dashed #555;
-    color: #ccc;
+    background: var(--color-bg-input);
+    border: 1px dashed var(--color-border);
+    color: var(--color-text-secondary);
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -350,15 +350,15 @@
 }
 
 .singleMetricGroup {
-    background: #222;
+    background: var(--color-bg-input);
     padding: 12px;
     border-radius: 6px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 .singleMetricGroupTitle {
     font-size: 12px;
-    color: #888;
+    color: var(--color-text-muted);
     font-weight: bold;
     margin-bottom: 10px;
     text-transform: uppercase;
@@ -372,7 +372,7 @@
 }
 
 .noMetricsMessage {
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 13px;
     font-style: italic;
 }

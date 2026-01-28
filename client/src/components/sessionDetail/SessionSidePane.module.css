@@ -2,9 +2,9 @@
 
 .sessionSidepane {
     width: 100%;
-    background: rgba(26, 26, 26, 0.85);
+    background: var(--color-bg-sidebar);
     backdrop-filter: blur(4px);
-    border: 1px solid rgba(51, 51, 51, 0.8);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
@@ -15,7 +15,7 @@
 
 .sidepaneHeader {
     padding: 10px 16px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
 }
 
@@ -28,10 +28,10 @@
 .sidepaneTab {
     flex: 1;
     padding: 6px 10px;
-    background: #2a2a2a;
-    border: 1px solid #333;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: #888;
+    color: var(--color-text-muted);
     cursor: pointer;
     transition: all 0.2s;
     font-size: 11px;
@@ -42,12 +42,12 @@
 }
 
 .sidepaneTab:hover {
-    background: #333;
-    color: #aaa;
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
 .sidepaneTabActive {
-    background: #333;
+    background: var(--color-bg-card-hover);
     border: 1px solid #4caf50;
     color: #4caf50;
     box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
@@ -96,11 +96,15 @@
 }
 
 .btnComplete {
-    background: #444;
+    background: var(--color-bg-card-hover);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
 }
 
 .btnCompleteActive {
     background: #4caf50;
+    border-color: #4caf50;
+    color: white;
 }
 
 .btnDone {
@@ -117,7 +121,7 @@
 
 /* The missing inline style */
 .divider {
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--color-border);
     margin-bottom: 20px;
 }
 

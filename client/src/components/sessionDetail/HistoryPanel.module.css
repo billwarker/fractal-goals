@@ -14,7 +14,7 @@
 
 .historySelector label {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -22,10 +22,10 @@
 .historySelector select {
     width: 100%;
     padding: 10px 12px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 14px;
     cursor: pointer;
 }
@@ -45,7 +45,7 @@
 .historyEmpty,
 .historyError {
     text-align: center;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 13px;
     padding: 20px;
     font-style: italic;
@@ -63,9 +63,10 @@
 
 /* History Card */
 .historyCard {
-    background: #222;
+    background: var(--color-bg-card-alt);
     border-radius: 6px;
     padding: 12px;
+    border: 1px solid var(--color-border);
 }
 
 .historyCardHeader {
@@ -83,12 +84,12 @@
 
 .historyCardDuration {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .historyCardSession {
     font-size: 12px;
-    color: #888;
+    color: var(--color-text-muted);
     margin-bottom: 8px;
 }
 
@@ -103,13 +104,13 @@
     align-items: center;
     gap: 8px;
     padding: 4px 8px;
-    background: #1a1a1a;
+    background: var(--color-bg-input);
     border-radius: 4px;
 }
 
 .historySetNum {
     font-size: 11px;
-    color: #666;
+    color: var(--color-text-muted);
     min-width: 20px;
 }
 
@@ -127,18 +128,18 @@
 
 .historyMetric {
     padding: 3px 8px;
-    background: #333;
+    background: var(--color-bg-input);
     border-radius: 4px;
     font-size: 12px;
-    color: #ccc;
+    color: var(--color-text-secondary);
 }
 
 .historyCardNotes {
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
     font-size: 12px;
-    color: #888;
+    color: var(--color-text-muted);
     font-style: italic;
 }
 
@@ -160,21 +161,21 @@
 }
 
 .noteTime {
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 11px;
     min-width: 50px;
 }
 
 .noteSetBadge {
     font-size: 10px;
-    background: #333;
+    background: var(--color-bg-input);
     padding: 1px 4px;
     border-radius: 3px;
-    color: #aaa;
+    color: var(--color-text-secondary);
     flex-shrink: 0;
 }
 
 .noteContent {
-    color: #aaa;
+    color: var(--color-text-secondary);
     font-size: 12px;
 }

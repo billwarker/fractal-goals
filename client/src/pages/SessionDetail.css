@@ -35,9 +35,9 @@
 .session-controls-bar {
     position: sticky;
     bottom: 0;
-    background: #121212;
+    background: var(--color-bg-sidebar);
     padding: 20px 0;
-    border-top: 1px solid #444;
+    border-top: 1px solid var(--color-border);
     display: flex;
     gap: 12px;
     justify-content: center;
@@ -74,8 +74,8 @@
 
 .btn-complete {
     background: transparent;
-    border: 2px solid #666;
-    color: #ccc;
+    border: 2px solid var(--color-text-muted);
+    color: var(--color-text-muted);
 }
 
 .btn-complete.completed {

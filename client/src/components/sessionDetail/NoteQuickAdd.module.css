@@ -2,10 +2,10 @@
 
 .noteQuickAdd {
     margin-bottom: 20px;
-    background: #1e1e1e;
+    background: var(--color-bg-card-alt);
     border-radius: 8px;
     padding: 12px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 .noteInputRow {
@@ -16,11 +16,11 @@
 
 .quickAddTextarea {
     flex: 1;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     padding: 10px 12px;
-    color: #eee;
+    color: var(--color-text-primary);
     font-size: 14px;
     resize: none;
     line-height: 1.4;
@@ -31,16 +31,16 @@
 .quickAddTextarea:focus {
     outline: none;
     border-color: #4caf50;
-    background: #333;
+    background: var(--color-bg-input);
 }
 
 .quickAddTextarea::placeholder {
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .noteSubmitBtn {
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     color: #4caf50;
     width: 38px;
     height: 38px;
@@ -54,14 +54,15 @@
 }
 
 .noteSubmitBtn:hover:not(:disabled) {
-    background: #444;
+    background: var(--color-bg-card-hover);
     border-color: #4caf50;
 }
 
 .noteSubmitBtn:disabled {
     opacity: 0.3;
+    opacity: 0.3;
     cursor: not-allowed;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .noteImagePreviewContainer {
@@ -74,7 +75,7 @@
     max-width: 100%;
     max-height: 150px;
     border-radius: 4px;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
 }
 
 .noteImageRemove {
@@ -97,7 +98,8 @@
 
 .noteHint {
     margin-top: 8px;
+    margin-top: 8px;
     font-size: 11px;
-    color: #666;
+    color: var(--color-text-muted);
     font-style: italic;
 }

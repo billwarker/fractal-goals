@@ -192,7 +192,7 @@ const ActivityAssociator = ({
         // When embedded=false (rendered as full modal view), skip the container styling
         const containerStyle = viewMode === 'selector'
             ? { display: 'flex', flexDirection: 'column', gap: '14px' }  // Full view - no container box
-            : { display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #4caf50' };  // Embedded - has container
+            : { display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--color-bg-card-alt)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-border)' };  // Embedded - has container
 
         return (
             <div style={containerStyle}>
@@ -215,7 +215,7 @@ const ActivityAssociator = ({
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: '#888',
+                            color: 'var(--color-text-muted)',
                             fontSize: '18px',
                             cursor: 'pointer',
                             padding: '0 4px'
@@ -224,7 +224,7 @@ const ActivityAssociator = ({
                         ←
                     </button>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px', color: 'white' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)' }}>
                             {activitySelectorGroupId === null
                                 ? 'Select Activity Group'
                                 : activityGroups.find(g => g.id === activitySelectorGroupId)?.name || 'Activities'}
@@ -243,8 +243,8 @@ const ActivityAssociator = ({
                                         alignItems: 'center',
                                         gap: '6px',
                                         padding: '4px 8px',
-                                        background: isGroupLinked ? '#2a4a2a' : 'transparent',
-                                        border: `1px solid ${isGroupLinked ? '#4caf50' : '#444'}`,
+                                        background: isGroupLinked ? 'var(--color-bg-input)' : 'transparent',
+                                        border: `1px solid ${isGroupLinked ? '#4caf50' : 'var(--color-border)'}`,
                                         borderRadius: '4px',
                                         cursor: isUpdatingGroupLink ? 'wait' : 'pointer',
                                         marginLeft: '12px'
@@ -266,7 +266,7 @@ const ActivityAssociator = ({
                             );
                         })()}
                     </div>
-                    <button onClick={handleCancelSelector} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                    <button onClick={handleCancelSelector} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '18px' }}>×</button>
                 </div>
 
                 {/* Content */}
@@ -284,10 +284,10 @@ const ActivityAssociator = ({
                                     onClick={() => setActivitySelectorGroupId(group.id)}
                                     style={{
                                         padding: '12px',
-                                        background: '#333',
-                                        border: selectedCount > 0 ? '1px solid #4caf50' : '1px solid #444',
+                                        background: 'var(--color-bg-input)',
+                                        border: selectedCount > 0 ? '1px solid #4caf50' : '1px solid var(--color-border)',
                                         borderRadius: '8px',
-                                        color: 'white',
+                                        color: 'var(--color-text-primary)',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -295,7 +295,7 @@ const ActivityAssociator = ({
                                     }}
                                 >
                                     <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{group.name}</div>
-                                    <div style={{ fontSize: '11px', color: '#888' }}>{groupActs.length} activities</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{groupActs.length} activities</div>
                                     {selectedCount > 0 && <div style={{ fontSize: '10px', color: '#4caf50', marginTop: '4px' }}>{selectedCount} selected</div>}
                                 </button>
                             );
@@ -304,12 +304,12 @@ const ActivityAssociator = ({
                             <button
                                 onClick={() => setActivitySelectorGroupId('ungrouped')}
                                 style={{
-                                    padding: '12px', background: '#333', border: '1px dashed #666', borderRadius: '8px', color: '#ccc', cursor: 'pointer',
+                                    padding: '12px', background: 'var(--color-bg-input)', border: '1px dashed var(--color-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center'
                                 }}
                             >
                                 <div style={{ fontSize: '13px', fontStyle: 'italic' }}>Ungrouped</div>
-                                <div style={{ fontSize: '11px', color: '#888' }}>{ungroupedActivities.length} activities</div>
+                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{ungroupedActivities.length} activities</div>
                             </button>
                         )}
                     </div>
@@ -325,8 +325,8 @@ const ActivityAssociator = ({
                                         key={activity.id}
                                         onClick={() => handleToggleActivitySelection(activity.id)}
                                         style={{
-                                            background: isSel ? '#2a4a2a' : '#1e1e1e',
-                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#444'}`,
+                                            background: isSel ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
+                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : 'var(--color-border)'}`,
                                             borderRadius: '6px',
                                             padding: '10px',
                                             cursor: isAssoc ? 'not-allowed' : 'pointer',
@@ -336,15 +336,15 @@ const ActivityAssociator = ({
                                     >
                                         <div style={{
                                             width: '18px', height: '18px', borderRadius: '4px',
-                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : '#666'}`,
+                                            border: `1px solid ${isSel || isAssoc ? '#4caf50' : 'var(--color-text-muted)'}`,
                                             background: isSel || isAssoc ? '#4caf50' : 'transparent',
                                             color: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
                                         }}>
                                             {(isSel || isAssoc) && '✓'}
                                         </div>
                                         <div>
-                                            <div style={{ fontSize: '13px', color: isSel || isAssoc ? '#4caf50' : '#ccc', fontWeight: 'bold' }}>{activity.name}</div>
-                                            {activity.description && <div style={{ fontSize: '11px', color: '#666' }}>{activity.description}</div>}
+                                            <div style={{ fontSize: '13px', color: isSel || isAssoc ? '#4caf50' : 'var(--color-text-primary)', fontWeight: 'bold' }}>{activity.name}</div>
+                                            {activity.description && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{activity.description}</div>}
                                         </div>
                                     </div>
                                 );
@@ -356,7 +356,7 @@ const ActivityAssociator = ({
                 )}
 
                 {/* Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', paddingTop: '10px', borderTop: '1px solid #333' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--color-border)' }}>
                     {/* Create New Activity Button */}
                     {onCreateActivity && (
                         <button
@@ -385,7 +385,7 @@ const ActivityAssociator = ({
                             style={{
                                 background: 'transparent',
                                 border: '1px dashed #888',
-                                color: '#888',
+                                color: 'var(--color-text-muted)',
                                 borderRadius: '4px',
                                 padding: '6px 12px',
                                 cursor: 'pointer',
@@ -399,13 +399,13 @@ const ActivityAssociator = ({
                     {!onCreateActivity && !isCreatingGroup && activitySelectorGroupId !== null && <div />}
 
                     <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={handleCancelSelector} style={{ background: 'transparent', border: '1px solid #666', color: '#ccc', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' }}>Cancel</button>
+                        <button onClick={handleCancelSelector} style={{ background: 'transparent', border: '1px solid var(--color-text-muted)', color: 'var(--color-text-muted)', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer' }}>Cancel</button>
                         <button
                             onClick={handleConfirmActivitySelection}
                             disabled={tempSelectedActivities.length === 0}
                             style={{
-                                background: tempSelectedActivities.length > 0 ? '#4caf50' : '#444',
-                                border: 'none', color: tempSelectedActivities.length > 0 ? 'white' : '#888',
+                                background: tempSelectedActivities.length > 0 ? '#4caf50' : 'var(--color-bg-input)',
+                                border: 'none', color: tempSelectedActivities.length > 0 ? 'white' : 'var(--color-text-muted)',
                                 borderRadius: '4px', padding: '6px 12px', cursor: tempSelectedActivities.length > 0 ? 'pointer' : 'not-allowed',
                                 fontWeight: 'bold'
                             }}
@@ -422,9 +422,9 @@ const ActivityAssociator = ({
                         alignItems: 'center',
                         gap: '8px',
                         padding: '10px',
-                        background: '#252525',
+                        background: 'var(--color-bg-card-alt)',
                         borderRadius: '6px',
-                        border: '1px solid #444'
+                        border: '1px solid var(--color-border)'
                     }}>
                         <input
                             type="text"
@@ -435,10 +435,10 @@ const ActivityAssociator = ({
                             style={{
                                 flex: 1,
                                 padding: '8px 10px',
-                                background: '#2a2a2a',
-                                border: '1px solid #555',
+                                background: 'var(--color-bg-input)',
+                                border: '1px solid var(--color-border)',
                                 borderRadius: '4px',
-                                color: 'white',
+                                color: 'var(--color-text-primary)',
                                 fontSize: '13px'
                             }}
                             onKeyDown={(e) => {
@@ -472,10 +472,10 @@ const ActivityAssociator = ({
                             disabled={isSubmittingGroup || !newGroupName.trim()}
                             style={{
                                 padding: '8px 12px',
-                                background: isSubmittingGroup || !newGroupName.trim() ? '#444' : '#4caf50',
+                                background: isSubmittingGroup || !newGroupName.trim() ? 'var(--color-bg-input)' : '#4caf50',
                                 border: 'none',
                                 borderRadius: '4px',
-                                color: isSubmittingGroup || !newGroupName.trim() ? '#888' : 'white',
+                                color: isSubmittingGroup || !newGroupName.trim() ? 'var(--color-text-muted)' : 'white',
                                 cursor: isSubmittingGroup || !newGroupName.trim() ? 'not-allowed' : 'pointer',
                                 fontSize: '12px',
                                 fontWeight: 'bold'
@@ -491,9 +491,9 @@ const ActivityAssociator = ({
                             style={{
                                 padding: '8px 12px',
                                 background: 'transparent',
-                                border: '1px solid #666',
+                                border: '1px solid var(--color-text-muted)',
                                 borderRadius: '4px',
-                                color: '#ccc',
+                                color: 'var(--color-text-muted)',
                                 cursor: 'pointer',
                                 fontSize: '12px'
                             }}
@@ -506,8 +506,8 @@ const ActivityAssociator = ({
                 {/* Associated Activities Display */}
                 {associatedActivities.length > 0 && (
                     <>
-                        <div style={{ borderTop: '1px solid #444', marginTop: '4px', paddingTop: '14px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
+                        <div style={{ borderTop: '1px solid var(--color-border)', marginTop: '4px', paddingTop: '14px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                                 Associated Activities ({associatedActivities.length})
                             </label>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -531,7 +531,7 @@ const ActivityAssociator = ({
                                                 alignItems: 'center',
                                                 gap: '6px',
                                                 padding: '4px 10px',
-                                                background: '#2a3a2a',
+                                                background: 'var(--color-bg-card-alt)',
                                                 border: '1px solid #4caf50',
                                                 borderRadius: '12px',
                                                 fontSize: '12px',
@@ -545,7 +545,7 @@ const ActivityAssociator = ({
                                                     style={{
                                                         background: 'none',
                                                         border: 'none',
-                                                        color: '#888',
+                                                        color: 'var(--color-text-muted)',
                                                         fontSize: '14px',
                                                         cursor: 'pointer',
                                                         padding: '0',
@@ -570,7 +570,7 @@ const ActivityAssociator = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                     Associated Activities
                 </label>
                 {isEditing && (
@@ -585,10 +585,10 @@ const ActivityAssociator = ({
                             }
                         }}
                         style={{
-                            background: '#2a2a2a',
-                            border: '1px solid #444',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: '#ccc',
+                            color: 'var(--color-text-secondary)',
                             cursor: 'pointer',
                             fontSize: '12px',
                             padding: '2px 6px'
@@ -601,7 +601,7 @@ const ActivityAssociator = ({
 
 
             {associatedActivities.length === 0 ? (
-                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                     {isAboveShortTermGoal && !completedViaChildren
                         ? "No activities associated. Can also be completed via children."
                         : "No activities associated."}
@@ -616,7 +616,7 @@ const ActivityAssociator = ({
                                 alignItems: 'center',
                                 gap: '6px',
                                 padding: '4px 10px',
-                                background: '#2a3a2a',
+                                background: 'var(--color-bg-card-alt)',
                                 border: '1px solid #4caf50',
                                 borderRadius: '12px',
                                 fontSize: '12px',
@@ -630,7 +630,7 @@ const ActivityAssociator = ({
                                     style={{
                                         background: 'none',
                                         border: 'none',
-                                        color: '#888',
+                                        color: 'var(--color-text-muted)',
                                         fontSize: '14px',
                                         cursor: 'pointer',
                                         padding: '0',

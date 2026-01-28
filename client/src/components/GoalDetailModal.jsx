@@ -635,7 +635,7 @@ function GoalDetailModal({
                                                 className={styles.programLink}
                                             >
                                                 <span style={{ fontSize: '14px' }}>📁</span>
-                                                <span style={{ fontSize: '13px', color: 'var(--color-text-inverse)' }}>{prog.name}</span>
+                                                <span style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{prog.name}</span>
                                             </div>
                                         ))}
                                     </div>

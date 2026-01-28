@@ -12,7 +12,7 @@
 
 .notesSection h4 {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     margin-bottom: 10px;
     letter-spacing: 0.5px;
@@ -20,7 +20,7 @@
 
 .notesEmpty {
     text-align: center;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 13px;
     padding: 16px;
     font-style: italic;
@@ -29,7 +29,7 @@
 .previousNotesSection {
     margin-top: 8px;
     padding-top: 12px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
 }
 
 .previousNotesHeader {
@@ -47,7 +47,7 @@
 
 .previousNotesToggle {
     font-size: 10px;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .previousNotesContent {
@@ -57,7 +57,7 @@
 }
 
 .previousSessionGroup {
-    background: #1e1e1e;
+    background: var(--color-bg-card-alt);
     border-radius: 6px;
     padding: 10px;
 }
@@ -72,7 +72,7 @@
 }
 
 .previousSessionName {
-    color: #888;
+    color: var(--color-text-secondary);
     font-size: 11px;
 }
 
@@ -84,10 +84,10 @@
 
 .previousNoteItem {
     font-size: 13px;
-    color: #aaa;
+    color: var(--color-text-secondary);
     line-height: 1.4;
     padding-left: 8px;
-    border-left: 2px solid #333;
+    border-left: 2px solid var(--color-border);
     cursor: pointer;
     transition: all 0.2s;
     padding: 4px 8px;

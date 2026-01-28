@@ -69,10 +69,10 @@
   --color-bg-sidebar: #ffffff;
   --color-bg-node: #bfdbfe;
   --color-bg-header: #ffffff;
-  --color-bg-input: #e5e7eb;
-  --color-border: #e5e7eb;
+  --color-bg-input: #cbd5e1;
+  --color-border: #000000;
   /* High contrast border for cards in light mode as per user request */
-  --color-border-card: #111827;
+  --color-border-card: #000000;
   --color-border-btn: #111827;
   --color-border-hover: #d1d5db;
   --color-connection-line: #9ca3af;

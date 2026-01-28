@@ -17,7 +17,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
         return (
             <div style={{
                 padding: '12px',
-                background: '#2a2a2a',
+                background: 'var(--color-bg-card-alt)',
                 border: '1px solid #f44336',
                 borderRadius: '6px',
                 display: 'flex',
@@ -50,19 +50,20 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             onClick={onClick}
             style={{
                 padding: '12px',
-                background: '#2a2a2a',
-                border: `1px solid ${isCompleted ? '#4caf50' : '#666'}`,
+                background: 'var(--color-bg-card-alt)',
+                border: `1px solid ${isCompleted ? '#4caf50' : 'var(--color-border)'}`,
                 borderLeft: `4px solid ${isCompleted ? '#4caf50' : '#ff9800'}`,
                 borderRadius: '6px',
                 marginBottom: '10px',
                 cursor: onClick ? 'pointer' : 'default',
-                transition: 'background-color 0.2s'
+                transition: 'background-color 0.2s',
+                color: 'var(--color-text-primary)'
             }}
             onMouseEnter={(e) => {
-                if (onClick) e.currentTarget.style.backgroundColor = '#333';
+                if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-hover)';
             }}
             onMouseLeave={(e) => {
-                if (onClick) e.currentTarget.style.backgroundColor = '#2a2a2a';
+                if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-alt)';
             }}
         >
             {/* Header with name and completion status */}
@@ -80,7 +81,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 }}>
                     <span style={{
                         fontSize: '16px',
-                        color: isCompleted ? '#4caf50' : '#666'
+                        color: isCompleted ? '#4caf50' : 'var(--color-text-muted)'
                     }}>
                         {isCompleted ? '✓' : '○'}
                     </span>
@@ -88,14 +89,14 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         <div style={{
                             fontWeight: 600,
                             fontSize: '14px',
-                            color: isCompleted ? '#4caf50' : 'white'
+                            color: isCompleted ? '#4caf50' : 'var(--color-text-primary)'
                         }}>
                             {target.name || activityDef.name}
                         </div>
                         {target.description && (
                             <div style={{
                                 fontSize: '11px',
-                                color: '#888',
+                                color: 'var(--color-text-muted)',
                                 marginTop: '2px'
                             }}>
                                 {target.description}
@@ -113,9 +114,9 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 style={{
                                     padding: '4px 8px',
                                     background: 'transparent',
-                                    border: '1px solid #666',
+                                    border: '1px solid var(--color-border)',
                                     borderRadius: '3px',
-                                    color: '#ccc',
+                                    color: 'var(--color-text-secondary)',
                                     cursor: 'pointer',
                                     fontSize: '11px'
                                 }}
@@ -183,16 +184,16 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         <div
                             key={metric.metric_id}
                             style={{
-                                background: '#1e1e1e',
+                                background: 'var(--color-bg-input)',
                                 padding: '4px 10px',
                                 borderRadius: '4px',
-                                border: '1px solid #444',
+                                border: '1px solid var(--color-border)',
                                 fontSize: '12px'
                             }}
                         >
-                            <span style={{ color: '#888' }}>{metricDef.name}:</span>
+                            <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}:</span>
                             {' '}
-                            <span style={{ fontWeight: 'bold', color: isCompleted ? '#4caf50' : 'white' }}>
+                            <span style={{ fontWeight: 'bold', color: isCompleted ? '#4caf50' : 'var(--color-text-primary)' }}>
                                 {metric.value} {metricDef.unit}
                             </span>
                         </div>
