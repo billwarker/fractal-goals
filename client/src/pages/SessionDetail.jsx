@@ -12,7 +12,7 @@ import SessionInfoPanel from '../components/sessionDetail/SessionInfoPanel';
 import { SessionSidePane } from '../components/sessionDetail'; // Keep this for now, as it's used in the side pane
 import useSessionNotes from '../hooks/useSessionNotes';
 import useTargetAchievements from '../hooks/useTargetAchievements';
-import './SessionDetail.css'; // New CSS import
+import styles from './SessionDetail.module.css'; // New CSS module import
 import { getGoalColor, getGoalTextColor } from '../utils/goalColors'; // Keep both for now, getGoalColor is used in SessionSidePane
 import '../App.css';
 
@@ -206,7 +206,7 @@ function SessionDetail() {
                 // Send session_start and session_end as top-level fields to save to DB columns
                 // Only include timing fields if they have values to avoid backend errors
                 const updatePayload = {
-                    session_data: JSON.stringify(metadataOnly)
+                    session_data: metadataOnly
                 };
 
                 // Normalize datetime formats - but preserve date-only strings!
@@ -935,7 +935,7 @@ function SessionDetail() {
     if (loading) {
         return (
             <div className="page-container">
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <div className={styles.statusMessage}>
                     <p>Loading session...</p>
                 </div>
             </div>
@@ -945,7 +945,7 @@ function SessionDetail() {
     if (!session || !sessionData) {
         return (
             <div className="page-container">
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <div className={styles.statusMessage}>
                     <p>Session not found</p>
                 </div>
             </div>
@@ -953,141 +953,111 @@ function SessionDetail() {
     }
 
     return (
-        <div className="page-container" style={{ color: 'white' }}>
-            <div className="session-detail-container">
-                {/* Main Content Column */}
-                <div className="session-main-content">
+        <div className={styles.sessionDetailContainer}>
+            {/* Main Content Column */}
+            <div className={styles.sessionMainContent}>
 
-                    {/* Minimal Header */}
+                {/* Minimal Header */}
 
-                    {/* Toast Notification for Target Achievements */}
-                    {toastMessage && (
-                        <div style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            background: 'linear-gradient(135deg, #1b4d1b 0%, #2d5a2d 100%)',
-                            border: '2px solid #4caf50',
-                            borderRadius: '12px',
-                            padding: '16px 24px',
-                            boxShadow: '0 8px 32px rgba(76, 175, 80, 0.3)',
-                            zIndex: 9999,
-                            animation: 'slideDown 0.3s ease-out',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px'
-                        }}>
-                            <span style={{ fontSize: '24px' }}>🎯</span>
-                            <div>
-                                <div style={{
-                                    fontSize: '14px',
-                                    fontWeight: 'bold',
-                                    color: '#4caf50',
-                                    marginBottom: '2px'
-                                }}>
-                                    Target Achieved!
-                                </div>
-                                <div style={{ fontSize: '13px', color: '#a5d6a7' }}>
-                                    {toastMessage.replace('🎯 Target achieved: ', '')}
-                                </div>
+                {/* Toast Notification for Target Achievements */}
+                {toastMessage && (
+                    <div className={styles.toastNotification}>
+                        <span className={styles.toastIcon}>🎯</span>
+                        <div className={styles.toastContent}>
+                            <div className={styles.toastTitle}>
+                                Target Achieved!
                             </div>
-                            <button
-                                onClick={() => setToastMessage(null)}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#81c784',
-                                    fontSize: '18px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    marginLeft: '8px'
-                                }}
-                            >
-                                ×
-                            </button>
+                            <div className={styles.toastText}>
+                                {toastMessage.replace('🎯 Target achieved: ', '')}
+                            </div>
                         </div>
-                    )}
-
-                    {/* Sections List */}
-                    <div className="session-sections-list">
-                        {sessionData.sections?.map((section, sectionIndex) => (
-                            <SessionSection
-                                key={sectionIndex}
-                                section={section}
-                                sectionIndex={sectionIndex}
-                                activityInstances={activityInstances}
-                                onDeleteActivity={handleDeleteActivity}
-                                onUpdateActivity={handleUpdateActivity}
-                                onFocusActivity={handleActivityFocus}
-                                selectedActivityId={selectedActivity?.id}
-                                rootId={rootId}
-                                showActivitySelector={showActivitySelector[sectionIndex]}
-                                onToggleActivitySelector={(val) => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: typeof val === 'boolean' ? val : !prev[sectionIndex] }))}
-                                onAddActivity={handleAddActivity}
-                                onOpenActivityBuilder={handleOpenActivityBuilder}
-                                groupedActivities={groupedActivities}
-                                groupMap={groupMap}
-                                activities={activities}
-                                onNoteCreated={refreshNotes}
-                                sessionId={sessionId}
-                                allNotes={sessionNotes}
-                                onAddNote={addNote}
-                                onUpdateNote={updateNote}
-                                onDeleteNote={deleteNote}
-                                // Drag and drop props
-                                onMoveActivity={handleMoveActivity}
-                                onReorderActivity={handleReorderActivity}
-                                draggedItem={draggedItem}
-                                setDraggedItem={setDraggedItem}
-                            />
-                        ))}
+                        <button
+                            onClick={() => setToastMessage(null)}
+                            className={styles.toastCloseBtn}
+                        >
+                            ×
+                        </button>
                     </div>
+                )}
 
+                {/* Sections List */}
+                <div className={styles.sessionSectionsList}>
+                    {sessionData.sections?.map((section, sectionIndex) => (
+                        <SessionSection
+                            key={sectionIndex}
+                            section={section}
+                            sectionIndex={sectionIndex}
+                            activityInstances={activityInstances}
+                            onDeleteActivity={handleDeleteActivity}
+                            onUpdateActivity={handleUpdateActivity}
+                            onFocusActivity={handleActivityFocus}
+                            selectedActivityId={selectedActivity?.id}
+                            rootId={rootId}
+                            showActivitySelector={showActivitySelector[sectionIndex]}
+                            onToggleActivitySelector={(val) => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: typeof val === 'boolean' ? val : !prev[sectionIndex] }))}
+                            onAddActivity={handleAddActivity}
+                            onOpenActivityBuilder={handleOpenActivityBuilder}
+                            groupedActivities={groupedActivities}
+                            groupMap={groupMap}
+                            activities={activities}
+                            onNoteCreated={refreshNotes}
+                            sessionId={sessionId}
+                            allNotes={sessionNotes}
+                            onAddNote={addNote}
+                            onUpdateNote={updateNote}
+                            onDeleteNote={deleteNote}
+                            // Drag and drop props
+                            onMoveActivity={handleMoveActivity}
+                            onReorderActivity={handleReorderActivity}
+                            draggedItem={draggedItem}
+                            setDraggedItem={setDraggedItem}
+                        />
+                    ))}
                 </div>
 
-                {/* Sidebar */}
-                <div className="session-sidebar-wrapper">
-                    <div className="session-sidebar-sticky">
-                        <SessionSidePane
-                            rootId={rootId}
-                            sessionId={sessionId}
-                            session={session}
-                            sessionData={sessionData}
-                            parentGoals={parentGoals}
-                            totalDuration={calculateTotalCompletedDuration(sessionData, activityInstances)}
-                            selectedActivity={selectedActivity}
-                            selectedSetIndex={selectedSetIndex}
-                            activityInstances={activityInstances}
-                            activityDefinitions={activities}
-                            onNoteAdded={refreshNotes}
-                            onGoalClick={(goal) => setSelectedGoal(goal)}
-                            refreshTrigger={0} // Deprecated
-                            notes={sessionNotes}
-                            previousNotes={previousNotes}
-                            previousSessionNotes={previousSessionNotes}
-                            addNote={addNote}
-                            updateNote={updateNote}
-                            deleteNote={deleteNote}
-                            isCompleted={session.attributes?.completed}
-                            onDelete={handleDeleteSessionClick}
-                            onCancel={() => navigate(`/${rootId}/sessions`)}
-                            onToggleComplete={handleToggleSessionComplete}
+            </div>
 
-                            onSave={handleSaveSession}
-                            onSessionChange={(updatedSession) => {
-                                setSession(updatedSession);
-                                // Update sessionData if datetime fields changed
-                                if (updatedSession.session_start || updatedSession.session_end) {
-                                    setSessionData(prev => ({
-                                        ...prev,
-                                        session_start: updatedSession.session_start,
-                                        session_end: updatedSession.session_end
-                                    }));
-                                }
-                            }}
-                        />
-                    </div>
+            {/* Sidebar */}
+            <div className={styles.sessionSidebarWrapper}>
+                <div className={styles.sessionSidebarSticky}>
+                    <SessionSidePane
+                        rootId={rootId}
+                        sessionId={sessionId}
+                        session={session}
+                        sessionData={sessionData}
+                        parentGoals={parentGoals}
+                        totalDuration={calculateTotalCompletedDuration(sessionData, activityInstances)}
+                        selectedActivity={selectedActivity}
+                        selectedSetIndex={selectedSetIndex}
+                        activityInstances={activityInstances}
+                        activityDefinitions={activities}
+                        onNoteAdded={refreshNotes}
+                        onGoalClick={(goal) => setSelectedGoal(goal)}
+                        refreshTrigger={0} // Deprecated
+                        notes={sessionNotes}
+                        previousNotes={previousNotes}
+                        previousSessionNotes={previousSessionNotes}
+                        addNote={addNote}
+                        updateNote={updateNote}
+                        deleteNote={deleteNote}
+                        isCompleted={session.attributes?.completed}
+                        onDelete={handleDeleteSessionClick}
+                        onCancel={() => navigate(`/${rootId}/sessions`)}
+                        onToggleComplete={handleToggleSessionComplete}
+
+                        onSave={handleSaveSession}
+                        onSessionChange={(updatedSession) => {
+                            setSession(updatedSession);
+                            // Update sessionData if datetime fields changed
+                            if (updatedSession.session_start || updatedSession.session_end) {
+                                setSessionData(prev => ({
+                                    ...prev,
+                                    session_start: updatedSession.session_start,
+                                    session_end: updatedSession.session_end
+                                }));
+                            }
+                        }}
+                    />
                 </div>
             </div>
 
@@ -1123,29 +1093,14 @@ function SessionDetail() {
             {/* Auto-save status indicator */}
             {
                 autoSaveStatus && (
-                    <div style={{
-                        position: 'fixed',
-                        bottom: '50px',
-                        right: '20px',
-                        zIndex: 999,
-                        padding: '8px 12px',
-                        background: '#1e1e1e',
-                        border: `1px solid ${autoSaveStatus === 'saved' ? '#4caf50' : autoSaveStatus === 'error' ? '#f44336' : '#888'}`,
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        color: autoSaveStatus === 'saved' ? '#4caf50' :
-                            autoSaveStatus === 'error' ? '#f44336' : '#888',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                    }}>
+                    <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
                         {autoSaveStatus === 'saving' && '💾 Saving...'}
                         {autoSaveStatus === 'saved' && '✓ Saved'}
                         {autoSaveStatus === 'error' && '⚠ Error'}
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 }
 

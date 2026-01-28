@@ -12,6 +12,7 @@
 import React, { useState } from 'react';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
+import styles from './NotesPanel.module.css';
 
 function NotesPanel({
     rootId,
@@ -52,7 +53,7 @@ function NotesPanel({
     };
 
     return (
-        <div className="notes-panel">
+        <div className={styles.notesPanel}>
             {/* Quick Add - Session Notes Only */}
             <NoteQuickAdd
                 onSubmit={handleAddNote}
@@ -60,7 +61,7 @@ function NotesPanel({
             />
 
             {/* Current Session Notes */}
-            <div className="notes-section">
+            <div className={styles.notesSection}>
                 <h4>
                     Session Notes
                     {sessionNotes.length > 0 && ` (${sessionNotes.length})`}
@@ -75,7 +76,7 @@ function NotesPanel({
                         onNoteSelect={setSelectedNoteId}
                     />
                 ) : (
-                    <div className="notes-empty">
+                    <div className={styles.notesEmpty}>
                         No session notes yet
                     </div>
                 )}
@@ -83,40 +84,32 @@ function NotesPanel({
 
             {/* Previous Session Notes (from last 3 sessions) */}
             {previousSessionNotes && previousSessionNotes.length > 0 && (
-                <div className="previous-notes-section">
+                <div className={styles.previousNotesSection}>
                     <div
-                        className="previous-notes-header"
+                        className={styles.previousNotesHeader}
                         onClick={() => setShowPreviousSessionNotes(!showPreviousSessionNotes)}
                     >
-                        <span className="previous-notes-toggle">
+                        <span className={styles.previousNotesToggle}>
                             {showPreviousSessionNotes ? '▼' : '▶'}
                         </span>
                         <h4>Previous Session Notes</h4>
                     </div>
                     {showPreviousSessionNotes && (
-                        <div className="previous-notes-content">
+                        <div className={styles.previousNotesContent}>
                             {previousSessionNotes.map(session => (
-                                <div key={session.session_id} className="previous-session-group">
-                                    <div className="previous-session-date">
+                                <div key={session.session_id} className={styles.previousSessionGroup}>
+                                    <div className={styles.previousSessionDate}>
                                         {session.session_date}
-                                        <span className="previous-session-name">
+                                        <span className={styles.previousSessionName}>
                                             {session.session_name}
                                         </span>
                                     </div>
-                                    <div className="previous-session-notes">
+                                    <div className={styles.previousSessionNotes}>
                                         {session.notes.map(note => (
                                             <div
                                                 key={note.id}
-                                                className="previous-note-item"
+                                                className={`${styles.previousNoteItem} ${selectedNoteId === note.id ? styles.previousNoteItemHighlighted : ''}`}
                                                 onClick={() => setSelectedNoteId(note.id)}
-                                                style={selectedNoteId === note.id ? {
-                                                    background: 'rgba(33, 150, 243, 0.15)',
-                                                    borderLeft: '3px solid #2196f3',
-                                                    borderLeftColor: '#2196f3', // Ensure color wins
-                                                    color: '#fff',
-                                                    borderRadius: '0 4px 4px 0',
-                                                    paddingLeft: '8px' // Override/match CSS
-                                                } : {}}
                                             >
                                                 {note.content}
                                             </div>

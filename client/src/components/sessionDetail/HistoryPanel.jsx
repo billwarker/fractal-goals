@@ -49,9 +49,9 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
     const selectedDef = sessionActivityDefs.find(d => d.id === selectedActivityId);
 
     return (
-        <div className="history-panel">
+        <div className={styles.historyPanel}>
             {/* Activity Selector */}
-            <div className="history-selector">
+            <div className={styles.historySelector}>
                 <label>Select Activity:</label>
                 <select
                     value={selectedActivityId || ''}
@@ -70,17 +70,17 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
             </div>
 
             {/* History Content */}
-            <div className="history-content">
+            <div className={styles.historyContent}>
                 {!selectedActivityId ? (
-                    <div className="history-empty">
+                    <div className={styles.historyEmpty}>
                         Select an activity to view previous sessions
                     </div>
                 ) : loading ? (
-                    <div className="history-loading">Loading history...</div>
+                    <div className={styles.historyLoading}>Loading history...</div>
                 ) : error ? (
-                    <div className="history-error">Error: {error}</div>
+                    <div className={styles.historyError}>Error: {error}</div>
                 ) : history.length > 0 ? (
-                    <div className="history-list">
+                    <div className={styles.historyList}>
                         {history.map(instance => (
                             <ActivityHistoryCard
                                 key={instance.id}
@@ -92,7 +92,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                         ))}
                     </div>
                 ) : (
-                    <div className="history-empty">
+                    <div className={styles.historyEmpty}>
                         No previous sessions found for {selectedDef?.name || 'this activity'}
                     </div>
                 )}
@@ -143,33 +143,33 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
     })();
 
     return (
-        <div className="history-card">
-            <div className="history-card-header">
-                <span className="history-card-date">
+        <div className={styles.historyCard}>
+            <div className={styles.historyCardHeader}>
+                <span className={styles.historyCardDate}>
                     {formatDate(instance.session_date || instance.created_at)}
                 </span>
                 {duration && (
-                    <span className="history-card-duration">⏱ {duration}</span>
+                    <span className={styles.historyCardDuration}>⏱ {duration}</span>
                 )}
             </div>
 
             {instance.session_name && (
-                <div className="history-card-session">
+                <div className={styles.historyCardSession}>
                     {instance.session_name}
                 </div>
             )}
 
             {/* Display sets if present */}
             {sets.length > 0 && (
-                <div className="history-card-sets">
+                <div className={styles.historyCardSets}>
                     {sets.map((set, idx) => (
-                        <div key={set.instance_id || idx} className="history-set">
-                            <span className="history-set-num">#{idx + 1}</span>
-                            <div className="history-set-metrics">
+                        <div key={set.instance_id || idx} className={styles.historySet}>
+                            <span className={styles.historySetNum}>#{idx + 1}</span>
+                            <div className={styles.historySetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
                                     const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
                                     return (
-                                        <span key={mIdx} className="history-metric">
+                                        <span key={mIdx} className={styles.historyMetric}>
                                             {def?.name && <span className={styles.metricLabel}>{def.name}:</span>}
                                             {m.value}
                                             {def?.unit && <span className={styles.metricUnit}>{def.unit}</span>}
@@ -184,9 +184,9 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
 
             {/* Display metrics if no sets */}
             {sets.length === 0 && hasMetrics && (
-                <div className="history-card-metrics">
+                <div className={styles.historyCardMetrics}>
                     {instance.metric_values.map((mv, idx) => (
-                        <span key={idx} className="history-metric">
+                        <span key={idx} className={styles.historyMetric}>
                             {mv.name}: {mv.value} {mv.unit}
                         </span>
                     ))}
@@ -195,7 +195,7 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
 
             {/* Notes preview */}
             {instance.notes && instance.notes.length > 0 && (
-                <div className="history-card-notes">
+                <div className={styles.historyCardNotes}>
                     {instance.notes.map((note, nIdx) => (
                         <div key={note.id || nIdx} className={styles.noteRow}>
                             <span className={styles.noteTime}>

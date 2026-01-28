@@ -1,8 +1,103 @@
 /* NoteQuickAdd Styles */
 
+.noteQuickAdd {
+    margin-bottom: 20px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #333;
+}
+
+.noteInputRow {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
 .quickAddTextarea {
+    flex: 1;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #eee;
+    font-size: 14px;
     resize: none;
-    overflow: hidden;
-    min-height: 38px;
     line-height: 1.4;
+    min-height: 38px;
+    transition: all 0.2s ease;
+}
+
+.quickAddTextarea:focus {
+    outline: none;
+    border-color: #4caf50;
+    background: #333;
+}
+
+.quickAddTextarea::placeholder {
+    color: #666;
+}
+
+.noteSubmitBtn {
+    background: #333;
+    border: 1px solid #444;
+    color: #4caf50;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 16px;
+}
+
+.noteSubmitBtn:hover:not(:disabled) {
+    background: #444;
+    border-color: #4caf50;
+}
+
+.noteSubmitBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    color: #666;
+}
+
+.noteImagePreviewContainer {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.noteImagePreview {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 4px;
+    border: 1px solid #444;
+}
+
+.noteImageRemove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #f44336;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.noteHint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
 }

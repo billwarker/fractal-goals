@@ -1,5 +1,65 @@
 /* NoteItem Styles */
 
+.noteTimeline {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.noteTimeline.compact {
+    gap: 6px;
+}
+
+.noteItem {
+    padding: 8px 0;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    transition: background 0.2s;
+}
+
+.noteItem.compact {
+    padding: 8px 10px;
+}
+
+.noteItemDeleting {
+    opacity: 0.5;
+    font-style: italic;
+    color: #888;
+}
+
+.noteItemTime {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.noteItemSetBadge {
+    background: #333;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #4caf50;
+}
+
+.noteDate {
+    color: #666;
+}
+
+.noteItemContent {
+    font-size: 14px;
+    color: #ddd;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.noteItem.compact .noteItemContent {
+    font-size: 13px;
+}
+
 .activityBadge {
     font-size: 11px;
     color: #4caf50;
@@ -16,6 +76,136 @@
 .setSeparator {
     margin: 0 6px;
     color: #666;
+}
+
+.noteImageWrapper {
+    position: relative;
+    max-width: 200px;
+    margin: 8px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid #444;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.noteImageWrapper:hover {
+    border-color: #4caf50;
+    transform: scale(1.02);
+}
+
+.noteImageThumbnail {
+    width: 100%;
+    max-height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+.noteImageOverlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 20px 8px 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.noteImageWrapper:hover .noteImageOverlay {
+    opacity: 1;
+}
+
+.noteImageOverlay span {
+    font-size: 11px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.noteItem.hasImage .noteItemActions {
+    top: auto;
+    bottom: 8px;
+}
+
+.noteItemActions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.noteItem:hover .noteItemActions {
+    opacity: 1;
+}
+
+.noteActionBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.noteActionBtn:hover {
+    opacity: 1;
+}
+
+.noteDeleteBtn:hover {
+    color: #f44336;
+}
+
+.noteItemEdit {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.noteEditInput {
+    flex: 1;
+    padding: 6px 10px;
+    background: #333;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.noteEditInput:focus {
+    outline: none;
+}
+
+.noteEditActions {
+    display: flex;
+    gap: 4px;
+}
+
+.noteSaveBtn,
+.noteCancelBtn {
+    background: none;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 8px;
+    color: #888;
+    transition: all 0.2s;
+}
+
+.noteSaveBtn:hover {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: #fff;
+}
+
+.noteCancelBtn:hover {
+    background: #444;
+    color: #fff;
 }
 
 .editTextarea {

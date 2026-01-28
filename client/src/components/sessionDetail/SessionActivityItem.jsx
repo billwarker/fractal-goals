@@ -374,7 +374,7 @@ function SessionActivityItem({
                                                             <label className={styles.metricLabel}>{m.name}</label>
                                                             <input
                                                                 type="number"
-                                                                className={styles.metricInput}
+                                                                className={`${styles.metricInput} ${styles.metricInputSmall}`}
                                                                 value={getMetricValue(set.metrics, m.id, split.id)}
                                                                 onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value, split.id)}
                                                             />
@@ -390,7 +390,7 @@ function SessionActivityItem({
                                                     <label className={styles.metricLabelLarge}>{m.name}</label>
                                                     <input
                                                         type="number"
-                                                        className={styles.metricInputLarge}
+                                                        className={`${styles.metricInput} ${styles.metricInputLarge}`}
                                                         value={getMetricValue(set.metrics, m.id)}
                                                         onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value)}
                                                     />
@@ -422,14 +422,15 @@ function SessionActivityItem({
                                         <div className={styles.singleMetricGroupTitle}>{split.name}</div>
                                         <div className={styles.singleMetricGroupContent}>
                                             {def.metric_definitions.map(m => (
-                                                <div key={m.id} className={styles.singleMetricField}>
-                                                    <label className={styles.metricLabelLarge}>{m.name} ({m.unit})</label>
+                                                <div key={m.id} className={styles.metricInputContainer}>
+                                                    <label className={styles.metricLabelLarge}>{m.name}</label>
                                                     <input
                                                         type="number"
-                                                        className={styles.metricInputXLarge}
+                                                        className={`${styles.metricInput} ${styles.metricInputLarge}`}
                                                         value={getMetricValue(exercise.metrics, m.id, split.id)}
                                                         onChange={(e) => handleSingleMetricChange(m.id, e.target.value, split.id)}
                                                     />
+                                                    <span className={styles.metricUnitLarge}>{m.unit}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -440,14 +441,15 @@ function SessionActivityItem({
                             // Render metrics without splits (original behavior)
                             <div className={styles.singleMetricsContainer}>
                                 {def.metric_definitions.map(m => (
-                                    <div key={m.id} className={styles.singleMetricField}>
-                                        <label className={styles.metricLabelLarge}>{m.name} ({m.unit})</label>
+                                    <div key={m.id} className={styles.metricInputContainer}>
+                                        <label className={styles.metricLabelLarge}>{m.name}</label>
                                         <input
                                             type="number"
-                                            className={styles.metricInputXLarge}
+                                            className={`${styles.metricInput} ${styles.metricInputLarge}`}
                                             value={getMetricValue(exercise.metrics, m.id)}
                                             onChange={(e) => handleSingleMetricChange(m.id, e.target.value)}
                                         />
+                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
                                     </div>
                                 ))}
                             </div>

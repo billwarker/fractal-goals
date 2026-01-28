@@ -125,7 +125,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
 
     if (isDeleting) {
         return (
-            <div className="note-item note-item-deleting">
+            <div className={`${styles.noteItem} ${styles.noteItemDeleting}`}>
                 Deleting...
             </div>
         );
@@ -136,7 +136,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
     return (
         <>
             <div
-                className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''} ${highlightStyle}`}
+                className={`${styles.noteItem} ${compact ? styles.compact : ''} ${hasImage ? styles.hasImage : ''} ${highlightStyle}`}
                 onClick={handleClick}
             >
                 {note.activityName && (
@@ -146,62 +146,62 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                         </span>
                     </div>
                 )}
-                <div className="note-item-time">
+                <div className={styles.noteItemTime}>
                     {note.set_index !== null && note.set_index !== undefined && (
                         <>
-                            <span className="note-item-set-badge">Set {note.set_index + 1}</span>
+                            <span className={styles.noteItemSetBadge}>Set {note.set_index + 1}</span>
                             <span className={styles.setSeparator}>-</span>
                         </>
                     )}
-                    <span className="note-date">{formatDate(note.created_at)}</span>
+                    <span className={styles.noteDate}>{formatDate(note.created_at)}</span>
                 </div>
 
                 {/* Image display */}
                 {hasImage && (
-                    <div className="note-image-wrapper" onClick={handleImageClick}>
+                    <div className={styles.noteImageWrapper} onClick={handleImageClick}>
                         <img
                             src={note.image_data}
                             alt="Note attachment"
-                            className="note-image-thumbnail"
+                            className={styles.noteImageThumbnail}
                         />
-                        <div className="note-image-overlay">
+                        <div className={styles.noteImageOverlay}>
                             <span>Click to view</span>
                         </div>
                     </div>
                 )}
 
                 {isEditing ? (
-                    <div className="note-item-edit">
+                    <div className={styles.noteItemEdit}>
                         <textarea
                             ref={textareaRef}
                             value={editContent}
                             onChange={handleChange}
                             onKeyDown={handleKeyDown}
-                            className={`note-edit-input ${styles.editTextarea}`}
+                            className={`${styles.noteEditInput} ${styles.editTextarea}`}
                             rows={1}
                         />
-                        <div className="note-edit-actions">
-                            <button onClick={handleSave} className="note-save-btn">✓</button>
+                        <div className={styles.noteEditActions}>
+                            <button onClick={handleSave} className={styles.noteSaveBtn}>✓</button>
                             <button onClick={() => {
                                 setEditContent(note.content);
                                 setIsEditing(false);
-                            }} className="note-cancel-btn">✕</button>
+                            }} className={styles.noteCancelBtn}>✕</button>
                         </div>
                     </div>
                 ) : (
                     <>
                         {/* Only show text content if it's not just the placeholder */}
                         {!isImageOnly && (
-                            <div className="note-item-content">
+                            <div className={styles.noteItemContent}>
                                 {note.content}
                             </div>
                         )}
                         {(onUpdate || onDelete) && (
-                            <div className="note-item-actions">
+                            <div className={styles.noteItemActions}>
                                 {onUpdate && !isImageOnly && (
                                     <button
                                         onClick={() => setIsEditing(true)}
-                                        className="note-action-btn"
+                                        className={styles.noteActionBtn}
                                         title="Edit"
                                     >
                                         ✏️
@@ -210,7 +210,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                                 {onDelete && (
                                     <button
                                         onClick={handleDelete}
-                                        className="note-action-btn note-delete-btn"
+                                        className={`${styles.noteActionBtn} ${styles.noteDeleteBtn}`}
                                         title="Delete"
                                     >
                                         🗑️

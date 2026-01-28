@@ -142,7 +142,7 @@ def serialize_session(session, include_image_data=False):
             "updated_at": format_utc(session.updated_at),
         },
         "activity_instances": [serialize_activity_instance(inst) for inst in session.activity_instances],
-        "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list] if hasattr(session, 'notes_list') else []
+        "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
     }
     
     # Parse session data from attributes

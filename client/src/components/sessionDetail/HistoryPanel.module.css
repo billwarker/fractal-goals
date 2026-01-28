@@ -1,5 +1,147 @@
 /* HistoryPanel Styles */
 
+.historyPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.historySelector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.historySelector label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.historySelector select {
+    width: 100%;
+    padding: 10px 12px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.historySelector select:focus {
+    outline: none;
+    border-color: #4caf50;
+}
+
+.historyContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.historyLoading,
+.historyEmpty,
+.historyError {
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+    padding: 20px;
+    font-style: italic;
+}
+
+.historyError {
+    color: #f44336;
+}
+
+.historyList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* History Card */
+.historyCard {
+    background: #222;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.historyCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.historyCardDate {
+    font-size: 12px;
+    color: #4caf50;
+    font-weight: 500;
+}
+
+.historyCardDuration {
+    font-size: 11px;
+    color: #888;
+}
+
+.historyCardSession {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.historyCardSets {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.historySet {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+
+.historySetNum {
+    font-size: 11px;
+    color: #666;
+    min-width: 20px;
+}
+
+.historySetMetrics {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.historyCardMetrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.historyMetric {
+    padding: 3px 8px;
+    background: #333;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.historyCardNotes {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #333;
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+}
+
 .metricLabel {
     opacity: 0.7;
     margin-right: 4px;

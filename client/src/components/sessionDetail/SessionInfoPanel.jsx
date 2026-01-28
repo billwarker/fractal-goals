@@ -104,12 +104,12 @@ function SessionInfoPanel({
     const endTime = session?.session_end || sessionData?.session_end;
 
     return (
-        <div className="session-info-panel">
+        <div className={styles.sessionInfoPanel}>
             {/* Session Title */}
-            <div className="session-info-title">
+            <div className={styles.sessionInfoTitle}>
                 <h2>{session.name}</h2>
                 <button
-                    className="session-info-toggle"
+                    className={styles.sessionInfoToggle}
                     onClick={() => setIsExpanded(!isExpanded)}
                     title={isExpanded ? 'Collapse' : 'Expand'}
                 >
@@ -118,17 +118,17 @@ function SessionInfoPanel({
             </div>
 
             {/* Always visible summary */}
-            <div className="session-info-summary">
-                <div className="session-info-row">
-                    <span className="label">Duration:</span>
-                    <span className="value duration">{formatDuration(totalDuration)}</span>
+            <div className={styles.sessionInfoSummary}>
+                <div className={styles.sessionInfoRow}>
+                    <span className={styles.label}>Duration:</span>
+                    <span className={`${styles.value} ${styles.duration}`}>{formatDuration(totalDuration)}</span>
                 </div>
                 {session.program_info && (
-                    <div className="session-info-row">
-                        <span className="label">Program:</span>
+                    <div className={styles.sessionInfoRow}>
+                        <span className={styles.label}>Program:</span>
                         <Link
                             to={`/${rootId}/programs/${session.program_info.program_id}`}
-                            className="value link"
+                            className={`${styles.value} ${styles.link}`}
                         >
                             {session.program_info.program_name}
                         </Link>
@@ -139,15 +139,15 @@ function SessionInfoPanel({
             {/* Expandable details */}
             {isExpanded && (
                 <>
-                    <div className="session-info-details">
-                        <div className="session-info-row">
-                            <span className="label">Template:</span>
-                            <span className="value">{sessionData?.template_name || '—'}</span>
+                    <div className={styles.sessionInfoDetails}>
+                        <div className={styles.sessionInfoRow}>
+                            <span className={styles.label}>Template:</span>
+                            <span className={styles.value}>{sessionData?.template_name || '—'}</span>
                         </div>
 
                         {/* Session Start */}
-                        <div className="session-info-row">
-                            <span className="label">Started:</span>
+                        <div className={styles.sessionInfoRow}>
+                            <span className={styles.label}>Started:</span>
                             {editingField === 'start' ? (
                                 <div className={styles.editTimeContainer}>
                                     <input
@@ -174,8 +174,8 @@ function SessionInfoPanel({
                         </div>
 
                         {/* Session End */}
-                        <div className="session-info-row">
-                            <span className="label">Ended:</span>
+                        <div className={styles.sessionInfoRow}>
+                            <span className={styles.label}>Ended:</span>
                             {editingField === 'end' ? (
                                 <div className={styles.editTimeContainer}>
                                     <input
@@ -201,29 +201,29 @@ function SessionInfoPanel({
                             )}
                         </div>
 
-                        <div className="session-info-row">
-                            <span className="label">Created:</span>
-                            <span className="value">{formatDate(session.created_at)}</span>
+                        <div className={styles.sessionInfoRow}>
+                            <span className={styles.label}>Created:</span>
+                            <span className={styles.value}>{formatDate(session.created_at)}</span>
                         </div>
-                        <div className="session-info-row">
-                            <span className="label">Planned:</span>
-                            <span className="value">{sessionData?.total_duration_minutes || '—'} min</span>
+                        <div className={styles.sessionInfoRow}>
+                            <span className={styles.label}>Planned:</span>
+                            <span className={styles.value}>{sessionData?.total_duration_minutes || '—'} min</span>
                         </div>
                     </div>
 
                     {/* Goals section */}
                     {(parentGoals?.length > 0 || session.immediate_goals?.length > 0) && (
-                        <div className="session-info-goals">
+                        <div className={styles.sessionInfoGoals}>
                             {parentGoals?.length > 0 && (
-                                <div className="goals-group">
-                                    <span className="goals-label">Short-Term Goals:</span>
-                                    <div className="goals-badges">
+                                <div className={styles.goalsGroup}>
+                                    <span className={styles.goalsLabel}>Short-Term Goals:</span>
+                                    <div className={styles.goalsBadges}>
                                         {parentGoals.map(goal => {
                                             const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
                                             return (
                                                 <div
                                                     key={goal.id}
-                                                    className="goal-badge"
+                                                    className={styles.goalBadge}
                                                     style={{
                                                         borderColor: goalColor,
                                                         color: goalColor
@@ -238,15 +238,15 @@ function SessionInfoPanel({
                                 </div>
                             )}
                             {session.immediate_goals?.length > 0 && (
-                                <div className="goals-group">
-                                    <span className="goals-label">Immediate Goals:</span>
-                                    <div className="goals-badges">
+                                <div className={styles.goalsGroup}>
+                                    <span className={styles.goalsLabel}>Immediate Goals:</span>
+                                    <div className={styles.goalsBadges}>
                                         {session.immediate_goals.map(goal => {
                                             const goalColor = getGoalColor(goal.type || 'ImmediateGoal');
                                             return (
                                                 <div
                                                     key={goal.id}
-                                                    className="goal-badge"
+                                                    className={styles.goalBadge}
                                                     style={{
                                                         borderColor: goalColor,
                                                         color: goalColor

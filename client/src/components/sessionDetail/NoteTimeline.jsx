@@ -1,9 +1,6 @@
-/**
- * NoteTimeline - Chronological list of notes
- */
-
 import React from 'react';
 import NoteItem from './NoteItem';
+import styles from './NoteItem.module.css';
 
 function NoteTimeline({ notes, onUpdate, onDelete, compact = false, selectedNoteId, onNoteSelect }) {
     if (!notes || notes.length === 0) {
@@ -11,7 +8,7 @@ function NoteTimeline({ notes, onUpdate, onDelete, compact = false, selectedNote
     }
 
     return (
-        <div className={`note-timeline ${compact ? 'compact' : ''}`}>
+        <div className={`${styles.noteTimeline} ${compact ? styles.compact : ''}`}>
             {notes.map(note => (
                 <NoteItem
                     key={note.id}

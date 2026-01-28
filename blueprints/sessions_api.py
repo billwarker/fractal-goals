@@ -308,15 +308,39 @@ def update_session(current_user, root_id, session_id, validated_data):
         # Update session analytics fields
         if 'session_start' in data:
             if isinstance(data['session_start'], str):
-                dt = datetime.fromisoformat(data['session_start'].replace('Z', '+00:00'))
-                session.session_start = dt.astimezone(timezone.utc)
+                try:
+                    s_str = data['session_start'].replace('Z', '+00:00')
+                    # Handle YYYY-MM-DD
+                    if len(s_str) == 10:
+                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                    else:
+                        dt = datetime.fromisoformat(s_str)
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        else:
+                            dt = dt.astimezone(timezone.utc)
+                    session.session_start = dt
+                except ValueError:
+                    logger.warning(f"Invalid session_start format: {data['session_start']}")
             else:
                 session.session_start = data['session_start']
         
         if 'session_end' in data:
             if isinstance(data['session_end'], str):
-                dt = datetime.fromisoformat(data['session_end'].replace('Z', '+00:00'))
-                session.session_end = dt.astimezone(timezone.utc)
+                try:
+                    s_str = data['session_end'].replace('Z', '+00:00')
+                    # Handle YYYY-MM-DD
+                    if len(s_str) == 10:
+                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                    else:
+                        dt = datetime.fromisoformat(s_str)
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        else:
+                            dt = dt.astimezone(timezone.utc)
+                    session.session_end = dt
+                except ValueError:
+                    logger.warning(f"Invalid session_end format: {data['session_end']}")
             else:
                 session.session_end = data['session_end']
         

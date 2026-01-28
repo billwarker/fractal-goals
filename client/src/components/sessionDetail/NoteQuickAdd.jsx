@@ -87,18 +87,18 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
     };
 
     return (
-        <form className="note-quick-add" onSubmit={handleSubmit}>
+        <form className={styles.noteQuickAdd} onSubmit={handleSubmit}>
             {/* Image Preview */}
             {imagePreview && (
-                <div className="note-image-preview-container">
+                <div className={styles.noteImagePreviewContainer}>
                     <img
                         src={imagePreview}
                         alt="Pasted image"
-                        className="note-image-preview"
+                        className={styles.noteImagePreview}
                     />
                     <button
                         type="button"
-                        className="note-image-remove"
+                        className={styles.noteImageRemove}
                         onClick={removeImage}
                         title="Remove image"
                     >
@@ -107,7 +107,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                 </div>
             )}
 
-            <div className="note-input-row">
+            <div className={styles.noteInputRow}>
                 <textarea
                     ref={inputRef}
                     value={content}
@@ -116,13 +116,13 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                     onPaste={handlePaste}
                     placeholder={imagePreview ? "Add a caption (optional)..." : placeholder}
                     disabled={isSubmitting}
-                    className={`note-input ${styles.quickAddTextarea}`}
+                    className={styles.quickAddTextarea}
                     rows={1}
                 />
                 <button
                     type="submit"
                     disabled={(!content.trim() && !pastedImage) || isSubmitting}
-                    className="note-submit-btn"
+                    className={styles.noteSubmitBtn}
                     title="Add note (Enter, Shift+Enter for new line, Paste image with Ctrl/Cmd+V)"
                 >
                     {isSubmitting ? '...' : pastedImage ? '🖼️' : '📝'}
@@ -130,7 +130,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
             </div>
 
             {!imagePreview && (
-                <div className="note-hint">
+                <div className={styles.noteHint}>
                     Paste images with Ctrl/Cmd+V
                 </div>
             )}

@@ -88,13 +88,33 @@ def get_previous_session_notes(current_user, root_id, session_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
-        # Get the 3 most recent sessions before this one
-        # Use nullslast() so sessions with actual start times are prioritized
+        # Get the current session to determine the cutoff date
+        current_session = db.query(Session).filter(Session.id == session_id).first()
+        if not current_session:
+            return jsonify({"error": "Session not found"}), 404
+            
+        current_start = current_session.session_start or current_session.created_at
+        
+        # Subquery to find sessions that actually have notes
+        sessions_with_notes = db.query(Note.session_id).filter(
+            Note.root_id == root_id, 
+            Note.context_type == 'session', 
+            Note.deleted_at == None
+        ).distinct()
+        
+        # Get the 5 most recent sessions BEFORE the current one that have notes
         previous_sessions = db.query(Session).filter(
             Session.root_id == root_id,
             Session.id != session_id,
-            Session.deleted_at == None
-        ).order_by(Session.session_start.desc().nullslast(), Session.created_at.desc()).limit(3).all()
+            Session.deleted_at == None,
+            Session.id.in_(sessions_with_notes),
+            # Filter specifically for sessions appearing BEFORE the current one
+            (Session.session_start < current_start) | 
+            ((Session.session_start == None) & (Session.created_at < current_start))
+        ).order_by(
+            Session.session_start.desc().nullslast(), 
+            Session.created_at.desc()
+        ).limit(5).all()
         
         if not previous_sessions:
             return jsonify([])
@@ -113,7 +133,7 @@ def get_previous_session_notes(current_user, root_id, session_id):
         results = []
         for session in previous_sessions:
             session_notes = [serialize_note(n) for n in notes if n.session_id == session.id]
-            if session_notes:  # Only include sessions that have notes
+            if session_notes:  # Should be always true due to filter, but good safety
                 results.append({
                     'session_id': session.id,
                     'session_name': session.name,

@@ -1,5 +1,133 @@
 /* SessionInfoPanel Styles */
-/* Migrated from inline styles to maintain pixel-perfect visual fidelity */
+/* Migrated from inline styles and global CSS to maintain pixel-perfect visual fidelity */
+
+.sessionInfoPanel {
+    padding: 12px;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.sessionInfoTitle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.sessionInfoTitle h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sessionInfoToggle {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 10px;
+}
+
+.sessionInfoToggle:hover {
+    color: #888;
+}
+
+.sessionInfoSummary,
+.sessionInfoDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sessionInfoDetails {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #333;
+}
+
+.sessionInfoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.label {
+    color: #666;
+}
+
+.value {
+    color: #aaa;
+}
+
+.value.duration {
+    color: #4caf50;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.link {
+    color: #2196f3;
+    text-decoration: none;
+}
+
+.link:hover {
+    text-decoration: underline;
+}
+
+.sessionInfoGoals {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #333;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.goalsGroup {
+    flex: 1;
+    min-width: 140px;
+    margin-bottom: 0;
+}
+
+.goalsLabel {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.goalsBadges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.goalBadge {
+    padding: 3px 8px;
+    background: rgba(42, 42, 42, 0.8);
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.goalBadge:hover {
+    background: rgba(60, 60, 60, 0.9);
+}
 
 .editTimeContainer {
     display: flex;

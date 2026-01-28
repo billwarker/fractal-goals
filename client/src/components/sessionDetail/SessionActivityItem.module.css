@@ -255,37 +255,56 @@
 .metricInputContainer {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    flex-wrap: nowrap;
 }
 
 .metricLabel {
-    font-size: 10px;
+    font-size: 11px;
     color: #888;
+    white-space: nowrap;
 }
 
 .metricLabelLarge {
-    font-size: 11px;
+    font-size: 13px;
+    color: #aaa;
+    white-space: nowrap;
 }
 
 .metricInput {
+    width: 60px;
+    padding: 4px;
+    background: #333;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.metricInput:focus {
+    outline: none;
+    border-color: #4caf50;
+    background: #3a3a3a;
+}
+
+.metricInputSmall {
     width: 50px;
     padding: 3px;
-    background: #333;
-    border: 1px solid #555;
-    color: white;
-    border-radius: 3px;
     font-size: 11px;
 }
 
 .metricInputLarge {
-    width: 60px;
-    padding: 4px;
+    width: 80px;
+    padding: 6px;
+    font-size: 15px;
 }
 
 .metricInputXLarge {
-    width: 80px;
-    padding: 6px;
-    border-radius: 4px;
+    width: 100px;
+    padding: 8px;
+    font-size: 18px;
+    font-weight: bold;
 }
 
 .metricUnit {
@@ -294,7 +313,8 @@
 }
 
 .metricUnitLarge {
-    font-size: 11px;
+    font-size: 12px;
+    color: #888;
 }
 
 .removeSetButton {
@@ -318,39 +338,37 @@
 
 .singleMetricsContainer {
     display: flex;
-    gap: 15px;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .singleMetricsContainerColumn {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 .singleMetricGroup {
     background: #222;
-    padding: 10px;
-    border-radius: 4px;
+    padding: 12px;
+    border-radius: 6px;
     border: 1px solid #333;
 }
 
 .singleMetricGroupTitle {
     font-size: 12px;
-    color: #aaa;
+    color: #888;
     font-weight: bold;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .singleMetricGroupContent {
     display: flex;
-    gap: 15px;
+    gap: 20px;
     flex-wrap: wrap;
-}
-
-.singleMetricField {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
 }
 
 .noMetricsMessage {
