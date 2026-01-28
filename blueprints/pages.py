@@ -33,54 +33,63 @@ REACT_APP_TEMPLATE = """
 """
 
 
+def get_react_template():
+    """Read the React index.html from the build directory."""
+    index_path = os.path.join(CLIENT_BUILD_DIR, 'index.html')
+    if os.path.exists(index_path):
+        with open(index_path, 'r') as f:
+            return f.read()
+    return REACT_APP_TEMPLATE
+
+
 @pages_bp.route('/')
 @pages_bp.route('/selection')
 def selection_page():
     """Fractal Goal Selection Page (home)."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 # Fractal-scoped routes
 @pages_bp.route('/<root_id>/fractal-goals')
 def fractal_goals_page(root_id):
     """Goals View - Flow Tree View in ReactJS."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/sessions')
 def sessions_page(root_id):
     """Sessions View - Display information about practice sessions."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/session/<session_id>')
 def session_detail_page(root_id, session_id):
     """Session Detail - Fill in details for a specific practice session."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/log')
 def log_page(root_id):
     """Log Session - Add practice sessions to the database."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/create-practice-session')
 def create_practice_session(root_id):
     """Create Practice Session - Page for creating new practice sessions."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/programs')
 def programs_page(root_id):
     """Programs - Future home for programming-related features."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 @pages_bp.route('/<root_id>/create-session-template')
 def create_session_template(root_id):
     """Create Session Template - Manage session templates."""
-    return render_template_string(REACT_APP_TEMPLATE)
+    return render_template_string(get_react_template())
 
 
 # Serve static files from the React build

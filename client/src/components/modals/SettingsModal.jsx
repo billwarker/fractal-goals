@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getGoalColorName } from '../../utils/goalColors'; // Still useful for display names
-import { CloseIcon } from '../../assets/icons'; // Assuming we have icons or will use text
 
 const SettingsModal = ({ isOpen, onClose }) => {
     const {
@@ -43,7 +42,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 borderRadius: '8px',
                 boxShadow: 'var(--shadow-md)',
                 display: 'flex',
-                direction: 'column',
+                flexDirection: 'column',
                 overflow: 'hidden'
             }}>
                 {/* Header */}
