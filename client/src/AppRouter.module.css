@@ -33,5 +33,5 @@
 .navSeparator {
     height: 20px;
     width: 1px;
-    background: #444;
+    background: var(--color-border);
 }

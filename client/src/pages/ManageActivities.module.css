@@ -1,7 +1,7 @@
 /* ManageActivities.module.css */
 
 .container {
-    color: white;
+    color: var(--color-text-primary);
     /* page-container is global, but we can extend or replace if needed. 
        For now we kept className="page-container" in other files, 
        but we can apply local styles too. */
@@ -13,7 +13,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 80px 40px 20px 40px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--color-border);
     margin-bottom: 30px;
 }
 
@@ -31,9 +31,9 @@
 .createGroupBtn {
     padding: 6px 16px;
     background: transparent;
-    border: 1px dashed #666;
+    border: 1px dashed var(--color-border);
     border-radius: var(--radius-sm);
-    color: #aaa;
+    color: var(--color-text-secondary);
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
@@ -41,16 +41,16 @@
 }
 
 .createGroupBtn:hover {
-    border-color: #aaa;
-    color: white;
+    border-color: var(--color-text-secondary);
+    color: var(--color-text-primary);
 }
 
 .createActivityBtn {
     padding: 6px 16px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    color: #ccc;
+    color: var(--color-text-primary);
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
@@ -58,8 +58,8 @@
 }
 
 .createActivityBtn:hover {
-    background: #444;
-    color: white;
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
 /* Error Message */
@@ -79,9 +79,9 @@
 /* Activity Group */
 .groupContainer {
     margin-bottom: 40px;
-    background: #1a1a1a;
+    background: var(--color-bg-card-alt);
     border-radius: 12px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
     padding: 24px;
 }
 
@@ -96,7 +96,7 @@
     font-size: 20px;
     font-weight: 400;
     margin: 0 0 6px 0;
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .groupDescription {
@@ -134,10 +134,10 @@
 
 .editGroupBtn {
     padding: 6px 12px;
-    background: #333;
+    background: var(--color-bg-input);
     border: none;
     border-radius: var(--radius-sm);
-    color: #ccc;
+    color: var(--color-text-primary);
     cursor: pointer;
     font-size: 12px;
     transition: background 0.2s;
@@ -151,9 +151,9 @@
 .deleteGroupBtn {
     padding: 6px 12px;
     background: transparent;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    color: #aaa;
+    color: var(--color-text-muted);
     cursor: pointer;
     font-size: 12px;
     transition: all 0.2s;
@@ -174,8 +174,8 @@
 .emptyGroupState {
     padding: 30px;
     text-align: center;
-    color: #555;
-    border: 1px dashed #333;
+    color: var(--color-text-muted);
+    border: 1px dashed var(--color-border);
     border-radius: 8px;
 }
 
@@ -201,8 +201,8 @@
 .emptyState {
     text-align: center;
     padding: 60px 20px;
-    background: #1e1e1e;
-    border: 1px dashed #444;
+    background: var(--color-bg-card);
+    border: 1px dashed var(--color-border);
     border-radius: 8px;
 }
 

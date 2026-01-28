@@ -5,8 +5,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1a1a1a;
-    border: 1px solid #333;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
     min-width: 0;
@@ -20,7 +20,7 @@
 }
 
 .windowContainer.selected {
-    border-color: #2196f3;
+    border-color: var(--color-brand-primary);
     /* 2px handled via props logic? No, just use class */
     border-width: 2px;
     box-shadow: 0 0 12px rgba(33, 150, 243, 0.3);
@@ -31,8 +31,8 @@
     display: flex;
     gap: 8px;
     padding: 8px 12px;
-    border-bottom: 1px solid #333;
-    background: #252525;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-card-alt);
     align-items: center;
     min-height: 48px;
     flex-wrap: nowrap;
@@ -50,7 +50,7 @@
     display: flex;
     gap: 4px;
     margin-right: 8px;
-    border-right: 1px solid #444;
+    border-right: 1px solid var(--color-border);
     padding-right: 8px;
     flex-shrink: 0;
 }
@@ -58,10 +58,10 @@
 /* Unified Button Styles */
 .navBtn {
     padding: 6px 8px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: #888;
+    color: var(--color-text-secondary);
     font-size: 14px;
     cursor: pointer;
     display: flex;
@@ -79,10 +79,10 @@
 /* Level Buttons */
 .levelBtn {
     padding: 6px 12px;
-    background: #333;
+    background: var(--color-bg-input);
     border: none;
     border-radius: 6px;
-    color: #888;
+    color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -144,10 +144,10 @@
     top: 100%;
     right: 0;
     margin-top: 4px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-hover);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-md);
     z-index: 100;
     min-width: 160px;
 }
@@ -167,7 +167,7 @@
 }
 
 .splitMenuItem:not(:first-child) {
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
 }
 
 /* Level 1 Renderer */
@@ -188,17 +188,17 @@
 
 .select {
     padding: 4px 8px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
     font-size: 12px;
 }
 
 .controlGroup {
     display: flex;
     gap: 4px;
-    border-left: 1px solid #444;
+    border-left: 1px solid var(--color-border);
     padding-left: 8px;
 }
 
@@ -300,8 +300,8 @@
 
 /* StatCard */
 .statCard {
-    background: #252525;
-    border: 1px solid #333;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     padding: 16px 20px;
     display: flex;

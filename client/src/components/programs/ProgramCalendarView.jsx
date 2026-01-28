@@ -13,7 +13,7 @@ function ProgramCalendarView({
     onEventClick
 }) {
     return (
-        <div style={{ height: 'calc(100vh - 200px)', minHeight: '500px', background: '#1e1e1e', padding: '20px', borderRadius: '12px', position: 'relative' }}>
+        <div style={{ height: 'calc(100vh - 200px)', minHeight: '500px', background: 'var(--color-bg-card)', padding: '20px', borderRadius: 'var(--border-radius-lg)', position: 'relative', border: '1px solid var(--color-border)' }}>
             {/* Block creation controls - positioned at top right of calendar area */}
             <div style={{
                 position: 'absolute',
@@ -27,10 +27,10 @@ function ProgramCalendarView({
                 <button
                     onClick={() => setBlockCreationMode(!blockCreationMode)}
                     style={{
-                        background: blockCreationMode ? '#3A86FF' : 'transparent',
-                        border: `1px solid ${blockCreationMode ? '#3A86FF' : '#444'}`,
+                        background: blockCreationMode ? 'var(--color-brand-primary)' : 'transparent',
+                        border: `1px solid ${blockCreationMode ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
                         borderRadius: '4px',
-                        color: blockCreationMode ? 'white' : '#888',
+                        color: blockCreationMode ? 'white' : 'var(--color-text-secondary)',
                         padding: '6px 12px',
                         cursor: 'pointer',
                         fontSize: '12px',
@@ -44,7 +44,7 @@ function ProgramCalendarView({
                 <button
                     onClick={onAddBlockClick}
                     style={{
-                        background: '#3A86FF',
+                        background: 'var(--color-brand-primary)',
                         border: 'none',
                         borderRadius: '4px',
                         color: 'white',

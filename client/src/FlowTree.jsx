@@ -140,7 +140,7 @@ const CustomNode = ({ data }) => {
                 <div
                     className={`${styles.nodeLabel} ${isUltimate ? styles.nodeLabelUltimate : ''} ${data.label.length > 30 ? styles.nodeLabelLongText : ''}`}
                     style={{
-                        color: isCompleted ? completedGold : '#e0e0e0',
+                        color: isCompleted ? completedGold : 'var(--color-text-primary)',
                     }}
                     onClick={data.onClick}
                 >
@@ -348,7 +348,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
                 type: 'straight',
                 className: isCompleted ? 'completed-edge' : '',
                 style: {
-                    stroke: isCompleted ? '#FFD700' : '#ffffff', // Hardcoded gold
+                    stroke: isCompleted ? '#FFD700' : 'var(--color-connection-line)', // Hardcoded gold for completed
                     strokeWidth: isCompleted ? 2.5 : 1.5,
                 },
             });
@@ -473,7 +473,7 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
                 nodesConnectable={false}
                 defaultEdgeOptions={{
                     type: 'straight',
-                    style: { stroke: '#ffffff', strokeWidth: 1.5 }
+                    style: { stroke: 'var(--color-connection-line)', strokeWidth: 1.5 }
                 }}
                 proOptions={{ hideAttribution: true }}
             >

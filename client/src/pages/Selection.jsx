@@ -8,6 +8,7 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Selection.module.css'; // Import CSS Module
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -24,6 +25,7 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated } = useAuth();
+    const { theme, toggleTheme } = useTheme();
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -128,6 +130,15 @@ function Selection() {
                         FRACTAL GOALS
                     </h1>
                 </div>
+
+                {/* Theme Toggle */}
+                <button
+                    onClick={toggleTheme}
+                    className={styles.themeToggle}
+                    title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                    {theme === 'dark' ? '☀️' : '🌙'}
+                </button>
 
                 {/* Profile Controls (Logged In Only) */}
                 {isAuthenticated && (

@@ -1,0 +1,128 @@
+/* ActivityCard.module.css */
+
+.card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.card:hover {
+    border-color: var(--color-border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cardName {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 3px;
+    color: var(--color-text-primary);
+}
+
+.description {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.lastUsed {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.indicatorList {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.indicator {
+    font-size: 11px;
+    background: var(--color-bg-input);
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    font-weight: 500;
+}
+
+.indicatorSets {
+    color: #ff9800;
+}
+
+.indicatorSplits {
+    color: #7B5CFF;
+}
+
+.indicatorNone {
+    color: var(--color-text-muted);
+}
+
+.indicatorMulti {
+    color: #f44336;
+}
+
+.indicatorMetric {
+    background: var(--color-bg-card-alt);
+    color: #4caf50;
+    border-color: var(--color-border);
+}
+
+.actionList {
+    display: flex;
+    gap: 6px;
+}
+
+.actionBtn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.editBtn {
+    background: #2196f3;
+}
+
+.editBtn:hover {
+    background: #1976d2;
+}
+
+.duplicateBtn {
+    padding: 8px 12px;
+    background: #ff9800;
+    font-size: 14px;
+}
+
+.duplicateBtn:hover {
+    background: #f57c00;
+}
+
+.duplicateBtn:disabled {
+    background: var(--color-text-muted);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.deleteBtn {
+    padding: 8px 12px;
+    background: #d32f2f;
+    font-size: 13px;
+}
+
+.deleteBtn:hover {
+    background: #b71c1c;
+}

@@ -1,8 +1,9 @@
 /* ReactFlow Edge Overrides */
 .react-flow__edge-path {
-    stroke: #ffffff !important;
+    stroke: var(--color-connection-line) !important;
     stroke-width: 1px !important;
 }
+
 
 /* Specific class for completed edges to override the default */
 .completed-edge .react-flow__edge-path {
@@ -15,6 +16,6 @@
 }
 
 .react-flow__connection-path {
-    stroke: #ffffff !important;
+    stroke: var(--color-connection-line) !important;
     stroke-width: 1px !important;
 }

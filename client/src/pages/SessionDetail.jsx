@@ -723,7 +723,7 @@ function SessionDetail() {
                     session_end: sessionEndTime,
                     total_duration_seconds: durationSeconds
                 };
-                updatePayload.session_data = JSON.stringify(updatedData);
+                updatePayload.session_data = updatedData;
 
                 // Update local sessionData immediately to prevent stale overwrites from fetchSession
                 setSessionData(updatedData);

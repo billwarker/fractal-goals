@@ -16,8 +16,8 @@
 }
 
 .modalContent {
-    background: var(--color-bg-surface, #1e1e1e);
-    border: 1px solid var(--color-border, #444);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius-lg, 12px);
     width: 100%;
     max-width: 600px;
@@ -91,7 +91,7 @@
 
 /* Program Day Card */
 .programDayCard {
-    background: #252525;
+    background: var(--color-bg-card-alt);
     border-radius: 8px;
     padding: 16px;
     border-left-width: 4px;
@@ -237,10 +237,10 @@
 
 /* Cards */
 .card {
-    background: #252525;
+    background: var(--color-bg-card-alt);
     border-radius: 8px;
     padding: 12px 16px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
     transition: transform 0.2s;
 }
 
@@ -313,9 +313,9 @@
 
 .actionToggle {
     background: transparent;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    color: white;
+    color: var(--color-text-primary);
     padding: 10px 16px;
     cursor: pointer;
     font-size: 14px;
@@ -352,10 +352,10 @@
 .select {
     width: 100%;
     padding: 10px;
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
     font-size: 14px;
 }
 
@@ -380,10 +380,10 @@
 
 .optionButton {
     padding: 10px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    color: white;
+    color: var(--color-text-primary);
     text-align: left;
     cursor: pointer;
     transition: background 0.2s;

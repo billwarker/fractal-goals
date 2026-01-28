@@ -363,7 +363,7 @@ function GoalDetailModal({
                                 <div className={styles.relevanceInfo}>
                                     {goalType === 'UltimateGoal'
                                         ? "Why does this Ultimate Goal matter to you?"
-                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || '#fff', fontWeight: 'bold' }}>?</span></span>
+                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
                                     }
                                 </div>
                                 <textarea
@@ -530,8 +530,8 @@ function GoalDetailModal({
                                     className={styles.btnAction}
                                     style={{
                                         background: isCompleted ? '#4caf50' : 'transparent',
-                                        border: `1px solid ${isCompleted ? '#4caf50' : (allowManualCompletion ? '#666' : '#444')}`,
-                                        color: isCompleted ? 'white' : (allowManualCompletion ? '#ccc' : '#888'),
+                                        border: `1px solid ${isCompleted ? '#4caf50' : (allowManualCompletion ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
+                                        color: isCompleted ? 'white' : (allowManualCompletion ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
                                         cursor: (isCompleted || allowManualCompletion) ? 'pointer' : 'default',
                                         fontWeight: isCompleted ? 'bold' : 'normal',
                                         opacity: (!isCompleted && !allowManualCompletion) ? 0.8 : 1
@@ -635,7 +635,7 @@ function GoalDetailModal({
                                                 className={styles.programLink}
                                             >
                                                 <span style={{ fontSize: '14px' }}>📁</span>
-                                                <span style={{ fontSize: '13px', color: 'white' }}>{prog.name}</span>
+                                                <span style={{ fontSize: '13px', color: 'var(--color-text-inverse)' }}>{prog.name}</span>
                                             </div>
                                         ))}
                                     </div>

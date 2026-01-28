@@ -11,6 +11,7 @@ import { SessionsProvider } from './contexts/SessionsContext.jsx'
 import { GoalsProvider } from './contexts/GoalsContext.jsx'
 
 import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
+import { ThemeProvider } from './contexts/ThemeContext.jsx'
 
 import { DebugProvider } from './contexts/DebugContext.jsx'
 
@@ -72,13 +73,15 @@ createRoot(document.getElementById('root')).render(
             />
             <TimezoneProvider>
               <AuthProvider>
-                <ActivitiesProvider>
-                  <SessionsProvider>
-                    <GoalsProvider>
-                      <AppRouter />
-                    </GoalsProvider>
-                  </SessionsProvider>
-                </ActivitiesProvider>
+                <ThemeProvider>
+                  <ActivitiesProvider>
+                    <SessionsProvider>
+                      <GoalsProvider>
+                        <AppRouter />
+                      </GoalsProvider>
+                    </SessionsProvider>
+                  </ActivitiesProvider>
+                </ThemeProvider>
               </AuthProvider>
             </TimezoneProvider>
           </DebugProvider>

@@ -282,7 +282,7 @@ function CreateSession() {
                 immediate_goal_ids: selectedImmediateGoalIds,
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
                 session_start: sessionStart,
-                session_data: JSON.stringify({
+                session_data: {
                     template_id: selectedTemplate.id,
                     template_name: selectedTemplate.name,
                     program_context: selectedProgramDay ? {
@@ -295,7 +295,7 @@ function CreateSession() {
                     } : null,
                     sections: sectionsWithExercises,
                     total_duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0
-                })
+                }
             };
 
             console.log('Creating session with rootId:', rootId);

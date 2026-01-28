@@ -352,7 +352,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                 {goalsCompletedOnDate.map(goal => (
                                     <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
                                         <div>
-                                            <div style={{ color: 'white', fontSize: '14px' }}>✅ {goal.name}</div>
+                                            <div style={{ color: 'var(--color-text-inverse)', fontSize: '14px' }}>✅ {goal.name}</div>
                                             <div className={styles.goalMeta} style={{ color: '#8bc34a' }}>
                                                 {goal.type || 'Goal'} • Met on this date
                                             </div>
@@ -368,10 +368,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                     return (
                                         <div key={`due-${goal.id}`} className={styles.goalCard}
                                             style={{
-                                                background: isCompleted ? '#1a2e1a' : '#252525',
+                                                background: isCompleted ? 'rgba(76, 175, 80, 0.2)' : 'var(--color-bg-card-hover)',
                                                 borderLeftColor: isCompleted ? '#4caf50' : getGoalColor(goal.type)
                                             }}>
-                                            <div style={{ color: 'white', fontSize: '14px' }}>
+                                            <div style={{ color: 'var(--color-text-primary)', fontSize: '14px' }}>
                                                 {isCompleted ? '✅' : '🎯'} {goal.name}
                                             </div>
                                             <div className={styles.goalMeta} style={{ color: isCompleted ? '#8bc34a' : getGoalColor(goal.type) }}>
@@ -430,8 +430,8 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         disabled={!selectedGoalId}
                                         className={styles.primaryButton}
                                         style={{
-                                            background: selectedGoalId ? '#3A86FF' : '#333',
-                                            color: selectedGoalId ? 'white' : '#666',
+                                            background: selectedGoalId ? '#3A86FF' : 'var(--color-bg-input)',
+                                            color: selectedGoalId ? 'white' : 'var(--color-text-muted)',
                                             cursor: selectedBlockId ? 'pointer' : 'not-allowed',
                                         }}
                                     >
@@ -523,7 +523,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                                         if (uniqueDays.length === 0) {
                                                             return (
-                                                                <div style={{ padding: '8px', color: '#666', fontStyle: 'italic', fontSize: '13px' }}>
+                                                                <div style={{ padding: '8px', color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
                                                                     No days defined in this block.
                                                                 </div>
                                                             );

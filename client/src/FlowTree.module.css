@@ -66,10 +66,10 @@
 }
 
 .nodeLabel {
-    color: #e0e0e0;
+    color: var(--color-text-primary);
     font-size: 14px;
     font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: var(--text-shadow-default);
     white-space: nowrap;
     word-break: keep-all;
     overflow-wrap: break-word;
@@ -89,15 +89,15 @@
 .completedDateLabel {
     font-size: 12px;
     margin-top: 2px;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: var(--text-shadow-default);
     font-weight: bold;
 }
 
 .timingContainer {
-    color: #fff;
+    color: var(--color-text-secondary);
     font-size: 12px;
     margin-top: 2px;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: var(--text-shadow-default);
     display: flex;
     gap: 8px;
     align-items: center;
@@ -124,7 +124,7 @@
     text-decoration: underline;
     cursor: pointer;
     font-weight: bold;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: var(--text-shadow-default);
 }
 
 .flowTreeContainer {

@@ -2,44 +2,90 @@
 /* Created from a pixel-perfect visual audit to replace inline styles */
 
 :root {
-  /* Core Colors */
+  /* Core Colors (Dark Mode Default) */
   --color-bg-app: #121212;
   --color-bg-card: rgb(42, 42, 42);
   --color-bg-card-alt: rgb(30, 30, 30);
+  --color-bg-card-hover: rgb(50, 50, 50);
   --color-bg-sidebar: rgb(26, 26, 26);
   --color-bg-node: rgb(233, 240, 255);
   --color-bg-header: #1a1a1a;
-  
+  --color-bg-input: #333;
+  --color-border: #333;
+  --color-border-card: #333;
+  --color-border-hover: #555;
+  --color-connection-line: #ffffff;
+  --color-grid: #333;
+  --color-overlay: rgba(0, 0, 0, 0.7);
+
   /* Text Colors */
   --color-text-primary: rgb(224, 224, 224);
   --color-text-secondary: rgb(212, 212, 212);
   --color-text-muted: #888;
-  
+  --color-text-inverse: #121212;
+
   /* Branding */
-  --color-brand-primary: #3b82f6; /* Approximate blue used in app */
+  --color-brand-primary: #3b82f6;
+  /* Approximate blue used in app */
+  --color-brand-primary-hover: #2563eb;
   --color-brand-success: #10b981;
+  --color-brand-success-hover: #059669;
   --color-brand-danger: #ef4444;
-  
+  --color-brand-danger-hover: #dc2626;
+
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
-  
+
   /* Boarders & Shadows */
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
   --border-radius-full: 50%;
-  
+
+  --text-shadow-default: 0 1px 3px rgba(0, 0, 0, 0.8);
+
   --shadow-sm: rgba(0, 0, 0, 0.3) 0px 2px 4px;
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.5);
-  
+
   /* Typography */
   --font-family: 'Inter', sans-serif;
   --font-size-base: 14px;
   --font-size-lg: 16px;
   --font-size-xl: 18px;
   --font-size-title: 24px;
+}
+
+[data-theme="light"] {
+  /* Core Colors */
+  --color-bg-app: #f3f4f6;
+  --color-bg-card: #ffffff;
+  --color-bg-card-alt: #f9fafb;
+  --color-bg-card-hover: #f3f4f6;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-node: #bfdbfe;
+  --color-bg-header: #ffffff;
+  --color-bg-input: #e5e7eb;
+  --color-border: #e5e7eb;
+  /* High contrast border for cards in light mode as per user request */
+  --color-border-card: #111827;
+  --color-border-hover: #d1d5db;
+  --color-connection-line: #9ca3af;
+  --color-grid: #e5e7eb;
+  --color-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Text Colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  --text-shadow-default: none;
+
+  /* Shadows */
+  --shadow-sm: rgba(0, 0, 0, 0.05) 0px 1px 2px;
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }

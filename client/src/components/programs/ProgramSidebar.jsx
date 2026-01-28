@@ -1,6 +1,7 @@
 import React from 'react';
 import { getGoalColor } from '../../utils/goalColors';
-import { formatDate, formatDurationSeconds } from '../../utils/formatters'; // Assuming these exist or I need to find where they are from
+import { formatDate, formatDurationSeconds } from '../../utils/formatters';
+import styles from './ProgramSidebar.module.css';
 
 // Helper to format date if not imported
 const defaultFormatDate = (d) => {
@@ -25,52 +26,30 @@ function ProgramSidebar({
         const completedAt = goal.completed_at || goal.attributes?.completed_at;
 
         return (
-            <div key={goal.id} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
+            <div key={goal.id} className={styles.goalItemWrapper} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
                 <div
                     onClick={() => onGoalClick(goal)}
+                    className={`${styles.goalItem} ${isCompleted ? styles.goalItemCompleted : ''}`}
                     style={{
-                        background: isCompleted ? '#1a2e1a' : '#252525',
-                        borderLeft: `3px solid ${isCompleted ? '#4caf50' : color}`,
-                        padding: '10px',
-                        borderRadius: '0 4px 4px 0',
-                        position: 'relative',
-                        marginBottom: '8px',
-                        cursor: 'pointer',
-                        transition: 'transform 0.1s ease-in-out',
+                        background: !isCompleted ? 'var(--color-bg-card-alt)' : undefined,
+                        borderLeft: `3px solid ${isCompleted ? 'var(--color-brand-success)' : color}`,
+                        borderBottom: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)'
                     }}
-                    onMouseOver={e => e.currentTarget.style.transform = 'translateX(4px)'}
-                    onMouseOut={e => e.currentTarget.style.transform = 'translateX(0)'}
                 >
                     {isCompleted && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            background: '#4caf50',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            color: 'white'
-                        }}>✓</div>
+                        <div className={styles.checkIcon}>✓</div>
                     )}
-                    <div style={{ color: isCompleted ? '#4caf50' : color, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+                    <div className={styles.goalType} style={{ color: isCompleted ? 'var(--color-brand-success)' : color }}>
                         {goalType?.replace(/([A-Z])/g, ' $1').trim()}
                     </div>
-                    <div style={{
-                        color: isCompleted ? '#8bc34a' : 'white',
-                        fontSize: '13px',
-                        fontWeight: 400,
-                        textDecoration: isCompleted ? 'line-through' : 'none',
-                        opacity: isCompleted ? 0.9 : 1
+                    <div className={`${styles.goalName} ${isCompleted ? styles.goalNameCompleted : ''}`} style={{
+                        color: isCompleted ? 'var(--color-brand-success)' : 'var(--color-text-primary)',
                     }}>
                         {goal.name}
                     </div>
                     {goal.deadline && (
-                        <div style={{ fontSize: '11px', color: isCompleted ? '#66bb6a' : '#888', marginTop: '2px' }}>
+                        <div className={styles.goalDeadline}>
                             {isCompleted ? (
                                 <>Completed: {defaultFormatDate(completedAt)}</>
                             ) : (
@@ -82,7 +61,6 @@ function ProgramSidebar({
                 {goal.children && goal.children.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {goal.children.map(child => {
-                            // Find child in flat goals to ensure we have latest data
                             const fullChild = getGoalDetails(child.id);
                             return fullChild ? renderGoalItem(fullChild, depth + 1) : null;
                         })}
@@ -93,20 +71,20 @@ function ProgramSidebar({
     };
 
     return (
-        <div style={{ width: '350px', borderRight: '1px solid #333', background: '#1e1e1e', display: 'flex', flexDirection: 'column' }}>
+        <div className={styles.sidebar}>
             {/* Fixed Top Section */}
-            <div style={{ padding: '24px', borderBottom: '1px solid #333' }}>
+            <div className={styles.topSection}>
                 {/* Program Metrics Section */}
                 {programMetrics && (
                     <div style={{ marginBottom: '24px' }}>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Metrics</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                            <div style={{ color: '#3A86FF', fontWeight: 600, fontSize: '16px', marginBottom: '4px' }}>
+                        <h3 className={styles.sectionHeader}>Program Metrics</h3>
+                        <div className={styles.metricsList}>
+                            <div className={styles.metricValuePrimary}>
                                 {programMetrics.daysRemaining} Days Remaining
                             </div>
-                            <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
-                            <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>
-                            <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
+                            <div><span className={styles.metricLabel}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
+                            <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>
+                            <div><span className={styles.metricLabel}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
                         </div>
                     </div>
                 )}
@@ -114,18 +92,18 @@ function ProgramSidebar({
                 {/* Current Block Metrics Section */}
                 {activeBlock && blockMetrics && (
                     <div>
-                        <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Current Block Metrics</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#ddd' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                                <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>{blockMetrics.name}</span>
+                        <h3 className={styles.sectionHeader}>Current Block Metrics</h3>
+                        <div className={styles.metricsList}>
+                            <div className={styles.blockHeader}>
+                                <span className={styles.blockName} style={{ color: blockMetrics.color }}>{blockMetrics.name}</span>
                                 <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
                                     • {blockMetrics.daysRemaining} Days Remaining
                                 </span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div><span style={{ color: '#888', fontSize: '12px' }}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
-                                <div><span style={{ color: '#888', fontSize: '12px' }}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(blockMetrics.totalDuration) : Math.round(blockMetrics.totalDuration / 60) + ' min'}</div>
-                                <div><span style={{ color: '#888', fontSize: '12px' }}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                                <div><span className={styles.metricLabel}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
+                                <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(blockMetrics.totalDuration) : Math.round(blockMetrics.totalDuration / 60) + ' min'}</div>
+                                <div><span className={styles.metricLabel}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
                             </div>
                         </div>
                     </div>
@@ -133,11 +111,11 @@ function ProgramSidebar({
             </div>
 
             {/* Scrollable Bottom Section */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-                <h3 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', marginBottom: '12px', letterSpacing: '1px' }}>Program Goals</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className={styles.bottomSection}>
+                <h3 className={styles.sectionHeader}>Program Goals</h3>
+                <div className={styles.goalsList}>
                     {programGoalSeeds.length === 0 ? (
-                        <div style={{ color: '#666', fontStyle: 'italic', fontSize: '13px' }}>No goals associated</div>
+                        <div className={styles.emptyState}>No goals associated</div>
                     ) : programGoalSeeds.map(goal => renderGoalItem(goal))}
                 </div>
             </div>

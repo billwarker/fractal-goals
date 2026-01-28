@@ -20,6 +20,7 @@ import { getChildType } from '../utils/goalHelpers';
 
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramLogic } from '../hooks/useProgramLogic';
+import styles from './ProgramDetail.module.css';
 
 const ProgramDetail = () => {
     const { rootId, programId } = useParams();
@@ -705,78 +706,47 @@ const ProgramDetail = () => {
     })() : null;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', paddingTop: '60px' }}>
-            <style>
-                {`
-                    .fc { color: #ddd; background: #1e1e1e; font-family: 'Inter', sans-serif; }
-                    .fc-toolbar-title { color: white; font-size: 1.2rem !important; }
-                    .fc-button { background-color: #333 !important; border-color: #444 !important; color: white !important; text-transform: capitalize; }
-                    .fc-button:hover { background-color: #444 !important; }
-                    .fc-button-active { background-color: #3A86FF !important; border-color: #3A86FF !important; }
-                    .fc-daygrid-day-number, .fc-col-header-cell-cushion { color: #ccc; text-decoration: none; }
-                    .fc-day-today { background-color: #2a2a2a !important; }
-                    .fc-theme-standard td, .fc-theme-standard th { border-color: #333; }
-                    .clickable-goal-event { cursor: pointer; }
-                    .program-day-event { font-weight: 600 !important; border-radius: 4px !important; }
-                    .template-event { font-size: 0.85em !important; opacity: 0.9; border-radius: 3px !important; }
-                `}
-            </style>
-
+        <div className={styles.container}>
             {/* Header */}
-            <div style={{
-                padding: '20px 40px',
-                borderBottom: '1px solid #333',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: '#1a1a1a'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div className={styles.header}>
+                <div className={styles.headerLeft}>
                     <button
                         onClick={() => navigate(`/${rootId}/programs?show_all=true`)}
-                        style={{ background: 'transparent', border: '1px solid #444', borderRadius: '4px', color: '#ccc', cursor: 'pointer', padding: '8px 12px', fontSize: '14px' }}
+                        className={styles.backBtn}
                     >
                         ← Back
                     </button>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, color: 'white' }}>{program.name}</h1>
-                        <div style={{ fontSize: '14px', color: '#888', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h1 className={styles.programTitle}>{program.name}</h1>
+                        <div className={styles.programMeta}>
                             <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
                             {program.description && (
                                 <>
                                     <span>•</span>
-                                    <span style={{ color: '#aaa' }}>{program.description}</span>
+                                    <span className={styles.description}>{program.description}</span>
                                 </>
                             )}
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{ background: '#333', borderRadius: '6px', padding: '4px', display: 'flex', gap: '4px' }}>
+                <div className={styles.headerActions}>
+                    <div className={styles.viewToggle}>
                         <button
                             onClick={() => setViewMode('calendar')}
-                            style={{
-                                background: viewMode === 'calendar' ? '#444' : 'transparent',
-                                border: 'none', borderRadius: '4px', color: viewMode === 'calendar' ? 'white' : '#888',
-                                padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500
-                            }}
+                            className={`${styles.toggleBtn} ${viewMode === 'calendar' ? styles.toggleBtnActive : ''}`}
                         >
                             Calendar
                         </button>
                         <button
                             onClick={() => setViewMode('blocks')}
-                            style={{
-                                background: viewMode === 'blocks' ? '#444' : 'transparent',
-                                border: 'none', borderRadius: '4px', color: viewMode === 'blocks' ? 'white' : '#888',
-                                padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500
-                            }}
+                            className={`${styles.toggleBtn} ${viewMode === 'blocks' ? styles.toggleBtnActive : ''}`}
                         >
                             Blocks
                         </button>
                     </div>
                     <button
                         onClick={() => setShowEditBuilder(true)}
-                        style={{ background: '#3A86FF', border: 'none', borderRadius: '6px', color: 'white', padding: '10px 20px', cursor: 'pointer', fontWeight: 600 }}
+                        className={styles.editBtn}
                     >
                         Edit Program
                     </button>
@@ -784,7 +754,7 @@ const ProgramDetail = () => {
             </div>
 
             {/* Main Content */}
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            <div className={styles.mainLayout}>
                 <ProgramSidebar
                     programMetrics={programMetrics}
                     activeBlock={activeBlock}
@@ -798,7 +768,7 @@ const ProgramDetail = () => {
                 />
 
                 {/* Right Panel */}
-                <div style={{ flex: 1, padding: '24px', background: '#121212', overflowY: 'auto' }}>
+                <div className={`${styles.rightPanel} ${styles.calendarWrapper}`}>
                     {viewMode === 'calendar' ? (
                         <ProgramCalendarView
                             program={program}

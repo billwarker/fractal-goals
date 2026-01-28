@@ -329,7 +329,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             {/* Associated Goals Section - Tree Navigation */}
                             <div>
                                 <div className={styles.goalHeader}>
-                                    <label style={{ fontSize: '12px', color: '#aaa' }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                                         Associated Goals ({selectedGoalIds.length})
                                     </label>
                                     <button
@@ -380,7 +380,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                         {/* Level Badges Row */}
                                         <div className={styles.levelBadgesRow} style={{ marginBottom: selectedLevel ? '12px' : '0' }}>
                                             {levelsWithGoals.length === 0 ? (
-                                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                                                     No goals available
                                                 </div>
                                             ) : (
@@ -421,8 +421,8 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                                 key={goal.id}
                                                                 className={styles.goalCheckboxLabel}
                                                                 style={{
-                                                                    background: isSelected ? `${goalColor}25` : '#333',
-                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid #555'
+                                                                    background: isSelected ? `${goalColor}25` : 'var(--color-bg-input)',
+                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid var(--color-border)'
                                                                 }}
                                                             >
                                                                 <input
@@ -439,7 +439,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                                 <span
                                                                     className={styles.goalName}
                                                                     style={{
-                                                                        color: isSelected ? goalColor : '#ccc',
+                                                                        color: isSelected ? goalColor : 'var(--color-text-muted)',
                                                                         fontWeight: isSelected ? 'bold' : 'normal'
                                                                     }}
                                                                 >
@@ -454,7 +454,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     </div>
                                 )}
 
-                                <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+                                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                                     Goals with associated activities meet the SMART "Achievable" criterion
                                 </div>
                             </div>

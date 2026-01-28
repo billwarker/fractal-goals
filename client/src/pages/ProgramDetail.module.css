@@ -1,0 +1,181 @@
+/* ProgramDetail.module.css */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    padding-top: 60px;
+}
+
+/* FullCalendar Overrides */
+.calendarWrapper :global(.fc) {
+    color: var(--color-text-primary);
+    background: var(--color-bg-app);
+    font-family: 'Inter', sans-serif;
+}
+
+.calendarWrapper :global(.fc-toolbar-title) {
+    color: var(--color-text-primary);
+    font-size: 1.2rem !important;
+}
+
+.calendarWrapper :global(.fc-button) {
+    background-color: var(--color-bg-input) !important;
+    border-color: var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+    text-transform: capitalize;
+}
+
+.calendarWrapper :global(.fc-button:hover) {
+    background-color: var(--color-bg-card-hover) !important;
+}
+
+.calendarWrapper :global(.fc-button-active) {
+    background-color: var(--color-brand-primary) !important;
+    border-color: var(--color-brand-primary) !important;
+    color: white !important;
+}
+
+.calendarWrapper :global(.fc-daygrid-day-number),
+.calendarWrapper :global(.fc-col-header-cell-cushion) {
+    color: var(--color-text-muted);
+    text-decoration: none;
+}
+
+.calendarWrapper :global(.fc-day-today) {
+    background-color: var(--color-bg-card-alt) !important;
+}
+
+.calendarWrapper :global(.fc-theme-standard td),
+.calendarWrapper :global(.fc-theme-standard th) {
+    border-color: var(--color-border);
+}
+
+/* Header */
+.header {
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-bg-header);
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.backBtn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.backBtn:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+}
+
+.programTitle {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.programMeta {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.description {
+    color: var(--color-text-secondary);
+}
+
+.headerActions {
+    display: flex;
+    gap: 12px;
+}
+
+.viewToggle {
+    background: var(--color-bg-input);
+    border-radius: 6px;
+    padding: 4px;
+    display: flex;
+    gap: 4px;
+}
+
+.toggleBtn {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.toggleBtnActive {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.editBtn {
+    background: var(--color-brand-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.editBtn:hover {
+    opacity: 0.9;
+}
+
+/* Layout */
+.mainLayout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.rightPanel {
+    flex: 1;
+    padding: 24px;
+    background: var(--color-bg-app);
+    overflow-y: auto;
+}
+
+/* Global Grid Overrides if needed */
+.calendarWrapper :global(.program-day-event) {
+    font-weight: 600 !important;
+    border-radius: 4px !important;
+}
+
+.calendarWrapper :global(.template-event) {
+    font-size: 0.85em !important;
+    opacity: 0.9;
+    border-radius: 3px !important;
+}
+
+.calendarWrapper :global(.clickable-goal-event) {
+    cursor: pointer;
+}

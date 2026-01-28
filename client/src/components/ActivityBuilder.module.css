@@ -16,15 +16,15 @@
 }
 
 .modalContent {
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 24px;
     max-width: 800px;
     width: 100%;
     max-height: 90vh;
     overflow: auto;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .modalTitle {
@@ -57,20 +57,20 @@
 .input {
     width: 100%;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .textarea {
     width: 100%;
     min-height: 80px;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
     font-family: inherit;
     resize: vertical;
 }
@@ -78,10 +78,10 @@
 .select {
     width: 100%;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 /* Associated Goals Section */
@@ -125,10 +125,10 @@
 
 /* Goal Selector Dropdown Area */
 .goalSelectorArea {
-    background: #252525;
+    background: var(--color-bg-card-alt);
     padding: 16px;
     border-radius: 6px;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
 }
 
 .levelBadgesRow {
@@ -223,10 +223,10 @@
 .splitInput {
     width: 150px;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .removeSplitBtn {
@@ -265,9 +265,9 @@
     flex-direction: column;
     gap: 6px;
     padding: 10px;
-    background: #252525;
+    background: var(--color-bg-card-alt);
     border-radius: 4px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 .metricRow {
@@ -279,19 +279,19 @@
 .metricInput {
     flex: 1;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .metricUnitInput {
     width: 100px;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .metricFlags {
