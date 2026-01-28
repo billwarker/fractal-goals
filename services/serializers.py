@@ -370,7 +370,7 @@ def serialize_event_log(log):
     """Serialize an EventLog object."""
     return {
         "id": log.id,
-        "event_name": log.event_name,
+        "event_type": log.event_type,
         "entity_type": log.entity_type,
         "entity_id": log.entity_id,
         "description": log.description,

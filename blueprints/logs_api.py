@@ -15,6 +15,19 @@ def get_logs(current_user, root_id):
     """
     Get all event logs for a specific fractal if owned by user.
     """
+    # Inline serializer to ensure correct key 'event_type' is used
+    def local_serialize_log(log):
+        return {
+            "id": log.id,
+            "event_type": log.event_type, 
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "description": log.description,
+            "payload": log.payload,
+            "source": log.source,
+            "timestamp": log.timestamp.isoformat() if log.timestamp else None
+        }
+
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)
     event_type = request.args.get('event_type')
@@ -69,7 +82,7 @@ def get_logs(current_user, root_id):
         event_types = [t for t in db_session.execute(types_stmt).scalars().all()]
         
         return jsonify({
-            "logs": [serialize_event_log(log) for log in results],
+            "logs": [local_serialize_log(log) for log in results],
             "event_types": sorted(event_types),
             "pagination": {
                 "limit": limit,
@@ -89,7 +102,7 @@ def get_logs(current_user, root_id):
 @token_required
 def clear_logs(current_user, root_id):
     """
-    Clear all logs for a specific fractal if owned by user.
+    Clear all logs for a specific fractal.
     """
     db_session = get_scoped_session()
     try:
@@ -97,11 +110,17 @@ def clear_logs(current_user, root_id):
         root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
+            
         from sqlalchemy import delete
+        
+        # Delete logs
         stmt = delete(EventLog).where(EventLog.root_id == root_id)
         db_session.execute(stmt)
         db_session.commit()
-        return jsonify({"success": True})
+        
+        logger.info(f"Cleared logs for root {root_id}")
+        return jsonify({"message": "Logs cleared successfully"})
+        
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error clearing logs for root {root_id}: {e}")
