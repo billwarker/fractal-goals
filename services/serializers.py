@@ -140,7 +140,8 @@ def serialize_session(session, include_image_data=False):
             "created_at": format_utc(session.created_at),
             "updated_at": format_utc(session.updated_at),
         },
-        "activity_instances": [serialize_activity_instance(inst) for inst in session.activity_instances]
+        "activity_instances": [serialize_activity_instance(inst) for inst in session.activity_instances],
+        "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list] if hasattr(session, 'notes_list') else []
     }
     
     # Parse session data from attributes
@@ -257,14 +258,7 @@ def serialize_session_template(template):
 def serialize_program(program):
     """Serialize a Program object."""
     # Build weekly_schedule from relational blocks (Source of Truth)
-    schedule_from_db = []
-    if program.blocks:
-        for b in program.blocks:
-            bd = serialize_program_block(b)
-            # Transform snake_case keys (DB) to camelCase (Frontend legacy compatibility)
-            bd['startDate'] = bd.pop('start_date', None)
-            bd['endDate'] = bd.pop('end_date', None)
-            schedule_from_db.append(bd)
+    schedule_from_db = [serialize_program_block(b) for b in (program.blocks or [])]
 
     return {
         "id": program.id,
@@ -276,7 +270,8 @@ def serialize_program(program):
         "end_date": format_utc(program.end_date),
         "weekly_schedule": schedule_from_db or _safe_load_json(program.weekly_schedule, []),
         "blocks": schedule_from_db,
-        "selected_goals": _safe_load_json(program.goal_ids, []),
+        "goal_ids": _safe_load_json(program.goal_ids, []),
+        "selected_goals": _safe_load_json(program.goal_ids, []),  # Keep both for safety
         "created_at": format_utc(program.created_at),
         "updated_at": format_utc(program.updated_at)
     }
@@ -301,6 +296,7 @@ def serialize_program_day(day):
         "block_id": day.block_id,
         "day_number": day.day_number,
         "name": day.name,
+        "notes": day.notes,
         "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
@@ -314,6 +310,10 @@ def serialize_note(note, include_image=False):
         "id": note.id,
         "context_type": note.context_type,
         "context_id": note.context_id,
+        "session_id": note.session_id,
+        "activity_instance_id": note.activity_instance_id,
+        "activity_definition_id": note.activity_definition_id,
+        "set_index": note.set_index,
         "content": note.content,
         "has_image": note.image_data is not None and len(note.image_data) > 0,
         "created_at": format_utc(note.created_at),

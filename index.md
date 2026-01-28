@@ -25,6 +25,7 @@
 - Created `AuthContext` for global frontend user/session management
 - Refactored Program logic into `ProgramService`
 - **Service Layer Refactor**: Implemented `services/serializers.py` to decouple API responses from database models, standardized JSON handling, and enforced strict Pydantic validation across all blueprints.
+- **Notes Regression Fix**: Resolved issues with missing notes by updating `serialize_note` to include critical context IDs (`session_id`, `activity_instance_id`, etc.) and ensuring nested notes are included in Session and ProgramDay payloads.
 - **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
 - **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.
 
@@ -210,6 +211,7 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - Frontend: Sessions page has "Load More" button to fetch additional sessions
   - Notes image_data excluded from list view (only loaded in detail view) to reduce response size
 - **Service Layer Serialization**: All API responses are now serialized via [serializers.py](file:///Users/will/Projects/fractal-goals/services/serializers.py). Models no longer have `to_dict()` methods. This ensures consistent field naming, date formatting, and secure handling of sensitive data.
+- **Nested Contextual Data**: Serializers for `Session`, `ProgramDay`, and `ActivityInstance` now automatically include their associated `notes` (filtered by context IDs) to ensure the frontend has immediate access to timeline data without secondary fetches.
 - **Strict Pydantic Validation**: All POST/PUT requests are validated via `@validate_request` decorator in [validators.py](file:///Users/will/Projects/fractal-goals/validators.py), ensuring data integrity before processing.
 
 ### 10. Visualization Annotations
