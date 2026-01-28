@@ -68,6 +68,8 @@ const calculateGoalAge = (createdAt) => {
     }
 };
 
+import SettingsModal from './components/modals/SettingsModal';
+
 function App() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -75,6 +77,7 @@ function App() {
     const [loading, setLoading] = useState(true);
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Navigation header component
     const NavigationHeader = () => {
@@ -159,6 +162,11 @@ function App() {
                         )}
 
                         <div className={`nav-separator ${styles.navSeparator}`}></div>
+                        <button className="nav-text-link" onClick={() => setIsSettingsOpen(true)}>
+                            SETTINGS
+                        </button>
+
+                        <div className={`nav-separator ${styles.navSeparator}`}></div>
                         <button className="nav-text-link home-link" onClick={() => navigate('/')}>
                             EXIT TO HOME
                         </button>
@@ -197,6 +205,9 @@ function App() {
                         </Routes>
                     )}
                 </div>
+
+                {/* Settings Modal */}
+                <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
                 {/* Environment Indicator */}
                 <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>

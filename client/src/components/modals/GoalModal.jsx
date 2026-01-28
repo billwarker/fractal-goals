@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
-import { getGoalColor, getGoalTextColor } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import AddTargetModal from '../AddTargetModal';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
+    const { getGoalColor, getGoalTextColor } = useTheme();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');

@@ -13,7 +13,6 @@ import { SessionSidePane } from '../components/sessionDetail'; // Keep this for 
 import useSessionNotes from '../hooks/useSessionNotes';
 import useTargetAchievements from '../hooks/useTargetAchievements';
 import styles from './SessionDetail.module.css'; // New CSS module import
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors'; // Keep both for now, getGoalColor is used in SessionSidePane
 import '../App.css';
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import { useTheme } from '../contexts/ThemeContext';
 import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
 import SMARTIndicator from './SMARTIndicator';
 import { fractalApi } from '../utils/api';
@@ -47,6 +47,7 @@ function GoalDetailModal({
     onCreate,  // Function to call when creating a new goal
     parentGoal  // Parent goal for context when creating
 }) {
+    const { getGoalColor, getGoalTextColor } = useTheme();
     const navigate = useNavigate();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];

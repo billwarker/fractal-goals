@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GOAL_COLORS } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Modal for selecting existing immediate goals to attach to session
@@ -11,6 +11,7 @@ function SelectExistingGoalModal({
     onClose,
     onConfirm
 }) {
+    const { getGoalColor } = useTheme();
     const [tempSelectedGoals, setTempSelectedGoals] = useState([]);
 
     if (!isOpen) return null;
@@ -84,7 +85,7 @@ function SelectExistingGoalModal({
                         disabled={tempSelectedGoals.length === 0}
                         style={{
                             padding: '10px 20px',
-                            background: tempSelectedGoals.length === 0 ? '#444' : GOAL_COLORS.ImmediateGoal,
+                            background: tempSelectedGoals.length === 0 ? '#444' : getGoalColor('ImmediateGoal'),
                             border: 'none',
                             borderRadius: '6px',
                             color: tempSelectedGoals.length === 0 ? '#888' : '#1a1a1a',
@@ -101,12 +102,13 @@ function SelectExistingGoalModal({
 }
 
 function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
+    const { getGoalColor } = useTheme();
     return (
         <div
             onClick={onToggle}
             style={{
                 background: isSelected ? '#2a4a2a' : '#1e1e1e',
-                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : (isAlreadyAdded ? '#333' : '#444')}`,
+                border: `2px solid ${isSelected ? getGoalColor('ImmediateGoal') : (isAlreadyAdded ? '#333' : '#444')}`,
                 borderRadius: '6px',
                 padding: '12px 16px',
                 cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
@@ -118,7 +120,7 @@ function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
             }}
             onMouseEnter={(e) => {
                 if (!isAlreadyAdded && !isSelected) {
-                    e.currentTarget.style.borderColor = GOAL_COLORS.ImmediateGoal;
+                    e.currentTarget.style.borderColor = getGoalColor('ImmediateGoal');
                 }
             }}
             onMouseLeave={(e) => {
@@ -131,8 +133,8 @@ function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
                 width: '20px',
                 height: '20px',
                 borderRadius: '4px',
-                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : '#666'}`,
-                background: isSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
+                border: `2px solid ${isSelected ? getGoalColor('ImmediateGoal') : '#666'}`,
+                background: isSelected ? getGoalColor('ImmediateGoal') : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -145,7 +147,7 @@ function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
             </div>
 
             <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected || isAlreadyAdded ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected || isAlreadyAdded ? getGoalColor('ImmediateGoal') : '#ccc' }}>
                     {goal.name}
                     {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
                 </div>

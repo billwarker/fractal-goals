@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { fractalApi } from '../utils/api';
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import { useTheme } from '../contexts/ThemeContext';
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
 import styles from './ActivityBuilder.module.css';
 
@@ -12,6 +12,7 @@ import styles from './ActivityBuilder.module.css';
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
     const { useFractalTreeQuery } = useGoals();
+    const { getGoalColor, getGoalTextColor } = useTheme();
 
     // Use the query hook to get the fractal tree
     const { data: currentFractal, isLoading: isLoadingGoals } = useFractalTreeQuery(rootId);

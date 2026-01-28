@@ -10,11 +10,14 @@ import 'reactflow/dist/style.css';
 import './FlowTree.css';
 import styles from './FlowTree.module.css';
 import dagre from 'dagre';
-import { getGoalColor, getGoalSecondaryColor, GOAL_COLORS } from './utils/goalColors';
 import { isSMART } from './utils/smartHelpers';
+
+import { useTheme } from './contexts/ThemeContext';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
+    const { getGoalColor, getGoalSecondaryColor } = useTheme();
+
     const isCompleted = data.completed || false;
     const isSmartGoal = data.isSmart || false;
 
@@ -22,7 +25,7 @@ const CustomNode = ({ data }) => {
     let fillColor = getGoalColor(data.type);
 
     // Achievement Gold for completed goals
-    const completedGold = GOAL_COLORS.CompletedGoal;
+    const completedGold = getGoalColor('CompletedGoal');
 
     // Check if it's an Ultimate Goal
     const isUltimate = data.type === 'UltimateGoal';

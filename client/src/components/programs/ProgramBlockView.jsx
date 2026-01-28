@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import { getGoalColor } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
 
 function ProgramBlockView({
@@ -14,6 +14,7 @@ function ProgramBlockView({
     onAddDay,
     onGoalClick
 }) {
+    const { getGoalColor } = useTheme();
     // Helper formatter
     const formatDate = (dateString) => {
         if (!dateString) return '';

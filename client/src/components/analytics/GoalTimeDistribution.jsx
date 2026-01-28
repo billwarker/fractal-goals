@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
@@ -13,6 +13,7 @@ import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
  * - Option to measure by activity duration vs session duration
  */
 function GoalTimeDistribution({ goals, chartRef }) {
+    const { getGoalColor } = useTheme();
     // Roll-up toggle: when true, child goal time is aggregated to parents
     const [rollUpEnabled, setRollUpEnabled] = useState(false);
     // Duration mode: 'activity' = activity instance duration, 'session' = full session duration
@@ -115,8 +116,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
 
         const datasets = goalsWithData.map((goalId, index) => {
             const goal = goalMap[goalId];
-            const colorInfo = GOAL_COLOR_SYSTEM[goal?.type] || { primary: '#666' };
-            const color = colorInfo.primary;
+            const color = getGoalColor(goal?.type);
 
             // Create semi-transparent version for fill
             const hexToRgba = (hex, alpha) => {

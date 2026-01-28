@@ -1,5 +1,5 @@
 import React from 'react';
-import { GOAL_COLORS } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import StepHeader from './StepHeader';
 import ImmediateGoalSection from './ImmediateGoalSection';
 
@@ -17,6 +17,7 @@ function GoalAssociation({
     onRemoveImmediateGoal,
     onCreateImmediateGoal
 }) {
+    const { getGoalColor } = useTheme();
     return (
         <div style={{
             background: 'var(--color-bg-card)',
@@ -46,7 +47,7 @@ function GoalAssociation({
 
                         return (
                             <div key={stg.id} style={{
-                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : 'var(--color-border)'}`,
+                                border: `2px solid ${isSelected ? getGoalColor('ShortTermGoal') : 'var(--color-border)'}`,
                                 borderRadius: '8px',
                                 overflow: 'hidden',
                                 transition: 'all 0.2s'
@@ -82,11 +83,12 @@ function GoalAssociation({
 }
 
 function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediateGoals, onClick }) {
+    const { getGoalColor } = useTheme();
     return (
         <div
             onClick={onClick}
             style={{
-                background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : 'var(--color-bg-input)', // or card-alt
+                background: isSelected ? `${getGoalColor('ShortTermGoal')}1A` : 'var(--color-bg-input)', // or card-alt
                 padding: '14px 16px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -98,8 +100,8 @@ function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediat
                 width: '22px',
                 height: '22px',
                 borderRadius: '4px',
-                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#666'}`,
-                background: isSelected ? GOAL_COLORS.ShortTermGoal : 'transparent',
+                border: `2px solid ${isSelected ? getGoalColor('ShortTermGoal') : '#666'}`,
+                background: isSelected ? getGoalColor('ShortTermGoal') : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -111,7 +113,7 @@ function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediat
                 {isSelected && '✓'}
             </div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? GOAL_COLORS.ShortTermGoal : 'var(--color-text-primary)' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? getGoalColor('ShortTermGoal') : 'var(--color-text-primary)' }}>
                     {stg.name}
                 </div>
                 {stg.description && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { GOAL_COLORS } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import StepHeader from './StepHeader';
 
 /**
@@ -79,6 +79,7 @@ function CreateSessionActions({
 }
 
 function SessionSummary({ selectedTemplate, selectedProgramDay, selectedGoalIds, immediateGoals }) {
+    const { getGoalColor } = useTheme();
     return (
         <div style={{ marginTop: '16px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
             Creating: <strong style={{ color: 'var(--color-text-primary)' }}>{selectedTemplate.name}</strong>
@@ -87,13 +88,13 @@ function SessionSummary({ selectedTemplate, selectedProgramDay, selectedGoalIds,
             )}
             <br />
             Associated with{' '}
-            <strong style={{ color: GOAL_COLORS.ShortTermGoal }}>
+            <strong style={{ color: getGoalColor('ShortTermGoal') }}>
                 {selectedGoalIds.length} short term goal{selectedGoalIds.length !== 1 ? 's' : ''}
             </strong>
             {immediateGoals.length > 0 && (
                 <span>
                     {' '}and{' '}
-                    <strong style={{ color: GOAL_COLORS.ImmediateGoal }}>
+                    <strong style={{ color: getGoalColor('ImmediateGoal') }}>
                         {immediateGoals.length} immediate goal{immediateGoals.length !== 1 ? 's' : ''}
                     </strong>
                 </span>

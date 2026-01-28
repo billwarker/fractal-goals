@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGoalColor } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
@@ -8,6 +8,7 @@ import moment from 'moment';
  * Shows all program days scheduled for the selected date and allows adding new ones
  */
 const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, onUnscheduleDay, blocks, sessions }) => {
+    const { getGoalColor } = useTheme();
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);

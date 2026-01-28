@@ -1,13 +1,9 @@
-/**
- * SessionInfoPanel - Compact session metadata display for the side pane
- */
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { fractalApi } from '../../utils/api';
 import { formatDateInTimezone, formatForInput } from '../../utils/dateUtils';
-import { getGoalColor } from '../../utils/goalColors';
 import styles from './SessionInfoPanel.module.css';
 
 function SessionInfoPanel({
@@ -19,6 +15,7 @@ function SessionInfoPanel({
     totalDuration,
     onSessionUpdate
 }) {
+    const { getGoalColor } = useTheme();
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
     const [editValue, setEditValue] = useState('');

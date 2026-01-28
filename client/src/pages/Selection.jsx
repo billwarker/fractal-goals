@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { globalApi } from '../utils/api';
 import { getTypeDisplayName } from '../utils/goalHelpers';
-import { getGoalColor, getGoalTextColor } from '../utils/goalColors';
 import GoalModal from '../components/modals/GoalModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
@@ -25,7 +24,7 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated } = useAuth();
-    const { theme, toggleTheme } = useTheme();
+    const { theme, toggleTheme, getGoalColor, getGoalTextColor } = useTheme();
 
     useEffect(() => {
         if (isAuthenticated) {

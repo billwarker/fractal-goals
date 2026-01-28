@@ -1,5 +1,5 @@
 import React from 'react';
-import { GOAL_COLORS } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Immediate Goals Section within a Short-Term Goal card
@@ -14,6 +14,7 @@ function ImmediateGoalSection({
     onRemoveNewGoal,
     onCreateNewGoal
 }) {
+    const { getGoalColor } = useTheme();
     const hasExistingGoals = existingImmediateGoals.length > 0;
     const hasNewGoals = newImmediateGoals.length > 0;
 
@@ -24,7 +25,7 @@ function ImmediateGoalSection({
             borderTop: '1px solid var(--color-border)'
         }}>
             <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: GOAL_COLORS.ImmediateGoal }}>◇</span>
+                <span style={{ color: getGoalColor('ImmediateGoal') }}>◇</span>
                 Immediate Goals (optional)
             </div>
 
@@ -64,16 +65,16 @@ function ImmediateGoalSection({
                 style={{
                     padding: '8px 14px',
                     background: 'transparent',
-                    border: `1px dashed ${GOAL_COLORS.ImmediateGoal}50`,
+                    border: `1px dashed ${getGoalColor('ImmediateGoal')}50`,
                     borderRadius: '4px',
-                    color: GOAL_COLORS.ImmediateGoal,
+                    color: getGoalColor('ImmediateGoal'),
                     cursor: 'pointer',
                     fontSize: '12px',
                     width: '100%',
                     transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `${GOAL_COLORS.ImmediateGoal}10`;
+                    e.currentTarget.style.background = `${getGoalColor('ImmediateGoal')}10`;
                     e.currentTarget.style.borderStyle = 'solid';
                 }}
                 onMouseLeave={(e) => {
@@ -88,6 +89,7 @@ function ImmediateGoalSection({
 }
 
 function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
+    const { getGoalColor } = useTheme();
     return (
         <div
             onClick={(e) => {
@@ -99,8 +101,8 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 alignItems: 'center',
                 gap: '10px',
                 padding: '10px 12px',
-                background: isSelected ? `${GOAL_COLORS.ImmediateGoal}15` : 'var(--color-bg-input)', // Replaced #252525
-                border: `1px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-border)'}`, // Replaced #333
+                background: isSelected ? `${getGoalColor('ImmediateGoal')}15` : 'var(--color-bg-input)', // Replaced #252525
+                border: `1px solid ${isSelected ? getGoalColor('ImmediateGoal') : 'var(--color-border)'}`, // Replaced #333
                 borderRadius: '4px',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
@@ -110,8 +112,8 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 width: '18px',
                 height: '18px',
                 borderRadius: '3px',
-                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-border-hover)'}`, // Replaced #555
-                background: isSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
+                border: `2px solid ${isSelected ? getGoalColor('ImmediateGoal') : 'var(--color-border-hover)'}`, // Replaced #555
+                background: isSelected ? getGoalColor('ImmediateGoal') : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -123,7 +125,7 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 {isSelected && '✓'}
             </div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', color: isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-text-muted)' }}>
+                <div style={{ fontSize: '13px', color: isSelected ? getGoalColor('ImmediateGoal') : 'var(--color-text-muted)' }}>
                     {goal.name}
                 </div>
                 {goal.deadline && (
@@ -140,6 +142,7 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
 }
 
 function NewGoalCard({ goal, onRemove }) {
+    const { getGoalColor } = useTheme();
     return (
         <div
             style={{
@@ -147,14 +150,14 @@ function NewGoalCard({ goal, onRemove }) {
                 alignItems: 'center',
                 gap: '10px',
                 padding: '10px 12px',
-                background: `${GOAL_COLORS.ImmediateGoal}15`,
-                border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
+                background: `${getGoalColor('ImmediateGoal')}15`,
+                border: `1px solid ${getGoalColor('ImmediateGoal')}`,
                 borderRadius: '4px'
             }}
         >
             <span style={{ fontSize: '12px', color: '#4caf50' }}>✨ New</span>
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', color: GOAL_COLORS.ImmediateGoal }}>
+                <div style={{ fontSize: '13px', color: getGoalColor('ImmediateGoal') }}>
                     {goal.name}
                 </div>
             </div>

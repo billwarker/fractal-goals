@@ -1,5 +1,5 @@
 import React from 'react';
-import { getGoalColor } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { formatDate, formatDurationSeconds } from '../../utils/formatters';
 import styles from './ProgramSidebar.module.css';
 
@@ -18,6 +18,8 @@ function ProgramSidebar({
     onGoalClick, // (goal) => ...
     getGoalDetails, // Function to get full goal details by ID (needed for children)
 }) {
+    const { getGoalColor } = useTheme();
+
     // Recursive renderer
     const renderGoalItem = (goal, depth = 0) => {
         const goalType = goal.type || goal.attributes?.type;

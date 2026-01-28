@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { getAchievedTargetsForSession } from '../utils/targetUtils';
-import { GOAL_COLORS, getGoalTextColor } from '../utils/goalColors';
+import { useTheme } from '../contexts/ThemeContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar } from '../components/sessions';
@@ -14,6 +14,7 @@ import styles from './Sessions.module.css';
  * Displays all practice sessions for the current fractal in card format with horizontal sections
  */
 function Sessions() {
+    const { getGoalColor } = useTheme();
     const { rootId } = useParams();
     const navigate = useNavigate();
     const timezone = useTimezone();
@@ -502,8 +503,8 @@ function Sessions() {
                                                                     key={goal.id}
                                                                     className={styles.goalTag}
                                                                     style={{
-                                                                        border: `1px solid ${GOAL_COLORS.ShortTermGoal}`,
-                                                                        color: GOAL_COLORS.ShortTermGoal
+                                                                        border: `1px solid ${getGoalColor('ShortTermGoal')}`,
+                                                                        color: getGoalColor('ShortTermGoal')
                                                                     }}
                                                                 >
                                                                     {goal.name}
@@ -525,8 +526,8 @@ function Sessions() {
                                                                     key={goal.id}
                                                                     className={`${styles.goalTag} ${goal.completed ? styles.goalTagCompleted : ''}`}
                                                                     style={{
-                                                                        border: `1px solid ${GOAL_COLORS.ImmediateGoal}`,
-                                                                        color: GOAL_COLORS.ImmediateGoal
+                                                                        border: `1px solid ${getGoalColor('ImmediateGoal')}`,
+                                                                        color: getGoalColor('ImmediateGoal')
                                                                     }}
                                                                 >
                                                                     {goal.name}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { findGoalById, getTypeDisplayName } from '../../utils/goalHelpers';
-import { getGoalColor } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 
 function GoalChildrenList({
     treeData,
@@ -8,6 +8,7 @@ function GoalChildrenList({
     goalColor,
     childType
 }) {
+    const { getGoalColor } = useTheme();
     const node = findGoalById(treeData, goalId);
     const children = node?.children || [];
 

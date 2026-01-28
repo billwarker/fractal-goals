@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import { GOAL_COLORS, getGoalColor, getGoalTextColor } from '../utils/goalColors';
+import { useTheme } from '../contexts/ThemeContext';
 import { getLocalISOString, localToISO } from '../utils/dateUtils';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
@@ -23,6 +23,7 @@ import { useProgramLogic } from '../hooks/useProgramLogic';
 import styles from './ProgramDetail.module.css';
 
 const ProgramDetail = () => {
+    const { getGoalColor, getGoalTextColor } = useTheme();
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
 

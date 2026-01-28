@@ -10,7 +10,7 @@ import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
 import AnnotationsList from './AnnotationsList';
 import { Bar, Line } from 'react-chartjs-2';
-import { GOAL_COLOR_SYSTEM } from '../../utils/goalColors';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -49,6 +49,7 @@ function ProfileWindow({
     onSelect,
     hasAnnotationsWindow = false
 }) {
+    const { getGoalColor } = useTheme();
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
@@ -229,7 +230,7 @@ function ProfileWindow({
 
     // Get goal type color
     const getGoalTypeColor = (type) => {
-        return GOAL_COLOR_SYSTEM[type]?.primary || '#666';
+        return getGoalColor(type);
     };
 
     // Prepare goal chart data
