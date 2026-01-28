@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import axios from 'axios';
 import { globalApi, fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './context/HeaderContext';
+import styles from './AppRouter.module.css';
 import './App.css';
 
 // Import page components
@@ -124,22 +125,12 @@ function App() {
             <div className="top-nav-links">
                 <div className="nav-group">
                     {/* Left Side: Title and Primary Nav */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <span className="fractal-title" style={{ fontSize: '18px', marginRight: '20px' }}>{fractalName}</span>
+                    <div className={styles.navContainer}>
+                        <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
 
                         <button
-                            className="nav-text-link add-session-btn"
+                            className={styles.addSessionBtn}
                             onClick={() => navigate(`/${rootId}/create-session`)}
-                            style={{
-                                background: '#4caf50',
-                                color: 'white',
-                                padding: '6px 14px',
-                                borderRadius: '4px',
-                                fontWeight: 'bold',
-                                border: 'none',
-                                fontSize: '11px',
-                                marginRight: '10px'
-                            }}
                         >
                             + ADD SESSION
                         </button>
@@ -156,18 +147,18 @@ function App() {
                     </div>
 
                     {/* Right Side: Actions and Exit */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginLeft: 'auto' }}>
+                    <div className={styles.navContainerRight}>
                         {/* Add Session removed from here */}
 
                         {/* Render Page Specific Actions */}
                         {headerActions && (
                             <>
-                                <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
+                                <div className={`nav-separator ${styles.navSeparator}`}></div>
                                 {headerActions}
                             </>
                         )}
 
-                        <div className="nav-separator" style={{ height: '20px', width: '1px', background: '#444' }}></div>
+                        <div className={`nav-separator ${styles.navSeparator}`}></div>
                         <button className="nav-text-link home-link" onClick={() => navigate('/')}>
                             EXIT TO HOME
                         </button>

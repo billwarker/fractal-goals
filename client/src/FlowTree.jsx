@@ -8,6 +8,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './FlowTree.css';
+import styles from './FlowTree.module.css';
 import dagre from 'dagre';
 import { getGoalColor, getGoalSecondaryColor, GOAL_COLORS } from './utils/goalColors';
 import { isSMART } from './utils/smartHelpers';
@@ -88,31 +89,13 @@ const CustomNode = ({ data }) => {
         : getGoalSecondaryColor(data.type);
 
     return (
-        <div
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-                position: 'relative',
-            }}
-        >
+        <div className={styles.nodeContainer}>
             {/* Circle with handles positioned relative to it */}
             <div
+                className={`${styles.nodeCircle} ${isCompleted ? styles.nodeCircleCompleted : ''}`}
                 style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: '50%',
                     background: isSmartGoal ? smartRingFillColor : fillColor,
                     border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
-                    boxShadow: isCompleted
-                        ? '0 0 10px rgba(255, 215, 0, 0.6)'
-                        : '0 2px 4px rgba(0,0,0,0.3)',
-                    flexShrink: 0,
-                    zIndex: 2,
-                    position: 'relative', // Handles are positioned relative to this circle
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                 }}
                 onClick={data.onClick}
             >
@@ -121,31 +104,17 @@ const CustomNode = ({ data }) => {
                     <>
                         {/* Middle Ring - with secondary color fill */}
                         <div
+                            className={styles.smartMiddleRing}
                             style={{
-                                position: 'absolute',
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
                                 background: smartRingFillColor,
                                 border: `2.5px solid ${fillColor}`,
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                pointerEvents: 'none',
                             }}
                         />
                         {/* Inner Core */}
                         <div
+                            className={styles.smartInnerCore}
                             style={{
-                                position: 'absolute',
-                                width: '10px',
-                                height: '10px',
-                                borderRadius: '50%',
                                 background: fillColor,
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                pointerEvents: 'none',
                             }}
                         />
                     </>
@@ -155,55 +124,23 @@ const CustomNode = ({ data }) => {
                 <Handle
                     type="target"
                     position={Position.Top}
-                    style={{
-                        top: '50%',
-                        left: '50%',
-                        background: 'transparent',
-                        border: 'none',
-                        transform: 'translate(-50%, -50%)',
-                        width: '1px',
-                        height: '1px',
-                        zIndex: 0
-                    }}
+                    className={styles.handle}
                 />
 
                 {/* Source Handle - centered on circle */}
                 <Handle
                     type="source"
                     position={Position.Bottom}
-                    style={{
-                        top: '50%',
-                        left: '50%',
-                        background: 'transparent',
-                        border: 'none',
-                        transform: 'translate(-50%, -50%)',
-                        width: '1px',
-                        height: '1px',
-                        zIndex: 0
-                    }}
+                    className={styles.handle}
                 />
             </div>
 
             {/* Text beside circle */}
-            <div
-                style={{
-                    marginLeft: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                }}
-            >
+            <div className={styles.nodeTextContainer}>
                 <div
+                    className={`${styles.nodeLabel} ${isUltimate ? styles.nodeLabelUltimate : ''} ${data.label.length > 30 ? styles.nodeLabelLongText : ''}`}
                     style={{
                         color: isCompleted ? completedGold : '#e0e0e0',
-                        fontSize: isUltimate ? '16px' : '14px',
-                        fontWeight: (isCompleted || isUltimate) ? '700' : '600',
-                        textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                        whiteSpace: data.label.length > 30 ? 'normal' : 'nowrap',
-                        wordBreak: 'keep-all',
-                        overflowWrap: 'break-word',
-                        maxWidth: '200px',
-                        lineHeight: '1.3',
                     }}
                     onClick={data.onClick}
                 >
@@ -212,35 +149,17 @@ const CustomNode = ({ data }) => {
                 {
                     isCompleted ? (
                         <div
-                            style={{
-                                color: completedGold,
-                                fontSize: '12px',
-                                marginTop: '2px',
-                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                                fontWeight: 'bold'
-                            }}
+                            className={styles.completedDateLabel}
+                            style={{ color: completedGold }}
                         >
                             {getCompletedDateLabel()}
                         </div>
                     ) : (timingLabel || dueTime) && (
-                        <div
-                            style={{
-                                color: '#fff',
-                                fontSize: '12px',
-                                marginTop: '2px',
-                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                                display: 'flex',
-                                gap: '8px',
-                                alignItems: 'center'
-                            }}
-                        >
+                        <div className={styles.timingContainer}>
                             {timingLabel && <span>{timingLabel}</span>}
-                            {timingLabel && dueTime && <span style={{ margin: '0 6px' }}>|</span>}
+                            {timingLabel && dueTime && <span className={styles.timingSeparator}>|</span>}
                             {dueTime && (
-                                <span style={{
-                                    color: dueTime.startsWith('-') ? '#ff5252' : '#4caf50',
-                                    fontWeight: 'bold'
-                                }}>
+                                <span className={dueTime.startsWith('-') ? styles.dueTimeOverdue : styles.dueTimeOnTime}>
                                     Due: {dueTime}
                                 </span>
                             )}
@@ -251,15 +170,7 @@ const CustomNode = ({ data }) => {
                 {
                     data.onAddChild && data.childTypeName && (
                         <div
-                            style={{
-                                color: '#ff9800',
-                                fontSize: '11px',
-                                marginTop: '4px',
-                                textDecoration: 'underline',
-                                cursor: 'pointer',
-                                fontWeight: 'bold',
-                                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                            }}
+                            className={styles.addChildButton}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 data.onAddChild();
@@ -544,12 +455,10 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
     }, [sidebarOpen, selectedNodeId, rfInstance]);
 
     return (
-        <div style={{
-            width: '100%',
-            height: '100%',
-            opacity: isVisible ? 1 : 0,
-            transition: 'opacity 200ms ease-in-out'
-        }}>
+        <div
+            className={styles.flowTreeContainer}
+            style={{ opacity: isVisible ? 1 : 0 }}
+        >
             <ReactFlow
                 nodes={nodes}
                 edges={edges}

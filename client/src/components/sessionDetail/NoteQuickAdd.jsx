@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import styles from './NoteQuickAdd.module.css';
 
 function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
     const [content, setContent] = useState('');
@@ -115,14 +116,8 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                     onPaste={handlePaste}
                     placeholder={imagePreview ? "Add a caption (optional)..." : placeholder}
                     disabled={isSubmitting}
-                    className="note-input"
+                    className={`note-input ${styles.quickAddTextarea}`}
                     rows={1}
-                    style={{
-                        resize: 'none',
-                        overflow: 'hidden',
-                        minHeight: '38px', // Match previous input height approx
-                        lineHeight: '1.4'
-                    }}
                 />
                 <button
                     type="submit"

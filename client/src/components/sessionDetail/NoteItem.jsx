@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from './ImageViewerModal';
+import styles from './NoteItem.module.css';
 
 function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSelect }) {
     const [isEditing, setIsEditing] = useState(false);
@@ -130,30 +131,17 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
         );
     }
 
-    const highlightStyle = isSelected ? {
-        background: 'rgba(33, 150, 243, 0.15)',
-        borderLeft: '4px solid #2196f3',
-        paddingLeft: '8px',
-        borderRadius: '4px'
-    } : {};
+    const highlightStyle = isSelected ? styles.highlightSelected : '';
 
     return (
         <>
             <div
-                className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''}`}
+                className={`note-item ${compact ? 'compact' : ''} ${hasImage ? 'has-image' : ''} ${highlightStyle}`}
                 onClick={handleClick}
-                style={highlightStyle}
             >
                 {note.activityName && (
-                    <div style={{ marginBottom: '4px' }}>
-                        <span style={{
-                            fontSize: '11px',
-                            color: '#4caf50',
-                            background: 'rgba(76, 175, 80, 0.1)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontWeight: '500'
-                        }}>
+                    <div className={styles.activityBadgeContainer}>
+                        <span className={styles.activityBadge}>
                             {note.activityName}
                         </span>
                     </div>
@@ -162,7 +150,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                     {note.set_index !== null && note.set_index !== undefined && (
                         <>
                             <span className="note-item-set-badge">Set {note.set_index + 1}</span>
-                            <span style={{ margin: '0 6px', color: '#666' }}>-</span>
+                            <span className={styles.setSeparator}>-</span>
                         </>
                     )}
                     <span className="note-date">{formatDate(note.created_at)}</span>
@@ -189,14 +177,8 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                             value={editContent}
                             onChange={handleChange}
                             onKeyDown={handleKeyDown}
-                            className="note-edit-input"
+                            className={`note-edit-input ${styles.editTextarea}`}
                             rows={1}
-                            style={{
-                                resize: 'none',
-                                overflow: 'hidden',
-                                minHeight: '32px',
-                                lineHeight: '1.4'
-                            }}
                         />
                         <div className="note-edit-actions">
                             <button onClick={handleSave} className="note-save-btn">✓</button>
@@ -238,15 +220,17 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                         )}
                     </>
                 )}
-            </div>
+            </div >
 
             {/* Image Viewer Modal */}
-            {showImageViewer && note.image_data && (
-                <ImageViewerModal
-                    imageData={note.image_data}
-                    onClose={() => setShowImageViewer(false)}
-                />
-            )}
+            {
+                showImageViewer && note.image_data && (
+                    <ImageViewerModal
+                        imageData={note.image_data}
+                        onClose={() => setShowImageViewer(false)}
+                    />
+                )
+            }
         </>
     );
 }

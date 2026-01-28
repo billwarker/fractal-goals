@@ -11,7 +11,7 @@ import React, { useState, useMemo } from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
-import './SessionSidePane.css';
+import styles from './SessionSidePane.module.css';
 
 function SessionSidePane({
     rootId,
@@ -58,18 +58,18 @@ function SessionSidePane({
     }, [selectedActivity, activityDefinitions]);
 
     return (
-        <div className="session-sidepane">
+        <div className={styles.sessionSidepane}>
             {/* Mode Toggle Header */}
-            <div className="sidepane-header">
-                <div className="sidepane-tabs">
+            <div className={styles.sidepaneHeader}>
+                <div className={styles.sidepaneTabs}>
                     <button
-                        className={`sidepane-tab ${mode === 'details' ? 'active' : ''}`}
+                        className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
                         onClick={() => setMode('details')}
                     >
                         Details
                     </button>
                     <button
-                        className={`sidepane-tab ${mode === 'history' ? 'active' : ''}`}
+                        className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
                         onClick={() => setMode('history')}
                     >
                         History
@@ -80,9 +80,9 @@ function SessionSidePane({
             </div>
 
             {/* Mode Content */}
-            <div className="sidepane-content">
+            <div className={styles.sidepaneContent}>
                 {mode === 'details' ? (
-                    <div className="details-view">
+                    <div className={styles.detailsView}>
                         {/* Session Metadata Panel */}
                         <SessionInfoPanel
                             session={session}
@@ -95,31 +95,31 @@ function SessionSidePane({
                         />
 
                         {/* Session Controls */}
-                        <div className="sidebar-actions">
+                        <div className={styles.sidebarActions}>
                             <button
                                 onClick={onToggleComplete}
-                                className={`sidebar-control-btn sidebar-btn-complete ${isCompleted ? 'completed' : ''}`}
+                                className={`${styles.sidebarControlBtn} ${styles.btnComplete} ${isCompleted ? styles.btnCompleteActive : ''}`}
                                 title="Mark Session Complete"
                             >
                                 {isCompleted ? '✓ Done' : 'Complete'}
                             </button>
                             <button
                                 onClick={onSave}
-                                className="sidebar-control-btn sidebar-btn-done"
+                                className={`${styles.sidebarControlBtn} ${styles.btnDone}`}
                                 title="Save & Exit"
                             >
                                 Save
                             </button>
                             <button
                                 onClick={onCancel}
-                                className="sidebar-control-btn sidebar-btn-cancel"
+                                className={`${styles.sidebarControlBtn} ${styles.btnCancel}`}
                                 title="Cancel (Go Back)"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={onDelete}
-                                className="sidebar-control-btn sidebar-btn-delete"
+                                className={`${styles.sidebarControlBtn} ${styles.btnDelete}`}
                                 title="Delete Session"
                             >
                                 Delete
@@ -127,10 +127,7 @@ function SessionSidePane({
                         </div>
 
                         {/* Divider */}
-                        <div style={{
-                            borderBottom: '1px solid #333',
-                            marginBottom: '20px'
-                        }}></div>
+                        <div className={styles.divider}></div>
 
                         {/* Notes Management */}
                         <NotesPanel

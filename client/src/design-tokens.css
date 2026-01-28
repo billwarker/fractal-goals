@@ -1,0 +1,45 @@
+/* Fractal Goals - Central Design Tokens */
+/* Created from a pixel-perfect visual audit to replace inline styles */
+
+:root {
+  /* Core Colors */
+  --color-bg-app: #121212;
+  --color-bg-card: rgb(42, 42, 42);
+  --color-bg-card-alt: rgb(30, 30, 30);
+  --color-bg-sidebar: rgb(26, 26, 26);
+  --color-bg-node: rgb(233, 240, 255);
+  --color-bg-header: #1a1a1a;
+  
+  /* Text Colors */
+  --color-text-primary: rgb(224, 224, 224);
+  --color-text-secondary: rgb(212, 212, 212);
+  --color-text-muted: #888;
+  
+  /* Branding */
+  --color-brand-primary: #3b82f6; /* Approximate blue used in app */
+  --color-brand-success: #10b981;
+  --color-brand-danger: #ef4444;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Boarders & Shadows */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-full: 50%;
+  
+  --shadow-sm: rgba(0, 0, 0, 0.3) 0px 2px 4px;
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.5);
+  
+  /* Typography */
+  --font-family: 'Inter', sans-serif;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-title: 24px;
+}

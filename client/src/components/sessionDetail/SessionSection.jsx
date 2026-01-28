@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
+import styles from './SessionSection.module.css';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -102,30 +103,23 @@ const SessionSection = ({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            style={{
-                background: '#1e1e1e',
-                border: isDragOver ? '2px dashed #4caf50' : '1px solid #333',
-                borderLeft: '4px solid #2196f3',
-                borderRadius: '8px',
-                padding: '20px',
-                marginBottom: '0' /* handled by wrapper gap */
-            }}
+            className={`${styles.sectionContainer} ${isDragOver ? styles.sectionContainerDragOver : ''}`}
         >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
+            <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>
                     {section.name || `Section ${sectionIndex + 1}`}
                 </h3>
-                <div style={{ fontSize: '14px', color: '#666', fontFamily: 'monospace' }}>
-                    Duration: <span style={{ color: '#4caf50', fontWeight: 'bold' }}>
+                <div className={styles.sectionDuration}>
+                    Duration: <span className={styles.durationValue}>
                         {formatDuration(calculateSectionDuration(section, activityInstances))}
                     </span>
-                    <span style={{ marginLeft: '8px', opacity: 0.7 }}>
+                    <span className={styles.durationPlanned}>
                         (planned: {section.estimated_duration_minutes || '—'} min)
                     </span>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className={styles.activitiesContainer}>
                 {section.activity_ids?.map((instanceId) => {
                     const instance = activityInstances.find(i => i.id === instanceId);
                     if (!instance) return null;
@@ -147,10 +141,7 @@ const SessionSection = ({
                             onDragEnd={() => {
                                 setDraggedItem(null);
                             }}
-                            style={{
-                                opacity: isDragging ? 0.5 : 1,
-                                cursor: 'grab'
-                            }}
+                            className={`${styles.draggableActivity} ${isDragging ? styles.draggableActivityDragging : ''}`}
                         >
                             <SessionActivityItem
                                 exercise={instance}
@@ -178,41 +169,25 @@ const SessionSection = ({
 
                 {/* Drop Zone Indicator */}
                 {isDragOver && draggedItem && (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '16px',
-                        color: '#4caf50',
-                        fontSize: '13px',
-                        fontStyle: 'italic',
-                        background: 'rgba(76, 175, 80, 0.1)',
-                        border: '1px dashed #4caf50',
-                        borderRadius: '6px',
-                        marginTop: '8px'
-                    }}>
+                    <div className={styles.dropZoneIndicator}>
                         Drop "{draggedItem.activityName}" here
                     </div>
                 )}
 
                 {/* Add Activity Button / Selector */}
                 {showActivitySelector ? (
-                    <div style={{
-                        background: '#252525',
-                        padding: '16px',
-                        borderRadius: '6px',
-                        border: '1px solid #444',
-                        animation: 'fadeIn 0.2s ease-in-out'
-                    }}>
-                        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 500, color: '#ddd' }}>
+                    <div className={styles.activitySelector}>
+                        <div className={styles.selectorHeader}>
+                            <span className={styles.selectorTitle}>
                                 {viewGroupId === null ? 'Select Activity Group' :
                                     viewGroupId === 'ungrouped' ? 'Ungrouped Activities' :
                                         groupMap[viewGroupId]?.name || 'Group Activities'}
                             </span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className={styles.selectorActions}>
                                 {viewGroupId !== null && (
                                     <button
                                         onClick={() => setViewGroupId(null)}
-                                        style={{ background: 'none', border: '1px solid #555', color: '#ccc', cursor: 'pointer', fontSize: '12px', padding: '2px 8px', borderRadius: '4px' }}
+                                        className={styles.backButton}
                                     >
                                         ← Back
                                     </button>
@@ -222,7 +197,7 @@ const SessionSection = ({
                                         onToggleActivitySelector(false);
                                         setViewGroupId(null); // Reset on close
                                     }}
-                                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px' }}
+                                    className={styles.closeButton}
                                 >
                                     ×
                                 </button>
@@ -232,7 +207,7 @@ const SessionSection = ({
                         {/* Hierarchical View */}
                         {viewGroupId === null ? (
                             /* LEVEL 1: GROUPS */
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                            <div className={styles.groupsGrid}>
                                 {/* Group Cards */}
                                 {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
                                     const group = groupMap[groupId];
@@ -241,25 +216,10 @@ const SessionSection = ({
                                         <button
                                             key={groupId}
                                             onClick={() => setViewGroupId(groupId)}
-                                            style={{
-                                                padding: '12px 10px',
-                                                background: '#333',
-                                                border: '1px solid #555',
-                                                borderRadius: '6px',
-                                                color: 'white',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                transition: 'background 0.2s',
-                                                textAlign: 'center'
-                                            }}
-                                            onMouseOver={(e) => e.target.style.background = '#444'}
-                                            onMouseOut={(e) => e.target.style.background = '#333'}
+                                            className={styles.groupCard}
                                         >
-                                            <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{group?.name || 'Unknown'}</div>
-                                            <div style={{ fontSize: '10px', color: '#888' }}>{groupActivities.length} activities</div>
+                                            <div className={styles.groupCardName}>{group?.name || 'Unknown'}</div>
+                                            <div className={styles.groupCardCount}>{groupActivities.length} activities</div>
                                         </button>
                                     );
                                 })}
@@ -268,54 +228,27 @@ const SessionSection = ({
                                 {ungroupedActivities.length > 0 && (
                                     <button
                                         onClick={() => setViewGroupId('ungrouped')}
-                                        style={{
-                                            padding: '12px 10px',
-                                            background: '#333',
-                                            border: '1px dashed #666',
-                                            borderRadius: '6px',
-                                            color: '#ccc',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            textAlign: 'center'
-                                        }}
+                                        className={styles.ungroupedCard}
                                     >
-                                        <div style={{ fontSize: '13px', fontStyle: 'italic' }}>Ungrouped</div>
-                                        <div style={{ fontSize: '10px', color: '#888' }}>{ungroupedActivities.length} activities</div>
+                                        <div className={styles.ungroupedCardName}>Ungrouped</div>
+                                        <div className={styles.groupCardCount}>{ungroupedActivities.length} activities</div>
                                     </button>
                                 )}
                             </div>
                         ) : (
                             /* LEVEL 2: ACTIVITIES */
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            <div className={styles.activitiesList}>
                                 {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
                                     <button
                                         key={act.id}
                                         onClick={() => onAddActivity(sectionIndex, act.id)}
-                                        style={{
-                                            padding: '8px 14px',
-                                            background: '#333',
-                                            border: '1px solid #4caf50',
-                                            borderRadius: '4px',
-                                            color: 'white',
-                                            cursor: 'pointer',
-                                            fontSize: '13px',
-                                            textAlign: 'left',
-                                            transition: 'transform 0.1s',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px'
-                                        }}
-                                        onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'}
-                                        onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
+                                        className={styles.activityButton}
                                     >
                                         <span>+</span> {act.name}
                                     </button>
                                 ))}
                                 {(!groupedActivities[viewGroupId] && viewGroupId !== 'ungrouped' && (
-                                    <div style={{ color: '#888', fontStyle: 'italic', padding: '10px' }}>No activities found in this group.</div>
+                                    <div className={styles.noActivitiesMessage}>No activities found in this group.</div>
                                 ))}
                             </div>
                         )}
@@ -323,20 +256,10 @@ const SessionSection = ({
                         {/* Actions Footer (only on root) */}
                         {viewGroupId === null && (
                             <>
-                                <div style={{ width: '100%', height: '1px', background: '#333', margin: '12px 0' }}></div>
+                                <div className={styles.selectorDivider}></div>
                                 <button
                                     onClick={() => onOpenActivityBuilder(sectionIndex)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        background: '#1a1a1a',
-                                        border: '1px dashed #666',
-                                        borderRadius: '4px',
-                                        color: '#aaa',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        fontWeight: 500
-                                    }}
+                                    className={styles.createActivityButton}
                                 >
                                     + Create New Activity Definition
                                 </button>
@@ -346,17 +269,7 @@ const SessionSection = ({
                 ) : (
                     <button
                         onClick={() => onToggleActivitySelector(true)}
-                        style={{
-                            background: 'transparent',
-                            border: '1px dashed #444',
-                            color: '#888',
-                            padding: '8px 16px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            width: '100%',
-                            textAlign: 'center'
-                        }}
+                        className={styles.addActivityButton}
                     >
                         + Add Activity
                     </button>

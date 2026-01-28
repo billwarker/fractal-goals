@@ -1,0 +1,8 @@
+/* NoteQuickAdd Styles */
+
+.quickAddTextarea {
+    resize: none;
+    overflow: hidden;
+    min-height: 38px;
+    line-height: 1.4;
+}

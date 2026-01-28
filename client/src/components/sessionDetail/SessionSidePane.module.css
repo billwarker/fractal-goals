@@ -1,0 +1,134 @@
+/* SessionSidePane Styles */
+
+.sessionSidepane {
+    width: 100%;
+    background: rgba(26, 26, 26, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(51, 51, 51, 0.8);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 120px);
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+.sidepaneHeader {
+    padding: 10px 16px;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.sidepaneTabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 0;
+}
+
+.sidepaneTab {
+    flex: 1;
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.sidepaneTab:hover {
+    background: #333;
+    color: #aaa;
+}
+
+.sidepaneTabActive {
+    background: #333;
+    border: 1px solid #4caf50;
+    color: #4caf50;
+    box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
+}
+
+.sidepaneContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.detailsView {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebarActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.sidebarControlBtn {
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex: 1;
+    text-align: center;
+    color: white;
+    transition: filter 0.2s;
+    min-width: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.sidebarControlBtn:hover {
+    filter: brightness(1.1);
+}
+
+.btnComplete {
+    background: #444;
+}
+
+.btnCompleteActive {
+    background: #4caf50;
+}
+
+.btnDone {
+    background: #2196f3;
+}
+
+.btnCancel {
+    background: #666;
+}
+
+.btnDelete {
+    background: #f44336;
+}
+
+/* The missing inline style */
+.divider {
+    border-bottom: 1px solid #333;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 1024px) {
+    .sessionSidepane {
+        max-height: calc(100vh - 100px);
+    }
+}
+
+@media (max-width: 768px) {
+    .sessionSidepane {
+        max-height: none;
+    }
+}

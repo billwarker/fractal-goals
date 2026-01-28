@@ -4,6 +4,7 @@ import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { fractalApi } from '../../utils/api';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
+import styles from './SessionActivityItem.module.css';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -171,39 +172,17 @@ function SessionActivityItem({
     return (
         <div
             onClick={handleActivityCardClick}
-            style={{
-                background: isSelected ? '#333' : '#2a2a2a',
-                border: isSelected ? '1px solid #4caf50' : '1px solid #333',
-                borderRadius: '6px',
-                padding: '16px',
-                cursor: 'default',
-                boxShadow: isSelected ? '0 0 0 1px rgba(76, 175, 80, 0.2)' : 'none',
-                transition: 'all 0.2s ease',
-                opacity: isDragging ? 0.5 : 1
-            }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            className={`${styles.activityCard} ${isSelected ? styles.activityCardSelected : ''} ${isDragging ? styles.activityCardDragging : ''}`}
+        >
+            <div className={styles.activityHeader}>
+                <div className={styles.activityHeaderLeft}>
                     {/* Reorder Buttons */}
                     {showReorderButtons && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div className={styles.reorderButtons}>
                             <button
                                 onClick={() => onReorder('up')}
                                 disabled={!canMoveUp}
-                                style={{
-                                    background: canMoveUp ? '#333' : 'transparent',
-                                    border: '1px solid #555',
-                                    borderRadius: '3px',
-                                    color: canMoveUp ? '#4caf50' : '#444',
-                                    cursor: canMoveUp ? 'pointer' : 'not-allowed',
-                                    fontSize: '12px',
-                                    padding: '2px 6px',
-                                    lineHeight: '1',
-                                    width: '24px',
-                                    height: '18px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
+                                className={`${styles.reorderButton} ${!canMoveUp ? styles.reorderButtonDisabled : ''}`}
                                 title="Move up"
                             >
                                 ▲
@@ -211,21 +190,7 @@ function SessionActivityItem({
                             <button
                                 onClick={() => onReorder('down')}
                                 disabled={!canMoveDown}
-                                style={{
-                                    background: canMoveDown ? '#333' : 'transparent',
-                                    border: '1px solid #555',
-                                    borderRadius: '3px',
-                                    color: canMoveDown ? '#4caf50' : '#444',
-                                    cursor: canMoveDown ? 'pointer' : 'not-allowed',
-                                    fontSize: '12px',
-                                    padding: '2px 6px',
-                                    lineHeight: '1',
-                                    width: '24px',
-                                    height: '18px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
+                                className={`${styles.reorderButton} ${!canMoveDown ? styles.reorderButtonDisabled : ''}`}
                                 title="Move down"
                             >
                                 ▼
@@ -236,14 +201,7 @@ function SessionActivityItem({
                     {dragHandleProps && (
                         <div
                             {...dragHandleProps}
-                            style={{
-                                cursor: 'grab',
-                                padding: '4px 8px',
-                                color: '#666',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}
+                            className={styles.dragHandle}
                             title="Drag to reorder"
                         >
                             ⋮⋮
@@ -256,22 +214,22 @@ function SessionActivityItem({
                             setSelectedSetIndex(null);
                             if (onFocus) onFocus(exercise, null);
                         }}
-                        style={{ cursor: 'pointer' }}
+                        className={styles.activityNameContainer}
                     >
-                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#4caf50' }}>
-                            {def.name} <span style={{ fontSize: '11px', color: '#888', fontWeight: 'normal' }}>(Activity)</span>
+                        <div className={styles.activityName}>
+                            {def.name} <span className={styles.activityLabel}>(Activity)</span>
                         </div>
-                        {def.description && <div style={{ fontSize: '12px', color: '#aaa' }}>{def.description}</div>}
+                        {def.description && <div className={styles.activityDescription}>{def.description}</div>}
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className={styles.activityHeaderRight}>
                     {/* Timer Controls - New Design */}
                     {exercise.id && (
                         <>
                             {/* DateTime Start Field */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Start</label>
+                            <div className={styles.timerFieldContainer}>
+                                <label className={styles.timerLabel}>Start</label>
                                 <input
                                     type="text"
                                     placeholder="YYYY-MM-DD HH:MM:SS"
@@ -291,22 +249,13 @@ function SessionActivityItem({
                                             onUpdate('time_start', null);
                                         }
                                     }}
-                                    style={{
-                                        padding: '4px 6px',
-                                        background: '#333',
-                                        border: '1px solid #555',
-                                        borderRadius: '3px',
-                                        color: '#ccc',
-                                        fontSize: '11px',
-                                        width: '160px',
-                                        fontFamily: 'monospace'
-                                    }}
+                                    className={styles.timerInput}
                                 />
                             </div>
 
                             {/* DateTime Stop Field */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Stop</label>
+                            <div className={styles.timerFieldContainer}>
+                                <label className={styles.timerLabel}>Stop</label>
                                 <input
                                     type="text"
                                     placeholder="YYYY-MM-DD HH:MM:SS"
@@ -327,39 +276,14 @@ function SessionActivityItem({
                                         }
                                     }}
                                     disabled={!exercise.time_start}
-                                    style={{
-                                        padding: '4px 6px',
-                                        background: exercise.time_start ? '#333' : '#222',
-                                        border: '1px solid #555',
-                                        borderRadius: '3px',
-                                        color: exercise.time_start ? '#ccc' : '#666',
-                                        fontSize: '11px',
-                                        width: '160px',
-                                        fontFamily: 'monospace',
-                                        cursor: exercise.time_start ? 'text' : 'not-allowed'
-                                    }}
+                                    className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
                                 />
                             </div>
 
                             {/* Duration Display */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <label style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Duration</label>
-                                <div style={{
-                                    padding: '4px 8px',
-                                    background: '#1a1a1a',
-                                    border: '1px solid #444',
-                                    borderRadius: '3px',
-                                    color: exercise.time_start && exercise.time_stop ? '#4caf50' : '#666',
-                                    fontSize: '13px',
-                                    fontWeight: 'bold',
-                                    fontFamily: 'monospace',
-                                    minWidth: '60px',
-                                    textAlign: 'center',
-                                    height: '26px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
+                            <div className={styles.timerFieldContainer}>
+                                <label className={styles.timerLabel}>Duration</label>
+                                <div className={`${styles.durationDisplay} ${exercise.time_start && exercise.time_stop ? styles.durationActive : styles.durationInactive}`}>
                                     {(() => {
                                         if (exercise.time_start && exercise.time_stop) {
                                             const start = new Date(exercise.time_start);
@@ -379,19 +303,7 @@ function SessionActivityItem({
                                         e.stopPropagation();
                                         onUpdate('timer_action', 'start');
                                     }}
-                                    style={{
-                                        background: '#4caf50',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        padding: '6px 10px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        marginTop: '14px'
-                                    }}
+                                    className={styles.startButton}
                                     title="Start timer"
                                 >
                                     ▶ Start
@@ -402,19 +314,7 @@ function SessionActivityItem({
                                         e.stopPropagation();
                                         onUpdate('timer_action', 'stop');
                                     }}
-                                    style={{
-                                        background: '#f44336',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        padding: '6px 10px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        marginTop: '14px'
-                                    }}
+                                    className={styles.stopButton}
                                     title="Stop timer"
                                 >
                                     ■ Stop
@@ -428,19 +328,7 @@ function SessionActivityItem({
                                         e.stopPropagation();
                                         onUpdate('timer_action', 'reset');
                                     }}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px solid #666',
-                                        borderRadius: '4px',
-                                        color: '#888',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        padding: '6px 10px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        marginTop: '14px'
-                                    }}
+                                    className={styles.resetButton}
                                     title="Reset timer"
                                 >
                                     ↺ Reset
@@ -450,17 +338,17 @@ function SessionActivityItem({
                     )}
 
                     {/* Delete Button */}
-                    <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', fontSize: '18px', marginTop: '14px' }}>×</button>
+                    <button onClick={onDelete} className={styles.deleteButton}>×</button>
                 </div>
             </div>
 
             {/* Content Area */}
-            <div style={{ marginTop: '15px', paddingLeft: '36px' }}>
+            <div className={styles.contentArea}>
 
                 {/* SETS VIEW */}
                 {hasSets ? (
                     <div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className={styles.setsContainer}>
                             {exercise.sets?.map((set, setIdx) => (
                                 <div
                                     key={set.instance_id}
@@ -471,36 +359,26 @@ function SessionActivityItem({
                                         // Notify parent of set selection change
                                         if (onFocus) onFocus(exercise, newSetIndex);
                                     }}
-                                    style={{
-                                        display: 'flex',
-                                        gap: '10px',
-                                        alignItems: 'center',
-                                        background: selectedSetIndex === setIdx ? 'rgba(76, 175, 80, 0.1)' : '#222',
-                                        padding: '8px',
-                                        borderRadius: '4px',
-                                        border: selectedSetIndex === setIdx ? '1px solid #4caf50' : '1px solid transparent',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
+                                    className={`${styles.setRow} ${selectedSetIndex === setIdx ? styles.setRowSelected : ''}`}
                                 >
-                                    <div style={{ width: '30px', color: '#666', fontSize: '12px', fontWeight: 'bold' }}>#{setIdx + 1}</div>
+                                    <div className={styles.setNumber}>#{setIdx + 1}</div>
 
                                     {hasMetrics && (
                                         hasSplits ? (
                                             // Render metrics grouped by split
                                             def.split_definitions.map(split => (
-                                                <div key={split.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', background: '#1a1a1a', borderRadius: '3px', border: '1px solid #333' }}>
-                                                    <span style={{ fontSize: '10px', color: '#aaa', fontWeight: 'bold', minWidth: '50px' }}>{split.name}</span>
+                                                <div key={split.id} className={styles.splitContainer}>
+                                                    <span className={styles.splitLabel}>{split.name}</span>
                                                     {def.metric_definitions.map(m => (
-                                                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <label style={{ fontSize: '10px', color: '#888' }}>{m.name}</label>
+                                                        <div key={m.id} className={styles.metricInputContainer}>
+                                                            <label className={styles.metricLabel}>{m.name}</label>
                                                             <input
                                                                 type="number"
-                                                                style={{ width: '50px', padding: '3px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '3px', fontSize: '11px' }}
+                                                                className={styles.metricInput}
                                                                 value={getMetricValue(set.metrics, m.id, split.id)}
                                                                 onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value, split.id)}
                                                             />
-                                                            <span style={{ fontSize: '10px', color: '#666' }}>{m.unit}</span>
+                                                            <span className={styles.metricUnit}>{m.unit}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -508,27 +386,27 @@ function SessionActivityItem({
                                         ) : (
                                             // Render metrics without splits (original behavior)
                                             def.metric_definitions.map(m => (
-                                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                    <label style={{ fontSize: '11px', color: '#888' }}>{m.name}</label>
+                                                <div key={m.id} className={styles.metricInputContainer}>
+                                                    <label className={styles.metricLabelLarge}>{m.name}</label>
                                                     <input
                                                         type="number"
-                                                        style={{ width: '60px', padding: '4px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '3px' }}
+                                                        className={styles.metricInputLarge}
                                                         value={getMetricValue(set.metrics, m.id)}
                                                         onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value)}
                                                     />
-                                                    <span style={{ fontSize: '11px', color: '#666' }}>{m.unit}</span>
+                                                    <span className={styles.metricUnitLarge}>{m.unit}</span>
                                                 </div>
                                             ))
                                         )
                                     )}
 
-                                    <button onClick={() => handleRemoveSet(setIdx)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>×</button>
+                                    <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton}>×</button>
                                 </div>
                             ))}
                         </div>
                         <button
                             onClick={handleAddSet}
-                            style={{ marginTop: '10px', background: '#333', border: '1px dashed #555', color: '#ccc', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                            className={styles.addSetButton}
                         >
                             + Add Set
                         </button>
@@ -538,17 +416,17 @@ function SessionActivityItem({
                     hasMetrics ? (
                         hasSplits ? (
                             // Render metrics grouped by split in a grid
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className={styles.singleMetricsContainerColumn}>
                                 {def.split_definitions.map(split => (
-                                    <div key={split.id} style={{ background: '#222', padding: '10px', borderRadius: '4px', border: '1px solid #333' }}>
-                                        <div style={{ fontSize: '12px', color: '#aaa', fontWeight: 'bold', marginBottom: '8px' }}>{split.name}</div>
-                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                    <div key={split.id} className={styles.singleMetricGroup}>
+                                        <div className={styles.singleMetricGroupTitle}>{split.name}</div>
+                                        <div className={styles.singleMetricGroupContent}>
                                             {def.metric_definitions.map(m => (
-                                                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                    <label style={{ fontSize: '11px', color: '#888' }}>{m.name} ({m.unit})</label>
+                                                <div key={m.id} className={styles.singleMetricField}>
+                                                    <label className={styles.metricLabelLarge}>{m.name} ({m.unit})</label>
                                                     <input
                                                         type="number"
-                                                        style={{ width: '80px', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px' }}
+                                                        className={styles.metricInputXLarge}
                                                         value={getMetricValue(exercise.metrics, m.id, split.id)}
                                                         onChange={(e) => handleSingleMetricChange(m.id, e.target.value, split.id)}
                                                     />
@@ -560,13 +438,13 @@ function SessionActivityItem({
                             </div>
                         ) : (
                             // Render metrics without splits (original behavior)
-                            <div style={{ display: 'flex', gap: '15px' }}>
+                            <div className={styles.singleMetricsContainer}>
                                 {def.metric_definitions.map(m => (
-                                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '11px', color: '#888' }}>{m.name} ({m.unit})</label>
+                                    <div key={m.id} className={styles.singleMetricField}>
+                                        <label className={styles.metricLabelLarge}>{m.name} ({m.unit})</label>
                                         <input
                                             type="number"
-                                            style={{ width: '80px', padding: '6px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '4px' }}
+                                            className={styles.metricInputXLarge}
                                             value={getMetricValue(exercise.metrics, m.id)}
                                             onChange={(e) => handleSingleMetricChange(m.id, e.target.value)}
                                         />
@@ -575,7 +453,7 @@ function SessionActivityItem({
                             </div>
                         )
                     ) : (
-                        <div style={{ color: '#666', fontSize: '13px', fontStyle: 'italic' }}>
+                        <div className={styles.noMetricsMessage}>
                             Track activity based on completion checkbox above.
                         </div>
                     )
@@ -583,9 +461,9 @@ function SessionActivityItem({
 
                 {/* Quick Note Add */}
                 {/* Notes Section - Timeline + Quick Add */}
-                <div style={{ marginTop: '15px' }}>
+                <div className={styles.notesSection}>
                     {activityNotes.length > 0 && (
-                        <div style={{ marginBottom: '10px' }}>
+                        <div className={styles.notesTimelineContainer}>
                             <NoteTimeline
                                 notes={activityNotes}
                                 onUpdate={onUpdateNote}

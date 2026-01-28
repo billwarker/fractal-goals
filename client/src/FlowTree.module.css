@@ -1,0 +1,134 @@
+/* FlowTree Custom Node Styles */
+/* Migrated from inline styles to maintain pixel-perfect visual fidelity */
+
+.nodeContainer {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+}
+
+.nodeCircle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+    z-index: 2;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nodeCircleCompleted {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+.smartMiddleRing {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.smartInnerCore {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.handle {
+    top: 50%;
+    left: 50%;
+    background: transparent;
+    border: none;
+    transform: translate(-50%, -50%);
+    width: 1px;
+    height: 1px;
+    z-index: 0;
+}
+
+.nodeTextContainer {
+    margin-left: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.nodeLabel {
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    max-width: 200px;
+    line-height: 1.3;
+}
+
+.nodeLabelUltimate {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.nodeLabelLongText {
+    white-space: normal;
+}
+
+.completedDateLabel {
+    font-size: 12px;
+    margin-top: 2px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    font-weight: bold;
+}
+
+.timingContainer {
+    color: #fff;
+    font-size: 12px;
+    margin-top: 2px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.timingSeparator {
+    margin: 0 6px;
+}
+
+.dueTimeOverdue {
+    color: #ff5252;
+    font-weight: bold;
+}
+
+.dueTimeOnTime {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.addChildButton {
+    color: #ff9800;
+    font-size: 11px;
+    margin-top: 4px;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: bold;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.flowTreeContainer {
+    width: 100%;
+    height: 100%;
+    transition: opacity 200ms ease-in-out;
+}

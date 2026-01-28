@@ -1,0 +1,243 @@
+/* SessionSection Styles */
+/* Migrated from inline styles to maintain pixel-perfect visual fidelity */
+
+.sectionContainer {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-left: 4px solid #2196f3;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 0;
+    /* handled by wrapper gap */
+}
+
+.sectionContainerDragOver {
+    border: 2px dashed #4caf50;
+}
+
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.sectionTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.sectionDuration {
+    font-size: 14px;
+    color: #666;
+    font-family: monospace;
+}
+
+.durationValue {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.durationPlanned {
+    margin-left: 8px;
+    opacity: 0.7;
+}
+
+.activitiesContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.draggableActivity {
+    cursor: grab;
+}
+
+.draggableActivityDragging {
+    opacity: 0.5;
+}
+
+.dropZoneIndicator {
+    text-align: center;
+    padding: 16px;
+    color: #4caf50;
+    font-size: 13px;
+    font-style: italic;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px dashed #4caf50;
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+.activitySelector {
+    background: #252525;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.selectorHeader {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.selectorTitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: #ddd;
+}
+
+.selectorActions {
+    display: flex;
+    gap: 8px;
+}
+
+.backButton {
+    background: none;
+    border: 1px solid #555;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.groupsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.groupCard {
+    padding: 12px 10px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.2s;
+    text-align: center;
+}
+
+.groupCard:hover {
+    background: #444;
+}
+
+.groupCardName {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.groupCardCount {
+    font-size: 10px;
+    color: #888;
+}
+
+.ungroupedCard {
+    padding: 12px 10px;
+    background: #333;
+    border: 1px dashed #666;
+    border-radius: 6px;
+    color: #ccc;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.ungroupedCardName {
+    font-size: 13px;
+    font-style: italic;
+}
+
+.activitiesList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.activityButton {
+    padding: 8px 14px;
+    background: #333;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    transition: transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.activityButton:active {
+    transform: scale(0.98);
+}
+
+.noActivitiesMessage {
+    color: #888;
+    font-style: italic;
+    padding: 10px;
+}
+
+.selectorDivider {
+    width: 100%;
+    height: 1px;
+    background: #333;
+    margin: 12px 0;
+}
+
+.createActivityButton {
+    width: 100%;
+    padding: 8px;
+    background: #1a1a1a;
+    border: 1px dashed #666;
+    border-radius: 4px;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.addActivityButton {
+    background: transparent;
+    border: 1px dashed #444;
+    color: #888;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    width: 100%;
+    text-align: center;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

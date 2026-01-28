@@ -8,6 +8,7 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import { fractalApi } from '../../utils/api';
 import { formatDateInTimezone, formatForInput } from '../../utils/dateUtils';
 import { getGoalColor } from '../../utils/goalColors';
+import styles from './SessionInfoPanel.module.css';
 
 function SessionInfoPanel({
     session,
@@ -148,23 +149,22 @@ function SessionInfoPanel({
                         <div className="session-info-row">
                             <span className="label">Started:</span>
                             {editingField === 'start' ? (
-                                <div className="edit-time-container" style={{ display: 'flex', gap: '4px' }}>
+                                <div className={styles.editTimeContainer}>
                                     <input
                                         type="datetime-local"
                                         value={editValue}
                                         onChange={(e) => setEditValue(e.target.value)}
                                         className="session-datetime-input"
                                     />
-                                    <button onClick={handleSaveEdit} disabled={saving} style={{ padding: '0 4px', cursor: 'pointer' }}>✓</button>
-                                    <button onClick={() => setEditingField(null)} style={{ padding: '0 4px', cursor: 'pointer' }}>✗</button>
+                                    <button onClick={handleSaveEdit} disabled={saving} className={styles.editButton}>✓</button>
+                                    <button onClick={() => setEditingField(null)} className={styles.editButton}>✗</button>
                                 </div>
                             ) : (
-                                <div className="value-with-edit" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className={styles.valueWithEdit}>
                                     <span>{formatDate(startTime)}</span>
                                     <span
-                                        className="edit-icon"
+                                        className={styles.editIcon}
                                         onClick={() => handleStartEdit('start', startTime)}
-                                        style={{ cursor: 'pointer', opacity: 0.5, fontSize: '10px' }}
                                         title="Edit start time"
                                     >
                                         ✏️
@@ -177,23 +177,22 @@ function SessionInfoPanel({
                         <div className="session-info-row">
                             <span className="label">Ended:</span>
                             {editingField === 'end' ? (
-                                <div className="edit-time-container" style={{ display: 'flex', gap: '4px' }}>
+                                <div className={styles.editTimeContainer}>
                                     <input
                                         type="datetime-local"
                                         value={editValue}
                                         onChange={(e) => setEditValue(e.target.value)}
                                         className="session-datetime-input"
                                     />
-                                    <button onClick={handleSaveEdit} disabled={saving} style={{ padding: '0 4px', cursor: 'pointer' }}>✓</button>
-                                    <button onClick={() => setEditingField(null)} style={{ padding: '0 4px', cursor: 'pointer' }}>✗</button>
+                                    <button onClick={handleSaveEdit} disabled={saving} className={styles.editButton}>✓</button>
+                                    <button onClick={() => setEditingField(null)} className={styles.editButton}>✗</button>
                                 </div>
                             ) : (
-                                <div className="value-with-edit" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className={styles.valueWithEdit}>
                                     <span>{formatDate(endTime)}</span>
                                     <span
-                                        className="edit-icon"
+                                        className={styles.editIcon}
                                         onClick={() => handleStartEdit('end', endTime)}
-                                        style={{ cursor: 'pointer', opacity: 0.5, fontSize: '10px' }}
                                         title="Edit end time"
                                     >
                                         ✏️

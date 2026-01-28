@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import styles from './HistoryPanel.module.css';
 
 function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs }) {
     // Default to selected activity's definition, or first in list
@@ -169,9 +170,9 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
                                     const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
                                     return (
                                         <span key={mIdx} className="history-metric">
-                                            {def?.name && <span style={{ opacity: 0.7, marginRight: '4px' }}>{def.name}:</span>}
+                                            {def?.name && <span className={styles.metricLabel}>{def.name}:</span>}
                                             {m.value}
-                                            {def?.unit && <span style={{ opacity: 0.7, marginLeft: '2px' }}>{def.unit}</span>}
+                                            {def?.unit && <span className={styles.metricUnit}>{def.unit}</span>}
                                         </span>
                                     );
                                 })}
@@ -196,23 +197,16 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
             {instance.notes && instance.notes.length > 0 && (
                 <div className="history-card-notes">
                     {instance.notes.map((note, nIdx) => (
-                        <div key={note.id || nIdx} style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginTop: '4px' }}>
-                            <span style={{ color: '#666', fontSize: '11px', minWidth: '50px' }}>
+                        <div key={note.id || nIdx} className={styles.noteRow}>
+                            <span className={styles.noteTime}>
                                 {formatTime(note.created_at)}
                             </span>
                             {note.set_index !== null && note.set_index !== undefined && (
-                                <span style={{
-                                    fontSize: '10px',
-                                    background: '#333',
-                                    padding: '1px 4px',
-                                    borderRadius: '3px',
-                                    color: '#aaa',
-                                    flexShrink: 0
-                                }}>
+                                <span className={styles.noteSetBadge}>
                                     Set {note.set_index + 1}
                                 </span>
                             )}
-                            <span style={{ color: '#aaa', fontSize: '12px' }}>
+                            <span className={styles.noteContent}>
                                 {note.content}
                             </span>
                         </div>

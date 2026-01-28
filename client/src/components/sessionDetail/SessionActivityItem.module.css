@@ -1,0 +1,368 @@
+/* SessionActivityItem Styles */
+/* Migrated from inline styles to maintain pixel-perfect visual fidelity */
+
+.activityCard {
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 16px;
+    cursor: default;
+    transition: all 0.2s ease;
+}
+
+.activityCardSelected {
+    background: #333;
+    border-color: #4caf50;
+    box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
+}
+
+.activityCardDragging {
+    opacity: 0.5;
+}
+
+.activityHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+}
+
+.activityHeaderLeft {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.reorderButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reorderButton {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #4caf50;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    line-height: 1;
+    width: 24px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reorderButtonDisabled {
+    background: transparent;
+    color: #444;
+    cursor: not-allowed;
+}
+
+.dragHandle {
+    cursor: grab;
+    padding: 4px 8px;
+    color: #666;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.activityNameContainer {
+    cursor: pointer;
+}
+
+.activityName {
+    font-weight: bold;
+    font-size: 16px;
+    color: #4caf50;
+}
+
+.activityLabel {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+}
+
+.activityDescription {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.activityHeaderRight {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.timerFieldContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.timerLabel {
+    font-size: 9px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.timerInput {
+    padding: 4px 6px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #ccc;
+    font-size: 11px;
+    width: 160px;
+    font-family: monospace;
+}
+
+.timerInputDisabled {
+    background: #222;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.durationDisplay {
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: monospace;
+    min-width: 60px;
+    text-align: center;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.durationActive {
+    color: #4caf50;
+}
+
+.durationInactive {
+    color: #666;
+}
+
+.startButton {
+    background: #4caf50;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 14px;
+}
+
+.stopButton {
+    background: #f44336;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 14px;
+}
+
+.resetButton {
+    background: transparent;
+    border: 1px solid #666;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 14px;
+}
+
+.deleteButton {
+    background: none;
+    border: none;
+    color: #f44336;
+    cursor: pointer;
+    font-size: 18px;
+    margin-top: 14px;
+}
+
+.contentArea {
+    margin-top: 15px;
+    padding-left: 36px;
+}
+
+.setsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setRow {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: #222;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.setRowSelected {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: #4caf50;
+}
+
+.setNumber {
+    width: 30px;
+    color: #666;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.splitContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    border: 1px solid #333;
+}
+
+.splitLabel {
+    font-size: 10px;
+    color: #aaa;
+    font-weight: bold;
+    min-width: 50px;
+}
+
+.metricInputContainer {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.metricLabel {
+    font-size: 10px;
+    color: #888;
+}
+
+.metricLabelLarge {
+    font-size: 11px;
+}
+
+.metricInput {
+    width: 50px;
+    padding: 3px;
+    background: #333;
+    border: 1px solid #555;
+    color: white;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.metricInputLarge {
+    width: 60px;
+    padding: 4px;
+}
+
+.metricInputXLarge {
+    width: 80px;
+    padding: 6px;
+    border-radius: 4px;
+}
+
+.metricUnit {
+    font-size: 10px;
+    color: #666;
+}
+
+.metricUnitLarge {
+    font-size: 11px;
+}
+
+.removeSetButton {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+}
+
+.addSetButton {
+    margin-top: 10px;
+    background: #333;
+    border: 1px dashed #555;
+    color: #ccc;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.singleMetricsContainer {
+    display: flex;
+    gap: 15px;
+}
+
+.singleMetricsContainerColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.singleMetricGroup {
+    background: #222;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+.singleMetricGroupTitle {
+    font-size: 12px;
+    color: #aaa;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.singleMetricGroupContent {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.singleMetricField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.noMetricsMessage {
+    color: #666;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.notesSection {
+    margin-top: 15px;
+}
+
+.notesTimelineContainer {
+    margin-bottom: 10px;
+}
