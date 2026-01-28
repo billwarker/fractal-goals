@@ -14,7 +14,7 @@ function GoalChildrenList({
     if (children.length === 0) return null;
 
     return (
-        <div style={{ borderTop: '1px solid #333', paddingTop: '14px', marginTop: '4px' }}>
+        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                 Associated {getTypeDisplayName(childType)}s
             </label>
@@ -28,7 +28,7 @@ function GoalChildrenList({
                             key={childId}
                             style={{
                                 padding: '10px 12px',
-                                background: '#252525',
+                                background: 'var(--color-bg-card-alt)',
                                 borderLeft: `3px solid ${childColor}`,
                                 borderRadius: '4px',
                                 display: 'flex',
@@ -37,7 +37,7 @@ function GoalChildrenList({
                                 opacity: childCompleted ? 0.7 : 1
                             }}
                         >
-                            <span style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--color-text-primary)' }}>
                                 {child.name}
                             </span>
                             {childCompleted && (

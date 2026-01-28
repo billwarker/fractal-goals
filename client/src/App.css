@@ -79,7 +79,7 @@ html {
 .sidebar h3 {
     margin-top: 0;
     margin-bottom: 20px;
-    color: #fff;
+    color: var(--color-text-primary);
     font-weight: 600;
 }
 
@@ -172,11 +172,11 @@ html {
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .empty-state h2 {
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .empty-state button {
@@ -343,7 +343,7 @@ html {
 
 .sidebar-header h3 {
     margin: 0;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 1.3rem;
     word-wrap: break-word;
 }
@@ -361,7 +361,7 @@ html {
 }
 
 .sidebar-content strong {
-    color: #fff;
+    color: var(--color-text-primary);
     display: inline-block;
     min-width: 90px;
 }
@@ -369,7 +369,7 @@ html {
 .sidebar-content h4 {
     margin-top: 20px;
     margin-bottom: 10px;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 1rem;
 }
 
@@ -615,7 +615,7 @@ html {
 .form-section label {
     display: block;
     margin-bottom: 10px;
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .checkbox-list {

@@ -22,9 +22,9 @@ function GoalSmartSection({
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                     Description
                 </label>
-                <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                     {goal.attributes?.description || goal.description ||
-                        <span style={{ fontStyle: 'italic', color: '#666' }}>No description</span>}
+                        <span style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>No description</span>}
                 </div>
             </div>
 
@@ -34,10 +34,10 @@ function GoalSmartSection({
                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
                         {goalType === 'UltimateGoal'
                             ? "Why does this Ultimate Goal matter to you?"
-                            : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || '#fff' }}>{parentGoalName}</span>?</span>
+                            : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || 'var(--color-text-primary)' }}>{parentGoalName}</span>?</span>
                         }
                     </label>
-                    <div style={{ fontSize: '13px', color: '#ccc', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                         {effectiveRelevance}
                     </div>
                 </div>
