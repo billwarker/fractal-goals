@@ -8,8 +8,8 @@ import StepHeader from './StepHeader';
 function SourceSelector({ sessionSource, onSelectSource }) {
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '24px',
             marginBottom: '24px'
@@ -41,8 +41,8 @@ function SourceCard({ icon, title, description, isSelected, onClick }) {
         <div
             onClick={onClick}
             style={{
-                background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
+                border: `2px solid ${isSelected ? 'var(--color-brand-success)' : 'var(--color-border)'}`,
                 borderRadius: '8px',
                 padding: '24px',
                 cursor: 'pointer',
@@ -51,26 +51,26 @@ function SourceCard({ icon, title, description, isSelected, onClick }) {
             }}
             onMouseEnter={(e) => {
                 if (!isSelected) {
-                    e.currentTarget.style.borderColor = '#4caf50';
+                    e.currentTarget.style.borderColor = 'var(--color-brand-success)';
                 }
             }}
             onMouseLeave={(e) => {
                 if (!isSelected) {
-                    e.currentTarget.style.borderColor = '#444';
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
                 }
             }}
         >
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>{icon}</div>
-            <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px', color: 'var(--color-text-primary)' }}>
                 {title}
             </div>
-            <div style={{ fontSize: '13px', color: '#aaa' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
                 {description}
             </div>
             {isSelected && (
                 <div style={{
                     marginTop: '12px',
-                    color: '#4caf50',
+                    color: 'var(--color-brand-success)',
                     fontSize: '12px',
                     fontWeight: 'bold'
                 }}>

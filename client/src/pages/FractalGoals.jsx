@@ -289,13 +289,13 @@ function FractalGoals() {
                         right: 'auto',
                         bottom: 'auto',
                         margin: '20px', // Floating margin
-                        border: '1px solid #444',
-                        background: 'rgba(20, 20, 20, 0.95)',
+                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-bg-sidebar)',
                         zIndex: 10,
                         display: 'flex',
                         flexDirection: 'column',
                         borderRadius: '12px',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+                        boxShadow: 'var(--shadow-md)',
                         backdropFilter: 'blur(10px)'
                     }}>
                         <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>

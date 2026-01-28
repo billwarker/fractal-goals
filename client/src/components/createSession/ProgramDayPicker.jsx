@@ -17,15 +17,15 @@ function ProgramDayPicker({
     if (programDays.length === 0) {
         return (
             <div style={{
-                background: '#1e1e1e',
-                border: '1px solid #333',
+                background: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '8px',
                 padding: '24px',
                 marginBottom: '24px'
             }}>
                 <StepHeader stepNumber={1} title="Select a Day from Your Program" />
                 <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: '#666', marginBottom: '16px' }}>No active program days available for today</p>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '16px' }}>No active program days available for today</p>
                     {hasTemplates && (
                         <button
                             onClick={onSwitchToTemplate}
@@ -49,8 +49,8 @@ function ProgramDayPicker({
 
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '24px',
             marginBottom: '24px'
@@ -93,8 +93,8 @@ function ProgramDayCard({ programDay, isSelected, hasMultipleSessions, onClick }
         <div
             onClick={onClick}
             style={{
-                background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)', // Replaced hardcoded dark/hover
+                border: `2px solid ${isSelected ? '#4caf50' : 'var(--color-border)'}`,
                 borderRadius: '6px',
                 padding: '16px',
                 cursor: 'pointer',
@@ -112,7 +112,7 @@ function ProgramDayCard({ programDay, isSelected, hasMultipleSessions, onClick }
                     <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
                         {programDay.program_name} - {programDay.block_name}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#aaa' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
                         {programDay.day_name} (Day {programDay.day_number})
                         {hasMultipleSessions && (
                             <span style={{ marginLeft: '8px', color: '#2196f3' }}>
@@ -127,7 +127,7 @@ function ProgramDayCard({ programDay, isSelected, hasMultipleSessions, onClick }
                 <div style={{ marginLeft: '16px', fontSize: '14px' }}>
                     <div style={{
                         padding: '8px',
-                        background: 'rgba(33, 150, 243, 0.1)',
+                        background: 'var(--color-bg-card-alt)',
                         borderRadius: '4px'
                     }}>
                         <div style={{ fontWeight: 'bold' }}>{programDay.sessions[0].template_name}</div>

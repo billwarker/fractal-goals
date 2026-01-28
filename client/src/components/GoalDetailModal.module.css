@@ -38,7 +38,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: var(--color-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -133,7 +133,9 @@
 /* Progress Measurement Section */
 .progressBox {
     padding: 12px;
-    background: var(--border-color);
+    background: var(--color-bg-card-alt);
+    /* #333 maps often to border color or surface-2 */
+    border: 1px solid var(--color-border);
     /* #333 maps often to border color or surface-2 */
     border-radius: var(--radius-md);
     /* 6px */
@@ -200,24 +202,33 @@
     /* Varying sizes in inline, standardizing where possible */
 }
 
+
 .btnCancel {
     padding: 8px 14px;
     background: transparent;
-    border: 1px solid #666;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    color: #ccc;
+    color: var(--color-text-secondary);
     cursor: pointer;
     font-size: 13px;
+    transition: all 0.2s;
+}
+
+.btnCancel:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
 .btnSave {
     padding: 8px 14px;
-    border: none;
+    /* border: none;  REMOVED to add global border if needed, or specific border below */
+    border: 1px solid var(--color-border-btn);
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
-    /* dynamic bg/color */
+    transition: background 0.2s;
+    /* dynamic bg/color handles primary/success/danger */
 }
 
 /* Associated Programs */
@@ -268,8 +279,8 @@
 .select {
     width: 100%;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     /* darker than standard input */
     border-radius: var(--radius-sm);
     color: var(--text-primary);
@@ -285,8 +296,8 @@
 .metricInput {
     flex: 1;
     padding: 8px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-size: 13px;
@@ -295,8 +306,8 @@
 .unitInput {
     width: 80px;
     padding: 8px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-size: 13px;

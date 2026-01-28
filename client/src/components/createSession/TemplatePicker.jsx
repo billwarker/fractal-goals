@@ -11,8 +11,8 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
 
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '24px',
             marginBottom: '24px'
@@ -21,7 +21,7 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
 
             {templates.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: '#666', marginBottom: '16px' }}>No templates available</p>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '16px' }}>No templates available</p>
                     <button
                         onClick={() => navigate(`/${rootId}/manage-session-templates`)}
                         style={{
@@ -49,22 +49,22 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                                 key={template.id}
                                 onClick={() => onSelectTemplate(template)}
                                 style={{
-                                    background: isSelected ? '#2a4a2a' : '#2a2a2a',
-                                    border: `2px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                    background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
+                                    border: `2px solid ${isSelected ? '#4caf50' : 'var(--color-border)'}`,
                                     borderRadius: '6px',
                                     padding: '16px',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px', color: 'var(--color-text-primary)' }}>
                                     {template.name}
                                 </div>
-                                <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
                                     {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
                                 </div>
                                 {template.description && (
-                                    <div style={{ fontSize: '12px', color: '#888' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                                         {template.description}
                                     </div>
                                 )}

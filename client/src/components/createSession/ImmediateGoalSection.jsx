@@ -19,11 +19,11 @@ function ImmediateGoalSection({
 
     return (
         <div style={{
-            background: '#1a1a1a',
+            background: 'var(--color-bg-card-alt)',
             padding: '12px 16px',
-            borderTop: '1px solid #333'
+            borderTop: '1px solid var(--color-border)'
         }}>
-            <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: GOAL_COLORS.ImmediateGoal }}>◇</span>
                 Immediate Goals (optional)
             </div>
@@ -99,8 +99,8 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 alignItems: 'center',
                 gap: '10px',
                 padding: '10px 12px',
-                background: isSelected ? `${GOAL_COLORS.ImmediateGoal}15` : '#252525',
-                border: `1px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : '#333'}`,
+                background: isSelected ? `${GOAL_COLORS.ImmediateGoal}15` : 'var(--color-bg-input)', // Replaced #252525
+                border: `1px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-border)'}`, // Replaced #333
                 borderRadius: '4px',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
@@ -110,12 +110,12 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 width: '18px',
                 height: '18px',
                 borderRadius: '3px',
-                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : '#555'}`,
+                border: `2px solid ${isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-border-hover)'}`, // Replaced #555
                 background: isSelected ? GOAL_COLORS.ImmediateGoal : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1a1a1a',
+                color: '#1a1a1a', // Keep checkmark dark for contrast on color
                 fontSize: '12px',
                 fontWeight: 'bold',
                 flexShrink: 0
@@ -123,11 +123,11 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
                 {isSelected && '✓'}
             </div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', color: isSelected ? GOAL_COLORS.ImmediateGoal : '#ccc' }}>
+                <div style={{ fontSize: '13px', color: isSelected ? GOAL_COLORS.ImmediateGoal : 'var(--color-text-muted)' }}>
                     {goal.name}
                 </div>
                 {goal.deadline && (
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                         📅 {new Date(goal.deadline).toLocaleDateString()}
                     </div>
                 )}

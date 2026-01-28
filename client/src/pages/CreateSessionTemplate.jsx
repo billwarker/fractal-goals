@@ -141,29 +141,29 @@ function CreateSessionTemplate() {
     };
 
     if (loading) {
-        return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading templates...</div>;
+        return <div className="page-container" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-primary)' }}>Loading templates...</div>;
     }
 
     return (
-        <div className="page-container" style={{ color: 'white' }}>
+        <div className="page-container">
             {/* Header with Create Button */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '80px 40px 20px 40px',
-                borderBottom: '1px solid #333',
+                padding: '0 0 20px 0',
+                borderBottom: '1px solid var(--color-border)',
                 marginBottom: '30px'
             }}>
-                <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px' }}>
+                <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px', color: 'var(--color-text-primary)' }}>
                     Manage Session Templates
                 </h1>
                 <button
                     onClick={handleCreateClick}
                     style={{
                         padding: '10px 20px',
-                        background: '#2196f3',
-                        border: 'none',
+                        background: 'var(--color-brand-primary)',
+                        border: '1px solid var(--color-border-btn)',
                         borderRadius: '6px',
                         color: 'white',
                         cursor: 'pointer',
@@ -171,8 +171,7 @@ function CreateSessionTemplate() {
                         fontWeight: 600,
                         transition: 'background 0.2s'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#1976d2'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#2196f3'}
+                    className="hover-brighten"
                 >
                     + Create Template
                 </button>
@@ -181,27 +180,27 @@ function CreateSessionTemplate() {
             {error && (
                 <div style={{
                     padding: '12px 16px',
-                    background: 'rgba(255,0,0,0.1)',
+                    background: 'rgba(244, 67, 54, 0.1)',
                     color: '#f44336',
-                    margin: '0 40px 20px 40px',
+                    marginBottom: '20px',
                     borderRadius: '6px',
-                    border: '1px solid rgba(255,0,0,0.2)'
+                    border: '1px solid rgba(244, 67, 54, 0.2)'
                 }}>
                     {error}
                 </div>
             )}
 
             {/* Templates Grid */}
-            <div style={{ padding: '0 40px 40px 40px' }}>
+            <div style={{ paddingBottom: '40px' }}>
                 {templates.length === 0 ? (
                     <div style={{
                         textAlign: 'center',
                         padding: '60px 20px',
-                        background: '#1e1e1e',
-                        border: '1px dashed #444',
+                        background: 'var(--color-bg-card)',
+                        border: '1px dashed var(--color-border)',
                         borderRadius: '8px'
                     }}>
-                        <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
+                        <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', marginBottom: '20px' }}>
                             No session templates created yet
                         </p>
                         <button
@@ -209,7 +208,7 @@ function CreateSessionTemplate() {
                             style={{
                                 padding: '12px 24px',
                                 background: '#4caf50',
-                                border: 'none',
+                                border: '1px solid var(--color-border-btn)',
                                 borderRadius: '6px',
                                 color: 'white',
                                 fontSize: '14px',

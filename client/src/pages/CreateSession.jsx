@@ -354,8 +354,8 @@ function CreateSession() {
     const currentProgramDays = selectedProgram ? (programsByName[selectedProgram]?.days || []) : [];
 
     return (
-        <div className="page-container" style={{ color: 'white' }}>
-            <h1 style={{ fontWeight: 300, borderBottom: '1px solid #444', paddingBottom: '15px', marginBottom: '30px' }}>
+        <div className="page-container">
+            <h1 style={{ fontWeight: 300, borderBottom: '1px solid var(--color-border)', paddingBottom: '15px', marginBottom: '30px', color: 'var(--color-text-primary)' }}>
                 Create Session
             </h1>
 

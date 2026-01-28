@@ -34,7 +34,7 @@
 .filterButton {
     padding: 6px 12px;
     background: transparent;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius-sm);
     color: var(--color-text-muted);
     cursor: pointer;
@@ -44,8 +44,9 @@
 }
 
 .filterButtonActive {
-    background: #333;
+    background: var(--color-bg-input);
     color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
 }
 
 .sortGroup {
@@ -102,10 +103,10 @@
 
 .secondaryButton {
     padding: 6px 16px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius-sm);
-    color: #ccc;
+    color: var(--color-text-primary);
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
@@ -452,16 +453,14 @@
 }
 
 .metricBadge {
-    background: #263238;
-    padding: 2px 8px;
-    border-radius: 3px;
-    border: 1px solid #37474F;
-    font-size: 12px;
+    display: flex;
+    gap: 4px;
+    font-size: 13px;
+    /* Removed background, border, padding to match set metrics style */
 }
 
 .metricBadgeLabel {
-    color: #aaa;
-    margin-right: 4px;
+    color: var(--color-text-muted);
 }
 
 .description {

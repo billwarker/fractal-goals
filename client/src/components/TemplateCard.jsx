@@ -14,8 +14,8 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
     return (
         <div
             style={{
-                background: '#1e1e1e',
-                border: '1px solid #333',
+                background: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border-card)',
                 borderRadius: '8px',
                 padding: '16px',
                 display: 'flex',
@@ -25,14 +25,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                 cursor: 'pointer'
             }}
             onClick={() => onEdit(template)}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#2196f3';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#333';
-                e.currentTarget.style.transform = 'translateY(0)';
-            }}
+            className="template-card hover-glow"
         >
             {/* Template Name */}
             <div>
@@ -40,14 +33,14 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                     fontSize: '16px',
                     fontWeight: 600,
                     margin: 0,
-                    color: '#fff'
+                    color: 'var(--color-text-primary)'
                 }}>
                     {template.name}
                 </h3>
                 {template.description && (
                     <p style={{
                         fontSize: '13px',
-                        color: '#888',
+                        color: 'var(--color-text-secondary)',
                         margin: '6px 0 0 0',
                         lineHeight: '1.4',
                         overflow: 'hidden',
@@ -65,15 +58,15 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
             <div style={{
                 display: 'flex',
                 gap: '16px',
-                color: '#aaa',
+                color: 'var(--color-text-muted)',
                 fontSize: '13px'
             }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: '#2196f3' }}>⏱</span>
+                    <span style={{ color: 'var(--color-brand-primary)' }}>⏱</span>
                     {totalDuration} min
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: '#4caf50' }}>§</span>
+                    <span style={{ color: 'var(--color-brand-success)' }}>§</span>
                     {sectionCount} section{sectionCount !== 1 ? 's' : ''}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -94,11 +87,11 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                             key={idx}
                             style={{
                                 padding: '4px 8px',
-                                background: '#2a2a2a',
+                                background: 'var(--color-bg-input)',
                                 borderRadius: '4px',
                                 fontSize: '11px',
-                                color: '#ccc',
-                                border: '1px solid #333'
+                                color: 'var(--color-text-secondary)',
+                                border: '1px solid var(--color-border)'
                             }}
                         >
                             {section.name}
@@ -109,7 +102,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                             padding: '4px 8px',
                             background: 'transparent',
                             fontSize: '11px',
-                            color: '#666'
+                            color: 'var(--color-text-muted)'
                         }}>
                             +{template.template_data.sections.length - 4} more
                         </span>
@@ -123,7 +116,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                 gap: '8px',
                 marginTop: 'auto',
                 paddingTop: '8px',
-                borderTop: '1px solid #333'
+                borderTop: '1px solid var(--color-border)'
             }}>
                 <button
                     onClick={(e) => {
@@ -133,8 +126,8 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                     style={{
                         flex: 1,
                         padding: '8px 12px',
-                        background: '#2196f3',
-                        border: 'none',
+                        background: 'var(--color-brand-primary)',
+                        border: '1px solid var(--color-border-btn)',
                         borderRadius: '4px',
                         color: 'white',
                         fontSize: '12px',
@@ -142,8 +135,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                         cursor: 'pointer',
                         transition: 'background 0.2s'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#1976d2'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#2196f3'}
+                    className="hover-brighten"
                 >
                     Edit
                 </button>
@@ -155,22 +147,15 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                         }}
                         style={{
                             padding: '8px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: '#ccc',
+                            color: 'var(--color-text-secondary)',
                             fontSize: '12px',
                             cursor: 'pointer',
                             transition: 'all 0.2s'
                         }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#444';
-                            e.currentTarget.style.color = 'white';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#333';
-                            e.currentTarget.style.color = '#ccc';
-                        }}
+                        className="hover-brighten"
                     >
                         Duplicate
                     </button>
@@ -183,9 +168,9 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                     style={{
                         padding: '8px 12px',
                         background: 'transparent',
-                        border: '1px solid #444',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '4px',
-                        color: '#aaa',
+                        color: 'var(--color-text-muted)',
                         fontSize: '12px',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
@@ -195,8 +180,8 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                         e.currentTarget.style.color = '#d32f2f';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#444';
-                        e.currentTarget.style.color = '#aaa';
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.color = 'var(--color-text-muted)';
                     }}
                 >
                     Delete

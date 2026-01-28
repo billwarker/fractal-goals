@@ -19,8 +19,8 @@ function GoalAssociation({
 }) {
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '24px',
             marginBottom: '24px'
@@ -46,7 +46,7 @@ function GoalAssociation({
 
                         return (
                             <div key={stg.id} style={{
-                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : '#444'}`,
+                                border: `2px solid ${isSelected ? GOAL_COLORS.ShortTermGoal : 'var(--color-border)'}`,
                                 borderRadius: '8px',
                                 overflow: 'hidden',
                                 transition: 'all 0.2s'
@@ -86,7 +86,7 @@ function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediat
         <div
             onClick={onClick}
             style={{
-                background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : '#2a2a2a',
+                background: isSelected ? `${GOAL_COLORS.ShortTermGoal}1A` : 'var(--color-bg-input)', // or card-alt
                 padding: '14px 16px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -111,11 +111,11 @@ function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediat
                 {isSelected && '✓'}
             </div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? GOAL_COLORS.ShortTermGoal : 'white' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? GOAL_COLORS.ShortTermGoal : 'var(--color-text-primary)' }}>
                     {stg.name}
                 </div>
                 {stg.description && (
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                         {stg.description}
                     </div>
                 )}
@@ -123,10 +123,11 @@ function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediat
             {hasImmediateGoals && (
                 <div style={{
                     fontSize: '11px',
-                    color: '#888',
+                    color: 'var(--color-text-muted)',
                     padding: '2px 8px',
-                    background: '#333',
-                    borderRadius: '10px'
+                    background: 'var(--color-bg-card)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--color-border)'
                 }}>
                     {totalImmediateCount} immediate goal{totalImmediateCount !== 1 ? 's' : ''}
                 </div>

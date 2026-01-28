@@ -29,7 +29,7 @@ function StepHeader({ stepNumber, title, subtitle }) {
                 {title}
             </h2>
             {subtitle && (
-                <p style={{ color: '#888', fontSize: '13px', marginBottom: '16px', marginLeft: '36px' }}>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: '16px', marginLeft: '36px' }}>
                     {subtitle}
                 </p>
             )}

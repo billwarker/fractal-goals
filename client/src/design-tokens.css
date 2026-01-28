@@ -13,6 +13,7 @@
   --color-bg-input: #333;
   --color-border: #333;
   --color-border-card: #333;
+  --color-border-btn: transparent;
   --color-border-hover: #555;
   --color-connection-line: #ffffff;
   --color-grid: #333;
@@ -72,6 +73,7 @@
   --color-border: #e5e7eb;
   /* High contrast border for cards in light mode as per user request */
   --color-border-card: #111827;
+  --color-border-btn: #111827;
   --color-border-hover: #d1d5db;
   --color-connection-line: #9ca3af;
   --color-grid: #e5e7eb;

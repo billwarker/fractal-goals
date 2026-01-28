@@ -139,7 +139,7 @@ html {
     padding: 12px;
     background: var(--color-brand-primary);
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
@@ -155,7 +155,7 @@ html {
     padding: 12px;
     background: #4caf50;
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
@@ -184,7 +184,7 @@ html {
     padding: 10px 24px;
     background: var(--color-brand-primary);
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     border-radius: 6px;
     cursor: pointer;
     font-size: 16px;
@@ -272,7 +272,7 @@ html {
 .modal button[type="submit"] {
     background: var(--color-brand-primary);
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
 }
 
 .modal button[type="button"] {
@@ -444,6 +444,7 @@ html {
 .action-btn.primary {
     background: var(--color-brand-primary);
     color: white;
+    border: 1px solid var(--color-border-btn);
 }
 
 .action-btn.primary:hover {
@@ -453,6 +454,7 @@ html {
 .action-btn.danger {
     background: #d32f2f;
     color: white;
+    border: 1px solid var(--color-border-btn);
 }
 
 .action-btn.danger:hover {
@@ -680,7 +682,7 @@ html {
 .remove-goal-btn {
     background: #d32f2f;
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -746,7 +748,7 @@ html {
 .close-connection-btn {
     background: #d32f2f;
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     padding: 10px 20px;
     border-radius: 6px;
     cursor: pointer;
@@ -790,7 +792,7 @@ html {
 .clear-session-btn {
     background: #d32f2f;
     color: white;
-    border: none;
+    border: 1px solid var(--color-border-btn);
     padding: 8px 16px;
     border-radius: 6px;
     cursor: pointer;
@@ -915,6 +917,7 @@ html {
 .sidebar-actions .action-btn.primary {
     background: var(--color-brand-primary);
     color: white;
+    border: 1px solid var(--color-border-btn);
 }
 
 .sidebar-actions .action-btn.primary:hover {
@@ -1084,7 +1087,7 @@ html {
 }
 
 .nav-link:hover {
-    color: #fff;
+    color: var(--color-brand-primary);
 }
 
 .nav-link.active {
@@ -1149,7 +1152,7 @@ html {
 }
 
 .nav-text-link:hover {
-    color: white;
+    color: var(--color-brand-primary);
 }
 
 .nav-text-link.active {

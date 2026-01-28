@@ -18,8 +18,8 @@ function CreateSessionActions({
 
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '24px',
             textAlign: 'center'
@@ -80,8 +80,8 @@ function CreateSessionActions({
 
 function SessionSummary({ selectedTemplate, selectedProgramDay, selectedGoalIds, immediateGoals }) {
     return (
-        <div style={{ marginTop: '16px', fontSize: '14px', color: '#aaa' }}>
-            Creating: <strong style={{ color: 'white' }}>{selectedTemplate.name}</strong>
+        <div style={{ marginTop: '16px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
+            Creating: <strong style={{ color: 'var(--color-text-primary)' }}>{selectedTemplate.name}</strong>
             {selectedProgramDay && (
                 <span> from <strong style={{ color: '#2196f3' }}>{selectedProgramDay.program_name}</strong></span>
             )}

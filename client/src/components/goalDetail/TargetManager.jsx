@@ -190,7 +190,7 @@ const TargetManager = ({
         // When triggered by internal state (add/edit), we're embedded so keep container styling
         const containerStyle = viewMode === 'builder'
             ? { display: 'flex', flexDirection: 'column', gap: '14px' }  // Full view - no container box
-            : { display: 'flex', flexDirection: 'column', gap: '14px', background: '#252525', padding: '16px', borderRadius: '8px', border: '1px solid #444' };  // Embedded - has container
+            : { display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--color-bg-card-alt)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-border)' };  // Embedded - has container
 
         return (
             <div style={containerStyle}>
@@ -200,14 +200,14 @@ const TargetManager = ({
                     alignItems: 'center',
                     gap: '10px',
                     paddingBottom: '12px',
-                    borderBottom: '1px solid #444'
+                    borderBottom: '1px solid var(--color-border)'
                 }}>
                     <button
                         onClick={handleCancel}
                         style={{
                             background: 'transparent',
                             border: 'none',
-                            color: '#888',
+                            color: 'var(--color-text-muted)',
                             fontSize: '18px',
                             cursor: 'pointer',
                             padding: '0 4px'
@@ -215,7 +215,7 @@ const TargetManager = ({
                     >
                         ←
                     </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)' }}>
                         {getBuilderTitle()}
                     </h3>
                 </div>
@@ -242,10 +242,10 @@ const TargetManager = ({
                                         onClick={() => handleActivityChange(activity.id)}
                                         style={{
                                             padding: '6px 12px',
-                                            background: isSelected ? '#1b3320' : '#2a2a2a',
-                                            border: `1px solid ${isSelected ? '#4caf50' : '#444'}`,
+                                            background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
+                                            border: `1px solid ${isSelected ? 'var(--color-success)' : 'var(--color-border)'}`,
                                             borderRadius: '16px',
-                                            color: isSelected ? '#4caf50' : '#ccc',
+                                            color: isSelected ? 'var(--color-success)' : 'var(--color-text-secondary)',
                                             fontSize: '13px',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s',
@@ -265,7 +265,7 @@ const TargetManager = ({
 
                 {/* Target Name */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                         Target Name
                     </label>
                     <input
@@ -276,10 +276,10 @@ const TargetManager = ({
                         style={{
                             width: '100%',
                             padding: '8px',
-                            background: '#1e1e1e',
-                            border: '1px solid #555',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: 'white',
+                            color: 'var(--color-text-primary)',
                             fontSize: '13px'
                         }}
                     />
@@ -287,7 +287,7 @@ const TargetManager = ({
 
                 {/* Target Description */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#aaa' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                         Description
                     </label>
                     <textarea
@@ -298,10 +298,10 @@ const TargetManager = ({
                         style={{
                             width: '100%',
                             padding: '8px',
-                            background: '#1e1e1e',
-                            border: '1px solid #555',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: 'white',
+                            color: 'var(--color-text-primary)',
                             fontSize: '13px',
                             resize: 'vertical'
                         }}
@@ -311,7 +311,7 @@ const TargetManager = ({
                 {/* Metric Values */}
                 {selectedActivity && selectedActivity.metric_definitions?.length > 0 && (
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                             Target Metrics
                         </label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -321,16 +321,16 @@ const TargetManager = ({
                                     alignItems: 'center',
                                     gap: '10px',
                                     padding: '10px',
-                                    background: '#1e1e1e',
+                                    background: 'var(--color-bg-input)',
                                     borderRadius: '4px',
-                                    border: '1px solid #444'
+                                    border: '1px solid var(--color-border)'
                                 }}>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '13px', color: 'white', fontWeight: '500' }}>
+                                        <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
                                             {metric.name}
                                         </div>
                                         {metric.description && (
-                                            <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                                                 {metric.description}
                                             </div>
                                         )}
@@ -344,15 +344,15 @@ const TargetManager = ({
                                             style={{
                                                 width: '70px',
                                                 padding: '6px',
-                                                background: '#2a2a2a',
-                                                border: '1px solid #555',
+                                                background: 'var(--color-bg-input)',
+                                                border: '1px solid var(--color-border)',
                                                 borderRadius: '4px',
-                                                color: 'white',
+                                                color: 'var(--color-text-primary)',
                                                 fontSize: '13px',
                                                 textAlign: 'right'
                                             }}
                                         />
-                                        <span style={{ fontSize: '12px', color: '#888', minWidth: '40px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', minWidth: '40px' }}>
                                             {metric.unit}
                                         </span>
                                     </div>
@@ -363,7 +363,7 @@ const TargetManager = ({
                 )}
 
                 {/* Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #333' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
                     {(viewState === 'edit' || initialTarget) && editingTarget ? (
                         <button
                             onClick={() => confirmAndDeleteTarget(editingTarget.id)}
@@ -387,9 +387,9 @@ const TargetManager = ({
                             style={{
                                 padding: '8px 14px',
                                 background: 'transparent',
-                                border: '1px solid #666',
+                                border: '1px solid var(--color-border)',
                                 borderRadius: '4px',
-                                color: '#ccc',
+                                color: 'var(--color-text-secondary)',
                                 cursor: 'pointer',
                                 fontSize: '13px'
                             }}
@@ -401,10 +401,10 @@ const TargetManager = ({
                             disabled={!selectedActivityId}
                             style={{
                                 padding: '8px 14px',
-                                background: selectedActivityId ? '#4caf50' : '#333',
+                                background: selectedActivityId ? 'var(--color-success)' : 'var(--color-bg-input)',
                                 border: 'none',
                                 borderRadius: '4px',
-                                color: selectedActivityId ? 'white' : '#666',
+                                color: selectedActivityId ? 'white' : 'var(--color-text-muted)',
                                 cursor: selectedActivityId ? 'pointer' : 'not-allowed',
                                 fontSize: '13px',
                                 fontWeight: 600
@@ -428,12 +428,12 @@ const TargetManager = ({
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
                 <div style={{
-                    background: '#252525', padding: '24px', borderRadius: '12px',
-                    width: '90%', maxWidth: '400px', border: '1px solid #444',
+                    background: 'var(--color-bg-card)', padding: '24px', borderRadius: '12px',
+                    width: '90%', maxWidth: '400px', border: '1px solid var(--color-border)',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
                 }}>
-                    <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'white' }}>Delete Target?</h3>
-                    <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#ccc', lineHeight: '1.5' }}>
+                    <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--color-text-primary)' }}>Delete Target?</h3>
+                    <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
                         Are you sure you want to delete this target? This action cannot be undone.
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -444,8 +444,8 @@ const TargetManager = ({
                             }}
                             style={{
                                 padding: '8px 16px', background: 'transparent',
-                                border: '1px solid #555', borderRadius: '6px',
-                                color: '#ccc', cursor: 'pointer', fontSize: '13px'
+                                border: '1px solid var(--color-border)', borderRadius: '6px',
+                                color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '13px'
                             }}
                         >
                             Cancel
@@ -473,7 +473,7 @@ const TargetManager = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {renderDeleteConfirm()}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                     Targets ({targets.length})
                 </label>
                 {isEditing && (
@@ -481,10 +481,10 @@ const TargetManager = ({
                         onClick={canAddTargets ? handleOpenAddTarget : undefined}
                         disabled={!canAddTargets}
                         style={{
-                            background: canAddTargets ? '#2a2a2a' : '#1a1a1a',
-                            border: `1px solid ${canAddTargets ? '#444' : '#333'}`,
+                            background: canAddTargets ? 'var(--color-bg-card-alt)' : 'var(--color-bg-input)',
+                            border: `1px solid ${canAddTargets ? 'var(--color-border)' : 'transparent'}`,
                             borderRadius: '4px',
-                            color: canAddTargets ? '#ccc' : '#555',
+                            color: canAddTargets ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
                             cursor: canAddTargets ? 'pointer' : 'not-allowed',
                             fontSize: '12px',
                             padding: '2px 6px'
@@ -496,7 +496,7 @@ const TargetManager = ({
             </div>
 
             {targets.length === 0 ? (
-                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                     {canAddTargets
                         ? 'No targets set.'
                         : 'Associate an activity with metrics to create a target.'}

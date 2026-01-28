@@ -63,11 +63,11 @@ const GoalSessionList = ({
             {/* Sessions - For ShortTermGoals (Goal is Parent of Session) */}
             {isShortTermGoal && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                         Associated Sessions ({childSessions.length})
                     </label>
                     {childSessions.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                             No sessions yet
                         </div>
                     ) : (
@@ -78,8 +78,8 @@ const GoalSessionList = ({
                                     onClick={() => handleSessionClick(session.id)}
                                     style={{
                                         padding: '8px 10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
+                                        background: 'var(--color-bg-card-alt)',
+                                        border: '1px solid var(--color-border)',
                                         borderRadius: '4px',
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -88,7 +88,7 @@ const GoalSessionList = ({
                                         fontSize: '13px'
                                     }}
                                 >
-                                    <span style={{ color: 'white' }}>{session.name}</span>
+                                    <span style={{ color: 'var(--color-text-primary)' }}>{session.name}</span>
                                     {session.attributes?.created_at && (
                                         <span style={{ fontSize: '11px', color: '#888' }}>
                                             {new Date(session.attributes.created_at).toLocaleDateString()}
@@ -97,7 +97,7 @@ const GoalSessionList = ({
                                 </div>
                             ))}
                             {childSessions.length > 5 && (
-                                <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', paddingLeft: '4px' }}>
                                     ... and {childSessions.length - 5} more
                                 </div>
                             )}
@@ -109,11 +109,11 @@ const GoalSessionList = ({
             {/* Associated Sessions - For ImmediateGoals (Goal is Child of Session) */}
             {isImmediateGoal && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: headerColor || '#aaa', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                         Associated Sessions ({associatedSessions.length})
                     </label>
                     {associatedSessions.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                             No associated sessions yet
                         </div>
                     ) : (
@@ -124,7 +124,7 @@ const GoalSessionList = ({
                                     onClick={() => handleSessionClick(session.id)}
                                     style={{
                                         padding: '8px 10px',
-                                        background: '#2a2a2a',
+                                        background: 'var(--color-bg-card-alt)',
                                         border: '1px solid #9c27b0', // Purple for parent link
                                         borderRadius: '4px',
                                         cursor: 'pointer',
@@ -134,7 +134,7 @@ const GoalSessionList = ({
                                         fontSize: '13px'
                                     }}
                                 >
-                                    <span style={{ color: 'white' }}>{session.name}</span>
+                                    <span style={{ color: 'var(--color-text-primary)' }}>{session.name}</span>
                                     {session.attributes?.created_at && (
                                         <span style={{ fontSize: '11px', color: '#888' }}>
                                             {new Date(session.attributes.created_at).toLocaleDateString()}
@@ -143,7 +143,7 @@ const GoalSessionList = ({
                                 </div>
                             ))}
                             {associatedSessions.length > 5 && (
-                                <div style={{ fontSize: '12px', color: '#888', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', paddingLeft: '4px' }}>
                                     ... and {associatedSessions.length - 5} more
                                 </div>
                             )}
