@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './TemplateBuilderModal.module.css';
+import Button from '../atoms/Button';
+import Input from '../atoms/Input';
 
 /**
  * Template Builder Modal - Full-screen modal for creating/editing session templates
@@ -235,27 +237,25 @@ function TemplateBuilderModal({
                     <h2 className={styles.headerTitle}>
                         {editingTemplate ? 'Edit Template' : 'Create Template'}
                     </h2>
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={handleClose}
                         className={styles.closeButton}
                     >
                         ×
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Content - Scrollable */}
                 <div className={styles.contentArea}>
                     {/* Template Name & Description */}
                     <div className={styles.formGroup}>
-                        <label className={styles.label}>
-                            Template Name
-                        </label>
-                        <input
-                            type="text"
+                        <Input
+                            label="Template Name"
                             value={currentTemplate.name}
                             onChange={(e) => setCurrentTemplate({ ...currentTemplate, name: e.target.value })}
                             placeholder="e.g., Morning Guitar Practice"
-                            className={styles.input}
+                            fullWidth
                         />
                     </div>
 
@@ -276,12 +276,13 @@ function TemplateBuilderModal({
                         <span className={styles.durationText}>
                             Total Duration: <strong className={styles.durationValue}>{totalDuration} minutes</strong>
                         </span>
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleOpenAddSection}
-                            className={styles.addSectionButton}
                         >
                             + Add Section
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Sections List */}
@@ -313,33 +314,37 @@ function TemplateBuilderModal({
                                                 </p>
                                             </div>
                                             <div className={styles.sectionControls}>
-                                                <button
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
                                                     onClick={() => handleEditSection(sectionIndex)}
-                                                    className={`${styles.controlButton} ${styles.editButton}`}
                                                     title="Edit section"
                                                 >
                                                     ✎
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
                                                     onClick={() => handleMoveSection(sectionIndex, 'up')}
                                                     disabled={sectionIndex === 0}
-                                                    className={styles.controlButton}
                                                 >
                                                     ↑
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
                                                     onClick={() => handleMoveSection(sectionIndex, 'down')}
                                                     disabled={sectionIndex === currentTemplate.sections.length - 1}
-                                                    className={styles.controlButton}
                                                 >
                                                     ↓
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="danger"
                                                     onClick={() => handleRemoveSection(sectionIndex)}
-                                                    className={`${styles.controlButton} ${styles.deleteButton}`}
                                                 >
                                                     ×
-                                                </button>
+                                                </Button>
                                             </div>
                                         </div>
 
@@ -384,20 +389,19 @@ function TemplateBuilderModal({
                     </div>
                 </div>
 
-                {/* Footer Actions */}
                 <div className={styles.footer}>
-                    <button
+                    <Button
+                        variant="secondary"
                         onClick={handleClose}
-                        className={styles.cancelMainButton}
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="success"
                         onClick={handleSave}
-                        className={styles.saveMainButton}
                     >
                         {editingTemplate ? 'Update Template' : 'Save Template'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -420,44 +424,43 @@ function TemplateBuilderModal({
                         </h2>
 
                         <div className={styles.formGroup}>
-                            <label className={styles.label}>Section Name</label>
-                            <input
-                                type="text"
+                            <Input
+                                label="Section Name"
                                 value={newSection.name}
                                 onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
                                 placeholder="e.g., Warm-up"
-                                className={styles.input}
+                                fullWidth
                             />
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label className={styles.label}>Duration (minutes)</label>
-                            <input
+                            <Input
                                 type="number"
+                                label="Duration (minutes)"
                                 min="1"
                                 value={newSection.duration_minutes}
                                 onChange={(e) => setNewSection({ ...newSection, duration_minutes: e.target.value })}
-                                className={styles.input}
+                                fullWidth
                             />
                         </div>
 
                         <div className={styles.secondaryActions}>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => {
                                     setShowSectionModal(false);
                                     setEditingSectionIndex(null);
                                     setNewSection({ name: '', duration_minutes: '10', activities: [] });
                                 }}
-                                className={styles.secondaryCancel}
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="success"
                                 onClick={editingSectionIndex !== null ? handleUpdateSection : handleAddSection}
-                                className={styles.secondaryConfirm}
                             >
                                 {editingSectionIndex !== null ? 'Update Section' : 'Add Section'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -523,24 +526,23 @@ function TemplateBuilderModal({
                         )}
 
                         <div className={styles.secondaryActions}>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => {
                                     setShowActivityModal(false);
                                     setSelectedSectionIndex(null);
                                     setSelectedActivities([]);
                                 }}
-                                className={styles.secondaryCancel}
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="success"
                                 onClick={handleAddActivities}
                                 disabled={selectedActivities.length === 0}
-                                className={styles.secondaryConfirm}
-                                style={{ opacity: selectedActivities.length === 0 ? 0.5 : 1 }}
                             >
                                 Add {selectedActivities.length > 0 ? `(${selectedActivities.length})` : ''}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

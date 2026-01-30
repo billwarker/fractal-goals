@@ -1,0 +1,195 @@
+/* ProgramBlockView.module.css */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.title {
+    color: var(--color-text-primary);
+    font-size: 18px;
+    margin: 0;
+}
+
+.blockCard {
+    /* Base styles handled by Card atom, specifics here if needed */
+    display: flex;
+    gap: 40px;
+    margin-bottom: 16px;
+    border-left-width: 4px;
+    border-left-style: solid;
+    /* Border color handled inline via style */
+    transition: background-color 0.2s ease;
+}
+
+.mainContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.blockInfo {
+    margin-bottom: 24px;
+}
+
+.blockHeaderRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.blockName {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.metaRow {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.goalBadgesRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.goalBadge {
+    background: transparent;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.goalBadgeCompleted {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.daysGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.emptyState {
+    color: var(--color-text-muted);
+    font-style: italic;
+    grid-column: 1 / -1;
+    font-size: 13px;
+}
+
+.dayCard {
+    background: var(--color-bg-card-alt);
+    padding: 16px;
+    border-radius: 8px;
+    min-height: 100px;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dayCard:hover {
+    border-color: var(--color-border-hover);
+    background: var(--color-bg-card-hover);
+}
+
+.dayHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.dayName {
+    color: var(--color-text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.daySubtext {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.sessionCount {
+    color: var(--color-brand-success);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.templatesList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.templateItem {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.templateItemDone {
+    color: var(--color-text-choices-completed, #c8e6c9);
+    /* Fallback */
+    background: var(--color-bg-choices-completed, #1b5e20);
+    /* Fallback - consider adding tokens for these states if not present */
+    border-left: 2px solid var(--color-brand-success);
+}
+
+.templateItemPending {
+    color: var(--color-text-muted);
+    background: var(--color-bg-input);
+    border-left: 2px solid var(--color-border);
+}
+
+.restDay {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.actionsColumn {
+    flex: 0 0 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fullWidthBtn {
+    width: 100%;
+    margin-bottom: 0;
+}

@@ -18,6 +18,10 @@
   --color-connection-line: #ffffff;
   --color-grid: #333;
   --color-overlay: rgba(0, 0, 0, 0.7);
+  --color-bg-surface: #1e1e1e;
+  --color-bg-secondary: #252525;
+  --color-bg-hover: rgba(255, 255, 255, 0.1);
+  --color-text-disabled: rgba(255, 255, 255, 0.38);
 
   /* Text Colors */
   --color-text-primary: rgb(224, 224, 224);
@@ -33,6 +37,10 @@
   --color-brand-success-hover: #059669;
   --color-brand-danger: #ef4444;
   --color-brand-danger-hover: #dc2626;
+
+  /* Aliases for semantic usage */
+  --color-success: var(--color-brand-success);
+  --color-error: var(--color-brand-danger);
 
   /* Spacing */
   --spacing-xs: 4px;
@@ -78,6 +86,10 @@
   --color-connection-line: #9ca3af;
   --color-grid: #e5e7eb;
   --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-bg-surface: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-hover: rgba(0, 0, 0, 0.05);
+  --color-text-disabled: rgba(0, 0, 0, 0.38);
 
   /* Text Colors */
   --color-text-primary: #111827;
@@ -90,4 +102,8 @@
   /* Shadows */
   --shadow-sm: rgba(0, 0, 0, 0.05) 0px 1px 2px;
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
+  /* Aliases for semantic usage */
+  --color-success: var(--color-brand-success);
+  --color-error: var(--color-brand-danger);
 }
