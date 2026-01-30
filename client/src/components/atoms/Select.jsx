@@ -15,6 +15,7 @@ const Select = forwardRef(({
     ...props
 }, ref) => {
     const selectId = id || props.name || Math.random().toString(36).substr(2, 9);
+    const errorId = error ? `${selectId}-error` : undefined;
 
     return (
         <div className={`${styles.container} ${fullWidth ? styles.fullWidth : ''} ${className}`}>
@@ -27,11 +28,13 @@ const Select = forwardRef(({
                 ref={ref}
                 id={selectId}
                 className={`${styles.input} ${error ? styles.hasError : ''}`}
+                aria-invalid={!!error}
+                aria-describedby={errorId}
                 {...props}
             >
                 {children}
             </select>
-            {error && <span className={styles.errorMessage}>{error}</span>}
+            {error && <span id={errorId} role="alert" className={styles.errorMessage}>{error}</span>}
         </div>
     );
 });

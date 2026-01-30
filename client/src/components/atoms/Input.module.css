@@ -1,7 +1,7 @@
 .container {
     display: flex;
     flex-direction: column;
-    margin-bottom: var(--spacing-sm, 8px);
+    margin-bottom: var(--spacing-sm);
     position: relative;
     width: auto;
 }
@@ -12,8 +12,7 @@
 
 .label {
     display: block;
-    margin-bottom: 4px;
-    /* var(--spacing-xs) */
+    margin-bottom: var(--spacing-xs);
     font-size: 12px;
     font-weight: 600;
     color: var(--color-text-secondary, #b0b0b0);
@@ -21,10 +20,10 @@
 
 .input {
     width: 100%;
-    padding: var(--spacing-sm, 8px) 12px;
+    padding: var(--spacing-sm) 12px;
     background-color: var(--color-bg-input, #333);
     border: 1px solid var(--color-border, #444);
-    border-radius: var(--border-radius-sm, 4px);
+    border-radius: var(--border-radius-sm);
     color: var(--color-text-primary, #e0e0e0);
     font-family: var(--font-family, inherit);
     font-size: 15px;
@@ -53,7 +52,7 @@
 }
 
 .errorMessage {
-    margin-top: 4px;
+    margin-top: var(--spacing-xs);
     font-size: 11px;
     color: var(--color-brand-danger, #ef4444);
 }

@@ -15,6 +15,7 @@ const TextArea = forwardRef(({
     ...props
 }, ref) => {
     const inputId = id || props.name || Math.random().toString(36).substr(2, 9);
+    const errorId = error ? `${inputId}-error` : undefined;
 
     return (
         <div className={`${styles.container} ${fullWidth ? styles.fullWidth : ''} ${className}`}>
@@ -29,9 +30,11 @@ const TextArea = forwardRef(({
                 rows={rows}
                 className={`${styles.input} ${error ? styles.hasError : ''}`}
                 style={{ resize: 'vertical' }}
+                aria-invalid={!!error}
+                aria-describedby={errorId}
                 {...props}
             />
-            {error && <span className={styles.errorMessage}>{error}</span>}
+            {error && <span id={errorId} role="alert" className={styles.errorMessage}>{error}</span>}
         </div>
     );
 });

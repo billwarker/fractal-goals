@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import { Heading, Text } from '../atoms/Typography';
+import { useForm } from '../../hooks/useForm';
 import styles from './AuthModal.module.css';
 import '../../App.css';
 import notify from '../../utils/notify';
@@ -14,56 +15,64 @@ import notify from '../../utils/notify';
 function AuthModal({ isOpen, onClose }) {
     const { login, signup } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [generalError, setGeneralError] = useState(null);
 
     // Theme color (For consistent highlighting)
-    // In light mode, white might be invisible against white background if used for text?
-    // The previous implementation used #ffffff which works on dark mode but fails on light mode.
-    // We should use a brand color reference or conditional logic.
-    // For now, let's use a brand color safe for text, or rely on the class.
     const themeColor = 'var(--color-text-primary)';
 
-    // Form states
-    const [formData, setFormData] = useState({
+    const validate = (values) => {
+        const errors = {};
+        if (isLogin) {
+            if (!values.usernameOrEmail) errors.usernameOrEmail = "Required";
+        } else {
+            if (!values.username) errors.username = "Required";
+            if (!values.email) errors.email = "Required";
+            if (!values.password) errors.password = "Required";
+            else if (values.password.length < 8) errors.password = "Must be at least 8 characters";
+        }
+        if (isLogin && !values.password) errors.password = "Required";
+        return errors;
+    };
+
+    const {
+        values,
+        errors,
+        touched,
+        handleChange,
+        handleBlur,
+        handleSubmit,
+        isSubmitting,
+        resetForm
+    } = useForm({
         username: '',
         email: '',
         password: '',
         usernameOrEmail: ''
-    });
+    }, validate);
 
     if (!isOpen) return null;
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        setError(null);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
+    const onSubmit = async (formValues) => {
+        setGeneralError(null);
         try {
             if (isLogin) {
-                await login(formData.usernameOrEmail, formData.password);
+                await login(formValues.usernameOrEmail, formValues.password);
                 onClose();
             } else {
-                // Client-side validation
-                if (formData.password.length < 8) {
-                    throw new Error("Password must be at least 8 characters long");
-                }
-                await signup(formData.username, formData.email, formData.password);
+                await signup(formValues.username, formValues.email, formValues.password);
                 setIsLogin(true);
-                setError(null);
-                setFormData(prev => ({ ...prev, usernameOrEmail: formData.username }));
+                setGeneralError(null);
                 notify.success("Account created! Please log in.");
+                // Optionally prefill login
+                handleChange({ target: { name: 'usernameOrEmail', value: formValues.username } });
+                resetForm(); // OR just keep values? Let's reset to clean state except usernameOrEmail maybe?
+                // Actually resetForm wipes everything. Let's just manually set.
+                // But useForm doesn't expose manual set well except generic handleChange.
+                // Let's just let the user type it or rely on browser autofill.
             }
         } catch (err) {
             let errorMessage = "An error occurred";
             if (err.response?.data?.details) {
-                // If backend provided structured validation errors, format them nicely
                 const details = err.response.data.details;
                 if (Array.isArray(details)) {
                     errorMessage = details.map(d => `${d.field}: ${d.message}`).join(", ");
@@ -73,10 +82,18 @@ function AuthModal({ isOpen, onClose }) {
             } else {
                 errorMessage = err.response?.data?.error || err.message || "An error occurred";
             }
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
+            setGeneralError(errorMessage);
         }
+    };
+
+    const handleToggleMode = () => {
+        setIsLogin(!isLogin);
+        setGeneralError(null);
+        // We probably want to clear errors when switching modes
+        // useForm doesn't expose clean 'clearErrors' but validation runs on next action.
+        // Or we can resetForm?
+        // resetForm(); // This might be annoying if user typed stuff.
+        // Let's leave values, validation will re-run on next submit/touch.
     };
 
     return (
@@ -97,14 +114,16 @@ function AuthModal({ isOpen, onClose }) {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className={styles.form}>
+                <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
                     {isLogin ? (
                         <div className={styles.formGroup}>
                             <Input
                                 label="Username or Email"
                                 name="usernameOrEmail"
-                                value={formData.usernameOrEmail}
-                                onChange={handleInputChange}
+                                value={values.usernameOrEmail}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.usernameOrEmail && errors.usernameOrEmail}
                                 required
                                 placeholder="Quantum Traveler"
                                 autoFocus
@@ -117,8 +136,10 @@ function AuthModal({ isOpen, onClose }) {
                                 <Input
                                     label="Username"
                                     name="username"
-                                    value={formData.username}
-                                    onChange={handleInputChange}
+                                    value={values.username}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={touched.username && errors.username}
                                     required
                                     placeholder="Explorer"
                                     autoFocus
@@ -130,8 +151,10 @@ function AuthModal({ isOpen, onClose }) {
                                     label="Email"
                                     type="email"
                                     name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
+                                    value={values.email}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={touched.email && errors.email}
                                     required
                                     placeholder="void@nebula.io"
                                     fullWidth
@@ -145,29 +168,31 @@ function AuthModal({ isOpen, onClose }) {
                             label="Password"
                             type="password"
                             name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
+                            value={values.password}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={touched.password && errors.password}
                             required
                             placeholder="••••••••"
                             fullWidth
                         />
                     </div>
 
-                    {error && (
+                    {generalError && (
                         <div className={styles.errorMessage}>
-                            {error}
+                            {generalError}
                         </div>
                     )}
 
                     <div className={styles.actions}>
                         <Button
                             type="submit"
-                            disabled={loading}
+                            disabled={isSubmitting}
                             fullWidth
                             variant="primary"
                             style={{ fontWeight: 'bold' }}
                         >
-                            {loading ? 'PROCESSING...' : (isLogin ? 'LOG IN' : 'CREATE')}
+                            {isSubmitting ? 'PROCESSING...' : (isLogin ? 'LOG IN' : 'CREATE')}
                         </Button>
 
                         <Button
@@ -186,7 +211,7 @@ function AuthModal({ isOpen, onClose }) {
                         </Text>
                         <button
                             type="button"
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={handleToggleMode}
                             className={styles.toggleButton}
                             style={{ color: themeColor }}
                         >

@@ -14,6 +14,7 @@ const Button = ({
     className = '',
     disabled = false,
     isLoading = false,
+    type = 'button',
     leftIcon,
     rightIcon,
     ...props
@@ -23,11 +24,12 @@ const Button = ({
 
     return (
         <button
+            type={type}
             className={`${styles.button} ${variantClass} ${sizeClass} ${className}`}
             disabled={disabled || isLoading}
             {...props}
         >
-            {isLoading && <span className={styles.loader}></span>}
+            {isLoading && <span className={styles.loader} aria-hidden="true"></span>}
             {!isLoading && leftIcon && <span className={styles.iconLeft}>{leftIcon}</span>}
             {children}
             {!isLoading && rightIcon && <span className={styles.iconRight}>{rightIcon}</span>}
