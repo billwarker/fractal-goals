@@ -29,6 +29,7 @@ export const authApi = {
     signup: (data) => axios.post(`${API_BASE}/auth/signup`, data),
     login: (data) => axios.post(`${API_BASE}/auth/login`, data),
     getMe: () => axios.get(`${API_BASE}/auth/me`),
+    updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),
 };
 
 /**

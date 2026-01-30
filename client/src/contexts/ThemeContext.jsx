@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GOAL_COLOR_SYSTEM } from '../utils/goalColors';
+import { authApi } from '../utils/api';
+
+import { useAuth } from './AuthContext';
 
 const ThemeContext = createContext();
 
@@ -27,6 +30,8 @@ function adjustBrightness(hex, percent) {
 }
 
 export const ThemeProvider = ({ children }) => {
+    const { user, isAuthenticated } = useAuth();
+
     // --- Light/Dark Mode ---
     const [theme, setTheme] = useState(() => {
         const savedTheme = localStorage.getItem('theme');
@@ -38,23 +43,6 @@ export const ThemeProvider = ({ children }) => {
     // --- Goal Colors ---
     // Structure: { UltimateGoal: { primary: '#...', secondary: '#...' }, ... }
     const [goalColors, setGoalColors] = useState(() => {
-        const savedColors = localStorage.getItem('fractal_goal_colors');
-        if (savedColors) {
-            try {
-                // Merge saved colors with defaults to ensure all keys exist if schema changes
-                const parsed = JSON.parse(savedColors);
-                const defaults = {};
-                Object.keys(GOAL_COLOR_SYSTEM).forEach(key => {
-                    defaults[key] = {
-                        primary: GOAL_COLOR_SYSTEM[key].primary,
-                        secondary: GOAL_COLOR_SYSTEM[key].secondary
-                    };
-                });
-                return { ...defaults, ...parsed };
-            } catch (e) {
-                console.error("Failed to parse saved goal colors", e);
-            }
-        }
         // Default initialization
         const defaults = {};
         Object.keys(GOAL_COLOR_SYSTEM).forEach(key => {
@@ -63,8 +51,29 @@ export const ThemeProvider = ({ children }) => {
                 secondary: GOAL_COLOR_SYSTEM[key].secondary
             };
         });
+
+        // Try local storage first as fallback
+        const savedColors = localStorage.getItem('fractal_goal_colors');
+        if (savedColors) {
+            try {
+                const parsed = JSON.parse(savedColors);
+                return { ...defaults, ...parsed };
+            } catch (e) {
+                console.error("Failed to parse saved goal colors", e);
+            }
+        }
         return defaults;
     });
+
+    // Sync with User Preferences on Login
+    useEffect(() => {
+        if (isAuthenticated && user?.preferences?.goal_colors) {
+            setGoalColors(prev => ({
+                ...prev,
+                ...user.preferences.goal_colors
+            }));
+        }
+    }, [isAuthenticated, user]);
 
     useEffect(() => {
         localStorage.setItem('theme', theme);
@@ -72,8 +81,31 @@ export const ThemeProvider = ({ children }) => {
     }, [theme]);
 
     useEffect(() => {
+        // Save to localStorage
         localStorage.setItem('fractal_goal_colors', JSON.stringify(goalColors));
-    }, [goalColors]);
+
+        // Save to backend if logged in
+        if (isAuthenticated) {
+            const savePreferences = async () => {
+                try {
+                    await authApi.updatePreferences({
+                        preferences: { goal_colors: goalColors }
+                    });
+                } catch (err) {
+                    console.error("Failed to save goal colors to user preferences", err);
+                }
+            };
+            // Debounce or just save? For simplicity, save on every change for now, 
+            // but in production consider debouncing.
+            // Check if colors actually changed from user prefs to avoid loop? 
+            // React state updates handle simple equality checks but deep objects trigger here.
+            // Let's assume the user doesn't tweak colors 100 times a second.
+            if (user?.preferences?.goal_colors && JSON.stringify(user.preferences.goal_colors) === JSON.stringify(goalColors)) {
+                return;
+            }
+            savePreferences();
+        }
+    }, [goalColors, isAuthenticated]);
 
     const toggleTheme = () => {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');

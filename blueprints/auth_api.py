@@ -6,7 +6,7 @@ from flask import request, jsonify, Blueprint
 import models
 from models import get_engine, get_session, User
 from config import config
-from validators import validate_request, UserSignupSchema, UserLoginSchema
+from validators import validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema
 from services.serializers import serialize_user
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -117,3 +117,33 @@ def login(validated_data):
 def get_me(current_user):
     """Get current user info."""
     return jsonify(serialize_user(current_user))
+
+@auth_bp.route('/preferences', methods=['PATCH'])
+@token_required
+@validate_request(UserPreferencesUpdateSchema)
+def update_preferences(current_user, validated_data):
+    """Update user preferences."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        # Re-query user to attach to this session
+        user = db_session.query(User).get(current_user.id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        # Update preferences
+        current_prefs = models._safe_load_json(user.preferences, {})
+        new_prefs = validated_data['preferences']
+        
+        # Deep merge or replace? For now, let's just merge top-level keys
+        if isinstance(new_prefs, dict):
+            current_prefs.update(new_prefs)
+            user.preferences = current_prefs
+        
+        db_session.commit()
+        return jsonify(serialize_user(user))
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()

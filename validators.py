@@ -160,6 +160,10 @@ class UserLoginSchema(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class UserPreferencesUpdateSchema(BaseModel):
+    """Schema for updating user preferences."""
+    preferences: Dict[str, Any] = Field(...)
+
 # =============================================================================
 # GOAL SCHEMAS
 # =============================================================================

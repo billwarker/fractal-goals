@@ -20,7 +20,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
-from services.serializers import serialize_goal
+from services.serializers import serialize_goal, calculate_smart_status
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -363,8 +363,12 @@ def get_all_fractals(current_user):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Filter root goals by owner_id
-        roots = db_session.query(Goal).filter(
+        # Filter root goals by owner_id with eager loading for SMART status checks
+        roots = db_session.query(Goal).options(
+            models.selectinload(Goal.associated_activities),
+            models.selectinload(Goal.associated_activity_groups),
+            models.selectinload(Goal.children) # For max_updated recursion if needed, though recursion might still trigger loads deeply
+        ).filter(
             Goal.parent_id == None,
             Goal.owner_id == current_user.id,
             Goal.deleted_at == None
@@ -391,7 +395,8 @@ def get_all_fractals(current_user):
                 "description": root.description,
                 "type": root.type,
                 "created_at": root.created_at.isoformat() if root.created_at else None,
-                "updated_at": last_activity.isoformat() if last_activity else None
+                "updated_at": last_activity.isoformat() if last_activity else None,
+                "is_smart": all(calculate_smart_status(root).values())
             })
         
         return jsonify(result)

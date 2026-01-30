@@ -24,7 +24,7 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated } = useAuth();
-    const { theme, toggleTheme, getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor } = useTheme();
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -90,17 +90,51 @@ function Selection() {
         });
     };
 
-    const getHighestLevelType = () => {
-        if (!fractals || fractals.length === 0) return 'UltimateGoal';
+    const getHighestPriorityRoot = () => {
+        if (!fractals || fractals.length === 0) return null;
+
         const hierarchy = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal'];
+
+        // Group by type
+        const grouped = {};
+        fractals.forEach(f => {
+            if (!grouped[f.type]) grouped[f.type] = [];
+            grouped[f.type].push(f);
+        });
+
+        // Find highest level existing type
         for (const type of hierarchy) {
-            if (fractals.some(f => f.type === type)) return type;
+            if (grouped[type] && grouped[type].length > 0) {
+                // Found the highest level. 
+                // Prioritize SMART goals within this level.
+                const smartGoal = grouped[type].find(f => f.is_smart);
+                if (smartGoal) return smartGoal;
+
+                // If no SMART goal, return the first one (or could sort by creation, etc.)
+                return grouped[type][0];
+            }
         }
-        return 'UltimateGoal';
+
+        // Fallback
+        return fractals[0];
     };
 
-    const headerType = getHighestLevelType();
+    const topRoot = getHighestPriorityRoot();
+    const headerType = topRoot ? topRoot.type : 'UltimateGoal';
+    const isHeaderSmart = topRoot ? topRoot.is_smart : false;
+
+    console.log('[Selection Logic Debug]', {
+        fractalsCount: fractals ? fractals.length : 0,
+        topRootName: topRoot ? topRoot.name : 'None',
+        topRootType: topRoot ? topRoot.type : 'None',
+        types: fractals ? fractals.map(f => `${f.name} (${f.type})`) : [],
+        isHeaderSmart
+    });
+
     const headerColor = getGoalColor(headerType);
+    console.log('[Selection Logic Debug] headerColor:', headerColor);
+
+    const headerSecondaryColor = getGoalSecondaryColor(headerType);
     const headerTextColor = getGoalTextColor(headerType);
     const isDarkText = headerTextColor === '#1a1a1a';
 
@@ -116,28 +150,76 @@ function Selection() {
                 <div
                     className={styles.goalNodeCircle}
                     style={{
-                        backgroundColor: headerColor,
+                        // SMART Goal: Secondary (Fill) with Primary Border
+                        // Normal Goal: Primary (Fill) with App-BG Border (cutout effect)
+                        backgroundColor: isHeaderSmart ? headerSecondaryColor : headerColor,
+                        border: isHeaderSmart
+                            ? `24px solid ${headerColor}`
+                            : `5px solid var(--color-bg-app)`, // Default cutout
+                        boxShadow: isHeaderSmart ? 'none' : '0 0 50px rgba(0, 0, 0, 0.5)',
+                        position: 'relative',
+                        overflow: 'hidden', // Ensure content stays inside
+                        boxSizing: 'border-box' // Explicitly set border-box to ensure visual math works
                     }}
                 >
+                    {/* SMART Goal Bullseye Layers */}
+                    {isHeaderSmart && (
+                        <>
+                            {/* Middle Ring 
+                                Scale: 186px / 280px ~ 66.4%
+                                Border: 24px
+                            */}
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    width: '186px',
+                                    height: '186px',
+                                    borderRadius: '50%',
+                                    backgroundColor: headerSecondaryColor,
+                                    border: `24px solid ${headerColor}`,
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    zIndex: 0,
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                            {/* Inner Core 
+                                Scale: 94px / 280px ~ 33.6%
+                            */}
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    width: '94px',
+                                    height: '94px',
+                                    borderRadius: '50%',
+                                    backgroundColor: headerColor,
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    zIndex: 0
+                                }}
+                            />
+                        </>
+                    )}
+
                     <h1
                         className={styles.title}
                         style={{
-                            color: headerTextColor,
-                            textShadow: isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)',
+                            // Ensure text is visible on top of dark core
+                            color: isHeaderSmart ? '#FFFFFF' : headerTextColor,
+                            textShadow: isHeaderSmart ? '0 2px 10px rgba(0,0,0,0.8)' : (isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)'),
+                            fontSize: isHeaderSmart ? '2.2rem' : '28px', // Larger text for SMART to pop
+                            zIndex: 10, // Text on top
+                            position: 'relative',
+                            maxWidth: '90%',
+                            lineHeight: 1.1,
+                            fontWeight: 800
                         }}
                     >
                         FRACTAL GOALS
                     </h1>
                 </div>
-
-                {/* Theme Toggle */}
-                <button
-                    onClick={toggleTheme}
-                    className={styles.themeToggle}
-                    title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                    {theme === 'dark' ? '☀️' : '🌙'}
-                </button>
 
                 {/* Profile Controls (Logged In Only) */}
                 {isAuthenticated && (

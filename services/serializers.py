@@ -226,6 +226,7 @@ def serialize_user(user):
         "username": user.username,
         "email": user.email,
         "is_active": user.is_active,
+        "preferences": _safe_load_json(user.preferences, {}),
         "created_at": format_utc(user.created_at)
     }
 
