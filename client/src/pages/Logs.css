@@ -1,26 +1,40 @@
 .logs-page-container {
-    padding: 80px 40px 40px 40px;
-    height: 100vh;
+    height: 100%;
+    width: 100%;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    background: var(--color-bg-app);
+    background-color: var(--color-bg-app);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
     color: var(--color-text-primary);
+    overflow: hidden;
 }
 
 .logs-page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #333;
+    padding: 80px 40px 20px 40px;
+    background: var(--color-bg-app);
+    border-bottom: 1px solid var(--color-border);
+    z-index: 10;
+}
+
+.header-main {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    flex: 1;
 }
 
 .logs-page-header h1 {
     margin: 0;
-    font-size: 24px;
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .header-subtitle {
@@ -68,12 +82,10 @@
 .logs-filters {
     display: flex;
     gap: 24px;
-    align-items: flex-end;
-    margin-bottom: 24px;
-    background: var(--color-bg-header);
-    padding: 16px 24px;
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
+    align-items: center;
+    background: transparent;
+    padding: 0;
+    border-bottom: none;
 }
 
 .filter-group {
@@ -95,7 +107,7 @@
     background: var(--color-bg-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
-    padding: 8px 12px;
+    padding: 4px 10px;
     border-radius: 4px;
     font-size: 13px;
     outline: none;
@@ -107,26 +119,30 @@
 }
 
 .logs-stats {
-    margin-left: auto;
     font-size: 13px;
     color: #666;
+    margin-left: 8px;
+    white-space: nowrap;
 }
 
 .logs-page-body {
     flex: 1;
     min-height: 0;
+    padding: 24px 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.logs-list-container {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-}
-
-.logs-list-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+    height: auto;
+    min-height: 400px;
 }
 
 .logs-grid-header {
@@ -237,7 +253,6 @@
     justify-content: center;
     align-items: center;
     gap: 20px;
-    padding: 16px;
     padding: 16px;
     background: var(--color-bg-header);
     border-top: 1px solid var(--color-border);

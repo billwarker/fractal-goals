@@ -75,36 +75,34 @@ function Logs() {
     return (
         <div className="logs-page-container">
             <div className="logs-page-header">
-                <div className="header-left">
+                <div className="header-main">
                     <h1>Application Events</h1>
-                    <p className="header-subtitle">Audit trail and history of activities</p>
+                    <div className="logs-filters">
+                        <div className="filter-group">
+                            <label>Type</label>
+                            <select value={eventType} onChange={(e) => { setEventType(e.target.value); setPage(1); }}>
+                                <option value="all">All</option>
+                                {eventTypes.map(t => (
+                                    <option key={t} value={t}>{t}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="filter-group">
+                            <label>From</label>
+                            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} />
+                        </div>
+                        <div className="filter-group">
+                            <label>To</label>
+                            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} />
+                        </div>
+                        <div className="logs-stats">
+                            {total} events
+                        </div>
+                    </div>
                 </div>
                 <div className="logs-header-actions">
                     <button className="refresh-logs-btn" onClick={() => fetchLogs()}>REFRESH</button>
                     <button className="clear-logs-btn" onClick={handleClearLogs}>CLEAR ALL</button>
-                </div>
-            </div>
-
-            <div className="logs-filters">
-                <div className="filter-group">
-                    <label>Event Type</label>
-                    <select value={eventType} onChange={(e) => { setEventType(e.target.value); setPage(1); }}>
-                        <option value="all">All Events</option>
-                        {eventTypes.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="filter-group">
-                    <label>From</label>
-                    <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} />
-                </div>
-                <div className="filter-group">
-                    <label>To</label>
-                    <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} />
-                </div>
-                <div className="logs-stats">
-                    Total: {total} events
                 </div>
             </div>
 
