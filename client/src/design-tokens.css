@@ -3,6 +3,7 @@
 
 :root {
   /* Core Colors (Dark Mode Default) */
+  color-scheme: dark;
   --color-bg-app: #121212;
   --color-bg-card: rgb(42, 42, 42);
   --color-bg-card-alt: rgb(30, 30, 30);
@@ -70,6 +71,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   /* Core Colors */
   --color-bg-app: #f3f4f6;
   --color-bg-card: #ffffff;

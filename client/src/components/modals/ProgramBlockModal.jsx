@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import moment from 'moment';
+import Modal from '../atoms/Modal';
+import Button from '../atoms/Button';
+import Input from '../atoms/Input';
+import styles from './ProgramBlockModal.module.css';
 
 const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
     const [formData, setFormData] = useState({
@@ -45,9 +48,6 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
             }
         }
 
-        // Optional: Validate valid range within program dates?
-        // For now, let's keep it flexible.
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -59,207 +59,78 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0,0,0,0.85)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1100, // Higher than other modals if nested, though unlikely
-                padding: '20px'
-            }}
-            onClick={onClose}
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={initialData?.id ? 'Edit Program Block' : 'Add Program Block'}
         >
-            <div
-                style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #444',
-                    borderRadius: '12px',
-                    width: '100%',
-                    maxWidth: '500px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                }}
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div style={{
-                    padding: '20px',
-                    borderBottom: '1px solid #333',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    <h2 style={{ margin: 0, fontSize: '20px', color: 'white', fontWeight: 500 }}>
-                        {initialData?.id ? 'Edit Program Block' : 'Add Program Block'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            padding: '0 8px'
-                        }}
-                    >
-                        ×
-                    </button>
+            <div className={styles.formContainer}>
+                <Input
+                    label="Block Name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Base Build Phase 1"
+                    autoFocus
+                    fullWidth
+                    error={errors.name}
+                    required
+                />
+
+                <div className={styles.dateRow}>
+                    <Input
+                        type="date"
+                        label="Start Date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        min={programDates.start}
+                        max={programDates.end}
+                        fullWidth
+                        error={errors.startDate}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="End Date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        min={formData.startDate || programDates.start}
+                        max={programDates.end}
+                        fullWidth
+                        error={errors.endDate}
+                        required
+                    />
                 </div>
 
-                {/* Content */}
-                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {errors.dateRange && (
+                    <div className={styles.error}>{errors.dateRange}</div>
+                )}
 
-                    {/* Name */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontSize: '14px' }}>
-                            Block Name *
-                        </label>
+                <div>
+                    <label className={styles.colorLabel} style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                        Color Code
+                    </label>
+                    <div className={styles.colorRow}>
                         <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="e.g., Base Build Phase 1"
-                            autoFocus
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                background: '#2a2a2a',
-                                border: errors.name ? '1px solid #f44336' : '1px solid #444',
-                                borderRadius: '6px',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
+                            type="color"
+                            value={formData.color}
+                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                            className={styles.colorInput}
                         />
-                        {errors.name && <div style={{ color: '#f44336', fontSize: '12px', marginTop: '4px' }}>{errors.name}</div>}
+                        <span className={styles.colorValue}>{formData.color}</span>
                     </div>
-
-                    {/* Dates */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontSize: '14px' }}>
-                                Start Date *
-                            </label>
-                            <input
-                                type="date"
-                                value={formData.startDate}
-                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                                min={programDates.start}
-                                max={programDates.end}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    background: '#2a2a2a',
-                                    border: errors.startDate ? '1px solid #f44336' : '1px solid #444',
-                                    borderRadius: '6px',
-                                    color: 'white',
-                                    fontSize: '14px'
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontSize: '14px' }}>
-                                End Date *
-                            </label>
-                            <input
-                                type="date"
-                                value={formData.endDate}
-                                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                                min={formData.startDate || programDates.start}
-                                max={programDates.end}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    background: '#2a2a2a',
-                                    border: errors.endDate ? '1px solid #f44336' : '1px solid #444',
-                                    borderRadius: '6px',
-                                    color: 'white',
-                                    fontSize: '14px'
-                                }}
-                            />
-                        </div>
-                    </div>
-                    {(errors.startDate || errors.endDate || errors.dateRange) && (
-                        <div style={{ color: '#f44336', fontSize: '12px', marginTop: '-12px' }}>
-                            {errors.startDate || errors.endDate || errors.dateRange}
-                        </div>
-                    )}
-
-                    {/* Color */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#ccc', fontSize: '14px' }}>
-                            Color Code
-                        </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <input
-                                type="color"
-                                value={formData.color}
-                                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                style={{
-                                    width: '50px',
-                                    height: '40px',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    background: 'transparent',
-                                    cursor: 'pointer'
-                                }}
-                            />
-                            <div style={{ color: '#888', fontSize: '13px' }}>{formData.color}</div>
-                        </div>
-                    </div>
-
-                </div>
-
-                {/* Footer */}
-                <div style={{
-                    padding: '20px',
-                    borderTop: '1px solid #333',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '12px'
-                }}>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: '1px solid #444',
-                            color: 'white',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        style={{
-                            padding: '10px 20px',
-                            background: '#3A86FF',
-                            border: 'none',
-                            color: 'white',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: '14px'
-                        }}
-                    >
-                        Save Block
-                    </button>
                 </div>
             </div>
-        </div>
+
+            <div className={styles.footerActions}>
+                <Button variant="secondary" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button variant="primary" onClick={handleSave}>
+                    Save Block
+                </Button>
+            </div>
+        </Modal>
     );
 };
 
