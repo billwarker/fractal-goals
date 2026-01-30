@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import TargetCard from '../TargetCard';
+import notify from '../../utils/notify';
 
 /**
  * TargetManager Component
@@ -113,7 +114,7 @@ const TargetManager = ({
 
     const handleSaveTarget = () => {
         if (!selectedActivityId) {
-            alert('Please select an activity');
+            notify.error('Please select an activity');
             return;
         }
 

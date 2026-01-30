@@ -12,6 +12,7 @@ import ProfileWindowLayout, {
 } from '../components/analytics/ProfileWindowLayout';
 import '../components/analytics/ChartJSWrapper'; // Registers Chart.js components
 import '../App.css';
+import notify from '../utils/notify';
 
 // Helper function to format duration
 const formatDuration = (seconds) => {
@@ -164,7 +165,7 @@ function Analytics() {
     const handleSplit = useCallback((windowId, direction) => {
         const currentCount = countWindows(layout);
         if (currentCount >= MAX_WINDOWS) {
-            alert(`Maximum of ${MAX_WINDOWS} profile windows reached`);
+            notify.error(`Maximum of ${MAX_WINDOWS} profile windows reached`);
             return;
         }
 

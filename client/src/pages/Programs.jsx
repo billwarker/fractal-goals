@@ -5,6 +5,8 @@ import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import styles from './Programs.module.css'; // Import CSS Module
+import notify from '../utils/notify';
+import { Heading, Text } from '../components/atoms/Typography';
 
 const GOAL_COLORS = {
     Amercement: '#FF6B6B',
@@ -119,7 +121,7 @@ function Programs() {
             setSelectedProgram(null);
         } catch (err) {
             console.error('Failed to save program:', err);
-            alert('Failed to save program: ' + (err.response?.data?.error || err.message));
+            notify.error('Failed to save program: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -147,7 +149,7 @@ function Programs() {
             setShowDeleteModal(true);
         } catch (err) {
             console.error('Failed to fetch session count:', err);
-            alert('Failed to fetch session count: ' + (err.response?.data?.error || err.message));
+            notify.error('Failed to fetch session count: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -162,7 +164,7 @@ function Programs() {
             fetchPrograms(); // Refresh the list
         } catch (err) {
             console.error('Failed to delete program:', err);
-            alert('Failed to delete program: ' + (err.response?.data?.error || err.message));
+            notify.error('Failed to delete program: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -170,9 +172,9 @@ function Programs() {
         <div className={styles.container}>
             {/* Page Header */}
             <div className={styles.header}>
-                <h1 className={styles.title}>
+                <Heading level={1} className={styles.title}>
                     Programs
-                </h1>
+                </Heading>
 
                 <button
                     onClick={() => setShowBuilder(true)}
@@ -190,12 +192,12 @@ function Programs() {
                         <div className={styles.emptyIcon}>
                             📋
                         </div>
-                        <h2 className={styles.emptyTitle}>
+                        <Heading level={2} className={styles.emptyTitle}>
                             No Programs Yet
-                        </h2>
-                        <p className={styles.emptyText}>
+                        </Heading>
+                        <Text className={styles.emptyText}>
                             Create your first training program to organize your sessions into a structured weekly schedule.
-                        </p>
+                        </Text>
                         <button
                             onClick={() => setShowBuilder(true)}
                             className={styles.createFirstBtn}
@@ -226,9 +228,9 @@ function Programs() {
 
                                     {/* Program Header */}
                                     <div className={styles.cardHeader}>
-                                        <h3 className={styles.cardTitle}>
+                                        <Heading level={3} className={styles.cardTitle}>
                                             {program.name}
-                                        </h3>
+                                        </Heading>
                                         <div className={styles.dateRange}>
                                             <span>📅</span>
                                             <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
@@ -237,9 +239,9 @@ function Programs() {
 
                                     {/* Goals */}
                                     <div className={styles.goalsSection}>
-                                        <div className={styles.sectionLabel}>
+                                        <Heading level={6} className={styles.sectionLabel} color="secondary">
                                             Selected Goals
-                                        </div>
+                                        </Heading>
                                         <div className={styles.goalList}>
                                             {(() => {
                                                 const grouped = progGoals.reduce((acc, g) => {
@@ -268,9 +270,9 @@ function Programs() {
 
                                     {/* Blocks Summary */}
                                     <div className={styles.blocksSection}>
-                                        <div className={styles.sectionLabel}>
+                                        <Heading level={6} className={styles.sectionLabel} color="secondary">
                                             Blocks
-                                        </div>
+                                        </Heading>
                                         <div className={styles.blockList}>
                                             {blocks.length > 0 ? blocks.map(b => {
                                                 const isActive = isBlockActive(b);

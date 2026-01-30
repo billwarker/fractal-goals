@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
+import notify from '../../utils/notify';
 
 const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
@@ -14,11 +15,11 @@ const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
 
     const handleSubmit = () => {
         if (!selectedGoalId) {
-            alert('Please select a goal');
+            notify.error('Please select a goal');
             return;
         }
         if (!deadline) {
-            alert('Please set a deadline');
+            notify.error('Please set a deadline');
             return;
         }
         onSave({ goal_id: selectedGoalId, deadline });

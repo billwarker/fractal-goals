@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import notify from '../utils/notify';
 import Input from './atoms/Input';
 import TextArea from './atoms/TextArea';
 import Select from './atoms/Select';
@@ -796,7 +797,7 @@ function GoalDetailModal({
         // Inline activity creation form
         const handleCreateActivity = async () => {
             if (!newActivityName.trim()) {
-                alert('Please enter an activity name');
+                notify.error('Please enter an activity name');
                 return;
             }
 

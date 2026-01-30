@@ -13,6 +13,7 @@ import { SessionSidePane } from '../components/sessionDetail'; // Keep this for 
 import useSessionNotes from '../hooks/useSessionNotes';
 import useTargetAchievements from '../hooks/useTargetAchievements';
 import styles from './SessionDetail.module.css'; // New CSS module import
+import notify from '../utils/notify';
 import '../App.css';
 
 /**
@@ -329,7 +330,7 @@ function SessionDetail() {
             const foundSession = sessionsData.find(s => s.id === sessionId);
 
             if (!foundSession) {
-                alert('Session not found');
+                notify.error('Session not found');
                 navigate(`/${rootId}/sessions`);
                 return;
             }
@@ -537,25 +538,23 @@ function SessionDetail() {
 
                 // Special handling for "Timer was never started" error
                 if (errorMsg.includes('Timer was never started')) {
-                    alert(
-                        `Timer Error: Timer was never started\n\n` +
+                    const message = `Timer Error: Timer was never started\n\n` +
                         `You clicked "Stop" without first clicking "Start".\n\n` +
                         `Solution:\n` +
                         `1. Click the "Start" button first, then "Stop"\n` +
                         `   OR\n` +
-                        `2. Manually enter the start and stop times in the fields below the timer buttons.`
-                    );
+                        `2. Manually enter the start and stop times in the fields below the timer buttons.`;
+                    notify.error(message, { duration: 6000 });
                 } else if (errorMsg.includes('Activity instance not found')) {
-                    alert(
-                        `Timer Error: Activity instance not found\n\n` +
+                    const message = `Timer Error: Activity instance not found\n\n` +
                         `This usually happens when:\n` +
                         `• The page was refreshed before starting the timer\n` +
                         `• The "Start" button was never clicked\n\n` +
                         `Solution: Click the "Start" button first, then "Stop".\n\n` +
-                        `Alternatively, you can manually enter the start and stop times below the timer buttons.`
-                    );
+                        `Alternatively, you can manually enter the start and stop times below the timer buttons.`;
+                    notify.error(message, { duration: 6000 });
                 } else {
-                    alert(`Error updating timer: ${errorMsg}\n\nInstance ID: ${instanceId}\nAction: ${value}`);
+                    notify.error(`Error updating timer: ${errorMsg}\n\nInstance ID: ${instanceId}\nAction: ${value}`);
                 }
             }
             return;
@@ -581,7 +580,7 @@ function SessionDetail() {
                 });
             } catch (err) {
                 console.error('Error syncing activity metrics update:', err);
-                alert(`Failed to update metrics: ${err.response?.data?.error || err.message}`);
+                notify.error(`Failed to update metrics: ${err.response?.data?.error || err.message}`);
             }
             return;
         }
@@ -604,7 +603,7 @@ function SessionDetail() {
                 });
             } catch (err) {
                 console.error('Error syncing activity sets update:', err);
-                alert(`Failed to update sets: ${err.response?.data?.error || err.message}`);
+                notify.error(`Failed to update sets: ${err.response?.data?.error || err.message}`);
             }
             return;
         }
@@ -640,7 +639,7 @@ function SessionDetail() {
             });
         } catch (err) {
             console.error('Error syncing activity instance update:', err);
-            alert(`Failed to update activity: ${err.response?.data?.error || err.message}`);
+            notify.error(`Failed to update activity: ${err.response?.data?.error || err.message}`);
         }
     };
 
@@ -660,7 +659,7 @@ function SessionDetail() {
             navigate(`/${rootId}/sessions`);
         } catch (err) {
             console.error('Error deleting session:', err);
-            alert('Error deleting session: ' + err.message);
+            notify.error('Error deleting session: ' + err.message);
         }
     };
 
@@ -787,7 +786,7 @@ function SessionDetail() {
                     }
 
                     console.log(message);
-                    setTimeout(() => alert(message), 100);
+                    setTimeout(() => notify.success(message, { duration: 6000 }), 100);
                 }
 
                 // Refresh session to get updated goal data
@@ -795,7 +794,7 @@ function SessionDetail() {
             }
         } catch (err) {
             console.error('Error toggling completion:', err);
-            alert('Error updating completion status: ' + (err.response?.data?.error || err.message));
+            notify.error('Error updating completion status: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -858,7 +857,7 @@ function SessionDetail() {
             setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
         } catch (err) {
             console.error('Error adding activity to session:', err);
-            alert(`Failed to add activity: ${err.response?.data?.error || err.message}`);
+            notify.error(`Failed to add activity: ${err.response?.data?.error || err.message}`);
         }
     };
 
@@ -884,7 +883,7 @@ function SessionDetail() {
             setSessionData(updatedData);
         } catch (err) {
             console.error('Error deleting activity:', err);
-            alert(`Failed to delete activity: ${err.response?.data?.error || err.message}`);
+            notify.error(`Failed to delete activity: ${err.response?.data?.error || err.message}`);
         }
     };
 
@@ -927,7 +926,7 @@ function SessionDetail() {
             setSelectedGoal(null);
         } catch (err) {
             console.error('Error updating goal:', err);
-            alert(`Failed to update goal: ${err.response?.data?.error || err.message}`);
+            notify.error(`Failed to update goal: ${err.response?.data?.error || err.message}`);
         }
     };
 

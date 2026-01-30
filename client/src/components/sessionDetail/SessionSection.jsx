@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
+import { Heading } from '../atoms/Typography';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -106,9 +107,9 @@ const SessionSection = ({
             className={`${styles.sectionContainer} ${isDragOver ? styles.sectionContainerDragOver : ''}`}
         >
             <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>
+                <Heading level={3} className={styles.sectionTitle}>
                     {section.name || `Section ${sectionIndex + 1}`}
-                </h3>
+                </Heading>
                 <div className={styles.sectionDuration}>
                     Duration: <span className={styles.durationValue}>
                         {formatDuration(calculateSectionDuration(section, activityInstances))}

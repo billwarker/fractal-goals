@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import AnnotationModal from './AnnotationModal';
 import { fractalApi } from '../../utils/api';
+import notify from '../../utils/notify';
 
 /**
  * AnnotatedChartWrapper - Wraps Chart.js visualizations with annotation support.
@@ -142,7 +143,7 @@ function AnnotatedChartWrapper({
             window.dispatchEvent(new CustomEvent('annotation-update'));
         } catch (err) {
             console.error('Failed to save annotation:', err);
-            alert('Failed to save annotation: ' + (err.response?.data?.error || err.message));
+            notify.error('Failed to save annotation: ' + (err.response?.data?.error || err.message));
         }
     };
 

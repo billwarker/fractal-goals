@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
+import { Heading, Text } from '../atoms/Typography';
 import styles from './AuthModal.module.css';
 import '../../App.css';
+import notify from '../../utils/notify';
 
 /**
  * AuthModal - Refactored to match exactly the application modal standards
@@ -56,7 +58,7 @@ function AuthModal({ isOpen, onClose }) {
                 setIsLogin(true);
                 setError(null);
                 setFormData(prev => ({ ...prev, usernameOrEmail: formData.username }));
-                alert("Account created! Please log in.");
+                notify.success("Account created! Please log in.");
             }
         } catch (err) {
             let errorMessage = "An error occurred";
@@ -83,9 +85,9 @@ function AuthModal({ isOpen, onClose }) {
                 {/* Header - Reference GoalDetailModal */}
                 <div className={styles.header} style={{ borderBottomColor: themeColor }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div className={styles.title} style={{ color: themeColor }}>
+                        <Heading level={3} className={styles.title} style={{ color: themeColor }}>
                             {isLogin ? 'WELCOME BACK' : 'CREATE AN ACCOUNT'}
-                        </div>
+                        </Heading>
                         <button
                             onClick={onClose}
                             className={styles.closeButton}
@@ -179,7 +181,9 @@ function AuthModal({ isOpen, onClose }) {
                     </div>
 
                     <div className={styles.toggleContainer}>
-                        {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
+                        <Text size="sm" as="span" style={{ marginRight: '8px' }}>
+                            {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
+                        </Text>
                         <button
                             type="button"
                             onClick={() => setIsLogin(!isLogin)}

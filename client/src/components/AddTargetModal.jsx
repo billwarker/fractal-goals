@@ -4,6 +4,7 @@ import Input from './atoms/Input';
 import TextArea from './atoms/TextArea';
 import Select from './atoms/Select';
 import Button from './atoms/Button';
+import notify from '../utils/notify';
 
 /**
  * AddTargetModal Component
@@ -59,7 +60,7 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
 
     const handleSave = () => {
         if (!selectedActivityId) {
-            alert('Please select an activity');
+            notify.error('Please select an activity');
             return;
         }
 

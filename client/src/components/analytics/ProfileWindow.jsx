@@ -12,6 +12,7 @@ import { Bar, Line } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../atoms/Button';
 import Select from '../atoms/Select';
+import { Heading } from '../atoms/Typography';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -639,7 +640,7 @@ function ProfileWindow({
                 case 'stats':
                     return (
                         <div className={styles.vizContainer}>
-                            <h3 className={styles.vizTitle}>Goal Summary</h3>
+                            <Heading level={3} className={styles.vizTitle}>Goal Summary</Heading>
                             <div className={styles.statsGrid}>
                                 <StatCard value={summary.completed_goals || 0} label="Completed" subLabel={`${summary.completion_rate?.toFixed(1) || 0}% rate`} color="#4caf50" />
                                 <StatCard value={`${summary.avg_goal_age_days || 0}d`} label="Avg Age" subLabel="Days old" color="#2196f3" />
@@ -690,7 +691,7 @@ function ProfileWindow({
                         <div className={styles.vizContainer}>
                             {/* Goal header */}
                             <div className={styles.goalHeader}>
-                                <h3 className={styles.goalTitle}>{selectedGoal.name}</h3>
+                                <Heading level={3} className={styles.goalTitle}>{selectedGoal.name}</Heading>
                                 <span className={styles.goalBadge} style={{ background: getGoalTypeColor(selectedGoal.type) }}>
                                     {selectedGoal.type.replace('Goal', '')}
                                 </span>
@@ -732,7 +733,7 @@ function ProfileWindow({
                 case 'stats':
                     return (
                         <div className={styles.vizContainer}>
-                            <h3 className={styles.vizTitle}>Session Summary</h3>
+                            <Heading level={3} className={styles.vizTitle}>Session Summary</Heading>
                             <div className={styles.statsGrid}>
                                 <StatCard value={sessions.length} label="Total Sessions" subLabel="All time" color="#2196f3" />
                                 <StatCard value={completedSessions.length} label="Completed" subLabel={`${sessions.length > 0 ? Math.round((completedSessions.length / sessions.length) * 100) : 0}% rate`} color="#4caf50" />

@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getLocalISOString } from '../utils/dateUtils';
+import notify from '../utils/notify';
 import {
     ProgramSelector,
     SourceSelector,
@@ -243,12 +244,12 @@ function CreateSession() {
 
     const handleCreateSession = async () => {
         if (!selectedTemplate) {
-            alert('Please select a template or program day');
+            notify.error('Please select a template or program day');
             return;
         }
 
         if (selectedGoalIds.length === 0) {
-            alert('Please select at least one short-term goal');
+            notify.error('Please select at least one short-term goal');
             return;
         }
 
@@ -327,7 +328,7 @@ function CreateSession() {
         } catch (err) {
             console.error('Error creating session:', err);
             const errorMessage = err.response?.data?.error || err.message;
-            alert('Error creating session: ' + errorMessage);
+            notify.error('Error creating session: ' + errorMessage);
             setCreating(false);
         }
     };

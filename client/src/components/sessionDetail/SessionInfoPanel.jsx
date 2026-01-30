@@ -7,6 +7,8 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import { fractalApi } from '../../utils/api';
 import { formatDateInTimezone, formatForInput } from '../../utils/dateUtils';
 import styles from './SessionInfoPanel.module.css';
+import notify from '../../utils/notify';
+import { Heading } from '../atoms/Typography';
 
 function SessionInfoPanel({
     session,
@@ -92,7 +94,7 @@ function SessionInfoPanel({
             setEditingField(null);
         } catch (error) {
             console.error("Failed to update session time", error);
-            alert("Failed to update time");
+            notify.error("Failed to update time");
         } finally {
             setSaving(false);
         }
@@ -106,7 +108,7 @@ function SessionInfoPanel({
         <div className={styles.sessionInfoPanel}>
             {/* Session Title */}
             <div className={styles.sessionInfoTitle}>
-                <h2>{session.name}</h2>
+                <Heading level={2}>{session.name}</Heading>
                 <Button
                     variant="ghost"
                     size="sm"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fractalApi } from '../../utils/api';
+import notify from '../../utils/notify';
 
 /**
  * ActivityAssociator Component
@@ -73,7 +74,7 @@ const ActivityAssociator = ({
             }
         } catch (error) {
             console.error('Error toggling group association:', error);
-            alert('Failed to update group association.');
+            notify.error('Failed to update group association.');
         } finally {
             setIsUpdatingGroupLink(false);
         }
@@ -137,7 +138,7 @@ const ActivityAssociator = ({
 
         } catch (error) {
             console.error('Error adding activity associations:', error);
-            alert('Failed to save associations: ' + error.message);
+            notify.error('Failed to save associations: ' + error.message);
         }
 
         setViewState('list');
@@ -162,7 +163,7 @@ const ActivityAssociator = ({
         });
 
         if (isUsedInTarget) {
-            alert('Cannot remove this activity because it is used in one or more targets for this goal. Please remove the targets first.');
+            notify.error('Cannot remove this activity because it is used in one or more targets for this goal. Please remove the targets first.');
             return;
         }
 
@@ -173,7 +174,7 @@ const ActivityAssociator = ({
             setAssociatedActivities(prev => prev.filter(a => a.id !== activityId));
         } catch (error) {
             console.error('Error removing activity association:', error);
-            alert('Failed to remove association');
+            notify.error('Failed to remove association');
         }
     };
 
@@ -464,7 +465,7 @@ const ActivityAssociator = ({
                                     setNewGroupName('');
                                 } catch (error) {
                                     console.error('Error creating activity group:', error);
-                                    alert('Failed to create group: ' + error.message);
+                                    notify.error('Failed to create group: ' + error.message);
                                 } finally {
                                     setIsSubmittingGroup(false);
                                 }
