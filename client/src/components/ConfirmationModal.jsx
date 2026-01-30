@@ -1,79 +1,46 @@
 
 import React from 'react';
+import Modal from './atoms/Modal';
+import Button from './atoms/Button';
+import { Text } from './atoms/Typography';
 
 /**
  * ConfirmationModal Component
- * A reusable modal for confirming actions.
+ * Standardized using Atom components.
  */
 function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel' }) {
-    if (!isOpen) return null;
+    const handleConfirm = () => {
+        onConfirm();
+        onClose();
+    };
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100
-        }}>
-            <div style={{
-                background: '#1e1e1e',
-                border: '1px solid #444',
-                borderRadius: '8px',
-                padding: '24px',
-                maxWidth: '400px',
-                width: '90%',
-                textAlign: 'center'
-            }}>
-                <h2 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'white' }}>
-                    {title}
-                </h2>
-                <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#ccc', lineHeight: '1.5' }}>
-                    {message}
-                </p>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={title}
+            size="sm"
+            showCloseButton={false}
+        >
+            <Text className="mb-6" style={{ marginBottom: '24px', color: '#ccc' }}>
+                {message}
+            </Text>
 
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: '#333',
-                            border: '1px solid #555',
-                            borderRadius: '4px',
-                            color: '#e0e0e0',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 500
-                        }}
-                    >
-                        {cancelText}
-                    </button>
-                    <button
-                        onClick={() => {
-                            onConfirm();
-                            onClose();
-                        }}
-                        style={{
-                            padding: '10px 20px',
-                            background: '#d32f2f',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 600
-                        }}
-                    >
-                        {confirmText}
-                    </button>
-                </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <Button
+                    variant="secondary"
+                    onClick={onClose}
+                >
+                    {cancelText}
+                </Button>
+                <Button
+                    variant="danger"
+                    onClick={handleConfirm}
+                >
+                    {confirmText}
+                </Button>
             </div>
-        </div>
+        </Modal>
     );
 }
 

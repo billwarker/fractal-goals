@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Checkbox from './atoms/Checkbox';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { fractalApi } from '../utils/api';
@@ -479,39 +480,27 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                             {/* Flags */}
                             <div className={styles.flagsContainer}>
-                                <label className={styles.flagLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={hasSets}
-                                        onChange={e => setHasSets(e.target.checked)}
-                                    />
-                                    Track Sets
-                                </label>
-                                <label className={styles.flagLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={hasSplits}
-                                        onChange={e => setHasSplits(e.target.checked)}
-                                    />
-                                    Track Splits
-                                </label>
-                                <label className={styles.flagLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={hasMetrics}
-                                        onChange={e => setHasMetrics(e.target.checked)}
-                                    />
-                                    Enable Metrics
-                                </label>
+                                <Checkbox
+                                    label="Track Sets"
+                                    checked={hasSets}
+                                    onChange={e => setHasSets(e.target.checked)}
+                                />
+                                <Checkbox
+                                    label="Track Splits"
+                                    checked={hasSplits}
+                                    onChange={e => setHasSplits(e.target.checked)}
+                                />
+                                <Checkbox
+                                    label="Enable Metrics"
+                                    checked={hasMetrics}
+                                    onChange={e => setHasMetrics(e.target.checked)}
+                                />
                                 {metrics.length >= 2 && (
-                                    <label className={styles.flagLabel}>
-                                        <input
-                                            type="checkbox"
-                                            checked={metricsMultiplicative}
-                                            onChange={e => setMetricsMultiplicative(e.target.checked)}
-                                        />
-                                        Metrics are multiplicative
-                                    </label>
+                                    <Checkbox
+                                        label="Metrics are multiplicative"
+                                        checked={metricsMultiplicative}
+                                        onChange={e => setMetricsMultiplicative(e.target.checked)}
+                                    />
                                 )}
                             </div>
 
@@ -589,24 +578,20 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                 {/* Metric Flags */}
                                                 <div className={styles.metricFlags}>
                                                     {hasSets && (
-                                                        <label className={styles.subFlagLabel}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={metric.is_top_set_metric || false}
-                                                                onChange={e => handleMetricChange(idx, 'is_top_set_metric', e.target.checked)}
-                                                            />
-                                                            Top Set Metric
-                                                        </label>
+                                                        <Checkbox
+                                                            label="Top Set Metric"
+                                                            checked={metric.is_top_set_metric || false}
+                                                            onChange={e => handleMetricChange(idx, 'is_top_set_metric', e.target.checked)}
+                                                            className={styles.subFlagLabel}
+                                                        />
                                                     )}
                                                     {metricsMultiplicative && (
-                                                        <label className={styles.subFlagLabel}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={metric.is_multiplicative !== undefined ? metric.is_multiplicative : true}
-                                                                onChange={e => handleMetricChange(idx, 'is_multiplicative', e.target.checked)}
-                                                            />
-                                                            Multiplicative
-                                                        </label>
+                                                        <Checkbox
+                                                            label="Multiplicative"
+                                                            checked={metric.is_multiplicative !== undefined ? metric.is_multiplicative : true}
+                                                            onChange={e => handleMetricChange(idx, 'is_multiplicative', e.target.checked)}
+                                                            className={styles.subFlagLabel}
+                                                        />
                                                     )}
                                                 </div>
                                             </div>

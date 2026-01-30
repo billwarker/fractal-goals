@@ -197,14 +197,8 @@
     flex-wrap: wrap;
 }
 
-.flagLabel {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #ccc;
-    cursor: pointer;
-}
+/* .flagLabel replaced by atom */
+
 
 /* Splits Section */
 .splitsContainer {
@@ -244,13 +238,20 @@
 
 .addSplitBtn {
     padding: 10px 16px;
-    background: #333;
-    border: 1px dashed #666;
+    background: var(--color-bg-card-alt);
+    border: 1px dashed var(--color-border);
     border-radius: 4px;
-    color: #aaa;
+    color: var(--color-text-muted);
     cursor: pointer;
     font-size: 13px;
     white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.addSplitBtn:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
 }
 
 /* Metrics Section */
@@ -301,22 +302,26 @@
 }
 
 .subFlagLabel {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: #aaa;
-    cursor: pointer;
+    /* Atom handles layout and color */
+    margin-bottom: 0;
 }
+
 
 .addMetricBtn {
     padding: 10px;
-    background: #333;
-    border: 1px dashed #666;
+    background: var(--color-bg-card-alt);
+    border: 1px dashed var(--color-border);
     border-radius: 4px;
-    color: #aaa;
+    color: var(--color-text-muted);
     cursor: pointer;
     font-size: 13px;
+    transition: all 0.2s;
+}
+
+.addMetricBtn:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
 }
 
 /* Action Buttons */

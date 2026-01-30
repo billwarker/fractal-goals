@@ -141,13 +141,7 @@
     margin-bottom: 10px;
 }
 
-.checkboxLabel {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 13px;
-    cursor: pointer;
-}
+/* .checkboxLabel replaced by atom */
 
 .checkboxGroup {
     display: flex;

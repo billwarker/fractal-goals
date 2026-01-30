@@ -1,0 +1,106 @@
+/* Headings */
+.heading {
+    margin: 0;
+    font-weight: 600;
+    line-height: 1.2;
+    font-family: var(--font-family, inherit);
+}
+
+.h1 {
+    font-size: 32px;
+    letter-spacing: -0.02em;
+}
+
+.h2 {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+}
+
+.h3 {
+    font-size: 20px;
+}
+
+.h4 {
+    font-size: 18px;
+}
+
+.h5 {
+    font-size: 16px;
+}
+
+.h6 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Text */
+.text {
+    margin: 0;
+    line-height: 1.5;
+    font-family: var(--font-family, inherit);
+}
+
+/* Sizes */
+.sm {
+    font-size: 12px;
+}
+
+.md {
+    font-size: 14px;
+}
+
+/* Base size */
+.lg {
+    font-size: 16px;
+}
+
+.xl {
+    font-size: 18px;
+}
+
+.xs {
+    font-size: 11px;
+}
+
+/* Colors */
+.primary {
+    color: var(--color-text-primary, #e0e0e0);
+}
+
+.secondary {
+    color: var(--color-text-secondary, #b0b0b0);
+}
+
+.muted {
+    color: var(--color-text-muted, #888);
+}
+
+.inverse {
+    color: var(--color-text-inverse, #121212);
+}
+
+.brand {
+    color: var(--color-brand-primary, #3b82f6);
+}
+
+.success {
+    color: var(--color-brand-success, #10b981);
+}
+
+.danger {
+    color: var(--color-brand-danger, #ef4444);
+}
+
+/* Weights */
+.normal {
+    font-weight: 400;
+}
+
+.medium {
+    font-weight: 500;
+}
+
+.bold {
+    font-weight: 600;
+}

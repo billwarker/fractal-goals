@@ -1,0 +1,59 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--spacing-sm, 8px);
+    position: relative;
+    width: auto;
+}
+
+.fullWidth {
+    width: 100%;
+}
+
+.label {
+    display: block;
+    margin-bottom: 4px;
+    /* var(--spacing-xs) */
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary, #b0b0b0);
+}
+
+.input {
+    width: 100%;
+    padding: var(--spacing-sm, 8px) 12px;
+    background-color: var(--color-bg-input, #333);
+    border: 1px solid var(--color-border, #444);
+    border-radius: var(--border-radius-sm, 4px);
+    color: var(--color-text-primary, #e0e0e0);
+    font-family: var(--font-family, inherit);
+    font-size: 15px;
+    /* Matches Sidebar/GoalDetail specific size */
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.input:focus {
+    border-color: var(--color-brand-primary, #3b82f6);
+    box-shadow: 0 0 0 1px var(--color-brand-primary, #3b82f6);
+}
+
+.input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--color-bg-card-alt, #222);
+}
+
+.hasError {
+    border-color: var(--color-brand-danger, #ef4444);
+}
+
+.hasError:focus {
+    box-shadow: 0 0 0 1px var(--color-brand-danger, #ef4444);
+}
+
+.errorMessage {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-brand-danger, #ef4444);
+}

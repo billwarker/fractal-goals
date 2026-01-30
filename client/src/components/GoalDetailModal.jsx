@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Input from './atoms/Input';
+import Checkbox from './atoms/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
@@ -335,11 +337,9 @@ function GoalDetailModal({
                             <label className={styles.label} style={{ color: goalColor }}>
                                 Name
                             </label>
-                            <input
-                                type="text"
+                            <Input
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className={styles.input}
                             />
                         </div>
 
@@ -384,11 +384,10 @@ function GoalDetailModal({
                             <label className={styles.label} style={{ color: goalColor }}>
                                 Deadline
                             </label>
-                            <input
+                            <Input
                                 type="date"
                                 value={deadline}
                                 onChange={(e) => setDeadline(e.target.value)}
-                                className={styles.inputDate}
                             />
                         </div>
 
@@ -398,32 +397,26 @@ function GoalDetailModal({
                                 How is progress measured? (Select all that apply)
                             </label>
                             <div className={styles.checkboxGroup}>
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={trackActivities}
-                                        onChange={(e) => setTrackActivities(e.target.checked)}
-                                    />
-                                    Activities & Targets
-                                </label>
+                                <Checkbox
+                                    label="Activities & Targets"
+                                    checked={trackActivities}
+                                    onChange={(e) => setTrackActivities(e.target.checked)}
+                                    className={styles.checkboxLabel}
+                                />
                                 {isAboveShortTermGoal(goalType) && (
-                                    <label className={styles.checkboxLabel}>
-                                        <input
-                                            type="checkbox"
-                                            checked={completedViaChildren}
-                                            onChange={(e) => setCompletedViaChildren(e.target.checked)}
-                                        />
-                                        Completed via Children
-                                    </label>
-                                )}
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={allowManualCompletion}
-                                        onChange={(e) => setAllowManualCompletion(e.target.checked)}
+                                    <Checkbox
+                                        label="Completed via Children"
+                                        checked={completedViaChildren}
+                                        onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                        className={styles.checkboxLabel}
                                     />
-                                    Manual Completion
-                                </label>
+                                )}
+                                <Checkbox
+                                    label="Manual Completion"
+                                    checked={allowManualCompletion}
+                                    onChange={(e) => setAllowManualCompletion(e.target.checked)}
+                                    className={styles.checkboxLabel}
+                                />
                             </div>
 
                             <div className={styles.infoList}>

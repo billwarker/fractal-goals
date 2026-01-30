@@ -1,0 +1,133 @@
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-family, inherit);
+    font-weight: 500;
+    border-radius: var(--border-radius-md, 8px);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    outline: none;
+    position: relative;
+}
+
+.button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.button:focus-visible {
+    box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.5);
+}
+
+/* Sizes */
+.sm {
+    font-size: 12px;
+    padding: 6px 12px;
+    height: 28px;
+}
+
+.md {
+    font-size: 14px;
+    padding: 10px 16px;
+    height: 38px;
+}
+
+.lg {
+    font-size: 16px;
+    padding: 12px 24px;
+    height: 48px;
+}
+
+/* Icons */
+.iconLeft {
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.iconRight {
+    margin-left: 8px;
+    display: flex;
+    align-items: center;
+}
+
+/* Variants */
+
+/* Primary - Brand Blue */
+.primary {
+    background-color: var(--color-brand-primary, #3b82f6);
+    color: white;
+    border-color: transparent;
+}
+
+.primary:hover:not(:disabled) {
+    background-color: var(--color-brand-primary-hover, #2563eb);
+}
+
+/* Secondary - Grey/Outline (Matches existing default buttons) */
+.secondary {
+    background-color: transparent;
+    border: 1px solid var(--color-border, #333);
+    color: var(--color-text-secondary, #e0e0e0);
+}
+
+.secondary:hover:not(:disabled) {
+    background-color: var(--color-bg-card-hover, #333);
+    border-color: var(--color-border-hover, #555);
+    color: var(--color-text-primary, #fff);
+}
+
+/* Success - Green (Matches 'Add Target' etc) */
+.success {
+    background-color: var(--color-brand-success, #10b981);
+    color: white;
+    border-color: transparent;
+}
+
+.success:hover:not(:disabled) {
+    background-color: var(--color-brand-success-hover, #059669);
+}
+
+/* Danger - Red */
+.danger {
+    background-color: var(--color-brand-danger, #ef4444);
+    color: white;
+    border-color: transparent;
+}
+
+.danger:hover:not(:disabled) {
+    background-color: var(--color-brand-danger-hover, #dc2626);
+}
+
+/* Ghost - Transparent text-only */
+.ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    border-color: transparent;
+}
+
+.ghost:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-text-primary, #fff);
+}
+
+/* Loader */
+.loader {
+    width: 1em;
+    height: 1em;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+    margin-right: 0.5em;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
