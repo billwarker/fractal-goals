@@ -56,8 +56,22 @@ class Config:
     
     # Frontend API URL (for documentation/reference)
     # Secret Key for JWT
+    # In production, we should fail if these are not set
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default-jwt-secret-keep-it-safe')
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
+
+    # Rate Limiting Storage URL (Redis)
+    RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+
+    @classmethod
+    def check_production_security(cls):
+        """Verify critical security settings in production."""
+        if cls.ENV == 'production':
+            if cls.JWT_SECRET_KEY == 'default-jwt-secret-keep-it-safe':
+                raise ValueError("CRITICAL: JWT_SECRET_KEY must be set in production environment!")
+            
+            if '*' in cls.CORS_ORIGINS:
+                raise ValueError("CRITICAL: Wildcard CORS origin (*) is NOT allowed in production!")
 
     @classmethod
     def get_database_url(cls):

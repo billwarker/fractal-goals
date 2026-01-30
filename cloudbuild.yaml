@@ -1,0 +1,82 @@
+steps:
+  # ==========================================
+  # 1. Build Backend Image
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Backend'
+    args: [
+      'build', 
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$SHORT_SHA',
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:latest',
+      '.'
+    ]
+
+  # ==========================================
+  # 2. Build Frontend Image
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Frontend'
+    args: [
+      'build',
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$SHORT_SHA',
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:latest',
+      'client'
+    ]
+
+  # ==========================================
+  # 3. Push Images to Artifact Registry
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Images'
+    args: [
+      'push', 
+      '--all-tags', 
+      '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Frontend'
+    args: [
+      'push', 
+      '--all-tags', 
+      '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend'
+    ]
+
+  # ==========================================
+  # 4. Deploy to Cloud Run (Backend)
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Backend'
+    entrypoint: gcloud
+    args: [
+      'run', 'deploy', 'fractal-backend',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$SHORT_SHA',
+      '--region', '$_REGION',
+      '--platform', 'managed',
+      '--allow-unauthenticated', # Remove if auth required
+      '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest'
+    ]
+
+  # ==========================================
+  # 5. Deploy to Cloud Run (Frontend)
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Frontend'
+    entrypoint: gcloud
+    args: [
+      'run', 'deploy', 'fractal-frontend',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$SHORT_SHA',
+      '--region', '$_REGION',
+      '--platform', 'managed',
+      '--allow-unauthenticated'
+    ]
+
+# Global timeout
+timeout: '1200s'
+
+# Substitutions to be configured in Cloud Build Trigger
+substitutions:
+  _REGION: 'us-central1'
+  _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
+
+options:
+  logging: CLOUD_LOGGING_ONLY

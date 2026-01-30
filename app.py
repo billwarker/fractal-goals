@@ -6,7 +6,11 @@ Main application file that integrates API and page routes.
 from flask import Flask
 from flask_cors import CORS
 from flask_compress import Compress
+from flask_compress import Compress
+from flask_talisman import Talisman
 import logging
+
+from extensions import limiter
 
 from config import config
 # from blueprints.api import api_bp # Deprecated
@@ -26,11 +30,41 @@ from services import init_services
 # Print configuration on startup
 config.print_config()
 
+# Verify production security settings
+try:
+    config.check_production_security()
+except ValueError as e:
+    print(f"\n📛 SECURITY ERROR: {e}\n")
+    exit(1)
+
 # Create Flask app
 app = Flask(__name__)
 app.config['ENV'] = config.ENV
 app.config['DEBUG'] = config.DEBUG
 Compress(app)
+
+# Initialize Rate Limiter
+limiter.init_app(app)
+# Configure storage URI if backend is not memory
+if config.RATELIMIT_STORAGE_URI and config.RATELIMIT_STORAGE_URI != "memory://":
+    limiter._storage_uri = config.RATELIMIT_STORAGE_URI
+
+# Initialize Security Headers (Talisman)
+# In development, we disable HTTPS enforcement to allow localhost:8001
+# CSP is set to flexible defaults for now to prevent breaking React Dev Tools
+csp = {
+    'default-src': '\'self\'',
+    'script-src': ['\'self\'', '\'unsafe-inline\'', '\'unsafe-eval\''], # Needed for Vite/React Dev
+    'style-src': ['\'self\'', '\'unsafe-inline\''],
+    'img-src': ['\'self\'', 'data:', 'https:'],
+    'connect-src': ['\'self\'', 'http://localhost:5173', 'https://*.fractalgoals.com'] # Allow frontend dev server
+}
+
+Talisman(
+    app, 
+    force_https=config.ENV == 'production',
+    content_security_policy=csp
+)
 
 # Configure logging
 logging.basicConfig(

@@ -8,6 +8,7 @@ from models import get_engine, get_session, User
 from config import config
 from validators import validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema
 from services.serializers import serialize_user
+from extensions import limiter
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -49,6 +50,7 @@ def token_required(f):
 
 @auth_bp.route('/signup', methods=['POST'])
 @validate_request(UserSignupSchema)
+@limiter.limit("5 per minute")  # Strict limit for account creation
 def signup(validated_data):
     """Register a new user."""
     engine = models.get_engine()
@@ -82,6 +84,7 @@ def signup(validated_data):
 
 @auth_bp.route('/login', methods=['POST'])
 @validate_request(UserLoginSchema)
+@limiter.limit("10 per minute")  # Strict limit for login attempts
 def login(validated_data):
     """Authenticate user and return JWT."""
     engine = models.get_engine()
