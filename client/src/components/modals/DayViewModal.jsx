@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { getShiftedDate } from '../../utils/dateUtils';
+import { getISOYMDInTimezone, getDatePart, formatLiteralDate } from '../../utils/dateUtils';
 import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
@@ -19,13 +19,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     // Find which blocks contain this date
     const blocksContainingDate = blocks ? blocks.filter(block => {
         if (!block.start_date || !block.end_date) return false;
-        const blockStart = new Date(block.start_date);
-        const blockEnd = new Date(block.end_date);
-        const selectedDate = new Date(date);
-        blockStart.setHours(0, 0, 0, 0);
-        blockEnd.setHours(23, 59, 59, 999);
-        selectedDate.setHours(12, 0, 0, 0);
-        return selectedDate >= blockStart && selectedDate <= blockEnd;
+        const start = getDatePart(block.start_date);
+        const end = getDatePart(block.end_date);
+        return date >= start && date <= end;
     }) : [];
 
     // Auto-select block if exactly one block contains this date
@@ -53,7 +49,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         program.blocks.forEach(block => {
             if (block.days) {
                 block.days.forEach(day => {
-                    if (day.date === date) {
+                    if (day.date && getDatePart(day.date) === date) {
                         scheduledProgramDays.push({
                             ...day,
                             blockName: block.name,
@@ -74,16 +70,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     const { timezone } = useTimezone();
     // Helper to get local date string from a datetime in the selected timezone
     const getLocalDateString = (dateTimeStr) => {
-        if (!dateTimeStr) return null;
-        if (dateTimeStr.length === 10) return dateTimeStr;
-        // Shift date to target timezone, then take the date part
-        const shifted = getShiftedDate(dateTimeStr, timezone);
-        if (!shifted) return null;
-
-        const year = shifted.getFullYear();
-        const month = String(shifted.getMonth() + 1).padStart(2, '0');
-        const day = String(shifted.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return getISOYMDInTimezone(dateTimeStr, timezone);
     };
 
     if (sessions) {
@@ -131,9 +118,8 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     // Assuming deadlines are date-only for now or standardized.
     const goalsDueOnDate = goals ? goals.filter(g => {
         if (!g.deadline) return false;
-        // If deadline contains T, treat as datetime, else date
-        const deadlineDate = g.deadline.includes('T') ? getLocalDateString(g.deadline) : g.deadline;
-        return deadlineDate === date;
+        // Deadlines are literal dates (YYYY-MM-DD or ISO)
+        return getDatePart(g.deadline) === date;
     }) : [];
 
     // Find goals completed on this date
@@ -145,19 +131,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     }) : [];
 
     const formatDate = (dateString) => {
-        // dateString is YYYY-MM-DD
-        // We want to format it nicely.
-        // Since it's a date-only string, we can treat it as a local date for the purpose of the label
-        // OR we can use formatDateInTimezone if we treat it as midnight in that timezone?
-        // Actually, for "Monday, January 1, 2023", it doesn't matter much as long as we parse YYYY-MM-DD correctly.
-        const [year, month, day] = dateString.split('-').map(Number);
-        const d = new Date(year, month - 1, day);
-        return d.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-        });
+        return formatLiteralDate(dateString, 'dddd, MMMM D, YYYY');
     };
 
     return (
