@@ -30,7 +30,7 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
                     name: '',
                     startDate: '',
                     endDate: '',
-                    color: '#3A86FF'
+                    color: 'var(--color-brand-primary)'
                 });
             }
             setErrors({});

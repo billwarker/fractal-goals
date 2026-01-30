@@ -6,7 +6,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: var(--color-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -31,7 +31,7 @@
 /* Header */
 .header {
     padding: var(--spacing-md);
-    border-bottom: 1px solid var(--color-border, #333);
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -40,14 +40,14 @@
 
 .headerTitle {
     margin: 0;
-    color: var(--color-text-primary, white);
+    color: var(--color-text-primary);
     font-size: var(--font-size-xl, 20px);
     font-weight: 600;
 }
 
 .headerMeta {
-    color: var(--color-text-muted, #888);
-    font-size: var(--font-size-sm, 13px);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-base, 13px);
     margin-top: 4px;
 }
 
@@ -68,7 +68,7 @@
 .closeButton {
     background: transparent;
     border: none;
-    color: var(--color-text-muted, #888);
+    color: var(--color-text-muted);
     font-size: 24px;
     cursor: pointer;
     line-height: 1;
@@ -78,8 +78,8 @@
 }
 
 .closeButton:hover {
-    color: var(--color-text-primary, white);
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+    background: var(--color-bg-hover);
 }
 
 /* Scrollable Content */
@@ -94,6 +94,7 @@
     background: var(--color-bg-card-alt);
     border-radius: 8px;
     padding: 16px;
+    border: 1px solid var(--color-border);
     border-left-width: 4px;
     border-left-style: solid;
     position: relative;
@@ -101,8 +102,8 @@
 }
 
 .programDayCardCompleted {
-    background: #1a2e1a;
-    border-left-color: #4caf50;
+    background: var(--color-bg-surface);
+    border-left-color: var(--color-brand-success);
 }
 
 .programDayHeader {
@@ -137,8 +138,8 @@
 }
 
 .removeButton:hover {
-    color: #ff4444;
-    background: rgba(255, 68, 68, 0.1);
+    color: var(--color-brand-danger);
+    background: var(--color-bg-hover);
 }
 
 /* Templates List */
@@ -158,16 +159,16 @@
 }
 
 .templateHeaderDone {
-    color: #8bc34a;
+    color: var(--color-brand-success);
 }
 
 .templateHeaderPending {
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 .sessionCountBadge {
     font-size: 11px;
-    background: #333;
+    background: var(--color-bg-secondary);
     padding: 2px 6px;
     border-radius: 4px;
 }
@@ -187,16 +188,16 @@
 }
 
 .sessionLink {
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 .sessionLinkCompleted {
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .sessionDuration {
     font-size: 11px;
-    color: #666;
+    color: var(--color-text-muted);
     margin-top: 1px;
 }
 
@@ -205,12 +206,12 @@
     flex-direction: column;
     gap: 8px;
     margin-top: 16px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
     padding-top: 12px;
 }
 
 .dayNotes {
-    color: #aaa;
+    color: var(--color-text-muted);
     font-size: 13px;
     margin-top: 12px;
     white-space: pre-wrap;
@@ -222,7 +223,7 @@
 }
 
 .sectionTitle {
-    color: var(--color-text-muted, #888);
+    color: var(--color-text-muted);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -251,7 +252,7 @@
 }
 
 .cardTitle {
-    color: white;
+    color: var(--color-text-primary);
     font-size: 14px;
     font-weight: 500;
 }
@@ -260,11 +261,11 @@
 .emptyState {
     text-align: center;
     padding: 30px 20px;
-    color: #666;
-    background: #1a1a1a;
+    color: var(--color-text-muted);
+    background: var(--color-bg-card-alt);
     border-radius: 8px;
     margin-bottom: 24px;
-    border: 1px dashed #333;
+    border: 1px dashed var(--color-border);
 }
 
 .emptyStateIcon {
@@ -285,14 +286,15 @@
 /* Goals */
 .goalCard {
     padding: 12px;
-    background: #252525;
+    background: var(--color-bg-secondary);
     border-radius: 6px;
+    border: 1px solid var(--color-border);
     border-left: 3px solid;
 }
 
 .goalCardCompleted {
-    background: #1a2e1a;
-    border-left-color: #4caf50;
+    background: var(--color-bg-surface);
+    border-left-color: var(--color-brand-success);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -327,13 +329,13 @@
 }
 
 .actionToggle:hover {
-    background: #252525;
+    background: var(--color-bg-hover);
 }
 
 .actionPanel {
     margin-top: 12px;
     padding: 16px;
-    background: #252525;
+    background: var(--color-bg-secondary);
     border-radius: 6px;
 }
 
@@ -373,8 +375,8 @@
 }
 
 .primaryButton:disabled {
-    background: #333;
-    color: #666;
+    background: var(--color-bg-input);
+    color: var(--color-text-disabled);
     cursor: not-allowed;
 }
 
@@ -394,7 +396,7 @@
 }
 
 .optionButton:hover {
-    background: #444;
+    background: var(--color-bg-hover);
 }
 
 .createButton {
@@ -417,7 +419,7 @@
 /* Footer */
 .footer {
     padding: 20px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--color-border);
     display: flex;
     justify-content: flex-end;
     gap: 12px;
@@ -427,13 +429,13 @@
 .closeFooterButton {
     padding: 10px 20px;
     background: transparent;
-    border: 1px solid #444;
-    color: white;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
     border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
 }
 
 .closeFooterButton:hover {
-    background: #333;
+    background: var(--color-bg-hover);
 }

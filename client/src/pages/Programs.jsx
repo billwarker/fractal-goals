@@ -129,14 +129,16 @@ function Programs() {
 
     const { timezone } = useTimezone();
 
-    const formatDate = (dateString) => {
+    const formatDate = (dateString, options = {}) => {
         if (!dateString) return '';
-        // If it's a date-only string (YYYY-MM-DD), we generally want to display it as is
-        // But for consistency with other parts, we can use the util
         return formatDateInTimezone(dateString, timezone, {
             month: 'short',
             day: 'numeric',
-            year: 'numeric'
+            year: 'numeric',
+            hour: undefined,
+            minute: undefined,
+            second: undefined,
+            ...options
         });
     };
 
@@ -272,7 +274,7 @@ function Programs() {
                                                         </div>
                                                     ))
                                                 ) : (
-                                                    <div style={{ fontSize: '13px', color: '#666' }}>No goals selected</div>
+                                                    <div className={styles.emptyGoals}>No goals selected</div>
                                                 );
                                             })()}
                                         </div>
@@ -299,7 +301,7 @@ function Programs() {
                                                     </div>
                                                 );
                                             }) : (
-                                                <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>No blocks defined</div>
+                                                <div className={styles.emptyBlocks}>No blocks defined</div>
                                             )}
                                         </div>
                                     </div>

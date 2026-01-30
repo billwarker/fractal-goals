@@ -111,8 +111,8 @@
 }
 
 .ghost:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: var(--color-text-primary, #fff);
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
 }
 
 /* Loader */

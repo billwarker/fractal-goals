@@ -15,16 +15,16 @@
     margin-bottom: var(--spacing-xs);
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-text-secondary, #b0b0b0);
+    color: var(--color-text-secondary);
 }
 
 .input {
     width: 100%;
     padding: var(--spacing-sm) 12px;
-    background-color: var(--color-bg-input, #333);
-    border: 1px solid var(--color-border, #444);
+    background-color: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius-sm);
-    color: var(--color-text-primary, #e0e0e0);
+    color: var(--color-text-primary);
     font-family: var(--font-family, inherit);
     font-size: 15px;
     /* Matches Sidebar/GoalDetail specific size */
@@ -33,14 +33,14 @@
 }
 
 .input:focus {
-    border-color: var(--color-brand-primary, #3b82f6);
-    box-shadow: 0 0 0 1px var(--color-brand-primary, #3b82f6);
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px var(--color-brand-primary);
 }
 
 .input:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    background-color: var(--color-bg-card-alt, #222);
+    background-color: var(--color-bg-card-alt);
 }
 
 .hasError {

@@ -281,7 +281,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         {unlinkedDaySessions.length > 0 && (
                                             <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
-                                                    <div key={s.id} style={{ fontSize: '12px', color: '#aaa' }}>
+                                                    <div key={s.id} style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                                                         ✓ {s.name} ({s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'})
                                                     </div>
                                                 ))}
@@ -367,8 +367,8 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                 {goalsCompletedOnDate.map(goal => (
                                     <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
                                         <div>
-                                            <div style={{ color: 'var(--color-text-inverse)', fontSize: '14px' }}>✅ {goal.name}</div>
-                                            <div className={styles.goalMeta} style={{ color: '#8bc34a' }}>
+                                            <div style={{ color: 'var(--color-text-primary)', fontSize: '14px' }}>✅ {goal.name}</div>
+                                            <div className={styles.goalMeta} style={{ color: 'var(--color-brand-success)' }}>
                                                 {goal.type || 'Goal'} • Met on this date
                                             </div>
                                         </div>
@@ -383,13 +383,13 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                     return (
                                         <div key={`due-${goal.id}`} className={styles.goalCard}
                                             style={{
-                                                background: isCompleted ? 'rgba(76, 175, 80, 0.2)' : 'var(--color-bg-card-hover)',
-                                                borderLeftColor: isCompleted ? '#4caf50' : getGoalColor(goal.type)
+                                                background: isCompleted ? 'var(--color-bg-success-subtle, rgba(16, 185, 129, 0.1))' : 'var(--color-bg-card-hover)',
+                                                borderLeftColor: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type)
                                             }}>
                                             <div style={{ color: 'var(--color-text-primary)', fontSize: '14px' }}>
                                                 {isCompleted ? '✅' : '🎯'} {goal.name}
                                             </div>
-                                            <div className={styles.goalMeta} style={{ color: isCompleted ? '#8bc34a' : getGoalColor(goal.type) }}>
+                                            <div className={styles.goalMeta} style={{ color: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type) }}>
                                                 {goal.type || 'Goal'} • {isCompleted ? `Completed ${completionDate ? 'on ' + getLocalDateString(completionDate) : ''}` : 'Due today'}
                                             </div>
                                         </div>
@@ -490,7 +490,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                         {blocksContainingDate.length === 0 && (
                                             <div className={styles.formGroup}>
-                                                <div style={{ marginBottom: '8px', color: '#888', fontSize: '12px' }}>
+                                                <div style={{ marginBottom: '8px', color: 'var(--color-text-muted)', fontSize: '12px' }}>
                                                     Select a block to add this day to:
                                                 </div>
                                                 <select
@@ -558,7 +558,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                             >
                                                                 <div>
                                                                     <div style={{ fontWeight: 600 }}>{day.name || `Day ${day.day_number}`}</div>
-                                                                    {day.notes && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{day.notes}</div>}
+                                                                    {day.notes && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{day.notes}</div>}
                                                                 </div>
                                                             </button>
                                                         ));
