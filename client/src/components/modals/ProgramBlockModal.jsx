@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import { Heading } from '../atoms/Typography';
 import styles from './ProgramBlockModal.module.css';
 
 const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
@@ -106,8 +107,8 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
                     <div className={styles.error}>{errors.dateRange}</div>
                 )}
 
-                <div>
-                    <label className={styles.colorLabel} style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                <div className={styles.field}>
+                    <label className={styles.colorLabel}>
                         Color Code
                     </label>
                     <div className={styles.colorRow}>

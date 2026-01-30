@@ -192,7 +192,12 @@ function Programs() {
 
             {/* Programs List */}
             <div className={styles.content}>
-                {programs.length === 0 ? (
+                {loading ? (
+                    <div className={styles.loadingContainer}>
+                        <div className={styles.spinner}></div>
+                        <Text>Loading programs...</Text>
+                    </div>
+                ) : programs.length === 0 ? (
                     <div className={styles.emptyState}>
                         <div className={styles.emptyIcon}>
                             📋

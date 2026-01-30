@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { legacyApi, fractalApi } from '../../utils/api';
 import moment from 'moment';
 import TemplateBuilderModal from './TemplateBuilderModal';
+import Modal from '../atoms/Modal';
+import Button from '../atoms/Button';
+import Input from '../atoms/Input';
+import styles from './ProgramDayModal.module.css';
 
 const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
     const [name, setName] = useState('');
@@ -139,55 +143,39 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         }
     };
 
-    if (!isOpen) return null;
-
-    const overlay = {
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-    };
-
-    const content = {
-        background: '#1e1e1e', padding: '24px', borderRadius: '8px', width: '500px',
-        border: '1px solid #333', boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-    };
-
-    const label = { color: '#ccc', display: 'block', marginBottom: '12px', fontSize: '12px', fontWeight: 500 };
-    const input = { width: '100%', padding: '10px', background: '#333', border: '1px solid #444', color: 'white', borderRadius: '4px', fontSize: '14px' };
-
     return (
         <>
-            <div style={overlay}>
-                <div style={content}>
-                    <h2 style={{ color: 'white', marginTop: 0, marginBottom: '20px', fontSize: '18px' }}>
-                        {isEdit ? 'Edit Program Day' : 'Add Program Day'}
-                    </h2>
+            <Modal
+                isOpen={isOpen}
+                onClose={onClose}
+                title={isEdit ? 'Edit Program Day' : 'Add Program Day'}
+                size="md"
+            >
+                <div className={styles.content}>
+                    <Input
+                        label="Day Name *"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="e.g., Leg Day or Day 1"
+                        fullWidth
+                    />
 
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={label}>Name (e.g. "Leg Day" or "Day 1")</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            placeholder="Day Name"
-                            style={input}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={label}>Sessions</label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+                    <div className={styles.field}>
+                        <label className={styles.label}>Sessions</label>
+                        <div className={styles.sessionList}>
                             {selectedTemplates.map((tid, idx) => {
                                 const t = sessionTemplates.find(st => st.id === tid);
                                 return (
-                                    <div key={idx} style={{ background: '#333', padding: '8px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ color: 'white', fontSize: '13px' }}>{t ? t.name : 'Unknown Template'}</span>
+                                    <div key={idx} className={styles.sessionItem}>
+                                        <span className={styles.sessionName}>{t ? t.name : 'Unknown Template'}</span>
                                         <button
                                             onClick={() => {
                                                 const newTids = [...selectedTemplates];
                                                 newTids.splice(idx, 1);
                                                 setSelectedTemplates(newTids);
                                             }}
-                                            style={{ background: 'transparent', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '16px' }}
+                                            className={styles.removeSessionBtn}
+                                            title="Remove Template"
                                         >
                                             &times;
                                         </button>
@@ -196,77 +184,46 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                             })}
                         </div>
 
-                        {/* Split into 2/3 dropdown, 1/3 create new button */}
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div className={styles.sessionActions}>
                             <select
                                 value=""
                                 onChange={handleAddTemplate}
-                                style={{ ...input, flex: 2 }}
+                                className={styles.templateSelect}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    background: 'var(--color-bg-input)',
+                                    border: '1px solid var(--color-border)',
+                                    color: 'var(--color-text-primary)',
+                                    borderRadius: 'var(--border-radius-sm)',
+                                    fontSize: '14px'
+                                }}
                             >
                                 <option value="">+ Add Session Template</option>
                                 {sessionTemplates.map(t => (
                                     <option key={t.id} value={t.id}>{t.name}</option>
                                 ))}
                             </select>
-                            <button
+                            <Button
                                 onClick={() => setShowTemplateBuilder(true)}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 12px',
-                                    background: '#2196f3',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    whiteSpace: 'nowrap',
-                                    transition: 'background 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#1976d2'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = '#2196f3'}
+                                size="sm"
+                                variant="secondary"
                             >
-                                + New Template
-                            </button>
+                                + New
+                            </Button>
                         </div>
                     </div>
 
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={label}>Optional Day of Week (For Date Mapping)</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    <div className={styles.field}>
+                        <label className={styles.label}>Optional Day of Week</label>
+                        <div className={styles.dayGrid}>
                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => {
                                 const isSelected = selectedDaysOfWeek.includes(d);
                                 return (
                                     <div
                                         key={d}
                                         onClick={() => handleToggleDay(d)}
-                                        style={{
-                                            padding: '8px 12px',
-                                            background: isSelected ? '#3A86FF' : '#2a2a2a',
-                                            border: `1px solid ${isSelected ? '#3A86FF' : '#444'}`,
-                                            borderRadius: '4px',
-                                            color: isSelected ? 'white' : '#ccc',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            minWidth: '40px'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (!isSelected) {
-                                                e.currentTarget.style.background = '#333';
-                                                e.currentTarget.style.borderColor = '#555';
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (!isSelected) {
-                                                e.currentTarget.style.background = '#2a2a2a';
-                                                e.currentTarget.style.borderColor = '#444';
-                                            }
-                                        }}
+                                        className={`${styles.dayBtn} ${isSelected ? styles.dayBtnSelected : ''}`}
                                     >
                                         {d.substring(0, 3)}
                                     </div>
@@ -274,42 +231,44 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                             })}
                         </div>
                         {selectedDaysOfWeek.length > 0 && (
-                            <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
-                                Day will be automatically scheduled for all occurrences of these days in the block.
+                            <div className={styles.hint}>
+                                Scheduled for all {selectedDaysOfWeek.join(', ')}s in the block.
                             </div>
                         )}
                     </div>
 
-
-
                     {isEdit && (
-                        <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px solid #333' }}>
-                            <label style={label}>Copy to Other Blocks</label>
-                            <button
+                        <div className={styles.copyArea}>
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={handleCopy}
-                                style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                fullWidth
                             >
                                 {copyStatus || 'Copy to Other Blocks'}
-                            </button>
+                            </Button>
                         </div>
                     )}
+                </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                        {isEdit ? (
-                            <button onClick={handleDelete} style={{ background: '#d32f2f', border: 'none', color: 'white', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Delete Day</button>
-                        ) : <div></div>}
+                <div className={styles.footer}>
+                    {isEdit ? (
+                        <Button variant="danger" onClick={handleDelete}>
+                            Delete Day
+                        </Button>
+                    ) : <div />}
 
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #444', color: '#ccc', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
-                            <button onClick={handleSave} style={{ background: '#3A86FF', border: 'none', color: 'white', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
-                                {isEdit ? 'Save Changes' : 'Add Day'}
-                            </button>
-                        </div>
+                    <div className={styles.rightActions}>
+                        <Button variant="secondary" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button variant="primary" onClick={handleSave}>
+                            {isEdit ? 'Save Changes' : 'Add Day'}
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </Modal>
 
-            {/* Template Builder Modal */}
             <TemplateBuilderModal
                 isOpen={showTemplateBuilder}
                 onClose={() => setShowTemplateBuilder(false)}
