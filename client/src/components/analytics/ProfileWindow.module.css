@@ -5,7 +5,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--color-bg-card);
+    background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
@@ -13,6 +13,7 @@
     position: relative;
     cursor: default;
     transition: border 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--shadow-md);
 }
 
 .windowContainer.selectable {
@@ -21,7 +22,6 @@
 
 .windowContainer.selected {
     border-color: var(--color-brand-primary);
-    /* 2px handled via props logic? No, just use class */
     border-width: 2px;
     box-shadow: 0 0 12px rgba(33, 150, 243, 0.3);
 }
@@ -32,11 +32,10 @@
     gap: 8px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-card-alt);
+    background: var(--color-bg-secondary);
     align-items: center;
     min-height: 48px;
     flex-wrap: nowrap;
-    /* Default */
     position: relative;
     z-index: 10;
 }
@@ -59,6 +58,7 @@
 .navBtn {
     padding: 6px 8px;
     background: var(--color-bg-input);
+    /* Or surface? Input seems okay for button background */
     border: 1px solid var(--color-border);
     border-radius: 4px;
     color: var(--color-text-secondary);
@@ -73,14 +73,17 @@
 }
 
 .navBtn:hover {
-    color: #fff;
+    color: var(--color-text-primary);
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-hover);
 }
 
 /* Level Buttons */
 .levelBtn {
     padding: 6px 12px;
-    background: var(--color-bg-input);
-    border: none;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    /* Added border for better definition in light mode */
     border-radius: 6px;
     color: var(--color-text-secondary);
     font-size: 12px;
@@ -94,9 +97,16 @@
     gap: 6px;
 }
 
+.levelBtn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
+}
+
 .levelBtn.active {
-    background: #2196f3;
+    background: var(--color-brand-primary);
     color: white;
+    border-color: var(--color-brand-primary);
 }
 
 /* Main Action Area */
@@ -119,23 +129,19 @@
 
 /* Annotations Button specific */
 .btnAnnotations {
-    composes: navBtn;
     width: auto;
     padding: 0 10px;
 }
 
 .btnAnnotations.active {
-    background: #2196f3;
+    background: var(--color-brand-primary);
     color: white;
+    border-color: var(--color-brand-primary);
 }
 
 .btnAnnotations.narrow {
     width: 32px;
     padding: 0;
-}
-
-.btnSplit {
-    composes: navBtn;
 }
 
 /* Split Menu */
@@ -144,7 +150,7 @@
     top: 100%;
     right: 0;
     margin-top: 4px;
-    background: var(--color-bg-card-hover);
+    background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
     border-radius: 6px;
     box-shadow: var(--shadow-md);
@@ -157,7 +163,7 @@
     padding: 10px 14px;
     background: transparent;
     border: none;
-    color: #ccc;
+    color: var(--color-text-primary);
     font-size: 13px;
     cursor: pointer;
     text-align: left;
@@ -166,13 +172,17 @@
     gap: 10px;
 }
 
+.splitMenuItem:hover {
+    background: var(--color-bg-hover);
+}
+
 .splitMenuItem:not(:first-child) {
     border-top: 1px solid var(--color-border);
 }
 
 /* Level 1 Renderer */
 .levelLabel {
-    color: #666;
+    color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 600;
     margin-right: 8px;
@@ -203,7 +213,7 @@
 }
 
 .vizName {
-    color: #ccc;
+    color: var(--color-text-muted);
     font-size: 12px;
     font-weight: 500;
 }
@@ -214,7 +224,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 14px;
     flex-direction: column;
     gap: 12px;
@@ -233,6 +243,8 @@
     flex-direction: column;
     gap: 16px;
     overflow-y: auto;
+    color: var(--color-text-primary);
+    /* Ensure text is visible */
 }
 
 .vizContainerHidden {
@@ -242,6 +254,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    color: var(--color-text-primary);
 }
 
 .vizContainerHeatmap {
@@ -250,11 +263,12 @@
     flex-direction: column;
     overflow: auto;
     padding: 16px;
+    color: var(--color-text-primary);
 }
 
 .vizTitle {
     margin: 0;
-    color: #ccc;
+    color: var(--color-text-secondary);
     font-size: 16px;
 }
 
@@ -273,7 +287,7 @@
 
 .goalTitle {
     margin: 0;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 16px;
 }
 
@@ -282,6 +296,7 @@
     border-radius: 4px;
     font-size: 11px;
     color: white;
+    /* Badge text typically white on colored bg */
 }
 
 .chartContainer {
@@ -295,12 +310,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 /* StatCard */
 .statCard {
-    background: var(--color-bg-card-alt);
+    background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: 6px;
     padding: 16px 20px;
@@ -314,16 +329,17 @@
 .statValue {
     font-size: 24px;
     font-weight: bold;
+    color: var(--color-text-primary);
 }
 
 .statLabel {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .statSubLabel {
     font-size: 10px;
-    color: #666;
+    color: var(--color-text-muted);
 }

@@ -110,7 +110,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 fontSize: '14px',
                 flexDirection: 'column',
                 gap: '12px',
@@ -131,7 +131,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 fontSize: '14px',
                 flexDirection: 'column',
                 gap: '12px',
@@ -151,7 +151,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 fontSize: '14px'
             }}>
                 Loading annotations...
@@ -167,14 +167,14 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'column',
-                color: '#ff6b6b',
+                color: 'var(--color-error)',
                 fontSize: '14px',
                 gap: '8px',
                 padding: '20px',
                 textAlign: 'center'
             }}>
                 <div>{error}</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                     Check that the backend server is running
                 </div>
             </div>
@@ -191,8 +191,8 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
             {/* Header */}
             <div style={{
                 padding: '16px 20px',
-                borderBottom: '1px solid #333',
-                background: '#252525',
+                borderBottom: '1px solid var(--color-border)',
+                background: 'var(--color-bg-secondary)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start'
@@ -200,7 +200,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                 <div>
                     <h3 style={{
                         margin: 0,
-                        color: '#ccc',
+                        color: 'var(--color-text-secondary)',
                         fontSize: '15px',
                         fontWeight: 600
                     }}>
@@ -208,7 +208,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                     </h3>
                     <div style={{
                         fontSize: '12px',
-                        color: '#666',
+                        color: 'var(--color-text-muted)',
                         marginTop: '4px'
                     }}>
                         {getVisualizationName(visualizationType)}
@@ -221,10 +221,10 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                         onClick={onToggleAnnotationMode}
                         style={{
                             padding: '6px 12px',
-                            background: isAnnotating ? '#2196f3' : 'rgba(50, 50, 50, 0.4)',
-                            border: isAnnotating ? '1px solid #1976d2' : '1px solid #444',
+                            background: isAnnotating ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
+                            border: isAnnotating ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: isAnnotating ? 'white' : '#aaa',
+                            color: isAnnotating ? 'white' : 'var(--color-text-muted)',
                             fontSize: '11px',
                             fontWeight: 500,
                             cursor: 'pointer',
@@ -252,7 +252,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#666',
+                        color: 'var(--color-text-muted)',
                         fontSize: '14px',
                         flexDirection: 'column',
                         gap: '12px',
@@ -261,7 +261,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                     }}>
                         <div style={{ fontSize: '32px', opacity: 0.5 }}>📝</div>
                         <div>No annotations for this visualization</div>
-                        <div style={{ fontSize: '12px', color: '#555' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                             Click "Annotate" above or drag on the chart to add notes
                         </div>
                     </div>
@@ -279,7 +279,7 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                             top: '0',
                             bottom: '0',
                             width: '2px',
-                            background: '#333',
+                            background: 'var(--color-border)',
                             marginLeft: '8px'
                         }} />
 
@@ -293,8 +293,8 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
                                     width: '10px',
                                     height: '10px',
                                     borderRadius: '50%',
-                                    background: '#2196f3',
-                                    border: '2px solid #1e1e1e', // Match bg
+                                    background: 'var(--color-brand-primary)',
+                                    border: '2px solid var(--color-bg-surface)', // Match visual bg
                                     zIndex: 2
                                 }} />
 
@@ -336,16 +336,16 @@ function AnnotationCard({ annotation, onDelete, isHighlighted, onClick }) {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
-                background: isHighlighted ? 'rgba(33, 150, 243, 0.1)' : '#252525',
-                border: isHighlighted ? '1px solid #2196f3' : '1px solid #333',
+                background: isHighlighted ? 'rgba(33, 150, 243, 0.1)' : 'var(--color-bg-surface)',
+                border: isHighlighted ? '1px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
                 borderRadius: '6px',
                 padding: '12px 14px',
                 position: 'relative',
                 transition: 'all 0.2s ease',
                 cursor: 'pointer',
                 ...(isHovered && !isHighlighted && {
-                    borderColor: '#444',
-                    background: '#2a2a2a'
+                    borderColor: 'var(--color-text-muted)',
+                    background: 'var(--color-bg-secondary)'
                 }),
                 ...(isHighlighted && {
                     boxShadow: '0 0 0 1px rgba(33, 150, 243, 0.1)'
@@ -355,25 +355,29 @@ function AnnotationCard({ annotation, onDelete, isHighlighted, onClick }) {
             {/* Delete button */}
             {isHovered && (
                 <button
-                    onClick={() => onDelete(annotation.id)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(annotation.id);
+                    }}
                     style={{
                         position: 'absolute',
                         top: '8px',
                         right: '8px',
-                        background: '#5c3030',
-                        border: '1px solid #744',
+                        background: 'transparent',
+                        border: '1px solid var(--color-brand-danger)',
                         borderRadius: '4px',
-                        color: '#ff6b6b',
+                        color: 'var(--color-brand-danger)',
                         fontSize: '11px',
                         padding: '4px 8px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease'
+                        transition: 'all 0.2s ease',
+                        zIndex: 10
                     }}
                     onMouseEnter={(e) => {
-                        e.target.style.background = '#6c3535';
+                        e.target.style.background = 'rgba(239, 68, 68, 0.1)';
                     }}
                     onMouseLeave={(e) => {
-                        e.target.style.background = '#5c3030';
+                        e.target.style.background = 'transparent';
                     }}
                 >
                     Delete
@@ -382,7 +386,7 @@ function AnnotationCard({ annotation, onDelete, isHighlighted, onClick }) {
 
             {/* Annotation text */}
             <div style={{
-                color: '#eee',
+                color: 'var(--color-text-primary)',
                 fontSize: '13px',
                 lineHeight: '1.5',
                 marginBottom: '8px',
@@ -396,7 +400,7 @@ function AnnotationCard({ annotation, onDelete, isHighlighted, onClick }) {
                 display: 'flex',
                 gap: '12px',
                 fontSize: '11px',
-                color: '#666'
+                color: 'var(--color-text-muted)'
             }}>
                 <span>{formatDate(annotation.created_at)}</span>
                 {annotation.selected_points && annotation.selected_points.length > 0 && (

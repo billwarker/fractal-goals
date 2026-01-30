@@ -49,19 +49,18 @@ html {
 }
 
 .metric-item {
-    color: white;
+    color: var(--color-text-primary);
     font-size: 16px;
     font-weight: 600;
     text-align: left;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .metric-completed {
-    color: #4caf50;
+    color: var(--color-success);
 }
 
 .metric-missed {
-    color: #ff5252;
+    color: var(--color-error);
 }
 
 .sidebar {

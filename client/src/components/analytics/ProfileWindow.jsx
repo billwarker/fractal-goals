@@ -392,7 +392,7 @@ function ProfileWindow({
                                 onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
                             }}
                             title="View Annotations"
-                            className={`${styles.btnAnnotations} ${selectedCategory === 'annotations' ? styles.active : ''} ${isNarrow ? styles.narrow : ''}`}
+                            className={`${styles.navBtn} ${styles.btnAnnotations} ${selectedCategory === 'annotations' ? styles.active : ''} ${isNarrow ? styles.narrow : ''}`}
                         >
                             <span>📝</span>
                             {!isNarrow && <span style={{ marginLeft: '4px' }}>Annotations</span>}
@@ -406,7 +406,7 @@ function ProfileWindow({
                                     e.stopPropagation();
                                     setShowSplitMenu(!showSplitMenu);
                                 }}
-                                className={styles.btnSplit}
+                                className={`${styles.navBtn} ${styles.btnSplit}`}
                             >
                                 {isNarrow ? '⊞▾' : '⊞ Split ▾'}
                             </button>

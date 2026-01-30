@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line } from 'react-chartjs-2';
-import { chartDefaults, createChartOptions } from './ChartJSWrapper';
+import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
 
 /**
  * Line Graph component for visualizing metric progression over time
@@ -22,56 +22,12 @@ function LineGraph({
 }) {
     console.log('LineGraph called', { selectedActivity, selectedMetric, selectedMetricY2, selectedSplit });
 
-    if (!selectedActivity) {
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#666',
-                fontSize: '14px'
-            }}>
-                Select an activity to view analytics
-            </div>
-        );
-    }
+    const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
+    const instances = activityInstances[selectedActivity?.id] || [];
 
-    const instances = activityInstances[selectedActivity.id] || [];
-    const activityDef = activities.find(a => a.id === selectedActivity.id);
-
-    if (!activityDef || instances.length === 0) {
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#666',
-                fontSize: '14px'
-            }}>
-                No data available for this activity
-            </div>
-        );
-    }
-
-    const metrics = activityDef.metric_definitions || [];
-    const hasSplits = activityDef.has_splits && activityDef.split_definitions?.length > 0;
-
-    if (metrics.length === 0) {
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#666',
-                fontSize: '14px'
-            }}>
-                This activity has no metrics to display
-            </div>
-        );
-    }
+    // Prepare metric definitions
+    const metrics = activityDef?.metric_definitions || [];
+    const hasSplits = activityDef?.has_splits && activityDef?.split_definitions?.length > 0;
 
     // Set default metric if not selected
     const metricToPlotY1 = selectedMetric || metrics[0];
@@ -81,11 +37,96 @@ function LineGraph({
     const isProductMetricY1 = metricToPlotY1?.id === '__product__';
     const isProductMetricY2 = metricToPlotY2?.id === '__product__';
 
-    // Find the metric designated as the "top set" metric
-    const topSetMetric = metrics.find(m => m.is_top_set_metric) || metrics[0];
-
     // Filter metrics for product calculation (only those marked as multiplicative)
     const multiplicativeMetrics = metrics.filter(m => m.is_multiplicative !== false);
+
+    // Get split name for title if applicable
+    let titleSuffix = '';
+    if (hasSplits && selectedSplit !== 'all') {
+        const splitDef = activityDef?.split_definitions?.find(s => s.id === selectedSplit);
+        if (splitDef) {
+            titleSuffix = ` - ${splitDef.name}`;
+        }
+    }
+
+    // Generate labels for metrics
+    const getMetricLabel = (metricToPlot, isProductMetric) => {
+        if (!metricToPlot) return '';
+        return isProductMetric
+            ? multiplicativeMetrics.map(m => m.name).join(' × ')
+            : metricToPlot.name;
+    };
+
+    const getMetricUnit = (metricToPlot, isProductMetric) => {
+        if (!metricToPlot) return '';
+        return isProductMetric
+            ? multiplicativeMetrics.map(m => m.unit).join(' × ')
+            : metricToPlot.unit;
+    };
+
+    const metricLabelY1 = getMetricLabel(metricToPlotY1, isProductMetricY1);
+    const metricUnitY1 = getMetricUnit(metricToPlotY1, isProductMetricY1);
+    const metricLabelY2 = metricToPlotY2 ? getMetricLabel(metricToPlotY2, isProductMetricY2) : '';
+    const metricUnitY2 = metricToPlotY2 ? getMetricUnit(metricToPlotY2, isProductMetricY2) : '';
+
+    // Build title
+    const titleParts = [(selectedActivity?.name || '') + titleSuffix];
+    if (metricLabelY1) titleParts.push(metricLabelY1);
+    if (metricLabelY2) titleParts.push(metricLabelY2);
+    const chartTitle = titleParts.length > 1 ? `${titleParts[0]} - ${titleParts.slice(1).join(' & ')} Over Time` : `${titleParts[0]} Over Time`;
+
+    // Use the hook to get theme-aware options
+    const baseOptions = useChartOptions({
+        title: chartTitle,
+        xAxisLabel: 'Date',
+        yAxisLabel: `${metricLabelY1} (${metricUnitY1})`,
+        isTimeScale: true
+    });
+
+    if (!selectedActivity) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--color-text-muted)',
+                fontSize: '14px'
+            }}>
+                Select an activity to view analytics
+            </div>
+        );
+    }
+
+    if (!activityDef || instances.length === 0) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--color-text-muted)',
+                fontSize: '14px'
+            }}>
+                No data available for this activity
+            </div>
+        );
+    }
+
+    if (metrics.length === 0) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--color-text-muted)',
+                fontSize: '14px'
+            }}>
+                This activity has no metrics to display
+            </div>
+        );
+    }
 
     // Helper function to check if a metric should be included based on split filter
     const shouldIncludeMetric = (metric) => {
@@ -135,6 +176,9 @@ function LineGraph({
             return null;
         }
     };
+
+    // Find the metric designated as the "top set" metric
+    const topSetMetric = metrics.find(m => m.is_top_set_metric) || metrics[0];
 
     // Collect data points with timestamps for both Y1 and Y2
     const collectDataPoints = (metricToPlot, isProductMetric) => {
@@ -238,42 +282,12 @@ function LineGraph({
                 height: '100%',
                 gap: '20px'
             }}>
-                <div style={{ color: '#666', fontSize: '14px' }}>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
                     No data available for the selected metric(s)
                 </div>
-                {/* Metric Selector */}
                 {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
             </div>
         );
-    }
-
-    // Generate labels for metrics
-    const getMetricLabel = (metricToPlot, isProductMetric) => {
-        if (!metricToPlot) return '';
-        return isProductMetric
-            ? multiplicativeMetrics.map(m => m.name).join(' × ')
-            : metricToPlot.name;
-    };
-
-    const getMetricUnit = (metricToPlot, isProductMetric) => {
-        if (!metricToPlot) return '';
-        return isProductMetric
-            ? multiplicativeMetrics.map(m => m.unit).join(' × ')
-            : metricToPlot.unit;
-    };
-
-    const metricLabelY1 = getMetricLabel(metricToPlotY1, isProductMetricY1);
-    const metricUnitY1 = getMetricUnit(metricToPlotY1, isProductMetricY1);
-    const metricLabelY2 = metricToPlotY2 ? getMetricLabel(metricToPlotY2, isProductMetricY2) : '';
-    const metricUnitY2 = metricToPlotY2 ? getMetricUnit(metricToPlotY2, isProductMetricY2) : '';
-
-    // Get split name for title if applicable
-    let titleSuffix = '';
-    if (hasSplits && selectedSplit !== 'all') {
-        const splitDef = activityDef.split_definitions.find(s => s.id === selectedSplit);
-        if (splitDef) {
-            titleSuffix = ` - ${splitDef.name}`;
-        }
     }
 
     // Colors for Y1 and Y2
@@ -320,7 +334,6 @@ function LineGraph({
         }
     ];
 
-    // Add Y2 dataset if a second metric is selected
     if (metricToPlotY2 && chartDataPointsY2.length > 0) {
         datasets.push({
             label: metricLabelY2,
@@ -344,49 +357,13 @@ function LineGraph({
 
     const chartData = { datasets };
 
-    // Build title
-    const titleParts = [selectedActivity.name + titleSuffix];
-    if (metricLabelY1) titleParts.push(metricLabelY1);
-    if (metricLabelY2) titleParts.push(metricLabelY2);
-    const chartTitle = titleParts.length > 1 ? `${titleParts[0]} - ${titleParts.slice(1).join(' & ')} Over Time` : `${titleParts[0]} Over Time`;
-
+    // Merge base options with specific needs
     const options = {
-        ...createChartOptions({
-            title: chartTitle,
-            xAxisLabel: 'Date',
-            yAxisLabel: `${metricLabelY1} (${metricUnitY1})`,
-            isTimeScale: true
-        }),
+        ...baseOptions,
         scales: {
-            ...createChartOptions({ isTimeScale: true }).scales,
-            x: {
-                ...createChartOptions({ isTimeScale: true }).scales?.x,
-                type: 'time',
-                time: {
-                    unit: 'day',
-                    displayFormats: {
-                        day: 'MMM d, yyyy',
-                        week: 'MMM d, yyyy',
-                        month: 'MMM yyyy'
-                    },
-                    tooltipFormat: 'MMM d, yyyy'
-                },
-                ticks: {
-                    color: chartDefaults.textColor,
-                    maxTicksLimit: 10
-                },
-                grid: {
-                    color: chartDefaults.gridColor
-                },
-                title: {
-                    display: true,
-                    text: 'Date',
-                    color: chartDefaults.textColor
-                }
-            },
+            ...baseOptions.scales,
             y: {
-                type: 'linear',
-                display: true,
+                ...baseOptions.scales.y,
                 position: 'left',
                 title: {
                     display: true,
@@ -396,9 +373,6 @@ function LineGraph({
                 },
                 ticks: {
                     color: lineColorY1
-                },
-                grid: {
-                    color: chartDefaults.gridColor
                 }
             },
             ...(metricToPlotY2 && chartDataPointsY2.length > 0 ? {
@@ -416,32 +390,24 @@ function LineGraph({
                         color: lineColorY2
                     },
                     grid: {
-                        drawOnChartArea: false // Don't draw grid lines for Y2
+                        drawOnChartArea: false
                     }
                 }
             } : {})
         },
         plugins: {
-            ...createChartOptions({}).plugins,
+            ...baseOptions.plugins,
             legend: {
                 display: metricToPlotY2 !== null,
                 position: 'top',
                 labels: {
-                    color: chartDefaults.textColor,
+                    color: '#888', // Fallback
                     usePointStyle: true,
                     padding: 20
                 }
             },
-            title: {
-                display: true,
-                text: chartTitle,
-                color: chartDefaults.textColor,
-                font: {
-                    size: 16
-                }
-            },
             tooltip: {
-                ...createChartOptions({}).plugins.tooltip,
+                ...baseOptions.plugins.tooltip,
                 callbacks: {
                     title: function (context) {
                         const point = context[0].raw;
@@ -476,10 +442,10 @@ function LineGraph({
     function renderMetricSelectors(metrics, metricY1, setMetricY1, metricY2, setMetricY2, activityDef, multiplicativeMetrics) {
         const selectStyle = {
             padding: '6px 12px',
-            background: '#333',
-            border: '1px solid #444',
+            background: 'var(--color-bg-input)',
+            border: '1px solid var(--color-border)',
             borderRadius: '4px',
-            color: 'white',
+            color: 'var(--color-text-primary)',
             fontSize: '12px',
             cursor: 'pointer',
             minWidth: '150px'
@@ -501,7 +467,7 @@ function LineGraph({
                         borderRadius: '50%',
                         background: isProductMetricY1 ? chartDefaults.secondaryColor : chartDefaults.primaryColor
                     }} />
-                    <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis (Left):</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis (Left):</span>
                     <select
                         value={metricY1?.id || ''}
                         onChange={(e) => {
@@ -537,7 +503,7 @@ function LineGraph({
                             borderRadius: '50%',
                             background: '#ff9800'
                         }} />
-                        <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis (Right):</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis (Right):</span>
                         <select
                             value={metricY2?.id || ''}
                             onChange={(e) => {
@@ -550,7 +516,7 @@ function LineGraph({
                                     setMetricY2(metric);
                                 }
                             }}
-                            style={{ ...selectStyle, borderColor: metricY2 ? '#ff9800' : '#444' }}
+                            style={{ ...selectStyle, borderColor: metricY2 ? '#ff9800' : 'var(--color-border)' }}
                         >
                             <option value="">None (Single Axis)</option>
                             {metrics.map(metric => (
@@ -568,7 +534,7 @@ function LineGraph({
                     </div>
                 )}
 
-                {/* Swap Button - only show when Y2 is selected */}
+                {/* Swap Button */}
                 {setMetricY2 && metricY2 && (
                     <button
                         onClick={() => {
@@ -578,10 +544,10 @@ function LineGraph({
                         }}
                         style={{
                             padding: '6px 12px',
-                            background: '#444',
-                            border: '1px solid #555',
+                            background: 'var(--color-bg-surface)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: '#ccc',
+                            color: 'var(--color-text-secondary)',
                             fontSize: '12px',
                             cursor: 'pointer',
                             display: 'flex',
@@ -599,10 +565,7 @@ function LineGraph({
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Metric Selectors */}
             {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
-
-            {/* Chart */}
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <Line ref={chartRef} data={chartData} options={options} />
             </div>

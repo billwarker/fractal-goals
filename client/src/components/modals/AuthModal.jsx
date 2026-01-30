@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import Input from '../atoms/Input';
+import Button from '../atoms/Button';
+import styles from './AuthModal.module.css';
 import '../../App.css';
 
 /**
@@ -12,8 +15,12 @@ function AuthModal({ isOpen, onClose }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Theme color (Matching the request for white highlighting)
-    const themeColor = '#ffffff';
+    // Theme color (For consistent highlighting)
+    // In light mode, white might be invisible against white background if used for text?
+    // The previous implementation used #ffffff which works on dark mode but fails on light mode.
+    // We should use a brand color reference or conditional logic.
+    // For now, let's use a brand color safe for text, or rely on the class.
+    const themeColor = 'var(--color-text-primary)';
 
     // Form states
     const [formData, setFormData] = useState({
@@ -71,193 +78,113 @@ function AuthModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal" style={{ width: '450px', maxWidth: '90vw' }}>
+        <div className={styles.modalOverlay}>
+            <div className={styles.modalContent}>
                 {/* Header - Reference GoalDetailModal */}
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    paddingBottom: '16px',
-                    marginBottom: '16px',
-                    borderBottom: `2px solid ${themeColor}`
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: themeColor, letterSpacing: '1px' }}>
+                <div className={styles.header} style={{ borderBottomColor: themeColor }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div className={styles.title} style={{ color: themeColor }}>
                             {isLogin ? 'WELCOME BACK' : 'CREATE AN ACCOUNT'}
                         </div>
                         <button
                             onClick={onClose}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#888',
-                                fontSize: '24px',
-                                cursor: 'pointer',
-                                padding: '0',
-                                lineHeight: 1
-                            }}
+                            className={styles.closeButton}
                         >
                             &times;
                         </button>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <form onSubmit={handleSubmit} className={styles.form}>
                     {isLogin ? (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                Username or Email
-                            </label>
-                            <input
-                                type="text"
+                        <div className={styles.formGroup}>
+                            <Input
+                                label="Username or Email"
                                 name="usernameOrEmail"
                                 value={formData.usernameOrEmail}
                                 onChange={handleInputChange}
                                 required
                                 placeholder="Quantum Traveler"
                                 autoFocus
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '14px'
-                                }}
+                                fullWidth
                             />
                         </div>
                     ) : (
                         <>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                    Username
-                                </label>
-                                <input
-                                    type="text"
+                            <div className={styles.formGroup}>
+                                <Input
+                                    label="Username"
                                     name="username"
                                     value={formData.username}
                                     onChange={handleInputChange}
                                     required
                                     placeholder="Explorer"
                                     autoFocus
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '14px'
-                                    }}
+                                    fullWidth
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                    Email
-                                </label>
-                                <input
+                            <div className={styles.formGroup}>
+                                <Input
+                                    label="Email"
                                     type="email"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleInputChange}
                                     required
                                     placeholder="void@nebula.io"
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '14px'
-                                    }}
+                                    fullWidth
                                 />
                             </div>
                         </>
                     )}
 
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                            Password
-                        </label>
-                        <input
+                    <div className={styles.formGroup}>
+                        <Input
+                            label="Password"
                             type="password"
                             name="password"
                             value={formData.password}
                             onChange={handleInputChange}
                             required
                             placeholder="••••••••"
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                background: '#2a2a2a',
-                                border: '1px solid #444',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
+                            fullWidth
                         />
                     </div>
 
                     {error && (
-                        <div style={{ color: '#ff5252', fontSize: '12px', textAlign: 'center', background: 'rgba(255, 82, 82, 0.1)', padding: '10px', borderRadius: '4px', marginTop: '5px' }}>
+                        <div className={styles.errorMessage}>
                             {error}
                         </div>
                     )}
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', paddingTop: '16px', borderTop: '1px solid #333' }}>
-                        <button
+                    <div className={styles.actions}>
+                        <Button
                             type="submit"
                             disabled={loading}
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                background: themeColor,
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: '#000000',
-                                fontWeight: 'bold',
-                                fontSize: '14px',
-                                cursor: 'pointer',
-                                transition: 'opacity 0.2s'
-                            }}
+                            fullWidth
+                            variant="primary"
+                            style={{ fontWeight: 'bold' }}
                         >
                             {loading ? 'PROCESSING...' : (isLogin ? 'LOG IN' : 'CREATE')}
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                background: 'transparent',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                color: '#aaa',
-                                cursor: 'pointer',
-                                fontSize: '13px'
-                            }}
+                            fullWidth
+                            variant="secondary"
                         >
                             Cancel
-                        </button>
+                        </Button>
                     </div>
 
-                    <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '13px', color: '#888' }}>
+                    <div className={styles.toggleContainer}>
                         {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
                         <button
                             type="button"
                             onClick={() => setIsLogin(!isLogin)}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: themeColor,
-                                cursor: 'pointer',
-                                padding: '0 5px',
-                                fontWeight: 'bold'
-                            }}
+                            className={styles.toggleButton}
+                            style={{ color: themeColor }}
                         >
                             {isLogin ? 'SIGN UP' : 'LOGIN'}
                         </button>

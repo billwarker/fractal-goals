@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
 import { useTheme } from '../../contexts/ThemeContext';
 import AddTargetModal from '../AddTargetModal';
+import Input from '../atoms/Input';
+import Button from '../atoms/Button';
+import styles from './GoalModal.module.css';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
     const { getGoalColor, getGoalTextColor } = useTheme();
@@ -76,68 +79,40 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
 
     return (
         <>
-            <div className="modal-overlay">
-                <div className="modal" style={{ width: '600px', maxWidth: '95vw' }}>
+            <div className={styles.modalOverlay}>
+                <div className={styles.modalContent}>
                     {/* Header */}
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        paddingBottom: '16px',
-                        marginBottom: '16px',
-                        borderBottom: `2px solid ${themeColor}`
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: themeColor, textTransform: 'uppercase' }}>
-                                {parent ? `Add ${getTypeDisplayName(goalType)}` : "Create New Fractal"}
-                            </div>
-                            <button
-                                onClick={onClose}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#888',
-                                    fontSize: '24px',
-                                    cursor: 'pointer',
-                                    padding: '0',
-                                    lineHeight: 1
-                                }}
-                            >
-                                &times;
-                            </button>
+                    <div className={styles.header} style={{ borderBottomColor: themeColor }}>
+                        <div className={styles.title} style={{ color: themeColor }}>
+                            {parent ? `Add ${getTypeDisplayName(goalType)}` : "Create New Fractal"}
                         </div>
+                        <button
+                            onClick={onClose}
+                            className={styles.closeButton}
+                        >
+                            &times;
+                        </button>
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    <form onSubmit={handleSubmit} className={styles.form}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label} style={{ color: themeColor }}>
                                 Goal Type
                             </label>
                             {parent ? (
-                                <div style={{
-                                    padding: '8px 12px',
-                                    background: themeColor,
-                                    borderRadius: '4px',
-                                    color: textColor,
-                                    fontWeight: 'bold',
-                                    fontSize: '13px',
-                                    display: 'inline-block'
-                                }}>
-                                    {getTypeDisplayName(goalType)}
+                                <div>
+                                    <div
+                                        className={styles.readOnlyType}
+                                        style={{ background: themeColor, color: textColor }}
+                                    >
+                                        {getTypeDisplayName(goalType)}
+                                    </div>
                                 </div>
                             ) : (
                                 <select
                                     value={goalType}
                                     onChange={e => setGoalType(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: '#2a2a2a',
-                                        border: '1px solid #444',
-                                        borderRadius: '4px',
-                                        color: 'white',
-                                        fontSize: '14px'
-                                    }}
+                                    className={styles.select}
                                 >
                                     <option value="UltimateGoal">Ultimate Goal</option>
                                     <option value="LongTermGoal">Long Term Goal</option>
@@ -147,30 +122,21 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                             )}
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                Name
-                            </label>
-                            <input
+                        <div className={styles.formGroup}>
+                            <Input
+                                label="Name"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 required
                                 autoFocus
                                 placeholder="Enter goal name..."
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '14px'
-                                }}
+                                fullWidth
+                            // Pass custom style if needed, but atom handles colors best
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label} style={{ color: themeColor }}>
                                 Description
                             </label>
                             <textarea
@@ -178,23 +144,15 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                 onChange={e => setDescription(e.target.value)}
                                 placeholder="What is this goal about?"
                                 rows={2}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
+                                className={styles.textarea}
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label} style={{ color: themeColor }}>
                                 Relevance (SMART)
                             </label>
-                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontStyle: 'italic' }}>
+                            <div className={styles.descriptionLabel}>
                                 {!parent
                                     ? `Why does ${name || 'this goal'} matter?`
                                     : `How does this help achieve "${parent.name}"?`
@@ -205,68 +163,40 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                 onChange={e => setRelevanceStatement(e.target.value)}
                                 placeholder={!parent ? "Explain the significance..." : "Explain the contribution..."}
                                 rows={2}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
+                                className={styles.textarea}
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: themeColor, fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label} style={{ color: themeColor }}>
                                 Deadline
                             </label>
-                            <input
+                            <Input
                                 type="date"
                                 value={deadline}
                                 onChange={e => setDeadline(e.target.value)}
-                                style={{
-                                    padding: '10px',
-                                    background: '#2a2a2a',
-                                    border: '1px solid #444',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
+                                fullWidth
                             />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #333', marginTop: '10px' }}>
-                            <button
-                                type="button"
+                        <div className={styles.footer}>
+                            <Button
+                                variant="secondary"
                                 onClick={onClose}
-                                style={{
-                                    padding: '8px 16px',
-                                    background: 'transparent',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px',
-                                    color: '#aaa',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}
+                                type="button"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="submit"
                                 style={{
-                                    padding: '8px 24px',
                                     background: themeColor,
                                     color: textColor,
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
+                                    borderColor: themeColor
                                 }}
                             >
                                 Create
-                            </button>
+                            </Button>
                         </div>
                     </form>
                 </div>

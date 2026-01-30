@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Scatter } from 'react-chartjs-2';
-import { chartDefaults, createChartOptions } from './ChartJSWrapper';
+import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
 
 /**
  * Scatter Plot component for visualizing activity metrics
@@ -27,6 +27,32 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         }
     }, [selectedActivity?.id]);
 
+    // Use selected metrics or defaults
+    const xMetricToPlot = xMetric || metrics[0];
+    const yMetricToPlot = yMetric || metrics[1];
+
+    // Get split name for title if applicable
+    let titleSuffix = '';
+    const hasSplits = activityDef?.has_splits && activityDef?.split_definitions?.length > 0;
+    if (hasSplits && selectedSplit !== 'all') {
+        const splitDef = activityDef.split_definitions.find(s => s.id === selectedSplit);
+        if (splitDef) {
+            titleSuffix = ` - ${splitDef.name}`;
+        }
+    }
+
+    const xAxisLabel = xMetricToPlot ? `${xMetricToPlot.name} (${xMetricToPlot.unit})` : '';
+    const yAxisLabel = yMetricToPlot ? `${yMetricToPlot.name} (${yMetricToPlot.unit})` : '';
+    const chartTitle = selectedActivity ? `${selectedActivity.name}${titleSuffix} - Metrics Analysis` : '';
+
+    // Use hook for options
+    const baseOptions = useChartOptions({
+        title: chartTitle,
+        xAxisLabel,
+        yAxisLabel,
+        isTimeScale: false
+    });
+
     if (!selectedActivity) {
         return (
             <div style={{
@@ -34,7 +60,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 fontSize: '14px'
             }}>
                 Select an activity to view analytics
@@ -43,7 +69,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     }
 
     const instances = activityInstances[selectedActivity.id] || [];
-    const hasSplits = activityDef?.has_splits && activityDef?.split_definitions?.length > 0;
 
     if (!activityDef || instances.length === 0) {
         return (
@@ -52,7 +77,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 fontSize: '14px'
             }}>
                 No data available for this activity
@@ -70,12 +95,12 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 justifyContent: 'center',
                 height: '100%',
                 gap: '16px',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 textAlign: 'center',
                 padding: '20px'
             }}>
                 <div style={{ fontSize: '48px' }}>📊</div>
-                <div style={{ fontSize: '16px', fontWeight: 500, color: '#888' }}>
+                <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
                     Scatter Plot Unavailable
                 </div>
                 <div style={{ fontSize: '14px', maxWidth: '400px' }}>
@@ -84,7 +109,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 </div>
                 <div style={{
                     fontSize: '13px',
-                    color: '#2196f3',
+                    color: 'var(--color-brand-primary)',
                     marginTop: '8px'
                 }}>
                     Try the Line Graph view instead to see metric progression over time.
@@ -92,10 +117,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
             </div>
         );
     }
-
-    // Use selected metrics or defaults
-    const xMetricToPlot = xMetric || metrics[0];
-    const yMetricToPlot = yMetric || metrics[1];
 
     // Collect data points from instances
     const dataPoints = [];
@@ -198,13 +219,13 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 height: '100%',
                 gap: '20px'
             }}>
-                <div style={{ color: '#666', fontSize: '14px' }}>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
                     No metric data available for the selected metrics
                 </div>
                 {/* Metric Selectors */}
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#888' }}>X-Axis:</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>X-Axis:</span>
                         <select
                             value={xMetricToPlot.id}
                             onChange={(e) => {
@@ -213,10 +234,10 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                             }}
                             style={{
                                 padding: '6px 12px',
-                                background: '#333',
-                                border: '1px solid #444',
+                                background: 'var(--color-bg-input)',
+                                border: '1px solid var(--color-border)',
                                 borderRadius: '4px',
-                                color: 'white',
+                                color: 'var(--color-text-primary)',
                                 fontSize: '12px',
                                 cursor: 'pointer'
                             }}
@@ -229,7 +250,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         </select>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis:</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis:</span>
                         <select
                             value={yMetricToPlot.id}
                             onChange={(e) => {
@@ -238,10 +259,10 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                             }}
                             style={{
                                 padding: '6px 12px',
-                                background: '#333',
-                                border: '1px solid #444',
+                                background: 'var(--color-bg-input)',
+                                border: '1px solid var(--color-border)',
                                 borderRadius: '4px',
-                                color: 'white',
+                                color: 'var(--color-text-primary)',
                                 fontSize: '12px',
                                 cursor: 'pointer'
                             }}
@@ -268,15 +289,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         set_number: p.set_number
     }));
 
-    // Get split name for title if applicable
-    let titleSuffix = '';
-    if (hasSplits && selectedSplit !== 'all') {
-        const splitDef = activityDef.split_definitions.find(s => s.id === selectedSplit);
-        if (splitDef) {
-            titleSuffix = ` - ${splitDef.name}`;
-        }
-    }
-
     const chartData = {
         datasets: [{
             label: selectedActivity.name,
@@ -292,20 +304,12 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         }]
     };
 
-    const xAxisLabel = `${xMetricToPlot.name} (${xMetricToPlot.unit})`;
-    const yAxisLabel = `${yMetricToPlot.name} (${yMetricToPlot.unit})`;
-
     const options = {
-        ...createChartOptions({
-            title: `${selectedActivity.name}${titleSuffix} - Metrics Analysis`,
-            xAxisLabel,
-            yAxisLabel,
-            isTimeScale: false
-        }),
+        ...baseOptions,
         plugins: {
-            ...createChartOptions({}).plugins,
+            ...baseOptions.plugins,
             tooltip: {
-                ...createChartOptions({}).plugins.tooltip,
+                ...baseOptions.plugins.tooltip,
                 callbacks: {
                     title: function (context) {
                         const point = context[0].raw;
@@ -343,7 +347,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 flexWrap: 'wrap'
             }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: '#888' }}>X-Axis:</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>X-Axis:</span>
                     <select
                         value={xMetricToPlot.id}
                         onChange={(e) => {
@@ -352,10 +356,10 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         }}
                         style={{
                             padding: '6px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: 'white',
+                            color: 'var(--color-text-primary)',
                             fontSize: '12px',
                             cursor: 'pointer'
                         }}
@@ -368,7 +372,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                     </select>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: '#888' }}>Y-Axis:</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis:</span>
                     <select
                         value={yMetricToPlot.id}
                         onChange={(e) => {
@@ -377,10 +381,10 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         }}
                         style={{
                             padding: '6px 12px',
-                            background: '#333',
-                            border: '1px solid #444',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '4px',
-                            color: 'white',
+                            color: 'var(--color-text-primary)',
                             fontSize: '12px',
                             cursor: 'pointer'
                         }}

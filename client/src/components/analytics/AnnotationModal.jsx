@@ -94,8 +94,8 @@ function AnnotationModal({
         >
             <div
                 style={{
-                    background: '#1e1e1e',
-                    border: '1px solid #333',
+                    background: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '12px',
                     padding: '24px',
                     width: '500px',
@@ -115,7 +115,7 @@ function AnnotationModal({
                         margin: 0,
                         fontSize: '16px',
                         fontWeight: 600,
-                        color: '#fff'
+                        color: 'var(--color-text-primary)'
                     }}>
                         ✏️ Add Annotation
                     </h3>
@@ -124,7 +124,7 @@ function AnnotationModal({
                         style={{
                             background: 'none',
                             border: 'none',
-                            color: '#888',
+                            color: 'var(--color-text-muted)',
                             fontSize: '18px',
                             cursor: 'pointer',
                             padding: '4px 8px'
@@ -136,15 +136,15 @@ function AnnotationModal({
 
                 {/* Selected points info */}
                 <div style={{
-                    background: '#252525',
-                    border: '1px solid #333',
+                    background: 'var(--color-bg-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '8px',
                     padding: '12px',
                     marginBottom: '16px'
                 }}>
                     <div style={{
                         fontSize: '11px',
-                        color: '#888',
+                        color: 'var(--color-text-muted)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         marginBottom: '4px'
@@ -153,7 +153,7 @@ function AnnotationModal({
                     </div>
                     <div style={{
                         fontSize: '13px',
-                        color: '#2196f3',
+                        color: 'var(--color-brand-primary)',
                         fontWeight: 500
                     }}>
                         {formatSelectedPoints()}
@@ -171,10 +171,10 @@ function AnnotationModal({
                         width: '100%',
                         height: '120px',
                         padding: '12px',
-                        background: '#252525',
-                        border: '1px solid #444',
+                        background: 'var(--color-bg-input)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
-                        color: '#fff',
+                        color: 'var(--color-text-primary)',
                         fontSize: '14px',
                         fontFamily: 'inherit',
                         resize: 'vertical',
@@ -186,7 +186,7 @@ function AnnotationModal({
                 {/* Hint */}
                 <div style={{
                     fontSize: '11px',
-                    color: '#666',
+                    color: 'var(--color-text-muted)',
                     marginTop: '8px',
                     marginBottom: '16px'
                 }}>
@@ -203,10 +203,10 @@ function AnnotationModal({
                         onClick={onClose}
                         style={{
                             padding: '10px 20px',
-                            background: '#333',
-                            border: 'none',
+                            background: 'var(--color-bg-surface)',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '6px',
-                            color: '#aaa',
+                            color: 'var(--color-text-secondary)',
                             fontSize: '13px',
                             fontWeight: 500,
                             cursor: 'pointer'
@@ -219,13 +219,14 @@ function AnnotationModal({
                         disabled={!content.trim()}
                         style={{
                             padding: '10px 20px',
-                            background: content.trim() ? '#2196f3' : '#444',
-                            border: 'none',
+                            background: content.trim() ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
+                            border: content.trim() ? 'none' : '1px solid var(--color-border)',
                             borderRadius: '6px',
-                            color: content.trim() ? 'white' : '#888',
+                            color: content.trim() ? 'white' : 'var(--color-text-muted)',
                             fontSize: '13px',
                             fontWeight: 500,
-                            cursor: content.trim() ? 'pointer' : 'not-allowed'
+                            cursor: content.trim() ? 'pointer' : 'not-allowed',
+                            opacity: content.trim() ? 1 : 0.7
                         }}
                     >
                         Save Annotation

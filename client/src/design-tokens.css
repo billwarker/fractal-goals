@@ -22,6 +22,7 @@
   --color-bg-secondary: #252525;
   --color-bg-hover: rgba(255, 255, 255, 0.1);
   --color-text-disabled: rgba(255, 255, 255, 0.38);
+  --color-bg-tooltip: rgba(30, 30, 30, 0.95);
 
   /* Text Colors */
   --color-text-primary: rgb(224, 224, 224);
@@ -90,6 +91,7 @@
   --color-bg-secondary: #f9fafb;
   --color-bg-hover: rgba(0, 0, 0, 0.05);
   --color-text-disabled: rgba(0, 0, 0, 0.38);
+  --color-bg-tooltip: rgba(255, 255, 255, 0.95);
 
   /* Text Colors */
   --color-text-primary: #111827;

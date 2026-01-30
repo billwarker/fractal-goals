@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext';
+import { chartDefaults } from './ChartJSWrapper'; // Import chartDefaults for consistent coloring
 
 /**
  * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
@@ -99,7 +100,6 @@ function GoalTimeDistribution({ goals, chartRef }) {
         });
 
         // Sort goals by type hierarchy: children first (bottom of stack), parents last (top of stack)
-        // Chart.js renders datasets in order - first = bottom, last = top
         const goalTypesHierarchy = [
             'NanoGoal', 'MicroGoal', 'ImmediateGoal',
             'ShortTermGoal', 'MidTermGoal', 'LongTermGoal', 'UltimateGoal'
@@ -160,7 +160,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 display: true,
                 position: 'top',
                 labels: {
-                    color: '#ccc',
+                    color: chartDefaults.textColor,
                     usePointStyle: true,
                     pointStyle: 'circle',
                     padding: 12,
@@ -169,7 +169,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 }
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                backgroundColor: 'rgba(30, 30, 30, 0.95)', // Chart.js needs exact color often, keep dark for now or use var if supported
                 titleColor: '#fff',
                 bodyColor: '#ccc',
                 padding: 12,
@@ -207,17 +207,17 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 title: {
                     display: true,
                     text: 'Date',
-                    color: '#888',
+                    color: chartDefaults.textColor,
                     font: { size: 12 }
                 },
                 ticks: {
-                    color: '#888',
+                    color: chartDefaults.textColor,
                     maxRotation: 45,
                     minRotation: 0,
                     autoSkip: true,
                     maxTicksLimit: 15
                 },
-                grid: { color: '#333' }
+                grid: { color: chartDefaults.gridColor }
             },
             y: {
                 stacked: true,
@@ -225,14 +225,14 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 title: {
                     display: true,
                     text: 'Time (hours)',
-                    color: '#888',
+                    color: chartDefaults.textColor,
                     font: { size: 12 }
                 },
                 ticks: {
-                    color: '#888',
+                    color: chartDefaults.textColor,
                     callback: (value) => `${value}h`
                 },
-                grid: { color: '#333' }
+                grid: { color: chartDefaults.gridColor }
             }
         }
     }), [chartData.sortedDates]);
@@ -252,7 +252,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                     alignItems: 'center',
                     marginBottom: '16px'
                 }}>
-                    <h3 style={{ margin: 0, fontSize: '14px', color: '#888' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                         Time Invested Over Time
                     </h3>
                 </div>
@@ -263,14 +263,14 @@ function GoalTimeDistribution({ goals, chartRef }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'column',
-                    color: '#666',
+                    color: 'var(--color-text-muted)',
                     padding: '40px'
                 }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>⏱️</div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#888', margin: 0 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)', margin: 0 }}>
                         No Time Recorded Yet
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', textAlign: 'center', maxWidth: '300px' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '8px', textAlign: 'center', maxWidth: '300px' }}>
                         Start working on goals to see time distribution over time
                     </p>
                 </div>
@@ -289,7 +289,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 flexWrap: 'wrap',
                 gap: '12px'
             }}>
-                <h3 style={{ margin: 0, fontSize: '14px', color: '#888' }}>
+                <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                     Time Invested Over Time
                 </h3>
 
@@ -299,7 +299,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                     <div style={{
                         display: 'flex',
                         gap: '4px',
-                        background: '#252525',
+                        background: 'var(--color-bg-input)', // Replaced #252525
                         borderRadius: '4px',
                         padding: '2px'
                     }}>
@@ -307,12 +307,13 @@ function GoalTimeDistribution({ goals, chartRef }) {
                             onClick={() => setDurationMode('activity')}
                             style={{
                                 padding: '4px 10px',
-                                background: durationMode === 'activity' ? '#333' : 'transparent',
+                                background: durationMode === 'activity' ? 'var(--color-bg-surface)' : 'transparent',
                                 border: 'none',
                                 borderRadius: '3px',
-                                color: durationMode === 'activity' ? '#fff' : '#666',
+                                color: durationMode === 'activity' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                                 fontSize: '11px',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
                             }}
                             title="Time spent on activities associated with each goal"
                         >
@@ -322,12 +323,13 @@ function GoalTimeDistribution({ goals, chartRef }) {
                             onClick={() => setDurationMode('session')}
                             style={{
                                 padding: '4px 10px',
-                                background: durationMode === 'session' ? '#333' : 'transparent',
+                                background: durationMode === 'session' ? 'var(--color-bg-surface)' : 'transparent',
                                 border: 'none',
                                 borderRadius: '3px',
-                                color: durationMode === 'session' ? '#fff' : '#666',
+                                color: durationMode === 'session' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                                 fontSize: '11px',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
                             }}
                             title="Full session duration when goal is associated"
                         >
@@ -342,7 +344,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                         gap: '6px',
                         cursor: 'pointer',
                         fontSize: '11px',
-                        color: '#888'
+                        color: 'var(--color-text-secondary)'
                     }}>
                         <input
                             type="checkbox"
@@ -352,7 +354,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                                 width: '13px',
                                 height: '13px',
                                 cursor: 'pointer',
-                                accentColor: '#2196f3'
+                                accentColor: 'var(--color-brand-primary)'
                             }}
                         />
                         <span>Roll up</span>
@@ -365,8 +367,8 @@ function GoalTimeDistribution({ goals, chartRef }) {
                                 width: '13px',
                                 height: '13px',
                                 borderRadius: '50%',
-                                background: '#333',
-                                color: '#888',
+                                background: 'var(--color-bg-input)',
+                                color: 'var(--color-text-muted)',
                                 fontSize: '9px',
                                 cursor: 'help'
                             }}

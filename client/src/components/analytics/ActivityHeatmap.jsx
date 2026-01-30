@@ -100,7 +100,7 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
 
     // Get color intensity based on count
     const getColor = (count) => {
-        if (count === 0) return '#1a1a1a';
+        if (count === 0) return 'var(--color-bg-input)';
 
         const intensity = count / maxCount;
 
@@ -131,8 +131,8 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
 
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '20px'
         }}>
@@ -146,7 +146,7 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                     margin: 0,
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#ccc'
+                    color: 'var(--color-text-secondary)'
                 }}>
                     📅 Activity Heatmap
                 </h3>
@@ -154,10 +154,10 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                     display: 'flex',
                     gap: '16px',
                     fontSize: '12px',
-                    color: '#888'
+                    color: 'var(--color-text-muted)'
                 }}>
-                    <span><strong style={{ color: '#4caf50' }}>{totalSessions}</strong> sessions</span>
-                    <span><strong style={{ color: '#2196f3' }}>{activeDays}</strong> active days</span>
+                    <span><strong style={{ color: 'var(--color-success)' }}>{totalSessions}</strong> sessions</span>
+                    <span><strong style={{ color: 'var(--color-brand-primary)' }}>{activeDays}</strong> active days</span>
                 </div>
             </div>
 
@@ -174,7 +174,7 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                             position: 'relative',
                             left: `${label.weekIndex * (cellSize + cellGap)}px`,
                             fontSize: '10px',
-                            color: '#666',
+                            color: 'var(--color-text-muted)',
                             marginRight: '-20px'
                         }}
                     >
@@ -197,7 +197,7 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                             style={{
                                 height: `${cellSize}px`,
                                 fontSize: '9px',
-                                color: '#666',
+                                color: 'var(--color-text-muted)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'flex-end',
@@ -255,10 +255,10 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                 gap: '4px',
                 marginTop: '12px',
                 fontSize: '10px',
-                color: '#666'
+                color: 'var(--color-text-muted)'
             }}>
                 <span>Less</span>
-                <div style={{ width: '10px', height: '10px', backgroundColor: '#1a1a1a', borderRadius: '2px' }} />
+                <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-bg-input)', borderRadius: '2px' }} />
                 <div style={{ width: '10px', height: '10px', backgroundColor: '#0e4429', borderRadius: '2px' }} />
                 <div style={{ width: '10px', height: '10px', backgroundColor: '#006d32', borderRadius: '2px' }} />
                 <div style={{ width: '10px', height: '10px', backgroundColor: '#26a641', borderRadius: '2px' }} />

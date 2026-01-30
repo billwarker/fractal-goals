@@ -79,7 +79,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
                 if (isRecent && isAboveAverage) return 'rgba(76, 175, 80, 0.8)'; // Green for recent high
                 if (isRecent) return 'rgba(33, 150, 243, 0.8)'; // Blue for recent
                 if (isAboveAverage) return 'rgba(76, 175, 80, 0.6)'; // Light green for above avg
-                return 'rgba(100, 100, 100, 0.5)'; // Grey for below average
+                return 'rgba(128, 128, 128, 0.5)'; // Grey for below average (neutral)
             }),
             borderColor: weeklyData.map((w, i) => {
                 const isRecent = i >= weeklyData.length - 2;
@@ -103,7 +103,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                backgroundColor: 'rgba(30, 30, 30, 0.95)', // Keep dark tooltip for contrast
                 titleColor: '#fff',
                 bodyColor: '#ccc',
                 padding: 12,
@@ -141,7 +141,8 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
                         label: {
                             display: true,
                             content: `Avg: ${averagePerWeek.toFixed(1)}`,
-                            position: 'end'
+                            position: 'end',
+                            color: 'rgba(255, 152, 0, 1)'
                         }
                     }
                 }
@@ -150,7 +151,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         scales: {
             x: {
                 ticks: {
-                    color: '#888',
+                    color: '#888', // Neutral grey
                     font: { size: 10 },
                     maxRotation: 45,
                     minRotation: 45
@@ -160,15 +161,15 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
             y: {
                 beginAtZero: true,
                 ticks: {
-                    color: '#888',
+                    color: '#888', // Neutral grey
                     stepSize: 1,
                     font: { size: 11 }
                 },
-                grid: { color: '#333' },
+                grid: { color: 'rgba(128, 128, 128, 0.1)' }, // Subtle grid
                 title: {
                     display: true,
                     text: 'Sessions',
-                    color: '#666',
+                    color: '#888',
                     font: { size: 11 }
                 }
             }
@@ -187,7 +188,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         switch (trend) {
             case 'up': return '#4caf50';
             case 'down': return '#f44336';
-            default: return '#888';
+            default: return 'var(--color-text-muted)';
         }
     };
 
@@ -205,8 +206,8 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
 
     return (
         <div style={{
-            background: '#1e1e1e',
-            border: '1px solid #333',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             padding: '20px',
             height: '100%',
@@ -225,7 +226,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
                     margin: 0,
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#ccc'
+                    color: 'var(--color-text-secondary)'
                 }}>
                     📊 Weekly Sessions
                 </h3>
@@ -246,41 +247,41 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
                 gap: '16px',
                 marginBottom: '20px',
                 padding: '12px 16px',
-                background: '#252525',
+                background: 'var(--color-bg-surface)',
                 borderRadius: '6px'
             }}>
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2196f3' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-brand-primary)' }}>
                         {thisWeek}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         This Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: '#444' }} />
+                <div style={{ width: '1px', background: 'var(--color-border)' }} />
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#666' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
                         {lastWeek}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Last Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: '#444' }} />
+                <div style={{ width: '1px', background: 'var(--color-border)' }} />
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff9800' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-warning)' }}>
                         {averagePerWeek.toFixed(1)}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Avg/Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: '#444' }} />
+                <div style={{ width: '1px', background: 'var(--color-border)' }} />
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-success)' }}>
                         {totalSessions}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Total ({weeks}w)
                     </div>
                 </div>
@@ -299,7 +300,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
                 gap: '8px',
                 marginTop: '12px',
                 fontSize: '11px',
-                color: '#888'
+                color: 'var(--color-text-muted)'
             }}>
                 <div style={{
                     width: '20px',
