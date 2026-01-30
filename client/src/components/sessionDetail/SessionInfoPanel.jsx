@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Button from '../atoms/Button';
+import Input from '../atoms/Input';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { fractalApi } from '../../utils/api';
@@ -105,13 +107,16 @@ function SessionInfoPanel({
             {/* Session Title */}
             <div className={styles.sessionInfoTitle}>
                 <h2>{session.name}</h2>
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     className={styles.sessionInfoToggle}
                     onClick={() => setIsExpanded(!isExpanded)}
                     title={isExpanded ? 'Collapse' : 'Expand'}
+                    style={{ padding: '4px 8px', minHeight: 'auto', height: 'auto' }}
                 >
                     {isExpanded ? '▲' : '▼'}
-                </button>
+                </Button>
             </div>
 
             {/* Always visible summary */}
@@ -147,14 +152,17 @@ function SessionInfoPanel({
                             <span className={styles.label}>Started:</span>
                             {editingField === 'start' ? (
                                 <div className={styles.editTimeContainer}>
-                                    <input
+                                    <Input
                                         type="datetime-local"
                                         value={editValue}
                                         onChange={(e) => setEditValue(e.target.value)}
-                                        className="session-datetime-input"
+                                        className={styles.dateTimeInput}
+                                        fullWidth
                                     />
-                                    <button onClick={handleSaveEdit} disabled={saving} className={styles.editButton}>✓</button>
-                                    <button onClick={() => setEditingField(null)} className={styles.editButton}>✗</button>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" style={{ padding: '0 8px' }}>✓</Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" style={{ padding: '0 8px' }}>✗</Button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className={styles.valueWithEdit}>
@@ -175,14 +183,17 @@ function SessionInfoPanel({
                             <span className={styles.label}>Ended:</span>
                             {editingField === 'end' ? (
                                 <div className={styles.editTimeContainer}>
-                                    <input
+                                    <Input
                                         type="datetime-local"
                                         value={editValue}
                                         onChange={(e) => setEditValue(e.target.value)}
-                                        className="session-datetime-input"
+                                        className={styles.dateTimeInput}
+                                        fullWidth
                                     />
-                                    <button onClick={handleSaveEdit} disabled={saving} className={styles.editButton}>✓</button>
-                                    <button onClick={() => setEditingField(null)} className={styles.editButton}>✗</button>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" style={{ padding: '0 8px' }}>✓</Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" style={{ padding: '0 8px' }}>✗</Button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className={styles.valueWithEdit}>

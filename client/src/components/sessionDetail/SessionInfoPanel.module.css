@@ -25,12 +25,9 @@
 }
 
 .sessionInfoToggle {
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    padding: 4px 8px;
+    /* Atom Button override */
     font-size: 10px;
+    color: var(--color-text-muted);
 }
 
 .sessionInfoToggle:hover {
@@ -131,12 +128,14 @@
 
 .editTimeContainer {
     display: flex;
-    gap: 4px;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
 }
 
-.editButton {
-    padding: 0 4px;
-    cursor: pointer;
+.dateTimeInput {
+    font-size: 12px;
+    padding: 4px 8px;
 }
 
 .valueWithEdit {

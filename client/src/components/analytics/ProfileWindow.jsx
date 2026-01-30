@@ -8,9 +8,10 @@ import AnnotatedHeatmap from './AnnotatedHeatmap';
 import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
-import AnnotationsList from './AnnotationsList';
 import { Bar, Line } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext';
+import Button from '../atoms/Button';
+import Select from '../atoms/Select';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -359,20 +360,24 @@ function ProfileWindow({
                 {/* Navigation Controls (Back/Top) */}
                 {hasCategory && (
                     <div className={styles.navGroup}>
-                        <button
+                        <Button
                             onClick={handleTop}
                             title="Top Level (All Categories)"
-                            className={styles.navBtn}
+                            variant="secondary"
+                            size="sm"
+                            style={{ padding: '0 8px', minWidth: '32px' }}
                         >
                             🏠
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={handleBack}
                             title="Go Back"
-                            className={styles.navBtn}
+                            variant="secondary"
+                            size="sm"
+                            style={{ padding: '0 8px', minWidth: '32px' }}
                         >
                             ⬅️
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -386,30 +391,35 @@ function ProfileWindow({
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
                     {(!hasAnnotationsWindow || selectedCategory === 'annotations') && (
-                        <button
+                        <Button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
                             }}
                             title="View Annotations"
-                            className={`${styles.navBtn} ${styles.btnAnnotations} ${selectedCategory === 'annotations' ? styles.active : ''} ${isNarrow ? styles.narrow : ''}`}
+                            variant={selectedCategory === 'annotations' ? 'primary' : 'secondary'}
+                            size="sm"
+                            className={`${isNarrow ? styles.narrow : ''}`}
+                            style={{ padding: isNarrow ? '0' : '0 10px', minWidth: isNarrow ? '32px' : 'auto' }}
                         >
                             <span>📝</span>
                             {!isNarrow && <span style={{ marginLeft: '4px' }}>Annotations</span>}
-                        </button>
+                        </Button>
                     )}
 
                     {canSplit && (
                         <div style={{ position: 'relative' }}>
-                            <button
+                            <Button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setShowSplitMenu(!showSplitMenu);
                                 }}
-                                className={`${styles.navBtn} ${styles.btnSplit}`}
+                                variant="secondary"
+                                size="sm"
+                                style={{ padding: '0 8px' }}
                             >
                                 {isNarrow ? '⊞▾' : '⊞ Split ▾'}
-                            </button>
+                            </Button>
                             {showSplitMenu && (
                                 <div className={styles.splitMenu}>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('vertical'); setShowSplitMenu(false); }}
@@ -425,7 +435,14 @@ function ProfileWindow({
                         </div>
                     )}
                     {canClose && (
-                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={styles.navBtn}>✕</button>
+                        <Button
+                            onClick={(e) => { e.stopPropagation(); onClose(); }}
+                            variant="ghost"
+                            size="sm"
+                            style={{ padding: '0 8px', minWidth: '32px' }}
+                        >
+                            ✕
+                        </Button>
                     )}
                 </div>
             </div>
@@ -435,13 +452,15 @@ function ProfileWindow({
     const renderLevel0 = () => (
         <>
             {['goals', 'sessions', 'activities'].map(category => (
-                <button
+                <Button
                     key={category}
                     onClick={() => handleCategoryChange(category)}
-                    className={`${styles.levelBtn} ${selectedCategory === category ? styles.active : ''}`}
+                    variant={selectedCategory === category ? 'primary' : 'secondary'}
+                    size="sm"
+                    style={{ whiteSpace: 'nowrap' }}
                 >
                     {categoryIcons[category]} {category.charAt(0).toUpperCase() + category.slice(1)}
-                </button>
+                </Button>
             ))}
         </>
     );
@@ -452,13 +471,15 @@ function ProfileWindow({
                 {selectedCategory}:
             </span>
             {visualizations[selectedCategory]?.map(vis => (
-                <button
+                <Button
                     key={vis.id}
                     onClick={() => setSelectedVisualization(vis.id)}
-                    className={`${styles.levelBtn} ${selectedVisualization === vis.id ? styles.active : ''}`}
+                    variant={selectedVisualization === vis.id ? 'primary' : 'secondary'}
+                    size="sm"
+                    style={{ whiteSpace: 'nowrap' }}
                 >
                     {vis.icon} {vis.name}
-                </button>
+                </Button>
             ))}
         </>
     );
@@ -474,13 +495,14 @@ function ProfileWindow({
                 <>
                     <span className={styles.levelLabel} style={{ marginRight: '8px' }}>Range:</span>
                     {timeRangeOptions.map(option => (
-                        <button
+                        <Button
                             key={option.value}
                             onClick={() => setHeatmapMonths(option.value)}
-                            className={`${styles.levelBtn} ${heatmapMonths === option.value ? styles.active : ''}`}
+                            variant={heatmapMonths === option.value ? 'primary' : 'secondary'}
+                            size="sm"
                         >
                             {option.label}
-                        </button>
+                        </Button>
                     ))}
                 </>
             );
@@ -492,43 +514,43 @@ function ProfileWindow({
 
             return (
                 <div className={styles.level2Container}>
-                    <select
+                    <Select
                         value={selectedActivity?.id || ''}
                         onChange={(e) => {
                             const activity = activities.find(a => a.id === e.target.value);
                             setSelectedActivity(activity || null);
                             setSelectedSplit('all');
                         }}
-                        className={styles.select}
+                        className={styles.selectAtom}
                     >
                         <option value="">Select Activity...</option>
                         {sortedActivities.map(a => (
                             <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
-                    </select>
+                    </Select>
 
                     {selectedActivity && currentActivityDef?.has_sets && (
-                        <select
+                        <Select
                             value={setsHandling}
                             onChange={(e) => setSetsHandling(e.target.value)}
-                            className={styles.select}
+                            className={styles.selectAtom}
                         >
                             <option value="top">Top Set</option>
                             <option value="average">Avg</option>
-                        </select>
+                        </Select>
                     )}
 
                     {selectedActivity && currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0 && (
-                        <select
+                        <Select
                             value={selectedSplit}
                             onChange={(e) => setSelectedSplit(e.target.value)}
-                            className={styles.select}
+                            className={styles.selectAtom}
                         >
                             <option value="all">All Splits</option>
                             {currentActivityDef.split_definitions.map(split => (
                                 <option key={split.id} value={split.id}>{split.name}</option>
                             ))}
-                        </select>
+                        </Select>
                     )}
                 </div>
             );
@@ -537,21 +559,33 @@ function ProfileWindow({
         if (selectedCategory === 'goals' && selectedVisualization === 'goalDetail') {
             const goals = goalAnalytics?.goals || [];
             return (
-                <div className={styles.level2Container}>
-                    <select
+                <div className={styles.level2Container} style={{ gap: '8px' }}>
+                    <Select
                         value={selectedGoal?.id || ''}
                         onChange={(e) => setSelectedGoal(goals.find(g => g.id === e.target.value) || null)}
-                        className={styles.select}
+                        className={styles.selectAtom}
                     >
                         <option value="">Select Goal...</option>
                         {goals.map(g => (
                             <option key={g.id} value={g.id}>{g.name}</option>
                         ))}
-                    </select>
+                    </Select>
                     {selectedGoal && (
                         <div className={styles.controlGroup}>
-                            <button onClick={() => setSelectedGoalChart('duration')} className={`${styles.levelBtn} ${selectedGoalChart === 'duration' ? styles.active : ''}`}>Time</button>
-                            <button onClick={() => setSelectedGoalChart('activity')} className={`${styles.levelBtn} ${selectedGoalChart === 'activity' ? styles.active : ''}`}>Acts</button>
+                            <Button
+                                onClick={() => setSelectedGoalChart('duration')}
+                                variant={selectedGoalChart === 'duration' ? 'primary' : 'secondary'}
+                                size="sm"
+                            >
+                                Time
+                            </Button>
+                            <Button
+                                onClick={() => setSelectedGoalChart('activity')}
+                                variant={selectedGoalChart === 'activity' ? 'primary' : 'secondary'}
+                                size="sm"
+                            >
+                                Acts
+                            </Button>
                         </div>
                     )}
                 </div>

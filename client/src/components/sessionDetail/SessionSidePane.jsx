@@ -9,6 +9,7 @@
 
 import React, { useState, useMemo } from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
+import Button from '../atoms/Button';
 import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
 import styles from './SessionSidePane.module.css';
@@ -96,34 +97,34 @@ function SessionSidePane({
 
                         {/* Session Controls */}
                         <div className={styles.sidebarActions}>
-                            <button
+                            <Button
                                 onClick={onToggleComplete}
-                                className={`${styles.sidebarControlBtn} ${styles.btnComplete} ${isCompleted ? styles.btnCompleteActive : ''}`}
+                                variant={isCompleted ? 'success' : 'secondary'}
                                 title="Mark Session Complete"
                             >
                                 {isCompleted ? '✓ Done' : 'Complete'}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={onSave}
-                                className={`${styles.sidebarControlBtn} ${styles.btnDone}`}
+                                variant="primary" // Blue
                                 title="Save & Exit"
                             >
                                 Save
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={onCancel}
-                                className={`${styles.sidebarControlBtn} ${styles.btnCancel}`}
+                                variant="secondary" // Grey
                                 title="Cancel (Go Back)"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={onDelete}
-                                className={`${styles.sidebarControlBtn} ${styles.btnDelete}`}
+                                variant="danger" // Red
                                 title="Delete Session"
                             >
                                 Delete
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Divider */}

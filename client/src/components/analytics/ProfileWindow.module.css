@@ -55,59 +55,10 @@
 }
 
 /* Unified Button Styles */
-.navBtn {
-    padding: 6px 8px;
-    background: var(--color-bg-input);
-    /* Or surface? Input seems okay for button background */
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-secondary);
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    height: 32px;
-    min-width: 32px;
-}
-
-.navBtn:hover {
-    color: var(--color-text-primary);
-    background: var(--color-bg-hover);
-    border-color: var(--color-border-hover);
-}
+/* Unified Button Styles - handled by Atom now */
 
 /* Level Buttons */
-.levelBtn {
-    padding: 6px 12px;
-    background: var(--color-bg-surface);
-    border: 1px solid var(--color-border);
-    /* Added border for better definition in light mode */
-    border-radius: 6px;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.levelBtn:hover {
-    background: var(--color-bg-hover);
-    color: var(--color-text-primary);
-    border-color: var(--color-border-hover);
-}
-
-.levelBtn.active {
-    background: var(--color-brand-primary);
-    color: white;
-    border-color: var(--color-brand-primary);
-}
+/* Level Buttons - handled by Atom now */
 
 /* Main Action Area */
 .mainActions {
@@ -128,18 +79,8 @@
 }
 
 /* Annotations Button specific */
-.btnAnnotations {
-    width: auto;
-    padding: 0 10px;
-}
-
-.btnAnnotations.active {
-    background: var(--color-brand-primary);
-    color: white;
-    border-color: var(--color-brand-primary);
-}
-
-.btnAnnotations.narrow {
+/* Annotations Button specific (mostly Atom now) */
+.narrow {
     width: 32px;
     padding: 0;
 }
@@ -196,13 +137,9 @@
     align-items: center;
 }
 
-.select {
-    padding: 4px 8px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-    font-size: 12px;
+.selectAtom {
+    margin-bottom: 0;
+    /* ensure no bottom margin in flex row */
 }
 
 .controlGroup {

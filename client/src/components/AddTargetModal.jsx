@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import Modal from './atoms/Modal';
+import Input from './atoms/Input';
+import TextArea from './atoms/TextArea';
+import Select from './atoms/Select';
+import Button from './atoms/Button';
 
 /**
  * AddTargetModal Component
@@ -84,49 +89,21 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
     );
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-        }}>
-            <div style={{
-                background: '#1e1e1e',
-                border: '1px solid #444',
-                borderRadius: '8px',
-                padding: '24px',
-                maxWidth: '500px',
-                width: '90%',
-                maxHeight: '80vh',
-                overflowY: 'auto'
-            }}>
-                <h2 style={{ margin: '0 0 20px 0', fontSize: '20px' }}>
-                    {existingTarget ? 'Edit Target' : 'Add Target'}
-                </h2>
 
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={existingTarget ? 'Edit Target' : 'Add Target'}
+            size="md"
+        >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Activity Selector */}
-                <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
-                        Activity *
-                    </label>
-                    <select
+                <div>
+                    <Select
+                        label="Activity *"
                         value={selectedActivityId}
                         onChange={(e) => handleActivityChange(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: '#2a2a2a',
-                            border: '1px solid #555',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '14px'
-                        }}
+                        fullWidth
                     >
                         <option value="">Select an activity...</option>
                         {activitiesWithMetrics.map(activity => (
@@ -134,63 +111,38 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
                                 {activity.name}
                             </option>
                         ))}
-                    </select>
+                    </Select>
                     {activitiesWithMetrics.length === 0 && (
-                        <div style={{ fontSize: '12px', color: '#f44336', marginTop: '4px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--color-brand-danger)', marginTop: '4px' }}>
                             No activities with metrics found. Create one first.
                         </div>
                     )}
                 </div>
 
                 {/* Target Name */}
-                <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
-                        Target Name
-                    </label>
-                    <input
-                        type="text"
-                        value={targetName}
-                        onChange={(e) => setTargetName(e.target.value)}
-                        placeholder={selectedActivity?.name || 'Enter target name...'}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: '#2a2a2a',
-                            border: '1px solid #555',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '14px'
-                        }}
-                    />
-                </div>
+                <Input
+                    label="Target Name"
+                    type="text"
+                    value={targetName}
+                    onChange={(e) => setTargetName(e.target.value)}
+                    placeholder={selectedActivity?.name || 'Enter target name...'}
+                    fullWidth
+                />
 
                 {/* Target Description */}
-                <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#aaa' }}>
-                        Description
-                    </label>
-                    <textarea
-                        value={targetDescription}
-                        onChange={(e) => setTargetDescription(e.target.value)}
-                        placeholder="Optional description..."
-                        rows={2}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: '#2a2a2a',
-                            border: '1px solid #555',
-                            borderRadius: '4px',
-                            color: 'white',
-                            fontSize: '14px',
-                            resize: 'vertical'
-                        }}
-                    />
-                </div>
+                <TextArea
+                    label="Description"
+                    value={targetDescription}
+                    onChange={(e) => setTargetDescription(e.target.value)}
+                    placeholder="Optional description..."
+                    rows={2}
+                    fullWidth
+                />
 
                 {/* Metric Values */}
                 {selectedActivity && selectedActivity.metric_definitions && (
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', marginBottom: '10px', fontSize: '13px', color: '#aaa' }}>
+                    <div style={{ marginTop: '4px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                             Target Values *
                         </label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -199,30 +151,23 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '10px',
-                                    background: '#2a2a2a',
+                                    background: 'var(--color-bg-card-alt)',
                                     padding: '10px',
-                                    borderRadius: '4px'
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--color-border)'
                                 }}>
-                                    <label style={{ flex: 1, fontSize: '14px' }}>
+                                    <label style={{ flex: 1, fontSize: '14px', color: 'var(--color-text-primary)' }}>
                                         {metric.name}
                                     </label>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={metricValues[metric.id] || ''}
                                         onChange={(e) => handleMetricChange(metric.id, e.target.value)}
                                         placeholder="0"
                                         step="any"
-                                        style={{
-                                            width: '100px',
-                                            padding: '6px',
-                                            background: '#333',
-                                            border: '1px solid #555',
-                                            borderRadius: '3px',
-                                            color: 'white',
-                                            fontSize: '14px'
-                                        }}
+                                        style={{ width: '100px', marginBottom: 0 }}
                                     />
-                                    <span style={{ fontSize: '13px', color: '#888', minWidth: '40px' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', minWidth: '40px' }}>
                                         {metric.unit}
                                     </span>
                                 </div>
@@ -232,41 +177,25 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
                 )}
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                    <button
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <Button
                         onClick={onClose}
-                        style={{
-                            padding: '8px 16px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
+                        variant="secondary"
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleSave}
                         disabled={!selectedActivityId}
-                        style={{
-                            padding: '8px 16px',
-                            background: selectedActivityId ? '#4caf50' : '#333',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: selectedActivityId ? 'white' : '#666',
-                            cursor: selectedActivityId ? 'pointer' : 'not-allowed',
-                            fontSize: '14px',
-                            fontWeight: 600
-                        }}
+                        variant="primary"
                     >
                         {existingTarget ? 'Update Target' : 'Add Target'}
-                    </button>
+                    </Button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
+
 }
 
 export default AddTargetModal;
