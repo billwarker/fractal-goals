@@ -1,0 +1,125 @@
+.calendarContainer {
+    height: calc(100vh - 200px);
+    min-height: 500px;
+    background: var(--color-bg-card);
+    padding: 32px 24px 24px 24px;
+    border-radius: var(--radius-lg);
+    position: relative;
+    border: 1px solid var(--color-border);
+}
+
+.headerActions {
+    position: absolute;
+    top: 32px;
+    right: 24px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Base style for custom buttons */
+.customBtn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.createModeBtn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+.createModeBtnActive {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+}
+
+.addBlockBtn {
+    background: var(--color-brand-primary);
+    border: none;
+    color: white;
+}
+
+.addBlockBtn:hover {
+    filter: brightness(1.1);
+}
+
+/* FullCalendar Header Overrides */
+:global(.fc-header-toolbar) {
+    margin-bottom: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    position: relative !important;
+    padding: 0 !important;
+    height: 34px !important;
+}
+
+:global(.fc-toolbar-chunk) {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+/* True absolute centering for the title */
+:global(.fc-toolbar-title) {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    color: var(--color-text-primary);
+    margin: 0 !important;
+    white-space: nowrap !important;
+}
+
+:global(.fc-button) {
+    height: 34px !important;
+    padding: 0 10px !important;
+    border-radius: var(--radius-md) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: capitalize !important;
+    transition: all 0.2s !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+}
+
+:global(.fc-button-primary) {
+    background-color: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+    box-shadow: none !important;
+}
+
+:global(.fc-button-primary:hover) {
+    background-color: var(--color-bg-hover) !important;
+    border-color: var(--color-border) !important;
+}
+
+:global(.fc-button-group) {
+    display: flex !important;
+    gap: 6px !important;
+    margin: 0 !important;
+}
+
+:global(.fc-button-group > .fc-button) {
+    border-radius: var(--radius-md) !important;
+}
+
+:global(.fc-icon) {
+    font-size: 1rem !important;
+}

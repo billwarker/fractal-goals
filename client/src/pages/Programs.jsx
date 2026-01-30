@@ -5,7 +5,7 @@ import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDateInTimezone } from '../utils/dateUtils';
+import { formatDateInTimezone, formatLiteralDate } from '../utils/dateUtils';
 import styles from './Programs.module.css'; // Import CSS Module
 import notify from '../utils/notify';
 import { Heading, Text } from '../components/atoms/Typography';
@@ -131,15 +131,8 @@ function Programs() {
 
     const formatDate = (dateString, options = {}) => {
         if (!dateString) return '';
-        return formatDateInTimezone(dateString, timezone, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: undefined,
-            minute: undefined,
-            second: undefined,
-            ...options
-        });
+        // Use literal formatting to ensure program range and deadline matches intended date
+        return formatLiteralDate(dateString, options);
     };
 
     const handleDeleteProgram = async (e, program) => {

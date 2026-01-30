@@ -2,6 +2,7 @@ import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import styles from './ProgramCalendarView.module.css';
 
 function ProgramCalendarView({
     program,
@@ -13,47 +14,18 @@ function ProgramCalendarView({
     onEventClick
 }) {
     return (
-        <div style={{ height: 'calc(100vh - 200px)', minHeight: '500px', background: 'var(--color-bg-card)', padding: '20px', borderRadius: 'var(--border-radius-lg)', position: 'relative', border: '1px solid var(--color-border)' }}>
+        <div className={styles.calendarContainer}>
             {/* Block creation controls - positioned at top right of calendar area */}
-            <div style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                zIndex: 10,
-                display: 'flex',
-                gap: '8px',
-                alignItems: 'center'
-            }}>
+            <div className={styles.headerActions}>
                 <button
                     onClick={() => setBlockCreationMode(!blockCreationMode)}
-                    style={{
-                        background: blockCreationMode ? 'var(--color-brand-primary)' : 'transparent',
-                        border: `1px solid ${blockCreationMode ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
-                        borderRadius: '4px',
-                        color: blockCreationMode ? 'white' : 'var(--color-text-secondary)',
-                        padding: '6px 12px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
-                    }}
+                    className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
                 >
                     {blockCreationMode ? '✓ Block Creation Mode' : 'Select Dates to Add Block'}
                 </button>
                 <button
                     onClick={onAddBlockClick}
-                    style={{
-                        background: 'var(--color-brand-primary)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        padding: '6px 12px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap'
-                    }}
+                    className={`${styles.customBtn} ${styles.addBlockBtn}`}
                 >
                     + Add Block
                 </button>

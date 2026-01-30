@@ -93,6 +93,93 @@ export const formatDateInTimezone = (dateValue, timezone, options = {}) => {
 };
 
 /**
+ * Extract the literal YYYY-MM-DD part of a date string or object 
+ * WITHOUT any timezone conversion. Use this for absolute dates like deadlines.
+ * @param {string|Date} dateValue 
+ * @returns {string} YYYY-MM-DD
+ */
+export const getDatePart = (dateValue) => {
+    if (!dateValue) return null;
+    if (typeof dateValue === 'string') {
+        // If it's already YYYY-MM-DD, return it
+        if (dateValue.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue;
+        }
+        // If it's an ISO string (2026-01-31T00:00:00Z), grab the first 10 chars
+        if (dateValue.includes('T')) {
+            return dateValue.split('T')[0];
+        }
+        // Fallback: try to parse and then extract components manually to avoid offset
+        const parts = dateValue.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (parts) return `${parts[1]}-${parts[2]}-${parts[3]}`;
+    }
+
+    const d = new Date(dateValue);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * Format a date without any timezone shifting (uses UTC/Literal parts)
+ * @param {string|Date} dateValue 
+ * @param {object} options - Intl.DateTimeFormat options
+ * @returns {string} Formatted date string
+ */
+export const formatLiteralDate = (dateValue, options = {}) => {
+    if (!dateValue) return '';
+    const datePart = getDatePart(dateValue);
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    // Create a date object that will return the correct parts in any timezone for formatting
+    // By using the local Date constructor with these parts, we can format it.
+    // Or just use Intl.DateTimeFormat with 'UTC' to be safe.
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    const defaultOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+        ...options
+    };
+
+    return new Intl.DateTimeFormat('en-US', defaultOptions).format(date);
+};
+
+/**
+ * Get the YYYY-MM-DD string for a date in the specified timezone
+ * @param {string|Date} dateValue - ISO string or Date object
+ * @param {string} timezone - IANA timezone
+ * @returns {string} Date string (YYYY-MM-DD)
+ */
+export const getISOYMDInTimezone = (dateValue, timezone) => {
+    if (!dateValue) return null;
+
+    // Handle date-only strings - return as is for consistency
+    if (typeof dateValue === 'string' && dateValue.length === 10 && dateValue.includes('-') && !dateValue.includes('T')) {
+        return dateValue;
+    }
+
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: timezone
+    });
+
+    const parts = formatter.formatToParts(date);
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+
+    return `${year}-${month}-${day}`;
+};
+
+/**
  * Format date only (no time) in the specified timezone
  * @param {string|Date} dateValue - ISO string or Date object
  * @param {string} timezone - IANA timezone

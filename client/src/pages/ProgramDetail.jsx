@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { getLocalISOString, localToISO } from '../utils/dateUtils';
+import { getISOYMDInTimezone, formatDateInTimezone, getDatePart, formatLiteralDate } from '../utils/dateUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
@@ -26,6 +27,7 @@ const ProgramDetail = () => {
     const { getGoalColor, getGoalTextColor } = useTheme();
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
+    const { timezone } = useTimezone();
 
     // Data Hook (manages program, goals, sessions, etc.)
     // Data Hook (manages program, goals, sessions, etc.)
@@ -80,7 +82,8 @@ const ProgramDetail = () => {
 
     const formatDate = (dateString, format = 'MMM D, YYYY') => {
         if (!dateString) return '';
-        return moment(dateString).format(format);
+        // Use literal formatting for header/program ranges to avoid timezone shifts
+        return formatLiteralDate(dateString);
     };
 
     const formatDurationSeconds = (seconds) => {
@@ -357,15 +360,9 @@ const ProgramDetail = () => {
         }
     };
 
-    // Helper to get local date string from a datetime (YYYY-MM-DD)
+    // Helper to get local date string from a datetime (YYYY-MM-DD) in user timezone
     const getLocalDateString = (dateTimeStr) => {
-        if (!dateTimeStr) return null;
-        if (typeof dateTimeStr === 'string' && dateTimeStr.length === 10) return dateTimeStr;
-        const d = new Date(dateTimeStr);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return getISOYMDInTimezone(dateTimeStr, timezone);
     };
 
     const calendarEvents = [];
@@ -381,7 +378,7 @@ const ProgramDetail = () => {
     program.blocks?.forEach(block => {
         block.days?.forEach(day => {
             if (day.date) {
-                const dateStr = getLocalDateString(day.date);
+                const dateStr = getDatePart(day.date);
                 if (!dateGroups[dateStr]) dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
 
                 const name = day.name || 'Untitled Day';
@@ -546,8 +543,8 @@ const ProgramDetail = () => {
         calendarEvents.push({
             id: `block-bg-${block.id}`,
             title: block.name,
-            start: block.start_date,
-            end: moment(block.end_date).add(1, 'days').format('YYYY-MM-DD'),
+            start: getDatePart(block.start_date),
+            end: moment(getDatePart(block.end_date)).add(1, 'days').format('YYYY-MM-DD'),
             backgroundColor: block.color || '#3A86FF',
             borderColor: block.color || '#3A86FF',
             textColor: 'white',
@@ -590,7 +587,7 @@ const ProgramDetail = () => {
             calendarEvents.push({
                 id: `goal-${goal.id}`,
                 title: isCompleted ? `✅ ${goal.name}` : `🎯 ${goal.name}`,
-                start: (isCompleted && completionDate) ? getLocalDateString(completionDate) : goal.deadline,
+                start: (isCompleted && completionDate) ? getISOYMDInTimezone(completionDate, timezone) : getDatePart(goal.deadline),
                 allDay: true,
                 backgroundColor: getGoalColor(goalType),
                 borderColor: getGoalColor(goalType),
