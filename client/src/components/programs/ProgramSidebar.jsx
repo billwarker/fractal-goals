@@ -1,13 +1,8 @@
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { formatDate, formatDurationSeconds } from '../../utils/formatters';
+import { formatDurationSeconds } from '../../utils/formatters';
+import { formatLiteralDate } from '../../utils/dateUtils';
 import styles from './ProgramSidebar.module.css';
-
-// Helper to format date if not imported
-const defaultFormatDate = (d) => {
-    if (!d) return '';
-    return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
 
 // Start component
 function ProgramSidebar({
@@ -21,50 +16,70 @@ function ProgramSidebar({
     const { getGoalColor } = useTheme();
 
     // Recursive renderer
-    const renderGoalItem = (goal, depth = 0) => {
+    const renderGoalItem = (goal, parentColors = []) => {
         const goalType = goal.type || goal.attributes?.type;
         const color = getGoalColor(goalType);
+        const name = goal.name || goal.attributes?.name;
+        const deadline = goal.deadline || goal.attributes?.deadline;
         const isCompleted = goal.completed || goal.attributes?.completed;
         const completedAt = goal.completed_at || goal.attributes?.completed_at;
+        const currentColor = isCompleted ? 'var(--color-brand-success)' : color;
+
+        // Full lineage for this level
+        const lineageColors = [...parentColors, currentColor];
 
         return (
-            <div key={goal.id} className={styles.goalItemWrapper} style={{ marginLeft: depth > 0 ? `${depth * 16}px` : 0 }}>
+            <div key={goal.id} className={styles.goalItemWrapper}>
+                {/* Fixed vertical stripes for this entire subtree row */}
+                <div className={styles.lineageStripes}>
+                    {lineageColors.map((stripeColor, idx) => (
+                        <div
+                            key={idx}
+                            className={styles.connectingStripe}
+                            style={{
+                                backgroundColor: stripeColor,
+                                left: `${idx * 4}px`,
+                                zIndex: 10 + idx
+                            }}
+                        />
+                    ))}
+                </div>
+
                 <div
                     onClick={() => onGoalClick(goal)}
-                    className={`${styles.goalItem} ${isCompleted ? styles.goalItemCompleted : ''}`}
-                    style={{
-                        background: !isCompleted ? 'var(--color-bg-card-alt)' : undefined,
-                        borderLeft: `3px solid ${isCompleted ? 'var(--color-brand-success)' : color}`,
-                        borderBottom: '1px solid var(--color-border)',
-                        color: 'var(--color-text-primary)'
-                    }}
+                    className={`${styles.goalCard} ${isCompleted ? styles.goalCardCompleted : ''}`}
                 >
+                    <div
+                        className={styles.cardContent}
+                        style={{ paddingLeft: `${lineageColors.length * 4 + 12}px` }}
+                    >
+                        <div className={styles.goalType} style={{ color: currentColor }}>
+                            {goalType?.replace(/([A-Z])/g, ' $1').trim()}
+                        </div>
+                        <div className={`${styles.goalName} ${isCompleted ? styles.goalNameCompleted : ''}`} style={{
+                            color: isCompleted ? 'var(--color-brand-success)' : 'var(--color-text-primary)'
+                        }}>
+                            {name}
+                        </div>
+                        {(deadline || (isCompleted && completedAt)) && (
+                            <div className={styles.goalDeadline}>
+                                {isCompleted ? (
+                                    <>Completed: {formatLiteralDate(completedAt, 'MMM D')}</>
+                                ) : (
+                                    <>Deadline: {formatLiteralDate(deadline, 'MMM D')}</>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     {isCompleted && (
                         <div className={styles.checkIcon}>✓</div>
                     )}
-                    <div className={styles.goalType} style={{ color: isCompleted ? 'var(--color-brand-success)' : color }}>
-                        {goalType?.replace(/([A-Z])/g, ' $1').trim()}
-                    </div>
-                    <div className={`${styles.goalName} ${isCompleted ? styles.goalNameCompleted : ''}`} style={{
-                        color: isCompleted ? 'var(--color-brand-success)' : 'var(--color-text-primary)',
-                    }}>
-                        {goal.name}
-                    </div>
-                    {goal.deadline && (
-                        <div className={styles.goalDeadline}>
-                            {isCompleted ? (
-                                <>Completed: {defaultFormatDate(completedAt)}</>
-                            ) : (
-                                <>Deadline: {defaultFormatDate(goal.deadline)}</>
-                            )}
-                        </div>
-                    )}
                 </div>
                 {goal.children && goal.children.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className={styles.childrenContainer}>
                         {goal.children.map(child => {
                             const fullChild = getGoalDetails(child.id);
-                            return fullChild ? renderGoalItem(fullChild, depth + 1) : null;
+                            return fullChild ? renderGoalItem(fullChild, lineageColors) : null;
                         })}
                     </div>
                 )}
@@ -118,7 +133,7 @@ function ProgramSidebar({
                 <div className={styles.goalsList}>
                     {programGoalSeeds.length === 0 ? (
                         <div className={styles.emptyState}>No goals associated</div>
-                    ) : programGoalSeeds.map(goal => renderGoalItem(goal))}
+                    ) : programGoalSeeds.map(goal => renderGoalItem(goal, []))}
                 </div>
             </div>
         </div>

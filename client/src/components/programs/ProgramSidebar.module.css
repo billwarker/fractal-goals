@@ -63,7 +63,8 @@
 .goalsList {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 24px;
+    /* Space between families - stripes will not span this */
 }
 
 .emptyState {
@@ -74,31 +75,70 @@
 
 /* Goal Item Styles */
 .goalItemWrapper {
-    /* Base for recursive items */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Space between card and children - spanned by absolute stripes */
 }
 
-.goalItem {
-    padding: 10px;
+.lineageStripes {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.connectingStripe {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.goalCard {
+    padding: 0;
     border-radius: 0 4px 4px 0;
+    /* Flat left for seamless stripe integration */
     position: relative;
-    margin-bottom: 8px;
     cursor: pointer;
     transition: transform 0.1s ease-in-out;
+    background: var(--color-bg-card-alt);
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--color-border);
 }
 
-.goalItem:hover {
+.cardContent {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 50px;
+    justify-content: center;
+}
+
+.goalCard:hover {
     transform: translateX(4px);
 }
 
-.goalItemCompleted {
+.goalCardCompleted {
     background: var(--color-bg-card-alt) !important;
+}
+
+.childrenContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Space between siblings - spanned by parent lineage stripes */
 }
 
 .checkIcon {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: var(--color-success, #4caf50);
+    background: var(--color-brand-success);
     border-radius: 50%;
     width: 18px;
     height: 18px;
