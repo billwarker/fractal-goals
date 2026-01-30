@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Input from './atoms/Input';
+import TextArea from './atoms/TextArea';
+import Select from './atoms/Select';
 import Checkbox from './atoms/Checkbox';
+import Button from './atoms/Button';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
@@ -843,89 +846,72 @@ function GoalDetailModal({
                     >
                         ←
                     </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'white', flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)', flex: 1 }}>
                         Create New Activity
                     </h3>
                 </div>
 
                 {/* Activity Name */}
-                <div>
-                    <label className={styles.sectionLabel}>
-                        Activity Name *
-                    </label>
-                    <input
-                        type="text"
-                        value={newActivityName}
-                        onChange={(e) => setNewActivityName(e.target.value)}
-                        placeholder="e.g. Scale Practice"
-                        className={styles.input}
-                    />
-                </div>
+                <Input
+                    label="Activity Name *"
+                    value={newActivityName}
+                    onChange={(e) => setNewActivityName(e.target.value)}
+                    placeholder="e.g. Scale Practice"
+                    fullWidth
+                    className={styles.inputWrapper}
+                />
 
                 {/* Description */}
-                <div>
-                    <label className={styles.sectionLabel}>
-                        Description
-                    </label>
-                    <textarea
-                        value={newActivityDescription}
-                        onChange={(e) => setNewActivityDescription(e.target.value)}
-                        placeholder="Optional description..."
-                        rows={2}
-                        className={styles.textarea}
-                    />
-                </div>
+                <TextArea
+                    label="Description"
+                    value={newActivityDescription}
+                    onChange={(e) => setNewActivityDescription(e.target.value)}
+                    placeholder="Optional description..."
+                    rows={2}
+                    fullWidth
+                    className={styles.inputWrapper}
+                />
 
                 {/* Group Selection */}
-                <div>
-                    <label className={styles.sectionLabel}>
-                        Activity Group
-                    </label>
-                    <select
-                        value={newActivityGroupId}
-                        onChange={(e) => setNewActivityGroupId(e.target.value)}
-                        className={styles.select}
-                    >
-                        <option value="">(No Group)</option>
-                        {activityGroups && activityGroups.map(group => (
-                            <option key={group.id} value={group.id}>
-                                {group.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                <Select
+                    label="Activity Group"
+                    value={newActivityGroupId}
+                    onChange={(e) => setNewActivityGroupId(e.target.value)}
+                    fullWidth
+                    className={styles.inputWrapper}
+                >
+                    <option value="">(No Group)</option>
+                    {activityGroups && activityGroups.map(group => (
+                        <option key={group.id} value={group.id}>
+                            {group.name}
+                        </option>
+                    ))}
+                </Select>
 
                 {/* Flags */}
                 <div className={styles.checkboxGroup}>
-                    <label className={styles.checkboxLabel} style={{ color: '#ccc' }}>
-                        <input
-                            type="checkbox"
-                            checked={newActivityHasSets}
-                            onChange={(e) => setNewActivityHasSets(e.target.checked)}
-                        />
-                        Track Sets
-                    </label>
-                    <label className={styles.checkboxLabel} style={{ color: '#ccc' }}>
-                        <input
-                            type="checkbox"
-                            checked={newActivityHasMetrics}
-                            onChange={(e) => setNewActivityHasMetrics(e.target.checked)}
-                        />
-                        Enable Metrics
-                    </label>
+                    <Checkbox
+                        label="Track Sets"
+                        checked={newActivityHasSets}
+                        onChange={(e) => setNewActivityHasSets(e.target.checked)}
+                    />
+                    <Checkbox
+                        label="Enable Metrics"
+                        checked={newActivityHasMetrics}
+                        onChange={(e) => setNewActivityHasMetrics(e.target.checked)}
+                    />
                 </div>
 
                 {/* Metrics Section */}
                 {newActivityHasMetrics && (
-                    <div>
-                        <label className={styles.label} style={{ color: '#aaa' }}>
+                    <div style={{ marginTop: '16px' }}>
+                        <div className={styles.label} style={{ color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
                             Metrics (needed for targets)
-                        </label>
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {newActivityMetrics.map((metric, idx) => (
                                 <div key={idx} className={styles.metricRow}>
-                                    <input
-                                        type="text"
+                                    <Input
                                         value={metric.name}
                                         onChange={(e) => {
                                             const updated = [...newActivityMetrics];
@@ -934,9 +920,9 @@ function GoalDetailModal({
                                         }}
                                         placeholder="Metric name (e.g. Speed)"
                                         className={styles.metricInput}
+                                        style={{ marginBottom: 0 }}
                                     />
-                                    <input
-                                        type="text"
+                                    <Input
                                         value={metric.unit}
                                         onChange={(e) => {
                                             const updated = [...newActivityMetrics];
@@ -945,27 +931,36 @@ function GoalDetailModal({
                                         }}
                                         placeholder="Unit (e.g. bpm)"
                                         className={styles.unitInput}
+                                        style={{ marginBottom: 0 }}
                                     />
                                     {newActivityMetrics.length > 1 && (
-                                        <button
+                                        <Button
                                             onClick={() => {
                                                 const updated = newActivityMetrics.filter((_, i) => i !== idx);
                                                 setNewActivityMetrics(updated);
                                             }}
-                                            className={styles.removeButton}
+                                            variant="ghost"
+                                            className={styles.removeMetricBtn}
+                                            style={{ padding: '0 8px', color: 'var(--color-brand-danger)' }}
+                                            title="Remove metric"
                                         >
-                                            ×
-                                        </button>
+                                            ✕
+                                        </Button>
                                     )}
                                 </div>
                             ))}
                             {newActivityMetrics.length < 3 && (
-                                <button
+                                <Button
                                     onClick={() => setNewActivityMetrics([...newActivityMetrics, { name: '', unit: '' }])}
-                                    className={styles.addMetricButton}
+                                    variant="secondary"
+                                    size="sm"
+                                    style={{
+                                        alignSelf: 'flex-start',
+                                        marginTop: '8px'
+                                    }}
                                 >
                                     + Add Metric
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -978,24 +973,20 @@ function GoalDetailModal({
 
                 {/* Actions */}
                 <div className={styles.editActions}>
-                    <button
+                    <Button
                         onClick={() => setViewState('activity-associator')}
-                        className={styles.btnCancel}
+                        variant="secondary"
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleCreateActivity}
                         disabled={isCreatingActivity || !newActivityName.trim()}
-                        className={styles.btnSave}
-                        style={{
-                            background: isCreatingActivity || !newActivityName.trim() ? '#444' : '#4caf50',
-                            color: isCreatingActivity || !newActivityName.trim() ? '#888' : 'white',
-                            cursor: isCreatingActivity || !newActivityName.trim() ? 'not-allowed' : 'pointer',
-                        }}
+                        isLoading={isCreatingActivity}
+                        variant="success"
                     >
-                        {isCreatingActivity ? 'Creating...' : 'Create Activity'}
-                    </button>
+                        Create Activity
+                    </Button>
                 </div>
             </div>
         );
