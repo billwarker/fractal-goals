@@ -400,7 +400,7 @@ class ProgramService:
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": models._safe_load_json(template.template_data, {})
+                                        "template_data": _safe_load_json(template.template_data, {})
                                     })
                                 
                                 result.append({
@@ -431,7 +431,7 @@ class ProgramService:
         if not goal_id:
              raise ValueError("Goal ID required")
         
-        current_ids = models._safe_load_json(block.goal_ids, [])
+        current_ids = _safe_load_json(block.goal_ids, [])
         if goal_id not in current_ids:
             current_ids.append(goal_id)
             block.goal_ids = json.dumps(current_ids)
