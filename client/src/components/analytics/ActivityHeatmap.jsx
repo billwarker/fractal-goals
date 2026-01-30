@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getShiftedDate } from '../../utils/dateUtils';
 
 /**
  * ActivityHeatmap - GitHub-style activity heatmap showing daily session counts
@@ -8,10 +10,15 @@ import React, { useMemo, useState } from 'react';
  */
 function ActivityHeatmap({ sessions = [], months = 12 }) {
     const [hoveredCell, setHoveredCell] = useState(null);
+    const { timezone } = useTimezone();
 
     // Process sessions into daily counts
     const { dailyData, weeks, maxCount, monthLabels } = useMemo(() => {
-        const today = new Date();
+        // Use shifted date for "today" to match selected timezone's today
+        const now = new Date();
+        const shiftedNow = getShiftedDate(now, timezone);
+
+        const today = new Date(shiftedNow);
         today.setHours(23, 59, 59, 999);
 
         // Calculate start date (beginning of week, months ago)
@@ -27,8 +34,8 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
             const sessionDate = session.session_start || session.created_at;
             if (!sessionDate) return;
 
-            const date = new Date(sessionDate);
-            const dateKey = date.toISOString().split('T')[0];
+            const shifted = getShiftedDate(sessionDate, timezone);
+            const dateKey = shifted.toISOString().split('T')[0];
             countMap[dateKey] = (countMap[dateKey] || 0) + 1;
         });
 

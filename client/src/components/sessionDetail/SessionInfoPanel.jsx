@@ -5,7 +5,7 @@ import Input from '../atoms/Input';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { fractalApi } from '../../utils/api';
-import { formatDateInTimezone, formatForInput } from '../../utils/dateUtils';
+import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
 import styles from './SessionInfoPanel.module.css';
 import notify from '../../utils/notify';
 import { Heading } from '../atoms/Typography';
@@ -24,7 +24,7 @@ function SessionInfoPanel({
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
     const [editValue, setEditValue] = useState('');
     const [saving, setSaving] = useState(false);
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -59,28 +59,12 @@ function SessionInfoPanel({
 
         setSaving(true);
         try {
-            // Convert input "YYYY-MM-DDTHH:mm" BACK to ISO string
-            // We can construct a Date assuming the timezone context logic,
-            // but simpler: append ":00" and use existing backend parsing if it takes local?
-            // Backend expects ISO (UTC).
-            // We need to convert "User Local Time" -> "UTC ISO".
-
-            // Construct string "YYYY-MM-DD HH:MM:SS"
+            // Convert input "YYYY-MM-DDTHH:mm" to "YYYY-MM-DD HH:MM:SS"
             const localDateTime = editValue.replace('T', ' ') + ':00';
 
-            // Use dateUtils localToISO if available, or manual logic?
-            // I'll rely on generating the date in browser relative to session.
-            // Actually, simply doing `new Date(editValue)` creates a date using BROWSER timezone.
-            // This is wrong if `timezone` (app setting) != `browser timezone`.
-            // But we don't have a robust "local to UTC" helper exposed easily (I saw localToISO in dateUtils, let's use it?).
-            // Checking imports... I didn't import localToISO.
-
-            // Workaround: Send the ISO string assuming Browser Timezone IF `timezone` matches browser.
-            // If they differ, it's tricky.
-            // I'll assume standard browser behavior for now (User's browser is in the "timezone" they selected effectively).
-
-            const dateObj = new Date(editValue);
-            const isoString = dateObj.toISOString();
+            // Convert wall time in selected timezone to UTC ISO string
+            // attributes.session_start/end are stored as UTC ISO strings
+            const isoString = localToISO(localDateTime, timezone);
 
             const field = editingField === 'start' ? 'session_start' : 'session_end';
             const payload = { [field]: isoString };

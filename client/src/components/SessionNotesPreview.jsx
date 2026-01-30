@@ -17,7 +17,7 @@ function SessionNotesPreview({ rootId, sessionId }) {
     const [error, setError] = useState(null);
     const [activities, setActivities] = useState([]);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     useEffect(() => {
         const fetchData = async () => {

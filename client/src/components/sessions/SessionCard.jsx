@@ -21,7 +21,7 @@ function SessionCard({
     onNavigate
 }) {
     const navigate = useNavigate();
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
     const { getGoalColor, getGoalTextColor } = useTheme();
 
     const sessionData = session.session_data || {};

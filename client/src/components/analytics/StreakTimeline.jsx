@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getShiftedDate } from '../../utils/dateUtils';
 
 /**
  * StreakTimeline - Visual timeline showing streaks and breaks
@@ -7,19 +9,21 @@ import React, { useMemo } from 'react';
  * @param {Array} sessions - Array of session objects with session_start dates
  */
 function StreakTimeline({ sessions = [] }) {
+    const { timezone } = useTimezone();
+
     // Calculate streaks and breaks
     const { streaks, currentStreak, longestStreak, totalActiveDays } = useMemo(() => {
         if (sessions.length === 0) {
             return { streaks: [], currentStreak: 0, longestStreak: 0, totalActiveDays: 0 };
         }
 
-        // Get unique dates with sessions
+        // Get unique dates with sessions in selected timezone
         const sessionDates = new Set();
         sessions.forEach(session => {
             const sessionDate = session.session_start || session.created_at;
             if (sessionDate) {
-                const date = new Date(sessionDate);
-                sessionDates.add(date.toISOString().split('T')[0]);
+                const shifted = getShiftedDate(sessionDate, timezone);
+                sessionDates.add(shifted.toISOString().split('T')[0]);
             }
         });
 
@@ -76,17 +80,35 @@ function StreakTimeline({ sessions = [] }) {
         });
 
         // Calculate current streak (if most recent session was today or yesterday)
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const now = new Date();
+        const shiftedNow = getShiftedDate(now, timezone);
+        const today = shiftedNow.toISOString().split('T')[0];
+
+        const yesterdayDate = new Date(shiftedNow);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterday = yesterdayDate.toISOString().split('T')[0];
+
         const lastSessionDate = sortedDates[sortedDates.length - 1];
 
         let current = 0;
         if (lastSessionDate === today || lastSessionDate === yesterday) {
             // Count backwards from today
-            let checkDate = new Date(lastSessionDate);
-            while (sessionDates.has(checkDate.toISOString().split('T')[0])) {
+            let checkDateStr = today;
+            // If we missed today but have yesterday, we start checking from yesterday for the streak
+            if (lastSessionDate === yesterday) checkDateStr = yesterday;
+
+            // Wait, standard streak logic:
+            // If last session was today, streak is ...
+            // If last session was yesterday, streak is ...
+            // The `sortedDates` are contiguous? No.
+            // Loop backwards from last session date (which is contiguous in set)
+
+            // Simpler: iterate back from lastSessionDate
+            current = 0;
+            let checkD = new Date(lastSessionDate);
+            while (sessionDates.has(checkD.toISOString().split('T')[0])) {
                 current++;
-                checkDate.setDate(checkDate.getDate() - 1);
+                checkD.setDate(checkD.getDate() - 1);
             }
         }
 

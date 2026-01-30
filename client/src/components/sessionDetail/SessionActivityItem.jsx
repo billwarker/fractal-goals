@@ -45,7 +45,7 @@ function SessionActivityItem({
     dragHandleProps
 }) {
     // Get timezone from context
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');

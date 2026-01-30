@@ -1,6 +1,8 @@
 import React from 'react';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import SMARTIndicator from '../SMARTIndicator';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../../utils/dateUtils';
 
 function GoalHeader({
     mode,
@@ -11,18 +13,11 @@ function GoalHeader({
     textColor,
     parentGoal,
     isCompleted,
-    onClose,
-    deadline
+    onClose, // Callback to close modal when navigating
+    deadline,
+    headerColor // New prop for header color
 }) {
-    // Construct goal object for SMART calculation if needed
-    // But mostly we pass what's needed for display
-
-    // NOTE: In the original, goalForSmart was constructed in the parent and passed to SMARTIndicator.
-    // We should pass goalForSmart from the parent to this component if we want to keep that logic centralized,
-    // or reconstruct it here. Reconstructing it here requires passing all the override fields.
-    // For simplicity, let's assume the parent passes the ready-to-use `goalForSmart` object prop for the indicator, OR we pass the raw goal and let the parent handle the SMART logic.
-    // Looking at the original code, `SMARTIndicator` took `goal={goalForSmart}`.
-    // Let's accept `smartGoal` as a prop.
+    const { timezone } = useTimezone();
 
     return (
         <div style={{
@@ -101,7 +96,7 @@ function GoalHeader({
                         <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
                             <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                {new Date(goal.attributes.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
                         </div>
                     )}
@@ -109,10 +104,17 @@ function GoalHeader({
                         <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
                             <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                {deadline
-                                    ? new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                    : (goal?.attributes?.deadline ? new Date(goal.attributes.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'None')
-                                }
+                                {(() => {
+                                    const d = deadline || goal?.attributes?.deadline;
+                                    // Deadlines are often YYYY-MM-DD.
+                                    // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
+                                    // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
+                                    if (d && d.length === 10 && !d.includes('T')) {
+                                        const [year, month, day] = d.split('-').map(Number);
+                                        return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                    }
+                                    return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
+                                })()}
                             </span>
                         </div>
                     )}

@@ -84,7 +84,7 @@ function formatDuration(seconds) {
 function SessionDetail() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     const [session, setSession] = useState(null);
     const [sessionData, setSessionData] = useState(null); // UI metadata only (section names, notes, ordering)

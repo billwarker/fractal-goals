@@ -12,7 +12,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showImageViewer, setShowImageViewer] = useState(false);
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
     const textareaRef = useRef(null);
 
     const adjustHeight = (el) => {

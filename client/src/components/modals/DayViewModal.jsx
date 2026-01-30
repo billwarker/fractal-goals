@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getShiftedDate } from '../../utils/dateUtils';
 import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
@@ -69,14 +71,18 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     const scheduledSessions = [];
     const completedSessions = [];
 
-    // Helper to get local date string from a datetime
+    const { timezone } = useTimezone();
+    // Helper to get local date string from a datetime in the selected timezone
     const getLocalDateString = (dateTimeStr) => {
         if (!dateTimeStr) return null;
         if (dateTimeStr.length === 10) return dateTimeStr;
-        const d = new Date(dateTimeStr);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
+        // Shift date to target timezone, then take the date part
+        const shifted = getShiftedDate(dateTimeStr, timezone);
+        if (!shifted) return null;
+
+        const year = shifted.getFullYear();
+        const month = String(shifted.getMonth() + 1).padStart(2, '0');
+        const day = String(shifted.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
 
@@ -120,9 +126,14 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     const looseCompletedSessions = completedSessions.filter(s => !claimedSessionIds.has(s.id));
 
     // Find goals due on this date
+    // Note: Goal deadlines are likely just YYYY-MM-DD or ISO.
+    // If ISO, we need to check timezone. If YYYY-MM-DD, it's date only.
+    // Assuming deadlines are date-only for now or standardized.
     const goalsDueOnDate = goals ? goals.filter(g => {
         if (!g.deadline) return false;
-        return g.deadline.split('T')[0] === date;
+        // If deadline contains T, treat as datetime, else date
+        const deadlineDate = g.deadline.includes('T') ? getLocalDateString(g.deadline) : g.deadline;
+        return deadlineDate === date;
     }) : [];
 
     // Find goals completed on this date
@@ -134,10 +145,13 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     }) : [];
 
     const formatDate = (dateString) => {
-        // Parse as local date by appending noon time to avoid timezone shifts
-        // YYYY-MM-DD strings are interpreted as UTC, which can shift the date
+        // dateString is YYYY-MM-DD
+        // We want to format it nicely.
+        // Since it's a date-only string, we can treat it as a local date for the purpose of the label
+        // OR we can use formatDateInTimezone if we treat it as midnight in that timezone?
+        // Actually, for "Monday, January 1, 2023", it doesn't matter much as long as we parse YYYY-MM-DD correctly.
         const [year, month, day] = dateString.split('-').map(Number);
-        const d = new Date(year, month - 1, day); // month is 0-indexed
+        const d = new Date(year, month - 1, day);
         return d.toLocaleDateString('en-US', {
             weekday: 'long',
             month: 'long',

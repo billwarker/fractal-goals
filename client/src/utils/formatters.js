@@ -1,8 +1,17 @@
 import moment from 'moment';
+import { getShiftedDate } from './dateUtils';
 
-export const formatDate = (dateString, format = 'MMM D, YYYY') => {
+export const formatDate = (dateString, format = 'MMM D, YYYY', timezone = null) => {
     if (!dateString) return '';
-    return moment(dateString).format(format);
+
+    let date = new Date(dateString);
+
+    // If a timezone is provided, shift the date so moment formats it in that timezone
+    if (timezone) {
+        date = getShiftedDate(date, timezone);
+    }
+
+    return moment(date).format(format);
 };
 
 export const formatDurationSeconds = (seconds) => {

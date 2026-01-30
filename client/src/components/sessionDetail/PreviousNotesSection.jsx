@@ -7,7 +7,7 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 
 function PreviousNotesSection({ notes, activityName }) {
     const [isExpanded, setIsExpanded] = useState(true);
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     // Format date for grouping
     const formatSessionDate = (isoString) => {

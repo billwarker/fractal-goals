@@ -3,12 +3,15 @@ import json
 from models import _safe_load_json
 
 def format_utc(dt):
-    """Format a datetime or date object to ISO string."""
+    """Format a datetime or date object to ISO string with UTC indicator."""
     if not dt: return None
+    # If it's just a date object, return YYYY-MM-DD
     if isinstance(dt, date) and not isinstance(dt, datetime):
         return dt.isoformat()
+    # If it's a naive datetime, assume UTC and append Z
     if dt.tzinfo is None:
         return dt.isoformat(timespec='seconds') + 'Z'
+    # If aware, ensure UTC and use Z suffix
     return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
 
 def calculate_smart_status(goal):
@@ -80,7 +83,7 @@ def serialize_goal(goal, include_children=True):
         "name": goal.name,
         "id": goal.id,
         "description": goal.description,
-        "deadline": goal.deadline.isoformat() if goal.deadline else None,
+        "deadline": format_utc(goal.deadline),
         "attributes": {
             "id": goal.id,
             "type": goal.type,
@@ -88,7 +91,7 @@ def serialize_goal(goal, include_children=True):
             "root_id": goal.root_id,
             "owner_id": goal.owner_id,
             "description": goal.description,
-            "deadline": goal.deadline.isoformat() if goal.deadline else None,
+            "deadline": format_utc(goal.deadline),
             "completed": goal.completed,
             "completed_at": format_utc(goal.completed_at),
             "created_at": format_utc(goal.created_at),
@@ -283,7 +286,8 @@ def serialize_session_template(template):
     return {
         "id": template.id, 
         "name": template.name, 
-        "template_data": _safe_load_json(template.template_data, {})
+        "template_data": _safe_load_json(template.template_data, {}),
+        "created_at": format_utc(getattr(template, 'created_at', None))
     }
 
 def serialize_program(program):

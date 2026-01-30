@@ -20,7 +20,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
-from services.serializers import serialize_goal, calculate_smart_status
+from services.serializers import serialize_goal, calculate_smart_status, format_utc
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -394,8 +394,8 @@ def get_all_fractals(current_user):
                 "name": root.name,
                 "description": root.description,
                 "type": root.type,
-                "created_at": root.created_at.isoformat() if root.created_at else None,
-                "updated_at": last_activity.isoformat() if last_activity else None,
+                "created_at": format_utc(root.created_at),
+                "updated_at": format_utc(last_activity),
                 "is_smart": all(calculate_smart_status(root).values())
             })
         
@@ -547,7 +547,7 @@ def get_active_goals_for_selection(current_user, root_id):
                 "id": stg.id,
                 "name": stg.name,
                 "description": stg.description,
-                "deadline": stg.deadline.isoformat() if stg.deadline else None,
+                "deadline": format_utc(stg.deadline),
                 "completed": stg.completed,
                 "immediateGoals": active_children
             }
@@ -847,7 +847,7 @@ def get_goal_analytics(root_id):
                     'session_name': session.name,
                     'duration_seconds': session_duration,
                     'completed': session.completed,
-                    'session_start': session.session_start.isoformat() if session.session_start else None
+                    'session_start': format_utc(session.session_start)
                 })
         
         # === BATCH QUERY 3: Get ALL activity instances for this fractal in one query ===
@@ -947,9 +947,9 @@ def get_goal_analytics(root_id):
                 'type': goal.type,
                 'description': goal.description,
                 'completed': goal.completed,
-                'completed_at': goal.completed_at.isoformat() if goal.completed_at else None,
-                'created_at': goal.created_at.isoformat() if goal.created_at else None,
-                'deadline': goal.deadline.isoformat() if goal.deadline else None,
+                'completed_at': format_utc(goal.completed_at),
+                'created_at': format_utc(goal.created_at),
+                'deadline': format_utc(goal.deadline),
                 'parent_id': goal.parent_id,
                 'age_days': goal_age_days,
                 'total_duration_seconds': total_duration,
@@ -1101,7 +1101,7 @@ def evaluate_goal_targets(root_id, goal_id):
             
             if target_achieved:
                 target['completed'] = True
-                target['completed_at'] = now.isoformat()
+                target['completed_at'] = format_utc(now)
                 target['completed_session_id'] = session_id
                 newly_completed_targets.append(target)
         

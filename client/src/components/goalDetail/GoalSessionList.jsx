@@ -1,5 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../../utils/dateUtils';
 
 /**
  * GoalSessionList Component
@@ -16,6 +18,7 @@ const GoalSessionList = ({
     headerColor // New prop for header color
 }) => {
     const navigate = useNavigate();
+    const { timezone } = useTimezone();
 
     // Session relationships
     const isShortTermGoal = goalType === 'ShortTermGoal';
@@ -24,7 +27,6 @@ const GoalSessionList = ({
     if (!isShortTermGoal && !isImmediateGoal) return null;
 
     // Filter Sessions
-
     // For STGs: Find sessions that have this goal in their short_term_goals array OR parent_ids
     const childSessions = isShortTermGoal
         ? sessions.filter(session => {
@@ -91,7 +93,7 @@ const GoalSessionList = ({
                                     <span style={{ color: 'var(--color-text-primary)' }}>{session.name}</span>
                                     {session.attributes?.created_at && (
                                         <span style={{ fontSize: '11px', color: '#888' }}>
-                                            {new Date(session.attributes.created_at).toLocaleDateString()}
+                                            {formatDateInTimezone(session.attributes.created_at, timezone, { month: 'numeric', day: 'numeric', year: 'numeric' })}
                                         </span>
                                     )}
                                 </div>
@@ -137,7 +139,7 @@ const GoalSessionList = ({
                                     <span style={{ color: 'var(--color-text-primary)' }}>{session.name}</span>
                                     {session.attributes?.created_at && (
                                         <span style={{ fontSize: '11px', color: '#888' }}>
-                                            {new Date(session.attributes.created_at).toLocaleDateString()}
+                                            {formatDateInTimezone(session.attributes.created_at, timezone, { month: 'numeric', day: 'numeric', year: 'numeric' })}
                                         </span>
                                     )}
                                 </div>

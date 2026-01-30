@@ -15,19 +15,6 @@ def get_logs(current_user, root_id):
     """
     Get all event logs for a specific fractal if owned by user.
     """
-    # Inline serializer to ensure correct key 'event_type' is used
-    def local_serialize_log(log):
-        return {
-            "id": log.id,
-            "event_type": log.event_type, 
-            "entity_type": log.entity_type,
-            "entity_id": log.entity_id,
-            "description": log.description,
-            "payload": log.payload,
-            "source": log.source,
-            "timestamp": log.timestamp.isoformat() if log.timestamp else None
-        }
-
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)
     event_type = request.args.get('event_type')
@@ -82,7 +69,7 @@ def get_logs(current_user, root_id):
         event_types = [t for t in db_session.execute(types_stmt).scalars().all()]
         
         return jsonify({
-            "logs": [local_serialize_log(log) for log in results],
+            "logs": [serialize_event_log(log) for log in results],
             "event_types": sorted(event_types),
             "pagination": {
                 "limit": limit,

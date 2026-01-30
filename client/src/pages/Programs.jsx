@@ -4,6 +4,8 @@ import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../utils/dateUtils';
 import styles from './Programs.module.css'; // Import CSS Module
 import notify from '../utils/notify';
 import { Heading, Text } from '../components/atoms/Typography';
@@ -125,10 +127,13 @@ function Programs() {
         }
     };
 
+    const { timezone } = useTimezone();
+
     const formatDate = (dateString) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+        // If it's a date-only string (YYYY-MM-DD), we generally want to display it as is
+        // But for consistency with other parts, we can use the util
+        return formatDateInTimezone(dateString, timezone, {
             month: 'short',
             day: 'numeric',
             year: 'numeric'

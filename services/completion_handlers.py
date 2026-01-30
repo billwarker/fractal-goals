@@ -16,7 +16,7 @@ import json
 from services.events import event_bus, Event, Events
 import models
 from models import get_session, Goal, Session, ActivityInstance
-from services.serializers import serialize_activity_instance
+from services.serializers import serialize_activity_instance, format_utc
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
         
         if target_achieved:
             target['completed'] = True
-            target['completed_at'] = now.isoformat()
+            target['completed_at'] = format_utc(now)
             target['completed_session_id'] = session_id
             newly_completed.append(target)
             

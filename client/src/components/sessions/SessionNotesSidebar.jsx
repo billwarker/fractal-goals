@@ -25,7 +25,7 @@ function SessionNotesSidebar({
 }) {
     const [allNotes, setAllNotes] = useState([]);
     const [viewImage, setViewImage] = useState(null);
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
     const scrollContainerRef = useRef(null);
     const firstNoteRefs = useRef({});
 

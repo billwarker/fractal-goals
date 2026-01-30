@@ -3,12 +3,30 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const TimezoneContext = createContext();
 
 export function TimezoneProvider({ children }) {
-    // Default to browser's local timezone
+    // Preference can be a specific IANA string (e.g. "America/New_York") or "local"
+    const [preference, setPreference] = useState(() => {
+        return localStorage.getItem('fractal_timezone_preference') || 'local';
+    });
+
+    // The actual timezone string to use for formatting
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+    useEffect(() => {
+        // Persist preference
+        localStorage.setItem('fractal_timezone_preference', preference);
+
+        // Resolve preference to actual timezone
+        if (preference === 'local') {
+            setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        } else {
+            setTimezone(preference);
+        }
+    }, [preference]);
+
     const value = {
-        timezone,
-        setTimezone
+        timezone,       // The resolved IANA string to use in formatters
+        preference,     // "local" or specific string
+        setPreference   // Function to update preference
     };
 
     return (
@@ -21,18 +39,14 @@ export function TimezoneProvider({ children }) {
 export function useTimezone() {
     const context = useContext(TimezoneContext);
     if (!context) {
-        // Fallback if used outside provider (e.g. tests)
-        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Fallback for tests or usage outside provider
+        return {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            preference: 'local',
+            setPreference: () => { }
+        };
     }
-    return context.timezone;
-}
-
-export function useSetTimezone() {
-    const context = useContext(TimezoneContext);
-    if (!context) {
-        throw new Error('useSetTimezone must be used within a TimezoneProvider');
-    }
-    return context.setTimezone;
+    return context;
 }
 
 export default TimezoneContext;

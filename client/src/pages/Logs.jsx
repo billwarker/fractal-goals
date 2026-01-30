@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../utils/dateUtils';
 import './Logs.css';
 
 /**
@@ -9,6 +11,7 @@ import './Logs.css';
 function Logs() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const { timezone } = useTimezone();
 
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -122,7 +125,15 @@ function Logs() {
                             {logs.map(log => (
                                 <div key={log.id} className="log-item">
                                     <span className="log-timestamp col-timestamp">
-                                        {new Date(log.timestamp).toLocaleString()}
+                                        {formatDateInTimezone(log.timestamp, timezone, {
+                                            month: 'numeric',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: 'numeric',
+                                            minute: 'numeric',
+                                            second: 'numeric',
+                                            hour12: true
+                                        })}
                                     </span>
                                     <span className="col-event">
                                         <span className={`log-event-tag ${(log.event_type || 'system').split('.')[0]} ${(log.event_type || '').endsWith('.deleted') ? 'deleted' : ''}`}>

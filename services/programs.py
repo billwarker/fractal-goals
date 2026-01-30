@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 
-import models
+from services.serializers import format_utc
 from models import (
     Program, ProgramBlock, ProgramDay, Goal, SessionTemplate, Session,
     validate_root_goal, _safe_load_json
@@ -412,7 +412,7 @@ class ProgramService:
                                     "day_id": day.id,
                                     "day_name": day.name,
                                     "day_number": day.day_number,
-                                    "day_date": day.date.isoformat() if day.date else None,
+                                    "day_date": format_utc(day.date),
                                     "is_completed": day.is_completed,
                                     "sessions": session_details,
                                     "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
@@ -485,7 +485,7 @@ class ProgramService:
                 'day_id': p_day.id,
                 'day_name': p_day.name,
                 'block_id': p_day.block_id,
-                'date': p_day.date.isoformat() if p_day.date else None
+                'date': format_utc(p_day.date)
             }, source='ProgramService.check_program_day_completion'))
             
             # Check Block Completion

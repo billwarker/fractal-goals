@@ -17,7 +17,7 @@ function Sessions() {
     const { getGoalColor } = useTheme();
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
     // Local page header is now rendered directly
 
 

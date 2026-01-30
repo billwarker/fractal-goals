@@ -46,12 +46,21 @@ export const parseAnyDate = (dateString) => {
         return new Date(year, month - 1, day);
     }
 
-    // If it's a datetime without timezone (YYYY-MM-DD HH:MM:SS), parse as local
+    // If it's a datetime without timezone (YYYY-MM-DD HH:MM:SS), 
+    // we assume UTC because all backend datetimes are UTC.
     if (typeof dateString === 'string' && dateString.includes(' ') && !dateString.includes('Z') && !dateString.includes('+')) {
         const [datePart, timePart] = dateString.split(' ');
         const [year, month, day] = datePart.split('-').map(Number);
         const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
-        return new Date(year, month - 1, day, hours || 0, minutes || 0, seconds || 0);
+        // Use Date.UTC to ensure it's interpreted as UTC
+        return new Date(Date.UTC(year, month - 1, day, hours || 0, minutes || 0, seconds || 0));
+    }
+
+    // If it's an ISO datetime string without timezone (YYYY-MM-DDTHH:MM:SS), 
+    // we assume UTC because the backend stores everything in UTC and might 
+    // be sending naive strings (missing 'Z') if the server hasn't reloaded.
+    if (typeof dateString === 'string' && dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
+        return new Date(dateString + 'Z');
     }
 
     // Otherwise use standard parsing (handles ISO strings with Z suffix)
@@ -68,7 +77,7 @@ export const parseAnyDate = (dateString) => {
 export const formatDateInTimezone = (dateValue, timezone, options = {}) => {
     if (!dateValue) return '';
 
-    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    const date = typeof dateValue === 'string' ? parseAnyDate(dateValue) : dateValue;
 
     const defaultOptions = {
         year: 'numeric',
@@ -191,4 +200,48 @@ export const localToISO = (localDateStr, timezone) => {
     const adjustedDate = new Date(targetDate.getTime() - offset);
 
     return adjustedDate.toISOString();
+};
+
+/**
+ * Create a Date object where the local time components match the wall time
+ * in the specified timezone. This allows libraries like moment.js (without timezone support)
+ * to format dates as if they were in the target timezone.
+ * 
+ * @param {Date|string} dateValue - The real date/time
+ * @param {string} timezone - Target timezone IANA string
+ * @returns {Date} A "shifted" Date object
+ */
+export const getShiftedDate = (dateValue, timezone) => {
+    if (!dateValue || !timezone) return dateValue ? new Date(dateValue) : null;
+
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+
+    // Get the wall time parts in the target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+        fractionalSecondDigits: 3
+    });
+
+    const parts = formatter.formatToParts(date);
+    const getPart = (type) => parseInt(parts.find(p => p.type === type)?.value || 0);
+
+    const year = getPart('year');
+    const month = getPart('month') - 1; // 0-indexed
+    const day = getPart('day');
+    const hour = getPart('hour');
+    const minute = getPart('minute');
+    const second = getPart('second');
+    // millisecond might be missing from parts in some environments or require specific options
+    // simpler to just carry over ms from original date if possible, but strict mapping is safer.
+    // Let's ignore ms for display formatting usually.
+
+    // Create new date using LOCAL constructor
+    return new Date(year, month, day, hour, minute, second);
 };

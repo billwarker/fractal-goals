@@ -28,7 +28,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
         sessionId // Exclude current session
     );
 
-    const timezone = useTimezone();
+    const { timezone } = useTimezone();
 
     const formatDate = (isoString) => {
         if (!isoString) return '';

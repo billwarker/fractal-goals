@@ -222,7 +222,7 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
 - **Drag-to-Select Interface:** Users can drag to select a range of data points (cells in heatmap, region in charts) to annotate.
 - **Visual Feedback:** Selection is highlighted, and annotated regions are marked with interactive indicators.
 - **Persistence:** Annotations are stored in the database linked to the visualization type, context (e.g., specific activity), and selected data points.
-- **Interactive Modals:** Annotation Modal for creating notes, and view modal for reading existing annotations.
+- **Timezone Localization**: Implemented global timezone selection in Settings (General tab) and updated all components to use `useTimezone` for consistent, localized datetime displays across the app.
 - **Activity Heatmap Fixes:** Improved crash resilience by handling non-array API responses and added interactive highlighting synchronized with the sidebar.
 
 ### 11. Profile Window & Unified Navigation

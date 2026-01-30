@@ -8,6 +8,11 @@ import styles from './ProgramBlockView.module.css';
 import { useState } from 'react';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatDateInTimezone } from '../../utils/dateUtils';
+
+// ... (imports)
+
 function ProgramBlockView({
     blocks, // sortedBlocks
     sessions,
@@ -20,13 +25,18 @@ function ProgramBlockView({
     onGoalClick
 }) {
     const { getGoalColor } = useTheme();
+    const { timezone } = useTimezone();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [blockToDelete, setBlockToDelete] = useState(null);
 
     // Helper formatter
     const formatDate = (dateString) => {
         if (!dateString) return '';
-        return moment(dateString).format('MMM D, YYYY');
+        return formatDateInTimezone(dateString, timezone, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
     };
 
     const handleDeleteClick = (block) => {
