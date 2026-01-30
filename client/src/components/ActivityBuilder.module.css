@@ -54,35 +54,7 @@
     margin-bottom: 6px;
 }
 
-.input {
-    width: 100%;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-}
-
-.textarea {
-    width: 100%;
-    min-height: 80px;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-    font-family: inherit;
-    resize: vertical;
-}
-
-.select {
-    width: 100%;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-}
+/* Input/Select/Textarea styles removed - handled by Atoms */
 
 /* Associated Goals Section */
 .goalHeader {
@@ -92,15 +64,7 @@
     margin-bottom: 6px;
 }
 
-.goalSelectBtn {
-    padding: 4px 10px;
-    background: transparent;
-    border: 1px solid #4caf50;
-    border-radius: 4px;
-    color: #4caf50;
-    cursor: pointer;
-    font-size: 11px;
-}
+/* .goalSelectBtn removed */
 
 .selectedGoalsContainer {
     display: flex;
@@ -214,45 +178,7 @@
     align-items: center;
 }
 
-.splitInput {
-    width: 150px;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-}
-
-.removeSplitBtn {
-    padding: 10px;
-    background: #d32f2f;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    width: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.addSplitBtn {
-    padding: 10px 16px;
-    background: var(--color-bg-card-alt);
-    border: 1px dashed var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    font-size: 13px;
-    white-space: nowrap;
-    transition: all 0.2s;
-}
-
-.addSplitBtn:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-    border-color: var(--color-text-muted);
-}
+/* Obsolete button styles removed */
 
 /* Metrics Section */
 .metricsList {
@@ -277,23 +203,7 @@
     align-items: center;
 }
 
-.metricInput {
-    flex: 1;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-}
-
-.metricUnitInput {
-    width: 100px;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-primary);
-}
+/* .metricInput, .metricUnitInput removed */
 
 .metricFlags {
     display: flex;
@@ -307,22 +217,7 @@
 }
 
 
-.addMetricBtn {
-    padding: 10px;
-    background: var(--color-bg-card-alt);
-    border: 1px dashed var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    font-size: 13px;
-    transition: all 0.2s;
-}
-
-.addMetricBtn:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-    border-color: var(--color-text-muted);
-}
+/* .addMetricBtn removed */
 
 /* Action Buttons */
 .actionsRow {
@@ -331,31 +226,8 @@
     margin-top: 10px;
 }
 
-.cancelBtn {
+.actionBtn {
     flex: 1;
-    padding: 12px;
-    background: #666;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.submitBtn {
-    flex: 1;
-    padding: 12px;
-    background: #4caf50;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.submitBtnDisabled {
-    background: #666;
-    cursor: not-allowed;
 }
 
 /* Warning Modal */

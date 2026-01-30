@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import Input from './atoms/Input';
+import TextArea from './atoms/TextArea';
+import Select from './atoms/Select';
+import Button from './atoms/Button';
 import Checkbox from './atoms/Checkbox';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoals } from '../contexts/GoalsContext';
@@ -307,43 +311,44 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                     <form onSubmit={handleSubmit}>
                         <div className={styles.formGrid}>
                             <div>
-                                <label className={styles.label}>Activity Name</label>
-                                <input
-                                    type="text"
+                                <Input
+                                    label="Activity Name"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
                                     placeholder="e.g. Scale Practice"
-                                    className={styles.input}
+                                    fullWidth
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className={styles.label}>Description</label>
-                                <textarea
+                                <TextArea
+                                    label="Description"
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
                                     placeholder="Optional description"
-                                    className={styles.textarea}
+                                    fullWidth
                                 />
                             </div>
 
                             {/* Associated Goals Section - Tree Navigation */}
                             <div>
                                 <div className={styles.goalHeader}>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                                         Associated Goals ({selectedGoalIds.length})
                                     </label>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => {
                                             setShowGoalSelector(!showGoalSelector);
                                             if (!showGoalSelector) setSelectedLevel(null);
                                         }}
-                                        className={styles.goalSelectBtn}
+                                        variant="ghost"
+                                        size="sm"
+                                        style={{ color: 'var(--color-brand-primary)' }}
                                     >
                                         {showGoalSelector ? 'Done' : 'Select Goals'}
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {/* Selected Goals Display */}
@@ -393,18 +398,21 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                     const isActive = selectedLevel === level.type;
 
                                                     return (
-                                                        <button
+                                                        <Button
                                                             key={level.type}
                                                             type="button"
                                                             onClick={() => setSelectedLevel(isActive ? null : level.type)}
                                                             className={`${styles.levelBadge} ${isActive ? styles.levelBadgeActive : styles.levelBadgeInactive}`}
                                                             style={{
                                                                 background: goalColor,
-                                                                color: textColor
+                                                                color: textColor,
+                                                                border: isActive ? '2px solid white' : '2px solid transparent',
+                                                                opacity: isActive ? 1 : 0.85
                                                             }}
+                                                            size="sm"
                                                         >
                                                             {level.name} ({count})
-                                                        </button>
+                                                        </Button>
                                                     );
                                                 })
                                             )}
@@ -463,11 +471,11 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                             {/* Group Selection */}
                             <div>
-                                <label className={styles.label}>Activity Group</label>
-                                <select
+                                <Select
+                                    label="Activity Group"
                                     value={groupId}
                                     onChange={e => setGroupId(e.target.value)}
-                                    className={styles.select}
+                                    fullWidth
                                 >
                                     <option value="">(No Group)</option>
                                     {activityGroups && activityGroups.map(group => (
@@ -475,7 +483,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                             {group.name}
                                         </option>
                                     ))}
-                                </select>
+                                </Select>
                             </div>
 
                             {/* Flags */}
@@ -507,34 +515,35 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             {/* Splits Section */}
                             {hasSplits && (
                                 <div>
-                                    <label className={styles.label}>Splits (Min 2, Max 5)</label>
+                                    <label className={styles.label} style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>Splits (Min 2, Max 5)</label>
                                     <div className={styles.splitsContainer}>
                                         {splits.map((split, idx) => (
                                             <div key={idx} className={styles.splitRow}>
-                                                <input
-                                                    type="text"
+                                                <Input
                                                     value={split.name}
                                                     onChange={e => handleSplitChange(idx, e.target.value)}
                                                     placeholder={`Split #${idx + 1}`}
-                                                    className={styles.splitInput}
+                                                    style={{ marginBottom: 0, width: '200px' }}
                                                 />
                                                 {splits.length > 2 && (
-                                                    <button
+                                                    <Button
                                                         type="button"
                                                         onClick={() => handleRemoveSplit(idx)}
-                                                        className={styles.removeSplitBtn}
+                                                        variant="ghost"
+                                                        style={{ color: 'var(--color-brand-danger)', padding: '8px' }}
                                                     >
                                                         ×
-                                                    </button>
+                                                    </Button>
                                                 )}
                                                 {idx === splits.length - 1 && splits.length < 5 && (
-                                                    <button
+                                                    <Button
                                                         type="button"
                                                         onClick={handleAddSplit}
-                                                        className={styles.addSplitBtn}
+                                                        variant="secondary"
+                                                        size="sm"
                                                     >
                                                         + Add Split
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         ))}
@@ -545,33 +554,32 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                             {/* Metrics Section */}
                             {hasMetrics && (
                                 <div>
-                                    <label className={styles.label}>Metrics (Max 3)</label>
+                                    <label className={styles.label} style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>Metrics (Max 3)</label>
                                     <div className={styles.metricsList}>
                                         {metrics.map((metric, idx) => (
                                             <div key={idx} className={styles.metricCard}>
                                                 <div className={styles.metricRow}>
-                                                    <input
-                                                        type="text"
+                                                    <Input
                                                         value={metric.name}
                                                         onChange={e => handleMetricChange(idx, 'name', e.target.value)}
                                                         placeholder="Metric Name (e.g. Speed)"
-                                                        className={styles.metricInput}
+                                                        style={{ marginBottom: 0, flex: 1 }}
                                                     />
-                                                    <input
-                                                        type="text"
+                                                    <Input
                                                         value={metric.unit}
                                                         onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
                                                         placeholder="Unit (e.g. bpm)"
-                                                        className={styles.metricUnitInput}
+                                                        style={{ marginBottom: 0, width: '120px' }}
                                                     />
                                                     {metrics.length > 1 && (
-                                                        <button
+                                                        <Button
                                                             type="button"
                                                             onClick={() => handleRemoveMetric(idx)}
-                                                            className={styles.removeSplitBtn}
+                                                            variant="ghost"
+                                                            style={{ color: 'var(--color-brand-danger)', padding: '8px' }}
                                                         >
                                                             ×
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </div>
 
@@ -597,13 +605,15 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                             </div>
                                         ))}
                                         {metrics.length < 3 && (
-                                            <button
+                                            <Button
                                                 type="button"
                                                 onClick={handleAddMetric}
-                                                className={styles.addMetricBtn}
+                                                variant="secondary"
+                                                size="sm"
+                                                style={{ alignSelf: 'flex-start' }}
                                             >
                                                 + Add Metric
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </div>
@@ -611,20 +621,23 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
                             {/* Action Buttons */}
                             <div className={styles.actionsRow}>
-                                <button
+                                <Button
                                     type="button"
                                     onClick={handleCancel}
-                                    className={styles.cancelBtn}
+                                    variant="secondary"
+                                    className={styles.actionBtn}
                                 >
                                     Cancel
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="submit"
                                     disabled={creating}
-                                    className={`${styles.submitBtn} ${creating ? styles.submitBtnDisabled : ''}`}
+                                    isLoading={creating}
+                                    variant="primary"
+                                    className={styles.actionBtn}
                                 >
-                                    {creating ? (editingActivity ? 'Saving...' : 'Creating...') : (editingActivity ? 'Save Activity' : 'Create Activity')}
-                                </button>
+                                    {editingActivity ? 'Save Activity' : 'Create Activity'}
+                                </Button>
                             </div>
                         </div>
                     </form>
