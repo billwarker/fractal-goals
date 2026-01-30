@@ -24,7 +24,6 @@ function Sessions() {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterCompleted, setFilterCompleted] = useState('all');
-    const [parentGoals, setParentGoals] = useState({});
     const [activities, setActivities] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
@@ -97,26 +96,6 @@ function Sessions() {
             setSessions(sessionsData);
             setHasMore(pagination.has_more);
             setTotalSessions(pagination.total);
-
-            // Fetch parent goals for all sessions
-            const allParentIds = new Set();
-            sessionsData.forEach(session => {
-                if (session.attributes?.parent_ids) {
-                    session.attributes.parent_ids.forEach(id => allParentIds.add(id));
-                }
-            });
-
-            // Fetch goal details for all parent IDs
-            const goalsMap = {};
-            for (const goalId of allParentIds) {
-                try {
-                    const goalRes = await fractalApi.getGoal(rootId, goalId);
-                    goalsMap[goalId] = goalRes.data;
-                } catch (err) {
-                    console.error(`Failed to fetch goal ${goalId}`, err);
-                }
-            }
-            setParentGoals(goalsMap);
             setLoading(false);
         } catch (err) {
             console.error("Failed to fetch practice sessions", err);
@@ -141,32 +120,6 @@ function Sessions() {
             // Append new sessions to existing
             setSessions(prev => [...prev, ...newSessions]);
             setHasMore(pagination.has_more);
-
-            // Fetch parent goals for new sessions only
-            const allParentIds = new Set();
-            newSessions.forEach(session => {
-                if (session.attributes?.parent_ids) {
-                    session.attributes.parent_ids.forEach(id => {
-                        // Only fetch if not already in parentGoals
-                        if (!parentGoals[id]) {
-                            allParentIds.add(id);
-                        }
-                    });
-                }
-            });
-
-            if (allParentIds.size > 0) {
-                const newGoalsMap = { ...parentGoals };
-                for (const goalId of allParentIds) {
-                    try {
-                        const goalRes = await fractalApi.getGoal(rootId, goalId);
-                        newGoalsMap[goalId] = goalRes.data;
-                    } catch (err) {
-                        console.error(`Failed to fetch goal ${goalId}`, err);
-                    }
-                }
-                setParentGoals(newGoalsMap);
-            }
         } catch (err) {
             console.error("Failed to load more sessions", err);
         } finally {
@@ -392,9 +345,8 @@ function Sessions() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {filteredSessions.map(session => {
                                 const sessionData = session.attributes?.session_data;
-                                const sessionParentGoals = (session.attributes?.parent_ids || [])
-                                    .map(id => parentGoals[id])
-                                    .filter(Boolean);
+                                const shortTermGoals = session.short_term_goals || [];
+                                const immediateGoals = session.immediate_goals || [];
 
                                 return (
                                     <div
@@ -488,17 +440,17 @@ function Sessions() {
                                             </div>
                                         </div>
 
-                                        {/* Parent Goals & Immediate Goals Section */}
-                                        {(sessionParentGoals.length > 0 || (session.immediate_goals && session.immediate_goals.length > 0)) && (
+                                        {/* Associated Goals Section */}
+                                        {(shortTermGoals.length > 0 || immediateGoals.length > 0) && (
                                             <div className={styles.goalsSection}>
-                                                {/* Short-Term Goals (left side) */}
-                                                {sessionParentGoals.length > 0 && (
+                                                {/* Short-Term Goals Group */}
+                                                {shortTermGoals.length > 0 && (
                                                     <div className={styles.goalsColumn}>
-                                                        <div className={styles.fieldLabel} style={{ marginBottom: '8px' }}>
-                                                            Short-Term Goals:
+                                                        <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
+                                                            Short-Term Goals
                                                         </div>
                                                         <div className={styles.goalsList}>
-                                                            {sessionParentGoals.map(goal => (
+                                                            {shortTermGoals.map(goal => (
                                                                 <div
                                                                     key={goal.id}
                                                                     className={styles.goalTag}
@@ -514,24 +466,24 @@ function Sessions() {
                                                     </div>
                                                 )}
 
-                                                {/* Immediate Goals (right side) - using new junction table data */}
-                                                {session.immediate_goals && session.immediate_goals.length > 0 && (
+                                                {/* Immediate Goals Group */}
+                                                {immediateGoals.length > 0 && (
                                                     <div className={styles.goalsColumn}>
-                                                        <div className={styles.fieldLabel} style={{ marginBottom: '8px' }}>
-                                                            Immediate Goals:
+                                                        <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
+                                                            Immediate Goals
                                                         </div>
                                                         <div className={styles.goalsList}>
-                                                            {session.immediate_goals.map(goal => (
+                                                            {immediateGoals.map(goal => (
                                                                 <div
                                                                     key={goal.id}
-                                                                    className={`${styles.goalTag} ${goal.completed ? styles.goalTagCompleted : ''}`}
+                                                                    className={`${styles.goalTag} ${(goal.completed || goal.attributes?.completed) ? styles.goalTagCompleted : ''}`}
                                                                     style={{
                                                                         border: `1px solid ${getGoalColor('ImmediateGoal')}`,
                                                                         color: getGoalColor('ImmediateGoal')
                                                                     }}
                                                                 >
                                                                     {goal.name}
-                                                                    {goal.completed && (
+                                                                    {(goal.completed || goal.attributes?.completed) && (
                                                                         <span className={styles.checkMark}>✓</span>
                                                                     )}
                                                                 </div>
@@ -544,7 +496,7 @@ function Sessions() {
 
                                         {/* Achieved Targets Section */}
                                         {(() => {
-                                            const achievedTargets = getAchievedTargetsForSession(session, sessionParentGoals);
+                                            const achievedTargets = getAchievedTargetsForSession(session, shortTermGoals);
                                             if (achievedTargets.length === 0) return null;
 
                                             return (
