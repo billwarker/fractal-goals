@@ -60,73 +60,64 @@ function GoalHeader({
             </div>
 
             {/* Second Row: Badges and Status */}
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-
-                {/* Group 1: Status Badges */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {mode === 'create' && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            + Create
-                        </span>
-                    )}
-                    <div style={{
-                        padding: '4px 10px',
-                        background: goalColor,
-                        color: textColor,
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                    }}>
-                        {getTypeDisplayName(goalType)}
-                    </div>
-
-                    {/* Only show SMART indicator in non-create mode, or if we have enough data */}
-                    {mode !== 'create' && (
-                        <SMARTIndicator goal={goal} goalType={goalType} />
-                    )}
-
-                    {mode === 'create' && parentGoal && (
-                        <span style={{ color: '#888', fontSize: '12px' }}>
-                            under "{parentGoal.name}"
-                        </span>
-                    )}
-                    {mode !== 'create' && isCompleted && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            ✓ Completed
-                        </span>
-                    )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {mode === 'create' && (
+                    <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                        + Create
+                    </span>
+                )}
+                <div style={{
+                    padding: '4px 10px',
+                    background: goalColor,
+                    color: textColor,
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                }}>
+                    {getTypeDisplayName(goalType)}
                 </div>
 
-                {/* Divider - only show if we have dates and we're not in create mode */}
-                {mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline) && (
-                    <div style={{ width: '1px', height: '16px', background: '#444' }} />
+                {/* Only show SMART indicator in non-create mode, or if we have enough data */}
+                {mode !== 'create' && (
+                    <SMARTIndicator goal={goal} goalType={goalType} />
                 )}
 
-                {/* Group 2: Dates */}
-                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {goal?.attributes?.created_at && (
-                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
-                                <span style={{ color: '#ccc', fontWeight: '500' }}>
-                                    {new Date(goal.attributes.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                            </div>
-                        )}
-                        {(deadline || goal?.attributes?.deadline) && (
-                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
-                                <span style={{ color: '#ccc', fontWeight: '500' }}>
-                                    {deadline
-                                        ? new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                                        : (goal?.attributes?.deadline ? new Date(goal.attributes.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'None')
-                                    }
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                {mode === 'create' && parentGoal && (
+                    <span style={{ color: '#888', fontSize: '12px' }}>
+                        under "{parentGoal.name}"
+                    </span>
+                )}
+                {mode !== 'create' && isCompleted && (
+                    <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                        ✓ Completed
+                    </span>
                 )}
             </div>
+
+            {/* Third Row: Dates */}
+            {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {goal?.attributes?.created_at && (
+                        <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
+                            <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                {new Date(goal.attributes.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                        </div>
+                    )}
+                    {(deadline || goal?.attributes?.deadline) && (
+                        <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
+                            <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                {deadline
+                                    ? new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                                    : (goal?.attributes?.deadline ? new Date(goal.attributes.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'None')
+                                }
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
