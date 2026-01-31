@@ -71,8 +71,20 @@ function AuthModal({ isOpen, onClose }) {
                 // Let's just let the user type it or rely on browser autofill.
             }
         } catch (err) {
+            console.error("Auth error:", err);
             let errorMessage = "An error occurred";
-            if (err.response?.data?.details) {
+
+            // Check for network errors (no response from server)
+            if (!err.response) {
+                errorMessage = "Network Error: Unable to reach the server. Please check your connection.";
+            }
+            // Check for server-side structure errors (500s)
+            else if (err.response.status >= 500) {
+                // Try to show specific error if available, otherwise generic
+                errorMessage = err.response.data?.error || "Server Error: Something went wrong. Please try again later.";
+            }
+            // Check for API-specific validation details
+            else if (err.response?.data?.details) {
                 const details = err.response.data.details;
                 if (Array.isArray(details)) {
                     errorMessage = details.map(d => `${d.field}: ${d.message}`).join(", ");
