@@ -76,7 +76,7 @@ timeout: '1200s'
 
 # Substitutions to be configured in Cloud Build Trigger
 substitutions:
-  _REGION: 'us-central1'
+  _REGION: 'us-east1'
   _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
 
 options:
