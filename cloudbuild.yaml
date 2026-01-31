@@ -79,5 +79,3 @@ substitutions:
   _REGION: 'us-east1'
   _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
 
-options:
-  logging: CLOUD_LOGGING_ONLY
