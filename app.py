@@ -82,10 +82,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Enable CORS with environment-based origins
-# Enable CORS with environment-based origins
 CORS(app, resources={
     r"/api/.*": {
-        "origins": "*",  # Allow all origins in development to avoid port mismatches
+        "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
