@@ -12,10 +12,10 @@ build/
 # Environment Variables
 .env
 .env.local
+.env.development
+.env.testing
+.env.production
 !.env.example
-!.env.development
-!.env.testing
-!.env.production
 
 # Virtual Environments
 fractal-goals-venv/
@@ -31,8 +31,8 @@ goals_prod.db
 goals_db*.json
 *.db-journal
 
-# Production database (tracked)
-# goals.db is tracked as it's the production database
+# Production database
+goals.db
 
 # Logs
 *.log
