@@ -54,7 +54,8 @@ steps:
       '--platform', 'managed',
       '--allow-unauthenticated', # Remove if auth required
       '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest',
-      '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com'
+      '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com',
+      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 
   # ==========================================
@@ -68,7 +69,8 @@ steps:
       '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$SHORT_SHA',
       '--region', '$_REGION',
       '--platform', 'managed',
-      '--allow-unauthenticated'
+      '--allow-unauthenticated',
+      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 
 # Global timeout
