@@ -56,6 +56,7 @@ steps:
       '--allow-unauthenticated', # Remove if auth required
       '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest',
       '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app',
+      '--add-cloudsql-instances', 'fractal-goals:us-east1:fractal-goals-postgres',
       '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 

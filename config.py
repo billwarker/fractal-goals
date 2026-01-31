@@ -105,7 +105,7 @@ class Config:
     def is_postgres(cls):
         """Check if the database is PostgreSQL."""
         url = cls.get_database_url()
-        return url.startswith('postgresql://') or url.startswith('postgres://')
+        return url.startswith('postgresql') or url.startswith('postgres')
     
     @classmethod
     def is_sqlite(cls):
