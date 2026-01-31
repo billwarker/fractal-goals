@@ -48,7 +48,12 @@ class Config:
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'goals.db')
     
     # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')
+    # Support comma or semicolon or space as delimiters for flexibility
+    CORS_ORIGINS = [
+        origin.strip() 
+        for origin in os.getenv('CORS_ORIGINS', 'http://localhost:5173').replace(';', ',').replace(' ', ',').split(',') 
+        if origin.strip()
+    ]
     
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
