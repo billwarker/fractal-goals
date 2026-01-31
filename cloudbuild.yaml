@@ -79,3 +79,5 @@ substitutions:
   _REGION: 'us-east1'
   _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
 
+options:
+  default_logs_bucket_behavior: REGIONAL_USER_OWNED_BUCKET
