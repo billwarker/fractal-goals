@@ -67,13 +67,17 @@ Talisman(
 )
 
 # Configure logging
+handlers = [logging.StreamHandler()]
+if config.ENV == 'development':
+    try:
+        handlers.append(logging.FileHandler(config.get_log_path()))
+    except Exception:
+        pass # Fallback to stdout if file write fails
+
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(config.get_log_path()),
-        logging.StreamHandler()
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 
