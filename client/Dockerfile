@@ -15,6 +15,9 @@ RUN npm ci
 COPY . .
 
 # Build for production
+# VITE_API_URL must be available at build time
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # =======================================
