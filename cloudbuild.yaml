@@ -20,6 +20,7 @@ steps:
       'build',
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$SHORT_SHA',
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:latest',
+      '--build-arg', 'VITE_API_URL=https://fractal-backend-195572181270.us-east1.run.app/api',
       'client'
     ]
 
@@ -54,7 +55,7 @@ steps:
       '--platform', 'managed',
       '--allow-unauthenticated', # Remove if auth required
       '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest',
-      '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com',
+      '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com,https://fractal-frontend-195572181270.us-east1.run.app',
       '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 
