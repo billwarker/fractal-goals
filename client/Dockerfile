@@ -35,5 +35,5 @@ EXPOSE 8080
 # Start Nginx
 # Cloud Run expects the container to listen on $PORT (defaults to 8080)
 # Nginx default listens on 80. We need to configure it to listen on 8080 or use env substitution.
-# Using 'sed' to update the port in default conf at runtime is a common Cloud Run pattern for Nginx.
-CMD sh -c "envsubst '\$PORT' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+# Nginx is configured to listen on 8080 in nginx.conf, matching Cloud Run default.
+CMD ["nginx", "-g", "daemon off;"]
