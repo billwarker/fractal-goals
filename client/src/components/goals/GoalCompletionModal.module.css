@@ -1,0 +1,178 @@
+/* GoalCompletionModal.module.css */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-brand-success);
+}
+
+.backButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.2s;
+}
+
+.backButton:hover {
+    color: var(--color-text-primary);
+}
+
+.title {
+    margin: 0;
+    font-size: 16px;
+    color: var(--color-brand-success);
+}
+
+/* Goal Card */
+.goalCard {
+    padding: 14px;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-brand-success);
+    border-radius: 6px;
+}
+
+.cardLabel {
+    font-size: 11px;
+    color: var(--color-brand-success);
+    margin-bottom: 4px;
+}
+
+.cardTitle {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--color-text-primary);
+}
+
+.cardType {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
+/* Info Box */
+.sectionLabel {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.infoBox {
+    padding: 12px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--color-text-primary);
+}
+
+/* Lists */
+.emptyText {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.listColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.listItem {
+    padding: 10px 12px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-card);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.programIcon {
+    color: #66bb6a;
+}
+
+/* Target Item */
+.targetItem {
+    padding: 10px 12px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border-card);
+    border-radius: 4px;
+}
+
+.targetName {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.metricList {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+
+.metricBadge {
+    padding: 2px 8px;
+    background: var(--color-bg-input);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+    margin-top: 8px;
+}
+
+.cancelButton,
+.confirmButton {
+    flex: 1;
+    padding: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.cancelButton {
+    background: transparent;
+    border: 1px solid var(--color-border-btn);
+    color: var(--color-text-muted);
+}
+
+.cancelButton:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.confirmButton {
+    background: var(--color-brand-success);
+    border: none;
+    color: white;
+    font-weight: bold;
+}
+
+.confirmButton:hover {
+    filter: brightness(1.1);
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import styles from './GoalCompletionModal.module.css';
 
 function GoalCompletionModal({
     goal,
@@ -32,92 +32,57 @@ function GoalCompletionModal({
     const associatedPrograms = findProgramsForGoal();
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className={styles.container}>
             {/* Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #4caf50'
-            }}>
+            <div className={styles.header}>
                 <button
                     onClick={onCancel}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#888',
-                        fontSize: '18px',
-                        cursor: 'pointer',
-                        padding: '0 4px'
-                    }}
+                    className={styles.backButton}
                 >
                     ←
                 </button>
-                <h3 style={{ margin: 0, fontSize: '16px', color: '#4caf50' }}>
+                <h3 className={styles.title}>
                     ✓ Confirm Goal Completion
                 </h3>
             </div>
 
             {/* Goal Name */}
-            <div style={{
-                padding: '14px',
-                background: '#2a3a2a',
-                border: '1px solid #4caf50',
-                borderRadius: '6px'
-            }}>
-                <div style={{ fontSize: '11px', color: '#4caf50', marginBottom: '4px' }}>
+            <div className={styles.goalCard}>
+                <div className={styles.cardLabel}>
                     Completing Goal:
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                <div className={styles.cardTitle}>
                     {goal.name}
                 </div>
-                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                <div className={styles.cardType}>
                     Type: {goalType}
                 </div>
             </div>
 
             {/* Completion Date */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                <label className={styles.sectionLabel}>
                     Will be marked as completed:
                 </label>
-                <div style={{
-                    padding: '12px',
-                    background: '#2a2a2a',
-                    border: '1px solid #444',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    color: 'white'
-                }}>
+                <div className={styles.infoBox}>
                     📅 {completionDate.toLocaleDateString()} at {completionDate.toLocaleTimeString()}
                 </div>
             </div>
 
             {/* Associated Programs */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                <label className={styles.sectionLabel}>
                     Programs that will log this completion:
                 </label>
                 {associatedPrograms.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                    <div className={styles.emptyText}>
                         No programs found
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className={styles.listColumn}>
                         {associatedPrograms.map((program, idx) => (
-                            <div key={idx} style={{
-                                padding: '10px 12px',
-                                background: '#252525',
-                                border: '1px solid #555',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                color: 'white',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}>
-                                <span style={{ color: '#66bb6a' }}>📁</span>
+                            <div key={idx} className={styles.listItem}>
+                                <span className={styles.programIcon}>📁</span>
                                 {program.name}
                             </div>
                         ))}
@@ -127,39 +92,28 @@ function GoalCompletionModal({
 
             {/* Associated Targets */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                <label className={styles.sectionLabel}>
                     Targets associated with this goal ({targets.length}):
                 </label>
                 {targets.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                    <div className={styles.emptyText}>
                         No targets defined for this goal
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className={styles.listColumn}>
                         {targets.map(target => {
                             const activity = activityDefinitions.find(a => a.id === target.activity_id);
                             return (
-                                <div key={target.id} style={{
-                                    padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
-                                    borderRadius: '4px'
-                                }}>
-                                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
+                                <div key={target.id} className={styles.targetItem}>
+                                    <div className={styles.targetName}>
                                         🎯 {target.name || activity?.name || 'Target'}
                                     </div>
                                     {target.metrics && target.metrics.length > 0 && (
-                                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                        <div className={styles.metricList}>
                                             {target.metrics.map(metric => {
                                                 const metricDef = activity?.metric_definitions?.find(m => m.id === metric.metric_id);
                                                 return (
-                                                    <span key={metric.metric_id} style={{
-                                                        padding: '2px 8px',
-                                                        background: '#333',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        color: '#ccc'
-                                                    }}>
+                                                    <span key={metric.metric_id} className={styles.metricBadge}>
                                                         {metricDef?.name || 'Metric'}: {metric.value} {metricDef?.unit || ''}
                                                     </span>
                                                 );
@@ -174,35 +128,16 @@ function GoalCompletionModal({
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
+            <div className={styles.actions}>
                 <button
                     onClick={onCancel}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: 'transparent',
-                        border: '1px solid #666',
-                        borderRadius: '4px',
-                        color: '#ccc',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                    }}
+                    className={styles.cancelButton}
                 >
                     Cancel
                 </button>
                 <button
                     onClick={() => onConfirm(completionDate)}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: '#4caf50',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                    }}
+                    className={styles.confirmButton}
                 >
                     ✓ Complete Goal
                 </button>

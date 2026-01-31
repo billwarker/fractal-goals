@@ -123,7 +123,7 @@
 }
 
 .goalBadge:hover {
-    background: rgba(60, 60, 60, 0.9);
+    background: var(--color-bg-hover);
 }
 
 .editTimeContainer {
