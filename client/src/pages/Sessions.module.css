@@ -417,15 +417,15 @@
 }
 
 .splitGroup {
-    background: #1a1a1a;
+    background: var(--color-bg-secondary);
     padding: 6px 8px;
     border-radius: 3px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 .splitHeader {
     font-size: 11px;
-    color: #aaa;
+    color: var(--color-text-secondary);
     font-weight: bold;
     margin-bottom: 4px;
 }
@@ -442,7 +442,7 @@
 }
 
 .metricName {
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .metricValue {
