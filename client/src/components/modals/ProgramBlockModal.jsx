@@ -20,8 +20,8 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
                 setFormData({
                     id: initialData.id, // Preserve id for editing
                     name: initialData.name || '',
-                    startDate: initialData.startDate || '',
-                    endDate: initialData.endDate || '',
+                    startDate: initialData.startDate || initialData.start_date || '',
+                    endDate: initialData.endDate || initialData.end_date || '',
                     color: initialData.color || '#3A86FF'
                 });
             } else {

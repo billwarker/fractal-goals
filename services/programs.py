@@ -39,10 +39,29 @@ class ProgramService:
             # Parse metadata
             start_dt = None
             end_dt = None
-            if block_data.get('startDate'):
-                start_dt = datetime.fromisoformat(block_data['startDate'].replace('Z', '')).date()
-            if block_data.get('endDate'):
-                end_dt = datetime.fromisoformat(block_data['endDate'].replace('Z', '')).date()
+            
+            # Handle both frontend (camelCase) and backend (snake_case) formats
+            start_str = block_data.get('startDate') or block_data.get('start_date')
+            end_str = block_data.get('endDate') or block_data.get('end_date')
+            
+            if start_str:
+                if 'T' in start_str: start_str = start_str.split('T')[0]
+                try:
+                    start_dt = datetime.fromisoformat(start_str.replace('Z', '')).date()
+                except ValueError:
+                    # Handle YYYY-MM-DD format directly if fromisoformat fails or double check
+                    try:
+                        start_dt = datetime.strptime(start_str, '%Y-%m-%d').date()
+                    except: pass
+
+            if end_str:
+                if 'T' in end_str: end_str = end_str.split('T')[0]
+                try:
+                    end_dt = datetime.fromisoformat(end_str.replace('Z', '')).date()
+                except ValueError:
+                    try:
+                        end_dt = datetime.strptime(end_str, '%Y-%m-%d').date()
+                    except: pass
             
             if b_id in existing_blocks:
                 block = existing_blocks[b_id]
