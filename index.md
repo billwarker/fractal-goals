@@ -203,6 +203,9 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - `ix_sessions_root_deleted_completed`: (root_id, deleted_at, completed)
   - `ix_activity_instances_session_deleted`: (session_id, deleted_at)
   - `ix_notes_root_context_deleted`: (root_id, context_type, context_id, deleted_at)
+- **Additional Foreign Key Indexes:** Migration `94a9feab5041` added indexes to `activity_definitions.group_id`, `activity_instances.activity_definition_id`, `metric_definitions.activity_id`, `split_definitions.activity_id`, `program_blocks.program_id`, and `program_days.block_id`.
+- **Frontend Code Splitting:** Implemented `React.lazy` and `Suspense` in `AppRouter.jsx` to lazy load non-critical pages (Programs, Sessions, Analytics, Logs), reducing initial bundle size.
+- **API Rate Limiting:** Implemented strict rate limits on goal/fractal creation endpoints via `Flask-Limiter`.
 - **TanStack Query (React Query):** Implemented on the frontend for `GoalsContext` and `SessionsContext`:
   - Automatic caching with `staleTime: 60s` and `cacheTime: 5m`.
   - Automatic cache invalidation on mutations (create/update/delete).

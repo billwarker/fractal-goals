@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { globalApi, fractalApi } from './utils/api';
@@ -9,15 +9,17 @@ import './App.css';
 // Import page components
 import Selection from './pages/Selection';
 import FractalGoals from './pages/FractalGoals';
-import Programs from './pages/Programs';
-import ProgramDetail from './pages/ProgramDetail';
-import Sessions from './pages/Sessions';
-import SessionDetail from './pages/SessionDetail';
 import CreateSession from './pages/CreateSession';
-import CreateSessionTemplate from './pages/CreateSessionTemplate';
-import ManageActivities from './pages/ManageActivities';
-import Analytics from './pages/Analytics';
-import Logs from './pages/Logs';
+
+// Lazy load non-critical pages
+const Programs = lazy(() => import('./pages/Programs'));
+const ProgramDetail = lazy(() => import('./pages/ProgramDetail'));
+const Sessions = lazy(() => import('./pages/Sessions'));
+const SessionDetail = lazy(() => import('./pages/SessionDetail'));
+const CreateSessionTemplate = lazy(() => import('./pages/CreateSessionTemplate'));
+const ManageActivities = lazy(() => import('./pages/ManageActivities'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Logs = lazy(() => import('./pages/Logs'));
 
 import { usePageTitle } from './hooks/usePageTitle';
 
@@ -212,15 +214,47 @@ function App() {
                                 path="/:rootId/goals"
                                 element={<FractalGoals />}
                             />
-                            <Route path="/:rootId/programs" element={<Programs />} />
-                            <Route path="/:rootId/programs/:programId" element={<ProgramDetail />} />
-                            <Route path="/:rootId/sessions" element={<Sessions />} />
-                            <Route path="/:rootId/analytics" element={<Analytics />} />
-                            <Route path="/:rootId/logs" element={<Logs />} />
-                            <Route path="/:rootId/session/:sessionId" element={<SessionDetail />} />
+                            <Route path="/:rootId/programs" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Programs />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/programs/:programId" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <ProgramDetail />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/sessions" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Sessions />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/analytics" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Analytics />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/logs" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Logs />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/session/:sessionId" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <SessionDetail />
+                                </Suspense>
+                            } />
                             <Route path="/:rootId/create-session" element={<CreateSession />} />
-                            <Route path="/:rootId/manage-session-templates" element={<CreateSessionTemplate />} />
-                            <Route path="/:rootId/manage-activities" element={<ManageActivities />} />
+                            <Route path="/:rootId/manage-session-templates" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <CreateSessionTemplate />
+                                </Suspense>
+                            } />
+                            <Route path="/:rootId/manage-activities" element={
+                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <ManageActivities />
+                                </Suspense>
+                            } />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     )}

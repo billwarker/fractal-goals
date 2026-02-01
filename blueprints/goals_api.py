@@ -21,6 +21,7 @@ from validators import (
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 from services.serializers import serialize_goal, calculate_smart_status, format_utc
+from extensions import limiter
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -46,6 +47,7 @@ def get_goals():
 
 @goals_bp.route('/goals', methods=['POST'])
 @validate_request(GoalCreateSchema)
+@limiter.limit("30 per minute")
 def create_goal(validated_data):
     """Create a new goal."""
     engine = models.get_engine()
@@ -407,6 +409,7 @@ def get_all_fractals(current_user):
 @goals_bp.route('/fractals', methods=['POST'])
 @token_required
 @validate_request(FractalCreateSchema)
+@limiter.limit("5 per minute")
 def create_fractal(current_user, validated_data):
     """Create a new fractal (root goal) owned by current user."""
     engine = models.get_engine()

@@ -43,7 +43,31 @@ steps:
     ]
 
   # ==========================================
-  # 4. Deploy to Cloud Run (Backend)
+  # 4. Run DB Migrations (Cloud Run Job)
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Update Migration Job'
+    entrypoint: gcloud
+    args: [
+      'run', 'jobs', 'update', 'migrate-db',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$SHORT_SHA',
+      '--region', '$_REGION',
+      '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest',
+      '--set-env-vars', 'FLASK_ENV=production',
+      '--command', 'python',
+      '--args', 'db_migrate.py,upgrade'
+    ]
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Run Migrations'
+    entrypoint: gcloud
+    args: [
+      'run', 'jobs', 'execute', 'migrate-db',
+      '--region', '$_REGION',
+      '--wait'
+    ]
+
+  # ==========================================
+  # 5. Deploy to Cloud Run (Backend)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Backend'
@@ -61,7 +85,7 @@ steps:
     ]
 
   # ==========================================
-  # 5. Deploy to Cloud Run (Frontend)
+  # 6. Deploy to Cloud Run (Frontend)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Frontend'

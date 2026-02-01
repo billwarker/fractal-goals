@@ -315,7 +315,7 @@ class ActivityDefinition(Base):
     has_metrics = Column(Boolean, default=True)
     metrics_multiplicative = Column(Boolean, default=False)  # When true, allows metric1 × metric2 × ... derived value
     has_splits = Column(Boolean, default=False)  # When true, activity can be split into multiple portions (e.g., left/right)
-    group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True)
+    group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True, index=True)
 
     group = relationship("ActivityGroup", backref="activities")
 
@@ -336,7 +336,7 @@ class MetricDefinition(Base):
     __tablename__ = 'metric_definitions'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)
     unit = Column(String, nullable=False)
@@ -354,7 +354,7 @@ class SplitDefinition(Base):
     __tablename__ = 'split_definitions'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     name = Column(String, nullable=False)  # e.g., "Left", "Right", "Split #1"
     order = Column(Integer, nullable=False)  # Display order
@@ -372,7 +372,7 @@ class ActivityInstance(Base):
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
     # Legacy column - kept for migration compatibility, will be deprecated
     practice_session_id = Column(String, nullable=True)
-    activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
     created_at = Column(DateTime, default=utc_now)
     time_start = Column(DateTime, nullable=True)
@@ -568,7 +568,7 @@ class ProgramBlock(Base):
     __tablename__ = 'program_blocks'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    program_id = Column(String, ForeignKey('programs.id'), nullable=False)
+    program_id = Column(String, ForeignKey('programs.id'), nullable=False, index=True)
     
     name = Column(String, nullable=False)
     start_date = Column(Date, nullable=True) # Nullable for abstract blocks
@@ -587,7 +587,7 @@ class ProgramDay(Base):
     __tablename__ = 'program_days'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    block_id = Column(String, ForeignKey('program_blocks.id'), nullable=False)
+    block_id = Column(String, ForeignKey('program_blocks.id'), nullable=False, index=True)
     
     date = Column(Date, nullable=True) # Abstract days don't have concrete dates
     day_number = Column(Integer, nullable=True) # Order within block (1, 2, 3...)

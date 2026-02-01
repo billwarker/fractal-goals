@@ -26,7 +26,7 @@ import subprocess
 
 def run_alembic(*args):
     """Run an alembic command."""
-    cmd = ['alembic'] + list(args)
+    cmd = [sys.executable, '-m', 'alembic'] + list(args)
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
     return result.returncode
