@@ -217,6 +217,7 @@ function AuthModal({ isOpen, onClose }) {
                         </Button>
                     </div>
 
+                    {/* Sign up temporarily disabled for public launch
                     <div className={styles.toggleContainer}>
                         <Text size="sm" as="span" style={{ marginRight: '8px' }}>
                             {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
@@ -230,6 +231,7 @@ function AuthModal({ isOpen, onClose }) {
                             {isLogin ? 'SIGN UP' : 'LOGIN'}
                         </button>
                     </div>
+                    */}
                 </form>
             </div>
         </div>
