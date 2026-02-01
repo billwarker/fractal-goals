@@ -35,17 +35,22 @@ from blueprints.goals_api import goals_bp
 from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
+from blueprints.notes_api import notes_bp
+from blueprints.annotations_api import annotations_bp
+from blueprints.logs_api import logs_api
+from blueprints.auth_api import auth_bp
 
 
 @pytest.fixture(scope='function')
 def app():
     """Create and configure a test Flask application instance."""
-    # Create a temporary database file
-    db_fd, db_path = tempfile.mkstemp(suffix='.db')
     
     # Create Flask app for testing
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
+    
+    # Load configuration to get DATABASE_URL
+    from config import config
     
     # Enable CORS
     CORS(test_app, resources={
@@ -63,37 +68,42 @@ def app():
     test_app.register_blueprint(templates_bp)
     test_app.register_blueprint(timers_bp)
     test_app.register_blueprint(programs_bp)
+    test_app.register_blueprint(notes_bp)
+    test_app.register_blueprint(annotations_bp)
+    test_app.register_blueprint(logs_api)
+    test_app.register_blueprint(auth_bp)
     
-    # Patch get_engine to use test database
-    original_get_engine = models.get_engine
-    test_db_uri = f'sqlite:///{db_path}'
-    
-    # Cache the engine to ensure we share the connection pool/state
-    cached_engine = []
+    # Ensure usage of test database
+    if not config.DATABASE_URL or 'test' not in config.DATABASE_URL:
+         pytest.fail("CRITICAL: Running tests against non-test database! Check .env.testing")
 
+    # Patch get_engine to use test database (although config should already point to it)
+    original_get_engine = models.get_engine
+    test_db_uri = config.get_database_url()
+    
+    # Create engine
+    from sqlalchemy import create_engine
+    engine = create_engine(test_db_uri, echo=False)
+    
     def mock_get_engine(db_path_arg=None):
-        if not cached_engine:
-            from sqlalchemy import create_engine
-            print(f"DEBUG: creating NEW engine for URI: {test_db_uri}")
-            cached_engine.append(create_engine(test_db_uri, echo=False))
-        else:
-             print(f"DEBUG: returning CACHED engine for URI: {test_db_uri}")
-        return cached_engine[0]
+        return engine
     
     models.get_engine = mock_get_engine
     
-    # Create all tables
-    engine = mock_get_engine()
+    # Reset Database
+    # Drop all tables and recreate them to ensure a clean state
+    Base.metadata.drop_all(engine)
     init_db(engine)
     
     yield test_app
     
+    # Cleanup
+    # Optional: drop tables after test
+    # Base.metadata.drop_all(engine)
+    
     # Restore original get_engine
     models.get_engine = original_get_engine
-    
-    # Cleanup
-    os.close(db_fd)
-    os.unlink(db_path)
+    models.engine = None # Reset cached engine in models if any
 
 
 @pytest.fixture(scope='function')

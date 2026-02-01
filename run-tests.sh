@@ -4,6 +4,7 @@
 # This script runs the test suite with various options
 
 set -e  # Exit on error
+export ENV=testing
 
 # Colors for output
 RED='\033[0;31m'

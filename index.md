@@ -14,8 +14,10 @@
 **Tech Stack:**
 - **Backend:** Flask + SQLAlchemy + JWT Auth + Pydantic validation (port 8001)
 - **Frontend:** React 19.2.0 + Vite + React Router + ReactFlow (port 5173)
-- **Database:** SQLite (development) / PostgreSQL (production) with Alembic migrations
-- **Authentication:** JWT-based user accounts with `scrypt` password hashing and ownership-based data isolation
+### 3. Local Development Data Flow
+- **Frontend**: Runs on port `5173` (Vite) -> Proxies/Requests to `http://localhost:8001/api`
+- **Backend**: Runs on port `8001` (Flask) -> Connects to Local Docker PostgreSQL (`localhost:5432`)
+- **Database**: PostgreSQL container (user: `fractal`, db: `fractal_goals`)
 - **Migrations:** Alembic for database schema versioning
 
 ## Recent Updates
@@ -1416,10 +1418,14 @@ When making changes, update these files as needed:
 
 ### Common Tasks
 
-**Start the application:**
-```bash
-./shell-scripts/start-all.sh [development|testing|production]
-```
+- **Option A (Recommended)**: Use the provided script:
+  ```bash
+  ./shell-scripts/start-all.sh
+  ```
+  This starts:
+  - Local PostgreSQL (via Docker)
+  - Flask Backend (Student)
+  - React Frontend
 
 **Access the app:**
 - Frontend: http://localhost:5173

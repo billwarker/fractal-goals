@@ -1,9 +1,9 @@
 #!/bin/zsh
 # Start both Frontend and Backend with environment selection
 # Usage: ./shell-scripts/start-all.sh [development|testing|production]
-# Default: development
+# Default: local
 
-ENV=${1:-development}
+ENV=${1:-local}
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -50,8 +50,14 @@ sleep 2
 
 # Start React frontend in background
 echo "Starting React frontend..."
+# Determine frontend mode (Vite doesn't support "local" as a mode name)
+FRONTEND_MODE=$ENV
+if [ "$ENV" = "local" ]; then
+    FRONTEND_MODE="development"
+fi
+
 cd "$PROJECT_ROOT/client"
-npm run dev -- --mode $ENV > "$PROJECT_ROOT/logs/${ENV}_frontend.log" 2>&1 &
+npm run dev -- --mode $FRONTEND_MODE > "$PROJECT_ROOT/logs/${ENV}_frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "✓ Frontend started (PID: $FRONTEND_PID)"
 

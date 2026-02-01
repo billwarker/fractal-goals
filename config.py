@@ -83,43 +83,25 @@ class Config:
         """
         Get the database connection URL.
         
-        If DATABASE_URL is set, use it directly (supports PostgreSQL, MySQL, etc.)
-        Otherwise, construct a SQLite URL from DATABASE_PATH.
+        Strictly requires DATABASE_URL to be set.
+        Only supports PostgreSQL.
         
         Returns:
             str: SQLAlchemy-compatible database URL
         """
-        if cls.DATABASE_URL:
-            # Production: Use provided DATABASE_URL
-            # Handle Heroku-style postgres:// URLs
-            url = cls.DATABASE_URL
-            if url.startswith('postgres://'):
-                url = url.replace('postgres://', 'postgresql://', 1)
-            return url
-        else:
-            # Development: Use SQLite
-            db_path = cls.get_db_path()
-            return f"sqlite:///{db_path}"
+        if not cls.DATABASE_URL:
+            raise ValueError("CRITICAL: DATABASE_URL must be set! SQLite is no longer supported.")
+
+        # Handle Heroku-style postgres:// URLs
+        url = cls.DATABASE_URL
+        if url.startswith('postgres://'):
+            url = url.replace('postgres://', 'postgresql://', 1)
+        return url
     
     @classmethod
     def is_postgres(cls):
         """Check if the database is PostgreSQL."""
-        url = cls.get_database_url()
-        return url.startswith('postgresql') or url.startswith('postgres')
-    
-    @classmethod
-    def is_sqlite(cls):
-        """Check if the database is SQLite."""
-        return cls.get_database_url().startswith('sqlite://')
-    
-    @classmethod
-    def get_db_path(cls):
-        """Get the absolute path to the SQLite database file."""
-        if cls.DATABASE_URL:
-            return None  # Not applicable for non-SQLite databases
-        if os.path.isabs(cls.DATABASE_PATH):
-            return cls.DATABASE_PATH
-        return str(BASE_DIR / cls.DATABASE_PATH)
+        return True
     
     @classmethod
     def get_log_path(cls):
@@ -151,7 +133,7 @@ class Config:
         print(f"Host:           {cls.HOST}")
         print(f"Port:           {cls.PORT}")
         print(f"Database:       {db_display}")
-        print(f"Database Type:  {'PostgreSQL' if cls.is_postgres() else 'SQLite'}")
+        print(f"Database Type:  PostgreSQL")
         print(f"Log File:       {cls.get_log_path()}")
         print(f"Log Level:      {cls.LOG_LEVEL}")
         print(f"CORS Origins:   {', '.join(cls.CORS_ORIGINS)}")
