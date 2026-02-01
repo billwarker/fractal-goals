@@ -93,7 +93,7 @@ steps:
     entrypoint: gcloud
     args: [
       'run', 'deploy', 'fractal-frontend',
-      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$SHORT_SHA',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$BUILD_ID',
       '--region', '$_REGION',
       '--platform', 'managed',
       '--allow-unauthenticated',
