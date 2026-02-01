@@ -35,7 +35,7 @@ function ProgramCalendarView({
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"
                 headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-                initialDate={program.start_date ? new Date(program.start_date) : new Date()}
+                initialDate={new Date()}
                 events={calendarEvents}
                 height="100%"
                 dayMaxEvents={5}

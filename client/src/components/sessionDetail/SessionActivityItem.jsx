@@ -151,6 +151,63 @@ function SessionActivityItem({
         onUpdate('metrics', currentMetrics);
     };
 
+    const handleCascade = (metricId, value, splitId = null, sourceIndex = 0) => {
+        const newSets = [...(exercise.sets || [])];
+        let hasChanges = false;
+
+        // Iterate through all sets after the source set
+        for (let i = sourceIndex + 1; i < newSets.length; i++) {
+            const set = { ...newSets[i] };
+
+            // Should we update this set? Only if the value is empty
+            const metricIdx = set.metrics.findIndex(m =>
+                m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+            );
+
+            // Get current value to check if empty
+            const currentVal = metricIdx >= 0 ? set.metrics[metricIdx].value : '';
+
+            // If empty (null, undefined, or empty string), update it
+            if (currentVal === '' || currentVal === null || currentVal === undefined) {
+                if (metricIdx >= 0) {
+                    set.metrics[metricIdx] = { ...set.metrics[metricIdx], value };
+                } else {
+                    const newMetric = { metric_id: metricId, value };
+                    if (splitId) newMetric.split_id = splitId;
+                    set.metrics.push(newMetric);
+                }
+                newSets[i] = set;
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges) {
+            onUpdate('sets', newSets);
+        }
+    };
+
+    // Helper to check if the IMMEDIATE next set has an empty value for a metric
+    const isNextSetEmpty = (currentIndex, metricId, splitId = null) => {
+        if (!exercise.sets || currentIndex >= exercise.sets.length - 1) return false;
+
+        const nextSet = exercise.sets[currentIndex + 1];
+        const val = getMetricValue(nextSet.metrics, metricId, splitId);
+
+        return val === '' || val === null || val === undefined;
+    };
+
+    // Helper to check if subsequent sets have empty values for a metric
+    const hasSubsequentEmptySets = (metricId, splitId = null) => {
+        if (!exercise.sets || exercise.sets.length <= 1) return false;
+
+        for (let i = 1; i < exercise.sets.length; i++) {
+            const set = exercise.sets[i];
+            const val = getMetricValue(set.metrics, metricId, splitId);
+            if (val === '' || val === null || val === undefined) return true;
+        }
+        return false;
+    };
+
     // Helper to get value for input
     const getMetricValue = (metricsList, metricId, splitId = null) => {
         const m = metricsList?.find(x =>
@@ -399,6 +456,52 @@ function SessionActivityItem({
                                             ))
                                         )
                                     )}
+
+                                    {/* Cascade Buttons Container */}
+                                    {/* Show IF: not the last set AND next set is empty for at least one metric */}
+                                    {setIdx < exercise.sets.length - 1 && (
+                                        <div className={styles.cascadeButtonsContainer}>
+                                            {/* Logic to render buttons for all applicable metrics */}
+                                            {(() => {
+                                                const buttons = [];
+
+                                                // Helper to check and add button
+                                                const checkAndAddButton = (m, splitId = null) => {
+                                                    // Must have a value in CURRENT set
+                                                    const val = getMetricValue(set.metrics, m.id, splitId);
+
+                                                    // AND next set must be empty for this metric
+                                                    if (val && isNextSetEmpty(setIdx, m.id, splitId)) {
+                                                        const key = splitId ? `${splitId}-${m.id}` : m.id;
+                                                        buttons.push(
+                                                            <button
+                                                                key={key}
+                                                                className={styles.cascadeButton}
+                                                                onClick={() => handleCascade(m.id, val, splitId, setIdx)}
+                                                                title={`Copy ${val} ${m.unit || ''} to subsequent empty sets`}
+                                                            >
+                                                                Cascade {m.unit || 'Value'}
+                                                            </button>
+                                                        );
+                                                    }
+                                                };
+
+                                                if (hasSplits) {
+                                                    def.split_definitions.forEach(split => {
+                                                        def.metric_definitions.forEach(m => checkAndAddButton(m, split.id));
+                                                    });
+                                                } else {
+                                                    def.metric_definitions.forEach(m => checkAndAddButton(m));
+                                                }
+
+                                                // Only render container if we have buttons
+                                                if (buttons.length === 0) return null;
+
+                                                return buttons;
+                                            })()}
+                                        </div>
+                                    )}
+
 
                                     <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton}>×</button>
                                 </div>

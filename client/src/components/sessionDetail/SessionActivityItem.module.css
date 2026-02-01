@@ -384,3 +384,31 @@
 .notesTimelineContainer {
     margin-bottom: 10px;
 }
+
+.cascadeButton {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 6px;
+    margin-left: 8px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.cascadeButton:hover {
+    background: var(--color-bg-input);
+    color: #4caf50;
+    border-color: #4caf50;
+}
+
+.cascadeButtonsContainer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--color-border);
+}
