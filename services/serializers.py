@@ -63,6 +63,7 @@ def serialize_activity_instance(instance):
         "activity_definition_id": instance.activity_definition_id,
         "name": instance.definition.name if instance.definition else "Unknown",
         "definition_name": instance.definition.name if instance.definition else "Unknown",
+        "group_name": instance.definition.group.name if instance.definition and instance.definition.group else None,
         "created_at": format_utc(instance.created_at),
         "time_start": format_utc(instance.time_start),
         "time_stop": format_utc(instance.time_stop),

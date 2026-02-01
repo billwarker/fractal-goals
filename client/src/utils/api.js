@@ -405,13 +405,13 @@ export const fractalApi = {
         axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/start`, data),
 
     /**
-     * Stop timer for an activity instance
+     * Complete an activity instance (sets stop time and marks completed)
      * @param {string} rootId - ID of the fractal
      * @param {string} instanceId - ID of the activity instance
      * @param {Object} data - Optional {session_id, activity_definition_id}
      */
-    stopActivityTimer: (rootId, instanceId, data = {}) =>
-        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/stop`, data),
+    completeActivityInstance: (rootId, instanceId, data = {}) =>
+        axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/complete`, data),
 
     /**
      * Update activity instance manually (e.g. set times)

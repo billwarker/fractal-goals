@@ -510,8 +510,8 @@ function SessionDetail() {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
-                } else if (value === 'stop') {
-                    response = await fractalApi.stopActivityTimer(rootId, instanceId, {
+                } else if (value === 'complete') {
+                    response = await fractalApi.completeActivityInstance(rootId, instanceId, {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id
                     });
@@ -531,6 +531,8 @@ function SessionDetail() {
                     setActivityInstances(prev => prev.map(inst =>
                         inst.id === instanceId ? response.data : inst
                     ));
+                    // Refresh from server to ensure full consistency
+                    await fetchActivityInstances();
                 }
             } catch (err) {
                 console.error('Error with timer action:', err);
@@ -550,7 +552,7 @@ function SessionDetail() {
                         `This usually happens when:\n` +
                         `• The page was refreshed before starting the timer\n` +
                         `• The "Start" button was never clicked\n\n` +
-                        `Solution: Click the "Start" button first, then "Stop".\n\n` +
+                        `Solution: Click the "Start" button first, then "Complete".\n\n` +
                         `Alternatively, you can manually enter the start and stop times below the timer buttons.`;
                     notify.error(message, { duration: 6000 });
                 } else {
@@ -678,7 +680,7 @@ function SessionDetail() {
                     const instance = updatedInstances[i];
                     if (instance.time_start && !instance.time_stop) {
                         try {
-                            const response = await fractalApi.stopActivityTimer(rootId, instance.id, {
+                            const response = await fractalApi.completeActivityInstance(rootId, instance.id, {
                                 session_id: sessionId,
                                 activity_definition_id: instance.activity_definition_id
                             });

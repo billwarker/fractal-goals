@@ -179,10 +179,10 @@ def start_activity_timer(current_user, root_id, instance_id):
         db_session.close()
 
 
-@timers_bp.route('/<root_id>/activity-instances/<instance_id>/stop', methods=['POST'])
+@timers_bp.route('/<root_id>/activity-instances/<instance_id>/complete', methods=['POST'])
 @token_required
-def stop_activity_timer(current_user, root_id, instance_id):
-    """Stop the timer for an activity instance if owned by user."""
+def complete_activity_instance(current_user, root_id, instance_id):
+    """Complete an activity instance (sets stop time and marks as completed)."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
@@ -192,41 +192,42 @@ def stop_activity_timer(current_user, root_id, instance_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
-        # Get the activity instance
         from sqlalchemy.orm import joinedload
         instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
         if not instance:
-            # Instance doesn't exist - this is an error condition
-            # The instance should have been created when the activity was added to the session
             return jsonify({
-                "error": "Activity instance not found. Please refresh the page and try again, or manually enter start and stop times."
+                "error": "Activity instance not found."
             }), 404
         
         if not instance.time_start:
-            # Timer was never started - return error instead of setting both times to now
-            return jsonify({
-                "error": "Cannot stop timer: Timer was never started. Please click 'Start' first, or manually enter start and stop times."
-            }), 400
-        
-        # Normal case - timer was started, now stopping it
-        instance.time_stop = datetime.utcnow()
-        duration = (instance.time_stop - instance.time_start).total_seconds()
-        instance.duration_seconds = int(duration)
+            # Instant completion: Set start = stop = now
+            now = datetime.utcnow()
+            instance.time_start = now
+            instance.time_stop = now
+            instance.duration_seconds = 0
+            instance.completed = True
+        else:
+            # Normal completion
+            instance.time_stop = datetime.utcnow()
+            duration = (instance.time_stop - instance.time_start).total_seconds()
+            instance.duration_seconds = int(duration)
+            instance.completed = True
         
         # Get activity name directly from definition
         activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
-        # Emit event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        # Emit completion event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_COMPLETED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,
             'session_id': instance.session_id,
             'root_id': root_id,
-            'updated_fields': ['time_stop', 'duration_seconds']
-        }, source='timers_api.stop_activity_timer'))
+            'duration_seconds': instance.duration_seconds,
+            'completed_at': instance.time_stop.isoformat()
+        }, source='timers_api.complete_activity_instance'))
         
         return jsonify(serialize_activity_instance(instance))
         

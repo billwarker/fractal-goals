@@ -52,6 +52,37 @@ function SessionActivityItem({
     const [localStopTime, setLocalStopTime] = useState('');
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
+    const [realtimeDuration, setRealtimeDuration] = useState(0);
+
+    // Real-time timer effect
+    useEffect(() => {
+        let intervalId;
+
+        const updateTimer = () => {
+            if (exercise.time_start && !exercise.time_stop) {
+                const start = new Date(exercise.time_start);
+                const now = new Date();
+                const seconds = Math.floor((now - start) / 1000);
+                setRealtimeDuration(seconds >= 0 ? seconds : 0);
+            }
+        };
+
+        if (exercise.time_start && !exercise.time_stop) {
+            // Initial update
+            updateTimer();
+            // Start interval
+            intervalId = setInterval(updateTimer, 1000);
+        } else if (exercise.duration_seconds != null) {
+            // Use stored duration if available (completed)
+            setRealtimeDuration(exercise.duration_seconds);
+        } else {
+            setRealtimeDuration(0);
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [exercise.time_start, exercise.time_stop, exercise.duration_seconds]);
 
     // Filter notes for this activity
     const activityNotes = allNotes?.filter(n => n.activity_instance_id === exercise.id) || [];
@@ -274,7 +305,7 @@ function SessionActivityItem({
                         className={styles.activityNameContainer}
                     >
                         <div className={styles.activityName}>
-                            {def.name} <span className={styles.activityLabel}>(Activity)</span>
+                            {def.name} <span className={styles.activityLabel}>{exercise.group_name ? `(${exercise.group_name})` : ''}</span>
                         </div>
                         {def.description && <div className={styles.activityDescription}>{def.description}</div>}
                     </div>
@@ -340,46 +371,56 @@ function SessionActivityItem({
                             {/* Duration Display */}
                             <div className={styles.timerFieldContainer}>
                                 <label className={styles.timerLabel}>Duration</label>
-                                <div className={`${styles.durationDisplay} ${exercise.time_start && exercise.time_stop ? styles.durationActive : styles.durationInactive}`}>
-                                    {(() => {
-                                        if (exercise.time_start && exercise.time_stop) {
-                                            const start = new Date(exercise.time_start);
-                                            const stop = new Date(exercise.time_stop);
-                                            const seconds = Math.floor((stop - start) / 1000);
-                                            return formatDuration(seconds);
-                                        }
-                                        return '--:--';
-                                    })()}
+                                <div className={`${styles.durationDisplay} ${(exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive}`}>
+                                    {formatDuration(realtimeDuration)}
                                 </div>
                             </div>
 
-                            {/* Start/Stop Button */}
+                            {/* Start/Complete Button Flow */}
                             {!exercise.time_start ? (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onUpdate('timer_action', 'start');
-                                    }}
-                                    className={styles.startButton}
-                                    title="Start timer"
-                                >
-                                    ▶ Start
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onUpdate('timer_action', 'start');
+                                        }}
+                                        className={styles.startButton}
+                                        style={{ marginTop: 0 }}
+                                        title="Start timer"
+                                    >
+                                        ▶ Start
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onUpdate('timer_action', 'complete');
+                                        }}
+                                        className={styles.completeButton}
+                                        style={{ marginTop: 0 }}
+                                        title="Instant complete (0s duration)"
+                                    >
+                                        ✓ Complete
+                                    </button>
+                                </div>
                             ) : !exercise.time_stop ? (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onUpdate('timer_action', 'stop');
+                                        onUpdate('timer_action', 'complete');
                                     }}
-                                    className={styles.stopButton}
-                                    title="Stop timer"
+                                    className={styles.completeButton}
+                                    title="Complete activity"
                                 >
-                                    ■ Stop
+                                    ✓ Complete
                                 </button>
-                            ) : null}
+                            ) : (
+                                <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
+                                    Completed
+                                </div>
+                            )}
 
-                            {/* Reset Button */}
-                            {(exercise.time_start || exercise.time_stop) && (
+                            {/* Reset Button - Only show if started */}
+                            {exercise.time_start && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -388,7 +429,7 @@ function SessionActivityItem({
                                     className={styles.resetButton}
                                     title="Reset timer"
                                 >
-                                    ↺ Reset
+                                    ↺
                                 </button>
                             )}
                         </>

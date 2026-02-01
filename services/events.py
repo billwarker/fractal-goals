@@ -189,6 +189,7 @@ class Events:
     ACTIVITY_INSTANCE_CREATED = 'activity_instance.created'
     ACTIVITY_INSTANCE_DELETED = 'activity_instance.deleted'
     ACTIVITY_INSTANCE_UPDATED = 'activity_instance.updated'
+    ACTIVITY_INSTANCE_COMPLETED = 'activity_instance.completed'
     ACTIVITY_METRICS_UPDATED = 'activity_instance.metrics_updated'
     
     # Program events
