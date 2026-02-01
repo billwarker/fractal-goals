@@ -19,6 +19,8 @@ import ManageActivities from './pages/ManageActivities';
 import Analytics from './pages/Analytics';
 import Logs from './pages/Logs';
 
+import { usePageTitle } from './hooks/usePageTitle';
+
 const API_URL = 'http://localhost:8000/api/goals';
 
 // Helper functions (from original App.jsx)
@@ -78,6 +80,24 @@ function App() {
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Determine page title based on path
+    const getPageTitle = (pathname) => {
+        if (pathname === '/') return 'Selection';
+        if (pathname.endsWith('/goals')) return 'Goals';
+        if (pathname.endsWith('/programs')) return 'Programs';
+        if (pathname.includes('/programs/')) return 'Program Detail';
+        if (pathname.endsWith('/sessions')) return 'Sessions';
+        if (pathname.includes('/session/')) return 'Session Detail';
+        if (pathname.endsWith('/analytics')) return 'Analytics';
+        if (pathname.endsWith('/logs')) return 'Logs';
+        if (pathname.endsWith('/create-session')) return 'Create Session';
+        if (pathname.endsWith('/manage-session-templates')) return 'Manage Templates';
+        if (pathname.endsWith('/manage-activities')) return 'Manage Activities';
+        return null;
+    };
+
+    usePageTitle(getPageTitle(location.pathname));
 
     // Navigation header component
     const NavigationHeader = () => {

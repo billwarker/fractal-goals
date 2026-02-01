@@ -1,0 +1,29 @@
+<svg width="32" height="32" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 
+    Geometry Calculation to match CSS (box-sizing: border-box):
+    - Outer Node: 30px dia (r=15). Border 2.5px. 
+      -> SVG: Circle r=13.75, stroke-width=2.5 (Extends 12.5 to 15)
+    
+    - Middle Node: 20px dia (r=10). Border 2.5px.
+      -> SVG: Circle r=8.75, stroke-width=2.5 (Extends 7.5 to 10)
+      
+    - Inner Node: 10px dia (r=5). Solid.
+      -> SVG: Circle r=5.
+      
+    Resulting Visible Pattern (Out to In):
+    - 15.0 - 12.5: Primary (Border) - 2.5px wide
+    - 12.5 - 10.0: Secondary (Background) - 2.5px wide
+    - 10.0 - 07.5: Primary (Border) - 2.5px wide
+    - 07.5 - 05.0: Secondary (Background) - 2.5px wide
+    - 05.0 - 00.0: Primary (Core) - 5px radius (10px dia)
+  -->
+
+  <!-- Layer 1: Outer Ring -->
+  <circle cx="15" cy="15" r="13.75" fill="#7A1E3A" stroke="#E9F0FF" stroke-width="2.5"/>
+  
+  <!-- Layer 2: Middle Ring -->
+  <circle cx="15" cy="15" r="8.75" fill="#7A1E3A" stroke="#E9F0FF" stroke-width="2.5"/>
+  
+  <!-- Layer 3: Inner Core -->
+  <circle cx="15" cy="15" r="5" fill="#E9F0FF"/>
+</svg>
