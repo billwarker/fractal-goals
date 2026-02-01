@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
@@ -24,8 +25,7 @@ function CreateSessionTemplate() {
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [templateToDelete, setTemplateToDelete] = useState(null);
 
-    // Alert/Success modal
-    const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '', type: 'info' });
+
 
     useEffect(() => {
         if (!rootId) {
@@ -78,20 +78,10 @@ function CreateSessionTemplate() {
             setShowBuilder(false);
             setEditingTemplate(null);
 
-            setAlertModal({
-                show: true,
-                title: 'Success',
-                message: `Template ${templateId ? 'updated' : 'created'} successfully!`,
-                type: 'success'
-            });
+            notify.success(`Template ${templateId ? 'updated' : 'created'} successfully!`);
         } catch (err) {
             console.error("Failed to save template", err);
-            setAlertModal({
-                show: true,
-                title: 'Error',
-                message: 'Failed to save template: ' + err.message,
-                type: 'error'
-            });
+            notify.error('Failed to save template: ' + err.message);
         }
     };
 
@@ -123,20 +113,10 @@ function CreateSessionTemplate() {
             await fractalApi.createSessionTemplate(rootId, payload);
             await fetchData();
 
-            setAlertModal({
-                show: true,
-                title: 'Success',
-                message: 'Template duplicated successfully!',
-                type: 'success'
-            });
+            notify.success('Template duplicated successfully!');
         } catch (err) {
             console.error("Failed to duplicate template", err);
-            setAlertModal({
-                show: true,
-                title: 'Error',
-                message: 'Failed to duplicate template: ' + err.message,
-                type: 'error'
-            });
+            notify.error('Failed to duplicate template: ' + err.message);
         }
     };
 
@@ -257,63 +237,7 @@ function CreateSessionTemplate() {
                 message={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
             />
 
-            {/* Alert/Success Modal */}
-            {alertModal.show && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.8)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2000
-                    }}
-                    onClick={() => setAlertModal({ ...alertModal, show: false })}
-                >
-                    <div
-                        style={{
-                            background: '#1e1e1e',
-                            border: '1px solid #444',
-                            borderRadius: '8px',
-                            padding: '24px',
-                            maxWidth: '400px',
-                            width: '90%'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h2 style={{
-                            margin: '0 0 16px 0',
-                            fontSize: '18px',
-                            color: alertModal.type === 'error' ? '#f44336' :
-                                alertModal.type === 'success' ? '#4caf50' : 'white'
-                        }}>
-                            {alertModal.title}
-                        </h2>
-                        <p style={{ margin: '0 0 20px 0', color: '#ccc' }}>
-                            {alertModal.message}
-                        </p>
-                        <button
-                            onClick={() => setAlertModal({ ...alertModal, show: false })}
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                background: alertModal.type === 'success' ? '#4caf50' : '#2196f3',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            OK
-                        </button>
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 }

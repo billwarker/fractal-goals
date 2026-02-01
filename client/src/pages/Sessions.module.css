@@ -172,9 +172,7 @@
     cursor: pointer;
 }
 
-.cardHeaderTitleCompleted {
-    text-decoration: line-through;
-}
+
 
 .cardDescription {
     font-size: 12px;
@@ -365,10 +363,7 @@
     text-decoration: none;
 }
 
-.exerciseNameCompleted {
-    color: #888;
-    text-decoration: line-through;
-}
+
 
 .activityDuration {
     font-size: 11px;

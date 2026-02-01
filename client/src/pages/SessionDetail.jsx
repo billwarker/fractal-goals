@@ -103,6 +103,7 @@ function SessionDetail() {
     const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
     const [selectedSetIndex, setSelectedSetIndex] = useState(null); // For set-level note context
     const [draggedItem, setDraggedItem] = useState(null); // For drag-and-drop between sections
+    const isFirstLoad = React.useRef(true); // Track initial load to prevent auto-save on mount
 
     // Handler for activity/set focus changes
     const handleActivityFocus = (instance, setIndex = null) => {
@@ -185,6 +186,12 @@ function SessionDetail() {
     // Auto-save sessionData (UI metadata only) to database whenever it changes
     useEffect(() => {
         if (!sessionData || loading) return;
+
+        // Skip the first update (initial load) to prevent auto-save on mount
+        if (isFirstLoad.current) {
+            isFirstLoad.current = false;
+            return;
+        }
 
         setAutoSaveStatus('saving');
         const timeoutId = setTimeout(async () => {
@@ -357,6 +364,13 @@ function SessionDetail() {
                         }
                     });
                 }
+
+                // Initialize session_start if it doesn't exist (moved from separate useEffect)
+                // Use the full datetime from created_at to preserve the time component
+                if (!parsedData.session_start && foundSession.attributes?.created_at) {
+                    parsedData.session_start = foundSession.attributes.created_at;
+                }
+
                 setSessionData(parsedData);
             }
 
@@ -389,26 +403,7 @@ function SessionDetail() {
         }
     };
 
-    // Initialize session_start if it doesn't exist
-    useEffect(() => {
-        if (!sessionData || !session || loading) return;
 
-        let needsUpdate = false;
-        const updatedData = { ...sessionData };
-
-        // Initialize session_start with created_at if not set (preserve full datetime)
-        if (!updatedData.session_start && session.attributes?.created_at) {
-            // Use the full datetime from created_at to preserve the time component
-            updatedData.session_start = session.attributes.created_at;
-            needsUpdate = true;
-        }
-
-        // DO NOT auto-initialize session_end - leave it NULL until user sets it
-
-        if (needsUpdate) {
-            setSessionData(updatedData);
-        }
-    }, [session, sessionData, loading]);
 
     // Sync local datetime fields with sessionData
     useEffect(() => {
@@ -647,6 +642,7 @@ function SessionDetail() {
 
     const handleSaveSession = async () => {
         // Auto-save is already handling persistence, so just navigate away
+        notify.success('Session saved successfully');
         navigate(`/${rootId}/sessions`);
     };
 
@@ -658,6 +654,7 @@ function SessionDetail() {
 
         try {
             await fractalApi.deleteSession(rootId, sessionId);
+            notify.success('Session deleted successfully');
             navigate(`/${rootId}/sessions`);
         } catch (err) {
             console.error('Error deleting session:', err);
@@ -789,6 +786,10 @@ function SessionDetail() {
 
                     console.log(message);
                     setTimeout(() => notify.success(message, { duration: 6000 }), 100);
+                } else if (!newCompleted) {
+                    notify.success('Session marked as incomplete');
+                } else {
+                    notify.success('Session completed!');
                 }
 
                 // Refresh session to get updated goal data

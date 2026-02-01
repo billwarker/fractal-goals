@@ -362,12 +362,17 @@ function Sessions() {
                                         <div className={styles.cardTopLevel}>
                                             {/* Session Name (Link) */}
                                             <div>
-                                                <Link
-                                                    to={`/${rootId}/session/${session.id}`}
-                                                    className={`${styles.cardHeaderTitle} ${session.attributes?.completed ? styles.cardHeaderTitleCompleted : ''}`}
-                                                >
-                                                    {session.name}
-                                                </Link>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Link
+                                                        to={`/${rootId}/session/${session.id}`}
+                                                        className={`${styles.cardHeaderTitle} ${session.attributes?.completed ? styles.cardHeaderTitleCompleted : ''}`}
+                                                    >
+                                                        {session.name}
+                                                    </Link>
+                                                    {session.attributes?.completed && (
+                                                        <span style={{ color: 'var(--color-brand-success)', fontSize: '16px' }}>✓</span>
+                                                    )}
+                                                </div>
                                                 {session.attributes?.description && (
                                                     <div className={styles.cardDescription}>
                                                         {session.attributes.description}
@@ -581,11 +586,9 @@ function Sessions() {
                                                                                     className={`${styles.exerciseCard} ${exercise.type === 'activity' ? styles.exerciseCardActivity : ''}`}
                                                                                 >
                                                                                     <div className={styles.exerciseHeader}>
-                                                                                        {exercise.type !== 'activity' && (
-                                                                                            <span className={`${styles.completionIcon} ${exercise.completed ? styles.completionIconCompleted : ''}`}>
-                                                                                                {exercise.completed ? '✓' : '○'}
-                                                                                            </span>
-                                                                                        )}
+                                                                                        <span className={`${styles.completionIcon} ${exercise.completed ? styles.completionIconCompleted : ''}`}>
+                                                                                            {exercise.completed ? '✓' : '○'}
+                                                                                        </span>
                                                                                         <div style={{ flex: 1 }}>
                                                                                             <div className={styles.exerciseTitleRow}>
                                                                                                 <div className={`${styles.exerciseName} ${exercise.completed ? styles.exerciseNameCompleted : ''}`}>
