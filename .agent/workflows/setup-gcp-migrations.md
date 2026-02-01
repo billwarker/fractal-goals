@@ -24,6 +24,7 @@ gcloud run jobs create migrate-db \
   --service-account "$SERVICE_ACCOUNT" \
   --set-secrets "DATABASE_URL=DATABASE_URL:latest" \
   --set-env-vars "FLASK_ENV=production" \
+  --add-cloudsql-instances "fractal-goals:us-east1:fractal-goals-postgres" \
   --command "python" \
   --args "db_migrate.py,upgrade" \
   --max-retries 0
