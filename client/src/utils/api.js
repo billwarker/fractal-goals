@@ -279,6 +279,16 @@ export const fractalApi = {
         axios.put(`${API_BASE}/${rootId}/activity-groups/${groupId}`, data),
 
     /**
+     * Set goals associated with an activity group (replaces existing)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} groupId - ID of the group
+     * @param {Array<string>} goalIds - Array of goal IDs
+     */
+    setActivityGroupGoals: (rootId, groupId, goalIds) =>
+        axios.post(`${API_BASE}/${rootId}/activity-groups/${groupId}/goals`, { goal_ids: goalIds }), // Note: backend expects { goal_ids: [...] }
+
+
+    /**
      * Reorder activity groups
      * @param {string} rootId - ID of the fractal
      * @param {Array<string>} groupIds - List of group IDs in order

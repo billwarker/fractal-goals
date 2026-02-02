@@ -415,6 +415,7 @@ class ActivityReorderSchema(BaseModel):
     activity_ids: List[str] = Field(..., min_length=1)
 
 
+
 class ActivityGroupCreateSchema(BaseModel):
     """Schema for creating an activity group."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -422,6 +423,7 @@ class ActivityGroupCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sort_order: Optional[int] = Field(None, ge=0)
+    parent_id: Optional[str] = None
     
     @field_validator('name')
     @classmethod
@@ -434,6 +436,7 @@ class ActivityGroupUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sort_order: Optional[int] = Field(None, ge=0)
+    parent_id: Optional[str] = None
 
 
 class MetricDefinitionSchema(BaseModel):

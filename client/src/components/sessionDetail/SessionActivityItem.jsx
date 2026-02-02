@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { fractalApi } from '../../utils/api';
@@ -307,7 +308,7 @@ function SessionActivityItem({
                         <div className={styles.activityName}>
                             {def.name} <span className={styles.activityLabel}>{exercise.group_name ? `(${exercise.group_name})` : ''}</span>
                         </div>
-                        {def.description && <div className={styles.activityDescription}>{def.description}</div>}
+                        {def.description && <div className={styles.activityDescription}><Linkify>{def.description}</Linkify></div>}
                     </div>
                 </div>
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import Linkify from './atoms/Linkify';
 import styles from './ActivityCard.module.css';
 
 /**
@@ -16,13 +17,23 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
         if (diffDays === 0) return 'Today';
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-        if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-        return `${Math.floor(diffDays / 365)} years ago`;
+
+        const weeks = Math.floor(diffDays / 7);
+        if (diffDays < 30) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+
+        const months = Math.floor(diffDays / 30);
+        if (diffDays < 365) return `${months} month${months !== 1 ? 's' : ''} ago`;
+
+        const years = Math.floor(diffDays / 365);
+        return `${years} year${years !== 1 ? 's' : ''} ago`;
     };
 
     return (
-        <div className={styles.card}>
+        <div
+            className={`${styles.card} ${styles.clickableCard}`}
+            onClick={() => onEdit(activity)}
+            style={{ cursor: 'pointer' }}
+        >
             {/* Header */}
             <div>
                 <h3 className={styles.cardName}>
@@ -30,7 +41,7 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
                 </h3>
                 {activity.description && (
                     <p className={styles.description}>
-                        {activity.description}
+                        <Linkify>{activity.description}</Linkify>
                     </p>
                 )}
                 <div className={styles.lastUsed}>
@@ -71,23 +82,33 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
             </div>
 
             {/* Action Buttons */}
-            <div className={styles.actionList}>
+            <div className={styles.actionList} onClick={(e) => e.stopPropagation()}>
                 <button
-                    onClick={() => onEdit(activity)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(activity);
+                    }}
                     className={`${styles.actionBtn} ${styles.editBtn}`}
                 >
                     Edit
                 </button>
                 <button
-                    onClick={() => onDuplicate(activity)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDuplicate(activity);
+                    }}
                     disabled={isCreating}
                     className={`${styles.actionBtn} ${styles.duplicateBtn}`}
-                    title="Duplicate this activity"
+                    title="Copy this activity"
+                    style={{ backgroundColor: '#ff9800' }} // Keep generic orange or use class
                 >
-                    ⎘
+                    Copy
                 </button>
                 <button
-                    onClick={() => onDelete(activity)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(activity);
+                    }}
                     className={`${styles.actionBtn} ${styles.deleteBtn}`}
                 >
                     Delete

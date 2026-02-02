@@ -214,7 +214,12 @@ function Programs() {
                     <div className={styles.grid}>
                         {programs.map(program => {
                             const progGoals = program.goal_ids?.map(id => getGoalDetails(id)).filter(Boolean) || [];
-                            const blocks = program.blocks || []; // Rename for clarity
+                            // Sort blocks by start_date
+                            const blocks = [...(program.blocks || [])].sort((a, b) => {
+                                if (!a.start_date) return 1;
+                                if (!b.start_date) return -1;
+                                return new Date(a.start_date) - new Date(b.start_date);
+                            });
 
                             return (
                                 <div

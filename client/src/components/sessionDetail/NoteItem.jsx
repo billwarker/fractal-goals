@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from './ImageViewerModal';
 import styles from './NoteItem.module.css';
@@ -193,7 +194,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                         {/* Only show text content if it's not just the placeholder */}
                         {!isImageOnly && (
                             <div className={styles.noteItemContent}>
-                                {note.content}
+                                <Linkify>{note.content}</Linkify>
                             </div>
                         )}
                         {(onUpdate || onDelete) && (

@@ -297,6 +297,15 @@ class ActivityGroup(Base):
         back_populates="associated_activity_groups",
         viewonly=True
     )
+    
+    # Self-referential relationship for nested groups
+    parent_id = Column(String, ForeignKey('activity_groups.id', ondelete='CASCADE'), nullable=True, index=True)
+    
+    children = relationship(
+        "ActivityGroup",
+        backref=backref('parent', remote_side=[id]),
+        cascade="all, delete-orphan"
+    )
 
 
 

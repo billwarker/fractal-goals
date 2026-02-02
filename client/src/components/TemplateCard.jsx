@@ -1,4 +1,5 @@
 import React from 'react';
+import Linkify from './atoms/Linkify';
 
 /**
  * Template Card - Display card for session templates in grid view
@@ -49,7 +50,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical'
                     }}>
-                        {template.description}
+                        <Linkify>{template.description}</Linkify>
                     </p>
                 )}
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -721,7 +722,7 @@ const ProgramDetail = () => {
                             {program.description && (
                                 <>
                                     <span>•</span>
-                                    <span className={styles.description}>{program.description}</span>
+                                    <span className={styles.description}><Linkify>{program.description}</Linkify></span>
                                 </>
                             )}
                         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Linkify from '../atoms/Linkify';
 import { fractalApi } from '../../utils/api';
 import './LogsModal.css';
 
@@ -90,7 +91,7 @@ function LogsModal({ isOpen, onClose, rootId }) {
                                         {log.event_type}
                                     </span>
                                     <span className="log-description">
-                                        {log.description}
+                                        <Linkify>{log.description}</Linkify>
                                         {log.entity_id && (
                                             <span className="log-entity-id" title={log.entity_id}>
                                                 ID: {log.entity_id.substring(0, 8)}...

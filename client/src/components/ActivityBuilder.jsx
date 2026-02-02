@@ -221,7 +221,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             };
 
             let result;
-            if (editingActivity) {
+            if (editingActivity && editingActivity.id) {
                 result = await updateActivity(rootId, editingActivity.id, dataToSubmit);
                 // Update goal associations
                 await fractalApi.setActivityGoals(rootId, editingActivity.id, selectedGoalIds);
@@ -299,7 +299,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 {/* Modal Content */}
                 <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
                     <h2 className={styles.modalTitle}>
-                        {editingActivity ? 'Edit Activity' : 'Create Activity'}
+                        {editingActivity && editingActivity.id ? 'Edit Activity' : 'Create Activity'}
                     </h2>
 
                     {error && (
@@ -636,7 +636,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     variant="primary"
                                     className={styles.actionBtn}
                                 >
-                                    {editingActivity ? 'Save Activity' : 'Create Activity'}
+                                    {editingActivity && editingActivity.id ? 'Save Activity' : 'Create Activity'}
                                 </Button>
                             </div>
                         </div>

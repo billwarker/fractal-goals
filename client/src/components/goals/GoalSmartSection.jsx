@@ -1,4 +1,5 @@
 import React from 'react';
+import Linkify from '../atoms/Linkify';
 
 function GoalSmartSection({
     goal,
@@ -23,8 +24,10 @@ function GoalSmartSection({
                     Description
                 </label>
                 <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                    {goal.attributes?.description || goal.description ||
-                        <span style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>No description</span>}
+                    <Linkify>{goal.attributes?.description || goal.description || ""}</Linkify>
+                    {(!goal.attributes?.description && !goal.description) && (
+                        <span style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>No description</span>
+                    )}
                 </div>
             </div>
 
@@ -38,7 +41,7 @@ function GoalSmartSection({
                         }
                     </label>
                     <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                        {effectiveRelevance}
+                        <Linkify>{effectiveRelevance}</Linkify>
                     </div>
                 </div>
             )}

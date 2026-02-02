@@ -242,6 +242,7 @@ def serialize_activity_group(group):
         "name": group.name,
         "description": group.description,
         "sort_order": group.sort_order,
+        "parent_id": group.parent_id,
         "created_at": format_utc(group.created_at),
         "associated_goal_ids": [g.id for g in group.associated_goals] if group.associated_goals else []
     }

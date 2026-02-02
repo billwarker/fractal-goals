@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 
 function PreviousNotesSection({ notes, activityName }) {
@@ -74,7 +75,7 @@ function PreviousNotesSection({ notes, activityName }) {
                             <div className="previous-session-notes">
                                 {group.notes.map(note => (
                                     <div key={note.id} className="previous-note-item">
-                                        {note.content}
+                                        <Linkify>{note.content}</Linkify>
                                     </div>
                                 ))}
                             </div>

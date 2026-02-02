@@ -10,6 +10,7 @@
  */
 
 import React, { useState } from 'react';
+import Linkify from '../atoms/Linkify';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './NotesPanel.module.css';
@@ -111,7 +112,7 @@ function NotesPanel({
                                                 className={`${styles.previousNoteItem} ${selectedNoteId === note.id ? styles.previousNoteItemHighlighted : ''}`}
                                                 onClick={() => setSelectedNoteId(note.id)}
                                             >
-                                                {note.content}
+                                                <Linkify>{note.content}</Linkify>
                                             </div>
                                         ))}
                                     </div>

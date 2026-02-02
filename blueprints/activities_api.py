@@ -65,7 +65,8 @@ def create_activity_group(current_user, root_id, validated_data):
             root_id=root_id,
             name=validated_data['name'],  # Already sanitized
             description=validated_data.get('description', ''),
-            sort_order=new_order
+            sort_order=new_order,
+            parent_id=validated_data.get('parent_id')
         )
         session.add(new_group)
         session.commit()
@@ -100,6 +101,8 @@ def update_activity_group(root_id, group_id, validated_data):
             group.name = validated_data['name']
         if 'description' in validated_data:
             group.description = validated_data['description']
+        if 'parent_id' in validated_data:
+            group.parent_id = validated_data['parent_id']
             
         session.commit()
         
@@ -175,6 +178,62 @@ def reorder_activity_groups(root_id, validated_data):
     except Exception as e:
         session.rollback()
         logger.exception("Error reordering activity groups")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@activities_bp.route('/<root_id>/activity-groups/<group_id>/goals', methods=['POST'])
+@token_required
+def set_activity_group_goals(current_user, root_id, group_id):
+    """Set goals associated with an activity group (replaces existing associations)."""
+    from models import Goal, goal_activity_group_associations
+    
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+        if not group:
+            return jsonify({"error": "Activity group not found"}), 404
+        
+        data = request.get_json()
+        goal_ids = data.get('goal_ids', [])
+        
+        # Clear existing associations for this group
+        session.execute(
+            goal_activity_group_associations.delete().where(
+                goal_activity_group_associations.c.activity_group_id == group_id
+            )
+        )
+        
+        # Add new associations
+        for goal_id in goal_ids:
+            goal = session.query(Goal).filter_by(id=goal_id).first()
+            if goal:
+                session.execute(
+                    goal_activity_group_associations.insert().values(
+                        activity_group_id=group_id,
+                        goal_id=goal_id
+                    )
+                )
+        
+        session.commit()
+        
+        # Refresh and return updated group
+        session.refresh(group)
+        
+        # Emit activity group updated event
+        event_bus.emit(Event(Events.ACTIVITY_GROUP_UPDATED, {
+            'group_id': group_id,
+            'name': group.name,
+            'root_id': root_id,
+            'updated_fields': ['associated_goals']
+        }, source='activities_api.set_activity_group_goals'))
+        
+        return jsonify(serialize_activity_group(group)), 200
+        
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error setting activity group goals")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()

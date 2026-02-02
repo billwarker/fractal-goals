@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -139,7 +140,7 @@ function Logs() {
                                         </span>
                                     </span>
                                     <span className="log-description col-description">
-                                        <div className="description-text">{log.description}</div>
+                                        <div className="description-text"><Linkify>{log.description}</Linkify></div>
                                         {log.entity_id && (
                                             <span className="log-entity-id" title={log.entity_id}>
                                                 ID: {log.entity_id}

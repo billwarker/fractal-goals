@@ -105,6 +105,18 @@ export function ActivitiesProvider({ children }) {
         }
     }, [fetchActivityGroups]);
 
+    // Set goals for an activity group
+    const setActivityGroupGoals = useCallback(async (rootId, groupId, goalIds) => {
+        try {
+            const res = await fractalApi.setActivityGroupGoals(rootId, groupId, goalIds);
+            await fetchActivityGroups(rootId);
+            return res.data;
+        } catch (err) {
+            console.error('Failed to set activity group goals:', err);
+            throw err;
+        }
+    }, [fetchActivityGroups]);
+
     // Delete activity group
     const deleteActivityGroup = useCallback(async (rootId, groupId) => {
         try {
@@ -149,7 +161,9 @@ export function ActivitiesProvider({ children }) {
         createActivityGroup,
         updateActivityGroup,
         deleteActivityGroup,
-        reorderActivityGroups
+        deleteActivityGroup,
+        reorderActivityGroups,
+        setActivityGroupGoals
     };
 
     return (
