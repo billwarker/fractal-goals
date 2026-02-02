@@ -163,9 +163,7 @@ const ProgramDetail = () => {
     };
 
     const handleDeleteBlock = async (blockId) => {
-        if (!window.confirm('Are you sure you want to delete this block? All days within this block will also be deleted.')) {
-            return;
-        }
+
 
         try {
             await actions.deleteBlock(blockId);

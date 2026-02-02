@@ -289,6 +289,15 @@ class ProgramService:
                 day.templates = templates
             
             created_count += 1
+            
+            # Emit event for day creation
+            event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, {
+                'day_id': day.id,
+                'day_name': day.name or f"Day {day.day_number}",
+                'block_id': target.id,
+                'program_id': program_id,
+                'root_id': root_id
+            }, source='ProgramService.add_block_day'))
                 
         return created_count
 
@@ -350,12 +359,31 @@ class ProgramService:
                              t_day.templates = new_templates
             except StopIteration: pass
 
+        event_bus.emit(Event(Events.PROGRAM_DAY_UPDATED, {
+            'day_id': day.id,
+            'day_name': day.name,
+            'block_id': block_id,
+            'program_id': program_id,
+            'root_id': root_id,
+            'updated_fields': list(data.keys())
+        }, source='ProgramService.update_block_day'))
+
     @staticmethod
     def delete_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str):
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day:
             raise ValueError("Day not found")
+        
+        day_name = day.name # Capture before delete
         session.delete(day)
+
+        event_bus.emit(Event(Events.PROGRAM_DAY_DELETED, {
+            'day_id': day_id,
+            'day_name': day_name,
+            'block_id': block_id,
+            'program_id': program_id,
+            'root_id': root_id
+        }, source='ProgramService.delete_block_day'))
 
     @staticmethod
     def copy_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict) -> int:
@@ -466,6 +494,14 @@ class ProgramService:
                 except ValueError:
                      raise ValueError("Invalid date format")
         
+        event_bus.emit(Event(Events.GOAL_BLOCK_ASSOCIATED, {
+            'block_id': block.id,
+            'block_name': block.name,
+            'goal_id': goal_id,
+            'program_id': program_id,
+            'root_id': root_id
+        }, source='ProgramService.attach_goal_to_block'))
+
         return serialize_program_block(block)
 
     @staticmethod

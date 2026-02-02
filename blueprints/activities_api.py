@@ -298,6 +298,13 @@ def create_activity(current_user, root_id):
         session.add(new_activity)
         session.flush() # Get ID
         
+        # Emit activity created event
+        event_bus.emit(Event(Events.ACTIVITY_CREATED, {
+            'activity_id': new_activity.id,
+            'activity_name': new_activity.name,
+            'root_id': root_id
+        }, source='activities_api.create_activity'))
+        
         # Create Metrics
         metrics_data = data.get('metrics', [])
         if len(metrics_data) > 3:

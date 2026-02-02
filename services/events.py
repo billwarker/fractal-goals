@@ -210,4 +210,18 @@ class Events:
     ACTIVITY_GROUP_DELETED = 'activity_group.deleted'
     
     # Block events
+    PROGRAM_BLOCK_CREATED = 'program_block.created'
+    PROGRAM_BLOCK_UPDATED = 'program_block.updated'
     PROGRAM_BLOCK_COMPLETED = 'program.block_completed'
+
+    # Program Day events
+    PROGRAM_DAY_CREATED = 'program_day.created'
+    PROGRAM_DAY_UPDATED = 'program_day.updated'
+    PROGRAM_DAY_DELETED = 'program_day.deleted'
+
+    # Association events
+    GOAL_BLOCK_ASSOCIATED = 'goal.block_associated'
+
+    # Session Template events
+    SESSION_TEMPLATE_CREATED = 'session_template.created'
+    SESSION_TEMPLATE_UPDATED = 'session_template.updated'

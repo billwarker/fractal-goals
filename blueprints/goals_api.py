@@ -211,7 +211,7 @@ def update_goal_endpoint(goal_id: str):
             event_bus.emit(Event(Events.GOAL_UPDATED, {
                 'goal_id': goal.id,
                 'goal_name': goal.name,
-                'root_id': goal.root_id,
+                'root_id': goal.root_id or goal.id, # For root goals, root_id is None, so use id
                 'updated_fields': list(data.keys())
             }, source='goals_api.update_goal'))
             
@@ -752,7 +752,7 @@ def update_fractal_goal(root_id, goal_id):
         event_bus.emit(Event(Events.GOAL_UPDATED, {
             'goal_id': goal.id,
             'goal_name': goal.name,
-            'root_id': goal.root_id,
+            'root_id': goal.root_id or goal.id, # For root goals, root_id is None, so use id
             'updated_fields': list(data.keys())
         }, source='goals_api.update_fractal_goal'))
         

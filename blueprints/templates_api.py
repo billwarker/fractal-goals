@@ -90,6 +90,12 @@ def create_session_template(current_user, root_id, validated_data):
         session.add(new_template)
         session.commit()
         
+        event_bus.emit(Event(Events.SESSION_TEMPLATE_CREATED, {
+            'template_id': new_template.id,
+            'name': new_template.name,
+            'root_id': root_id
+        }, source='templates_api.create_session_template'))
+        
         return jsonify(serialize_session_template(new_template)), 201
         
     except Exception as e:
@@ -125,6 +131,13 @@ def update_session_template(current_user, root_id, template_id, validated_data):
             template.template_data = json.dumps(validated_data['template_data'])
         
         session.commit()
+        
+        event_bus.emit(Event(Events.SESSION_TEMPLATE_UPDATED, {
+            'template_id': template.id,
+            'name': template.name,
+            'root_id': root_id,
+            'updated_fields': list(validated_data.keys())
+        }, source='templates_api.update_session_template'))
         
         return jsonify(serialize_session_template(template))
         
