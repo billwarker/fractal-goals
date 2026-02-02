@@ -12,6 +12,7 @@ function TemplateBuilderModal({
     onSave,
     editingTemplate,
     activities,
+    activityGroups = [], // New prop for grouping
     rootId
 }) {
     const [currentTemplate, setCurrentTemplate] = useState({
@@ -29,6 +30,7 @@ function TemplateBuilderModal({
         activities: []
     });
     const [selectedActivities, setSelectedActivities] = useState([]);
+    const [selectedGroupId, setSelectedGroupId] = useState(null); // For group selection flow
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
 
     // Load editing template when modal opens
@@ -190,6 +192,27 @@ function TemplateBuilderModal({
         setCurrentTemplate({
             ...currentTemplate,
             sections: newSections
+        });
+    };
+
+    const handleMoveActivity = (sectionIndex, activityIndex, direction) => {
+        const updatedSections = [...currentTemplate.sections];
+        const section = updatedSections[sectionIndex];
+        const newActivities = [...section.activities];
+        const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
+
+        if (newIndex < 0 || newIndex >= newActivities.length) return;
+
+        [newActivities[activityIndex], newActivities[newIndex]] = [newActivities[newIndex], newActivities[activityIndex]];
+
+        updatedSections[sectionIndex] = {
+            ...section,
+            activities: newActivities
+        };
+
+        setCurrentTemplate({
+            ...currentTemplate,
+            sections: updatedSections
         });
     };
 
@@ -355,7 +378,7 @@ function TemplateBuilderModal({
                                                     key={activityIndex}
                                                     className={styles.activityItem}
                                                 >
-                                                    <div>
+                                                    <div style={{ flex: 1 }}>
                                                         <div className={styles.activityName}>{activity.name}</div>
                                                         {activity.type && (
                                                             <div className={styles.activityType}>
@@ -363,12 +386,28 @@ function TemplateBuilderModal({
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
-                                                        className={styles.removeActivityButton}
-                                                    >
-                                                        ×
-                                                    </button>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                            <button
+                                                                className={styles.miniMoveBtn}
+                                                                onClick={(e) => { e.stopPropagation(); handleMoveActivity(sectionIndex, activityIndex, 'up'); }}
+                                                                disabled={activityIndex === 0}
+                                                                title="Move Up"
+                                                            >↑</button>
+                                                            <button
+                                                                className={styles.miniMoveBtn}
+                                                                onClick={(e) => { e.stopPropagation(); handleMoveActivity(sectionIndex, activityIndex, 'down'); }}
+                                                                disabled={activityIndex === (section.activities || []).length - 1}
+                                                                title="Move Down"
+                                                            >↓</button>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
+                                                            className={styles.removeActivityButton}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                             <button
@@ -480,7 +519,9 @@ function TemplateBuilderModal({
                         className={`${styles.secondaryModalContent} ${styles.secondaryModalLarge}`}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h2 className={styles.secondaryHeader}>Add Activities</h2>
+                        <h2 className={styles.secondaryHeader}>
+                            {selectedSectionIndex !== null && !selectedGroupId ? 'Select Activity Group' : 'Select Activities'}
+                        </h2>
 
                         {activities.length === 0 ? (
                             <div className={styles.emptyState} style={{ padding: '20px', border: 'none', background: 'transparent' }}>
@@ -489,39 +530,120 @@ function TemplateBuilderModal({
                             </div>
                         ) : (
                             <div className={styles.contentArea} style={{ padding: '0 4px 0 0' }}>
-                                <label className={styles.label} style={{ marginBottom: '12px' }}>Select Activities:</label>
-                                <div className={styles.activityListContainer}>
-                                    {activities.map(activity => {
-                                        const isSelected = selectedActivities.includes(activity.id);
-                                        return (
-                                            <div
-                                                key={activity.id}
-                                                onClick={() => {
-                                                    if (isSelected) {
-                                                        setSelectedActivities(selectedActivities.filter(id => id !== activity.id));
-                                                    } else {
-                                                        setSelectedActivities([...selectedActivities, activity.id]);
-                                                    }
-                                                }}
-                                                className={`${styles.activitySelectable} ${isSelected ? styles.selected : ''}`}
-                                            >
-                                                <div className={styles.checkbox}>
-                                                    {isSelected && '✓'}
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
-                                                        {activity.name}
-                                                    </div>
-                                                    {activity.type && (
-                                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                                                            {activity.type}
+                                {!selectedGroupId ? (
+                                    // MODE 1: GROUP SELECTION
+                                    <div className={styles.groupsGrid}>
+                                        {/* Activity Groups */}
+                                        {activityGroups.map(group => {
+                                            const groupActivities = activities.filter(a => a.group_id === group.id);
+                                            const selectedCountInGroup = groupActivities.filter(a => selectedActivities.includes(a.id)).length;
+
+                                            return (
+                                                <div
+                                                    key={group.id}
+                                                    className={styles.groupCard}
+                                                    onClick={() => setSelectedGroupId(group.id)}
+                                                    style={selectedCountInGroup > 0 ? { borderColor: 'var(--color-brand-primary)', background: 'rgba(76, 175, 80, 0.05)' } : {}}
+                                                >
+                                                    <div className={styles.groupName}>{group.name}</div>
+                                                    <div className={styles.groupCount}>{groupActivities.length} activities</div>
+                                                    {selectedCountInGroup > 0 && (
+                                                        <div style={{
+                                                            marginTop: '6px',
+                                                            fontSize: '12px',
+                                                            color: 'var(--color-brand-primary)',
+                                                            fontWeight: 'bold'
+                                                        }}>
+                                                            {selectedCountInGroup} selected
                                                         </div>
                                                     )}
                                                 </div>
+                                            );
+                                        })}
+
+                                        {/* Ungrouped */}
+                                        {(() => {
+                                            const ungroupedActs = activities.filter(a => !a.group_id);
+                                            const selectedCountInUngrouped = ungroupedActs.filter(a => selectedActivities.includes(a.id)).length;
+
+                                            return (
+                                                <div
+                                                    className={`${styles.groupCard} ${styles.ungroupedCard}`}
+                                                    onClick={() => setSelectedGroupId('ungrouped')}
+                                                    style={selectedCountInUngrouped > 0 ? { borderColor: 'var(--color-brand-primary)', background: 'rgba(76, 175, 80, 0.05)' } : {}}
+                                                >
+                                                    <div className={styles.groupName}>Ungrouped</div>
+                                                    <div className={styles.groupCount}>
+                                                        {ungroupedActs.length} activities
+                                                    </div>
+                                                    {selectedCountInUngrouped > 0 && (
+                                                        <div style={{
+                                                            marginTop: '6px',
+                                                            fontSize: '12px',
+                                                            color: 'var(--color-brand-primary)',
+                                                            fontWeight: 'bold'
+                                                        }}>
+                                                            {selectedCountInUngrouped} selected
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                ) : (
+                                    // MODE 2: ACTIVITY SELECTION (Inside Group)
+                                    <>
+                                        <button
+                                            className={styles.backButtonLink}
+                                            onClick={() => setSelectedGroupId(null)}
+                                        >
+                                            ← Back to Groups
+                                        </button>
+
+                                        <div className={styles.selectedGroupHeader}>
+                                            <div style={{ fontWeight: 'bold' }}>
+                                                {selectedGroupId === 'ungrouped'
+                                                    ? 'Ungrouped Activities'
+                                                    : activityGroups.find(g => g.id === selectedGroupId)?.name}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        </div>
+
+                                        <div className={styles.activityListContainer}>
+                                            {activities
+                                                .filter(a => selectedGroupId === 'ungrouped' ? !a.group_id : a.group_id === selectedGroupId)
+                                                .map(activity => {
+                                                    const isSelected = selectedActivities.includes(activity.id);
+                                                    return (
+                                                        <div
+                                                            key={activity.id}
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setSelectedActivities(selectedActivities.filter(id => id !== activity.id));
+                                                                } else {
+                                                                    setSelectedActivities([...selectedActivities, activity.id]);
+                                                                }
+                                                            }}
+                                                            className={`${styles.activitySelectable} ${isSelected ? styles.selected : ''}`}
+                                                        >
+                                                            <div className={styles.checkbox}>
+                                                                {isSelected && '✓'}
+                                                            </div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                                                                    {activity.name}
+                                                                </div>
+                                                                {activity.type && (
+                                                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                                                                        {activity.type}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -532,6 +654,7 @@ function TemplateBuilderModal({
                                     setShowActivityModal(false);
                                     setSelectedSectionIndex(null);
                                     setSelectedActivities([]);
+                                    setSelectedGroupId(null);
                                 }}
                             >
                                 Cancel
@@ -541,7 +664,7 @@ function TemplateBuilderModal({
                                 onClick={handleAddActivities}
                                 disabled={selectedActivities.length === 0}
                             >
-                                Add {selectedActivities.length > 0 ? `(${selectedActivities.length})` : ''}
+                                Add Selected {selectedActivities.length > 0 ? `(${selectedActivities.length})` : '(0)'}
                             </Button>
                         </div>
                     </div>

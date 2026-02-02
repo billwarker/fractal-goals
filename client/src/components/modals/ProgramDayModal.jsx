@@ -14,6 +14,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
 
     const [sessionTemplates, setSessionTemplates] = useState([]);
     const [activities, setActivities] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
     const [copyStatus, setCopyStatus] = useState('');
     const [copyMode, setCopyMode] = useState('all');
 
@@ -36,12 +37,14 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         const fetchData = async () => {
             if (!rootId) return;
             try {
-                const [templatesRes, activitiesRes] = await Promise.all([
+                const [templatesRes, activitiesRes, groupsRes] = await Promise.all([
                     fractalApi.getSessionTemplates(rootId),
-                    fractalApi.getActivities(rootId)
+                    fractalApi.getActivities(rootId),
+                    fractalApi.getActivityGroups(rootId)
                 ]);
                 setSessionTemplates(templatesRes.data);
                 setActivities(activitiesRes.data);
+                setActivityGroups(groupsRes.data);
             } catch (err) {
                 console.error("Failed to fetch data");
             }
@@ -275,6 +278,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                 onSave={handleTemplateBuilderSave}
                 editingTemplate={null}
                 activities={activities}
+                activityGroups={activityGroups}
                 rootId={rootId}
             />
         </>
