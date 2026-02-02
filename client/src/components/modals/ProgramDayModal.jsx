@@ -7,6 +7,8 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import styles from './ProgramDayModal.module.css';
 
+import DeleteConfirmModal from './DeleteConfirmModal';
+
 const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
     const [name, setName] = useState('');
     const [selectedTemplates, setSelectedTemplates] = useState([]);
@@ -20,6 +22,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
 
     // Template builder modal state
     const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const isEdit = !!initialData;
 
@@ -81,9 +84,8 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                 setName('');
                 setSelectedDaysOfWeek([]);
                 setSelectedTemplates([]);
-
+                setCopyStatus(''); // Reset copy status on new add
             }
-            setCopyStatus('');
         }
     }, [isOpen, initialData]);
 
@@ -113,9 +115,12 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
     };
 
     const handleDelete = () => {
-        if (window.confirm('Are you sure you want to delete this day?')) {
-            onDelete(initialData.id);
-        }
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = () => {
+        onDelete(initialData.id);
+        setShowDeleteConfirm(false);
     };
 
     const handleAddTemplate = (e) => {
@@ -280,6 +285,14 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                 activities={activities}
                 activityGroups={activityGroups}
                 rootId={rootId}
+            />
+
+            <DeleteConfirmModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Program Day"
+                message={`Are you sure you want to delete "${name}"? This will remove all scheduled sessions for this day.`}
             />
         </>
     );
