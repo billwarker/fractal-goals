@@ -239,8 +239,8 @@ class Session(Base):
     )
     
     # Template/Program references
-    template_id = Column(String, ForeignKey('session_templates.id'), nullable=True)
-    program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True)
+    template_id = Column(String, ForeignKey('session_templates.id'), nullable=True, index=True)
+    program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True, index=True)
     
     # Flexible data storage (sections, exercises, notes, etc.)
     attributes = Column(JSON_TYPE, nullable=True)
@@ -409,7 +409,7 @@ class MetricValue(Base):
     __tablename__ = 'metric_values'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False)
+    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, index=True)
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
     split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)  # Nullable for non-split activities
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)  # Performance: direct fractal scoping
@@ -724,7 +724,8 @@ def get_session(engine):
 def get_all_root_goals(db_session):
     return db_session.query(Goal).options(
         selectinload(Goal.associated_activities),
-        selectinload(Goal.associated_activity_groups)
+        selectinload(Goal.associated_activity_groups),
+        selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children)
     ).filter(
         Goal.parent_id == None
     ).all()
@@ -734,7 +735,8 @@ def get_goal_by_id(db_session, goal_id, load_associations=True):
     if load_associations:
         query = query.options(
             selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups)
+            selectinload(Goal.associated_activity_groups),
+            selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children)
         )
     return query.filter(Goal.id == goal_id).first()
 

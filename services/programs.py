@@ -93,7 +93,15 @@ class ProgramService:
         if not root:
             return None
         
-        programs = session.query(Program).filter_by(root_id=root_id).all()
+        from sqlalchemy.orm import selectinload
+        programs = session.query(Program).options(
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.templates),
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.completed_sessions)
+        ).filter_by(root_id=root_id).all()
         return [serialize_program(program) for program in programs]
 
     @staticmethod
@@ -102,7 +110,15 @@ class ProgramService:
         if not root:
             return None
         
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        from sqlalchemy.orm import selectinload
+        program = session.query(Program).options(
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.templates),
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.completed_sessions)
+        ).filter_by(id=program_id, root_id=root_id).first()
         if not program:
             return None
         
@@ -428,7 +444,12 @@ class ProgramService:
     def get_active_program_days(session, root_id: str) -> List[Dict]:
         today = date.today()
         
-        active_programs = session.query(Program).filter_by(
+        from sqlalchemy.orm import selectinload
+        active_programs = session.query(Program).options(
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.templates)
+        ).filter_by(
             root_id=root_id,
             is_active=True
         ).all()

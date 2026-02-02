@@ -96,6 +96,8 @@ def get_fractal_sessions(current_user, root_id):
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
@@ -418,6 +420,8 @@ def get_session_endpoint(current_user, root_id, session_id):
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
         ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
         
