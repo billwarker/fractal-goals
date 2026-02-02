@@ -19,39 +19,46 @@ def setup_event_logging():
         # We need to filter out some internal events if necessary, 
         # or just log everything. The user said "all activities that would generate an event".
         
-        # Extract root_id from event data
-        root_id = event.data.get('root_id')
-        if not root_id:
-            # If root_id is missing, we might not be able to scope it correctly
-            # but let's try to find it in the data or just skip if it's truly global
-            logger.debug(f"Event {event.name} missing root_id, skipping database log")
-            return
 
-        # Prepare description based on event type
-        description = _get_event_description(event)
-        
-        # Get entity info
-        entity_type, entity_id = _get_entity_info(event)
 
-        db_session = _get_db_session()
-        try:
-            log_entry = EventLog(
-                root_id=root_id,
-                event_type=event.name,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                description=description,
-                payload=event.data,
-                source=event.source or 'system',
-                timestamp=event.timestamp
-            )
-            db_session.add(log_entry)
-            db_session.commit()
-        except Exception as e:
-            db_session.rollback()
-            logger.error(f"Failed to log event {event.name} to database: {e}")
-        finally:
-            db_session.close()
+        # Define the worker function
+        def worker(evt: Event):
+            root_id = evt.data.get('root_id')
+            if not root_id:
+                logger.debug(f"Event {evt.name} missing root_id, skipping database log")
+                return
+
+            try:
+                description = _get_event_description(evt)
+                entity_type, entity_id = _get_entity_info(evt)
+                
+                db_session = _get_db_session()
+                try:
+                    log_entry = EventLog(
+                        root_id=root_id,
+                        event_type=evt.name,
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        description=description,
+                        payload=evt.data,
+                        source=evt.source or 'system',
+                        timestamp=evt.timestamp
+                    )
+                    db_session.add(log_entry)
+                    db_session.commit()
+                except Exception as e:
+                    db_session.rollback()
+                    logger.error(f"Failed to log event {evt.name} to database: {e}")
+                finally:
+                    db_session.close()
+            except Exception as e:
+                logger.error(f"Error preparing log for {evt.name}: {e}")
+
+        # Start thread
+        import threading
+        t = threading.Thread(target=worker, args=(event,))
+        t.daemon = True # Don't block app exit
+        t.start()
 
 def _get_entity_info(event: Event):
     """Extract entity type and ID from event name and data."""
