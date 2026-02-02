@@ -60,10 +60,25 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
             if (initialData) {
                 setName(initialData.name || '');
                 // Try to load day_of_week first, then fallback to inferring from date
+                // Try to load day_of_week first, then fallback to inferring from date
                 if (initialData.day_of_week) {
-                    const dows = Array.isArray(initialData.day_of_week)
-                        ? initialData.day_of_week
-                        : [initialData.day_of_week];
+                    let dows = [];
+                    if (Array.isArray(initialData.day_of_week)) {
+                        dows = initialData.day_of_week;
+                    } else if (typeof initialData.day_of_week === 'string') {
+                        // Attempt to parse if it looks like a JSON array (e.g. from legacy data)
+                        if (initialData.day_of_week.trim().startsWith('[')) {
+                            try {
+                                const parsed = JSON.parse(initialData.day_of_week);
+                                if (Array.isArray(parsed)) dows = parsed;
+                                else dows = [initialData.day_of_week];
+                            } catch (e) {
+                                dows = [initialData.day_of_week];
+                            }
+                        } else {
+                            dows = [initialData.day_of_week];
+                        }
+                    }
                     setSelectedDaysOfWeek(dows);
                 } else if (initialData.date) {
                     setSelectedDaysOfWeek([moment(initialData.date).format('dddd')]);
@@ -240,7 +255,15 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                         </div>
                         {selectedDaysOfWeek.length > 0 && (
                             <div className={styles.hint}>
-                                Scheduled for all {selectedDaysOfWeek.join(', ')}s in the block.
+                                Scheduled for every {
+                                    (() => {
+                                        const sorter = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+                                        const sorted = [...selectedDaysOfWeek].sort((a, b) => sorter[a] - sorter[b]);
+                                        if (sorted.length === 0) return '';
+                                        if (sorted.length === 1) return sorted[0];
+                                        return sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+                                    })()
+                                } in the block.
                             </div>
                         )}
                     </div>
