@@ -6,7 +6,10 @@ from flask import request, jsonify, Blueprint
 import models
 from models import get_engine, get_session, User
 from config import config
-from validators import validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema
+from validators import (
+    validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
+    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema
+)
 from services.serializers import serialize_user
 from extensions import limiter
 
@@ -145,6 +148,98 @@ def update_preferences(current_user, validated_data):
         
         db_session.commit()
         return jsonify(serialize_user(user))
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+@auth_bp.route('/account/password', methods=['PUT'])
+@token_required
+@validate_request(UserPasswordUpdateSchema)
+def update_password(current_user, validated_data):
+    """Update user password."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        user = db_session.query(User).get(current_user.id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        if not user.check_password(validated_data['current_password']):
+            return jsonify({"error": "Invalid current password"}), 401
+            
+        user.set_password(validated_data['new_password'])
+        db_session.commit()
+        return jsonify({"message": "Password updated successfully"})
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+@auth_bp.route('/account/email', methods=['PUT'])
+@token_required
+@validate_request(UserEmailUpdateSchema)
+def update_email(current_user, validated_data):
+    """Update user email."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        user = db_session.query(User).get(current_user.id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        if not user.check_password(validated_data['password']):
+            return jsonify({"error": "Invalid password"}), 401
+
+        # Check for existing email
+        existing = db_session.query(User).filter(User.email == validated_data['email']).first()
+        if existing and existing.id != user.id:
+            return jsonify({"error": "Email already in use"}), 400
+            
+        user.email = validated_data['email']
+        db_session.commit()
+        return jsonify(serialize_user(user))
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+@auth_bp.route('/account', methods=['DELETE'])
+@token_required
+@validate_request(UserDeleteSchema)
+def delete_account(current_user, validated_data):
+    """Delete user account."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        user = db_session.query(User).get(current_user.id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        if not user.check_password(validated_data['password']):
+            return jsonify({"error": "Invalid password"}), 401
+            
+        # Hard delete? Or soft delete? 
+        # Models usually support soft delete if they have deleted_at, but User might not.
+        # User model HAS is_active, but no deleted_at in the audit view (let me check).
+        # Actually models.py showed:
+        # User: is_active, no deleted_at.
+        # Goals: deleted_at. 
+        # So we should probably cascade delete everything OR just mark is_active=False + sanitize PII.
+        # For "Right to be forgotten", we should randomize PII and set is_active=False.
+        
+        # Anonymize
+        import uuid
+        user.username = f"deleted_{uuid.uuid4()}"
+        user.email = f"deleted_{uuid.uuid4()}@fractalgoals.com"
+        user.is_active = False
+        user.password_hash = "deleted"
+        
+        db_session.commit()
+        return jsonify({"message": "Account deleted successfully"})
     except Exception as e:
         db_session.rollback()
         return jsonify({"error": str(e)}), 500

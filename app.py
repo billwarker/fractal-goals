@@ -11,6 +11,19 @@ from flask_talisman import Talisman
 import logging
 
 from extensions import limiter
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+import os
+
+# Initialize Sentry if DSN is present
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,  # Enable profiling
+        environment=os.getenv("ENV", "development")
+    )
 
 from config import config
 # from blueprints.api import api_bp # Deprecated

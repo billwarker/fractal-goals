@@ -164,6 +164,30 @@ class UserPreferencesUpdateSchema(BaseModel):
     """Schema for updating user preferences."""
     preferences: Dict[str, Any] = Field(...)
 
+
+class UserPasswordUpdateSchema(BaseModel):
+    """Schema for updating password."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+
+
+class UserEmailUpdateSchema(BaseModel):
+    """Schema for updating email."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    password: str = Field(..., min_length=1)  # Require password to change email
+
+
+class UserDeleteSchema(BaseModel):
+    """Schema for deleting account."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    password: str = Field(..., min_length=1)  # Require password to delete account
+    confirmation: str = Field(..., pattern=r'^DELETE$')
+
 # =============================================================================
 # GOAL SCHEMAS
 # =============================================================================

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { authApi } from '../../utils/api';
+import toast from 'react-hot-toast';
 import { getGoalColorName } from '../../utils/goalColors'; // Still useful for display names
 
 const SettingsModal = ({ isOpen, onClose }) => {
@@ -17,6 +20,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const [activeTab, setActiveTab] = useState('general');
     const [availableTimezones, setAvailableTimezones] = useState([]);
 
+    const { logout } = useAuth();
+    const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
+    const [emailData, setEmailData] = useState({ email: '', password: '' });
+    const [deleteData, setDeleteData] = useState({ password: '', confirmation: '' });
+
     useEffect(() => {
         if (isOpen) {
             try {
@@ -27,6 +35,44 @@ const SettingsModal = ({ isOpen, onClose }) => {
             }
         }
     }, [isOpen]);
+
+    const handlePasswordUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await authApi.updatePassword(passwordData);
+            toast.success('Password updated successfully');
+            setPasswordData({ current_password: '', new_password: '' });
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to update password');
+        }
+    };
+
+    const handleEmailUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await authApi.updateEmail(emailData);
+            toast.success('Email updated successfully');
+            setEmailData({ email: '', password: '' });
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to update email');
+        }
+    };
+
+    const handleDeleteAccount = async (e) => {
+        e.preventDefault();
+        if (deleteData.confirmation !== 'DELETE') return;
+
+        if (window.confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
+            try {
+                await authApi.deleteAccount(deleteData);
+                toast.success('Account deleted.');
+                logout();
+                onClose();
+            } catch (err) {
+                toast.error(err.response?.data?.error || 'Failed to delete account');
+            }
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -91,37 +137,57 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         width: '200px',
                         borderRight: '1px solid var(--color-border)',
                         backgroundColor: 'var(--color-bg-sidebar)',
-                        padding: '16px 0'
+                        padding: '16px 0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
                     }}>
-                        <div
-                            onClick={() => setActiveTab('general')}
-                            style={{
-                                padding: '12px 24px',
-                                cursor: 'pointer',
-                                backgroundColor: activeTab === 'general' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                color: activeTab === 'general' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                fontWeight: activeTab === 'general' ? 'bold' : 'normal',
-                                borderLeft: activeTab === 'general' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
-                            }}
-                        >
-                            General
+                        <div>
+                            <div
+                                onClick={() => setActiveTab('general')}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    backgroundColor: activeTab === 'general' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: activeTab === 'general' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                    fontWeight: activeTab === 'general' ? 'bold' : 'normal',
+                                    borderLeft: activeTab === 'general' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                }}
+                            >
+                                General
+                            </div>
+                            <div
+                                onClick={() => setActiveTab('themes')}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    backgroundColor: activeTab === 'themes' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: activeTab === 'themes' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                    fontWeight: activeTab === 'themes' ? 'bold' : 'normal',
+                                    borderLeft: activeTab === 'themes' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                }}
+                            >
+                                Themes
+                            </div>
+                            <div
+                                onClick={() => setActiveTab('account')}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    backgroundColor: activeTab === 'account' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: activeTab === 'account' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                    fontWeight: activeTab === 'account' ? 'bold' : 'normal',
+                                    borderLeft: activeTab === 'account' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                }}
+                            >
+                                Account
+                            </div>
                         </div>
-                        <div
-                            onClick={() => setActiveTab('themes')}
-                            style={{
-                                padding: '12px 24px',
-                                cursor: 'pointer',
-                                backgroundColor: activeTab === 'themes' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                color: activeTab === 'themes' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                fontWeight: activeTab === 'themes' ? 'bold' : 'normal',
-                                borderLeft: activeTab === 'themes' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
-                            }}
-                        >
-                            Themes
-                        </div>
-                        {/* Placeholder for future settings */}
-                        <div style={{ padding: '12px 24px', color: 'var(--color-text-muted)', cursor: 'not-allowed', opacity: 0.5 }}>
-                            Account (Coming Soon)
+
+                        {/* Legal Footer in Sidebar */}
+                        <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
+                            <a href="/privacy" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px', textDecoration: 'none' }}>Privacy Policy</a>
+                            <a href="/terms" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', textDecoration: 'none' }}>Terms of Service</a>
                         </div>
                     </div>
 
@@ -317,6 +383,108 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                             </div>
                                         ))}
                                     </div>
+                                </section>
+                            </div>
+                        )}
+
+                        {activeTab === 'account' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                {/* Change Password */}
+                                <section>
+                                    <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+                                        Change Password
+                                    </h3>
+                                    <form onSubmit={handlePasswordUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
+                                        <input
+                                            type="password"
+                                            placeholder="Current Password"
+                                            value={passwordData.current_password}
+                                            onChange={e => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                            required
+                                        />
+                                        <input
+                                            type="password"
+                                            placeholder="New Password (min 8 chars)"
+                                            value={passwordData.new_password}
+                                            onChange={e => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                            required
+                                            minLength={8}
+                                        />
+                                        <button type="submit" style={{ padding: '8px 16px', background: 'var(--color-brand-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                            Update Password
+                                        </button>
+                                    </form>
+                                </section>
+
+                                {/* Change Email */}
+                                <section>
+                                    <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+                                        Change Email
+                                    </h3>
+                                    <form onSubmit={handleEmailUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
+                                        <input
+                                            type="email"
+                                            placeholder="New Email Address"
+                                            value={emailData.email}
+                                            onChange={e => setEmailData({ ...emailData, email: e.target.value })}
+                                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                            required
+                                        />
+                                        <input
+                                            type="password"
+                                            placeholder="Current Password to Confirm"
+                                            value={emailData.password}
+                                            onChange={e => setEmailData({ ...emailData, password: e.target.value })}
+                                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                            required
+                                        />
+                                        <button type="submit" style={{ padding: '8px 16px', background: 'var(--color-brand-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                            Update Email
+                                        </button>
+                                    </form>
+                                </section>
+
+                                {/* Danger Zone */}
+                                <section style={{ border: '1px solid var(--color-brand-danger)', padding: '16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)' }}>
+                                    <h3 style={{ marginTop: 0, marginBottom: '8px', color: 'var(--color-brand-danger)' }}>Danger Zone</h3>
+                                    <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
+                                        Deleting your account is permanent. All your data will be wiped.
+                                    </p>
+                                    <form onSubmit={handleDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
+                                        <input
+                                            type="password"
+                                            placeholder="Current Password"
+                                            value={deleteData.password}
+                                            onChange={e => setDeleteData({ ...deleteData, password: e.target.value })}
+                                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                            required
+                                        />
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Type DELETE to confirm"
+                                                value={deleteData.confirmation}
+                                                onChange={e => setDeleteData({ ...deleteData, confirmation: e.target.value })}
+                                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border-input)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={deleteData.confirmation !== 'DELETE'}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: deleteData.confirmation === 'DELETE' ? 'var(--color-brand-danger)' : 'var(--color-text-muted)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    cursor: deleteData.confirmation === 'DELETE' ? 'pointer' : 'not-allowed'
+                                                }}>
+                                                Delete Account
+                                            </button>
+                                        </div>
+                                    </form>
                                 </section>
                             </div>
                         )}
