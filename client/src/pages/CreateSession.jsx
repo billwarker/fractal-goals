@@ -378,6 +378,7 @@ function CreateSession() {
                     <SourceSelector
                         sessionSource={sessionSource}
                         onSelectSource={handleSelectSource}
+                        programName={selectedProgram}
                     />
                 )}
 

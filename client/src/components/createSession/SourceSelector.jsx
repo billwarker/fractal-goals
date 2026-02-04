@@ -5,7 +5,7 @@ import StepHeader from './StepHeader';
  * Step 0b: Choose Session Source
  * Displayed when single program AND templates are both available
  */
-function SourceSelector({ sessionSource, onSelectSource }) {
+function SourceSelector({ sessionSource, onSelectSource, programName }) {
     return (
         <div style={{
             background: 'var(--color-bg-card)',
@@ -19,7 +19,7 @@ function SourceSelector({ sessionSource, onSelectSource }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <SourceCard
                     icon="📅"
-                    title="From Active Program"
+                    title={programName ? `From ${programName}` : "From Active Program"}
                     description="Select a day from your current training program"
                     isSelected={sessionSource === 'program'}
                     onClick={() => onSelectSource('program')}
