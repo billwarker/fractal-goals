@@ -318,11 +318,13 @@ function ManageActivities() {
                 key={group.id}
                 className={`${styles.groupContainer} ${styles.dropZone} ${isDragOver ? styles.dropZoneActive : ''}`}
                 style={{
-                    marginBottom: isRoot ? '40px' : '20px',
-                    marginLeft: isRoot ? 0 : '24px',
-                    borderLeft: isRoot ? '1px solid var(--color-border)' : '2px solid rgba(255, 255, 255, 0.1)',
-                    backgroundColor: isRoot ? 'var(--color-bg-card-alt)' : 'transparent',
-                    padding: isRoot ? '24px' : '12px 0 12px 12px'
+                    marginBottom: '24px',
+                    marginLeft: 0,
+                    border: isRoot ? 'none' : '1px solid var(--color-border)',
+                    borderLeft: `3px solid ${isRoot ? 'var(--color-border)' : 'var(--color-brand-primary)'}`,
+                    backgroundColor: 'var(--color-bg-card-alt)',
+                    padding: '20px 24px',
+                    borderRadius: isRoot ? '0' : '8px'
                 }}
                 onDragOver={(e) => handleDragOver(e, group.id)}
                 onDragLeave={handleDragLeave}
@@ -332,17 +334,17 @@ function ManageActivities() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <button
                             onClick={() => toggleGroupCollapse(group.id)}
-                            className={styles.moveBtn} // reusing class for simplicity
+                            className={styles.moveBtn}
                             style={{ fontSize: '14px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}
                         >
                             {isCollapsed ? '+' : '-'}
                         </button>
                         <div>
-                            <h2 className={styles.groupTitle} style={{ fontSize: isRoot ? '20px' : '16px' }}>
+                            <h2 className={styles.groupTitle} style={{ fontSize: isRoot ? '20px' : '18px' }}>
                                 {group.name}
                             </h2>
                             {group.description && (
-                                <p className={styles.groupDescription} style={{ fontSize: isRoot ? '13px' : '12px' }}>
+                                <p className={styles.groupDescription}>
                                     <Linkify>{group.description}</Linkify>
                                 </p>
                             )}
