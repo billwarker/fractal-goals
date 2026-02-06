@@ -11,7 +11,7 @@ from models import (
     validate_root_goal, _safe_load_json
 )
 from services import event_bus, Event, Events
-from services.serializers import serialize_program, serialize_program_block
+from services.serializers import serialize_program, serialize_program_block, serialize_goal
 
 logger = logging.getLogger(__name__)
 
@@ -468,7 +468,8 @@ class ProgramService:
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": _safe_load_json(template.template_data, {})
+                                        "template_data": _safe_load_json(template.template_data, {}),
+                                        "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
                                     })
                                 
                                 result.append({
@@ -477,10 +478,12 @@ class ProgramService:
                                     "block_id": block.id,
                                     "block_name": block.name,
                                     "block_color": block.color,
+                                    "block_goal_ids": _safe_load_json(block.goal_ids, []),
                                     "day_id": day.id,
                                     "day_name": day.name,
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
+                                    "goals": [serialize_goal(g, include_children=False) for g in day.goals] if hasattr(day, 'goals') else [],
                                     "is_completed": day.is_completed,
                                     "sessions": session_details,
                                     "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])

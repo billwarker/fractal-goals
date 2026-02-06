@@ -9,12 +9,12 @@ import StepHeader from './StepHeader';
 function CreateSessionActions({
     selectedTemplate,
     selectedProgramDay,
-    selectedGoalIds,
-    immediateGoals,
     creating,
-    onCreateSession
+    onCreateSession,
+    activityDefinitions = [],
+    goals = []
 }) {
-    const isDisabled = !selectedTemplate || selectedGoalIds.length === 0 || creating;
+    const isDisabled = !selectedTemplate || creating;
 
     return (
         <div style={{
@@ -43,7 +43,7 @@ function CreateSessionActions({
                     justifyContent: 'center',
                     fontSize: '14px',
                     fontWeight: 'bold'
-                }}>3</span>
+                }}>2</span>
                 Create Session
             </h2>
 
@@ -66,38 +66,127 @@ function CreateSessionActions({
                 {creating ? 'Creating...' : '✓ Create Session'}
             </button>
 
-            {selectedTemplate && selectedGoalIds.length > 0 && (
+            {selectedTemplate && (
                 <SessionSummary
                     selectedTemplate={selectedTemplate}
                     selectedProgramDay={selectedProgramDay}
-                    selectedGoalIds={selectedGoalIds}
-                    immediateGoals={immediateGoals}
+                    activityDefinitions={activityDefinitions}
+                    goals={goals}
                 />
             )}
         </div>
     );
 }
 
-function SessionSummary({ selectedTemplate, selectedProgramDay, selectedGoalIds, immediateGoals }) {
-    const { getGoalColor } = useTheme();
+function SessionSummary({ selectedTemplate, selectedProgramDay, activityDefinitions, goals }) {
+    // Combine goals from template, program day, and activities
+    const calculateGoals = () => {
+        let potentialGoals = [];
+        const seenIds = new Set();
+
+        // Helper to find a goal by ID in the hierarchical structure
+        const findGoalById = (id) => {
+            for (const stg of goals) {
+                if (stg.id === id) return stg;
+                if (stg.immediateGoals) {
+                    const ig = stg.immediateGoals.find(ig => ig.id === id);
+                    if (ig) return ig;
+                }
+            }
+            return null;
+        };
+
+        // 1. Goals from Template
+        if (selectedTemplate.goals) {
+            selectedTemplate.goals.forEach(g => {
+                if (!seenIds.has(g.id)) {
+                    seenIds.add(g.id);
+                    potentialGoals.push(g);
+                }
+            });
+        }
+
+        // 2. Goals from Program Day
+        if (selectedProgramDay?.goals) {
+            selectedProgramDay.goals.forEach(g => {
+                if (!seenIds.has(g.id)) {
+                    seenIds.add(g.id);
+                    potentialGoals.push(g);
+                }
+            });
+        }
+
+        // 3. Goals from Activities
+        // Extract unique activity IDs from template sections
+        const templateActivityIds = new Set();
+        if (selectedTemplate.template_data?.sections) {
+            selectedTemplate.template_data.sections.forEach(section => {
+                if (section.activities) {
+                    section.activities.forEach(a => {
+                        if (a.activity_id) templateActivityIds.add(a.activity_id);
+                    });
+                }
+            });
+        }
+
+        // Find matching definitions and their goals
+        templateActivityIds.forEach(actId => {
+            const def = activityDefinitions.find(d => d.id === actId);
+            if (def && def.associated_goal_ids) {
+                def.associated_goal_ids.forEach(goalId => {
+                    if (!seenIds.has(goalId)) {
+                        // Find full goal object from goals prop (recursive/nested search)
+                        const goalObj = findGoalById(goalId);
+                        if (goalObj) {
+                            seenIds.add(goalId);
+                            potentialGoals.push(goalObj);
+                        } else {
+                            console.warn(`Goal object not found for ID: ${goalId}`);
+                        }
+                    }
+                });
+            }
+        });
+
+        // 4. Filtering by Program Block
+        if (selectedProgramDay?.block_goal_ids && selectedProgramDay.block_goal_ids.length > 0) {
+            const allowedIds = new Set(selectedProgramDay.block_goal_ids);
+            potentialGoals = potentialGoals.filter(g => allowedIds.has(g.id));
+        }
+
+        return potentialGoals;
+    };
+
+    const associatedGoals = calculateGoals();
+
     return (
         <div style={{ marginTop: '16px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
             Creating: <strong style={{ color: 'var(--color-text-primary)' }}>{selectedTemplate.name}</strong>
             {selectedProgramDay && (
                 <span> from <strong style={{ color: '#2196f3' }}>{selectedProgramDay.program_name}</strong></span>
             )}
-            <br />
-            Associated with{' '}
-            <strong style={{ color: getGoalColor('ShortTermGoal') }}>
-                {selectedGoalIds.length} short term goal{selectedGoalIds.length !== 1 ? 's' : ''}
-            </strong>
-            {immediateGoals.length > 0 && (
-                <span>
-                    {' '}and{' '}
-                    <strong style={{ color: getGoalColor('ImmediateGoal') }}>
-                        {immediateGoals.length} immediate goal{immediateGoals.length !== 1 ? 's' : ''}
-                    </strong>
-                </span>
+
+            {associatedGoals.length > 0 ? (
+                <div style={{ marginTop: '12px', textAlign: 'left', background: 'var(--color-bg-page)', padding: '12px', borderRadius: '6px' }}>
+                    <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '4px', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+                        Associated Goals ({associatedGoals.length})
+                    </div>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                        {associatedGoals.map(goal => (
+                            <li key={goal.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                <span style={{
+                                    width: '8px', height: '8px', borderRadius: '50%',
+                                    background: (goal.smart_status && Object.values(goal.smart_status).every(Boolean)) ? '#f44336' : '#2196f3'
+                                }}></span>
+                                {goal.name}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : (
+                <div style={{ fontSize: '12px', fontStyle: 'italic', marginTop: '12px' }}>
+                    Goals will be automatically associated based on the activities and context.
+                </div>
             )}
         </div>
     );

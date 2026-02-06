@@ -17,6 +17,7 @@ function CreateSessionTemplate() {
 
     const [templates, setTemplates] = useState([]);
     const [activities, setActivities] = useState([]);
+    const [activityGroups, setActivityGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -37,12 +38,14 @@ function CreateSessionTemplate() {
 
     const fetchData = async () => {
         try {
-            const [templatesRes, activitiesRes] = await Promise.all([
+            const [templatesRes, activitiesRes, groupsRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
-                fractalApi.getActivities(rootId)
+                fractalApi.getActivities(rootId),
+                fractalApi.getActivityGroups(rootId)
             ]);
             setTemplates(templatesRes.data);
             setActivities(activitiesRes.data);
+            setActivityGroups(groupsRes.data);
             setLoading(false);
         } catch (err) {
             console.error("Failed to fetch data", err);
@@ -225,6 +228,7 @@ function CreateSessionTemplate() {
                 onSave={handleBuilderSave}
                 editingTemplate={editingTemplate}
                 activities={activities}
+                activityGroups={activityGroups}
                 rootId={rootId}
             />
 

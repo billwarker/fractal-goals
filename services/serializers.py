@@ -289,7 +289,8 @@ def serialize_session_template(template):
         "id": template.id, 
         "name": template.name, 
         "template_data": _safe_load_json(template.template_data, {}),
-        "created_at": format_utc(getattr(template, 'created_at', None))
+        "created_at": format_utc(getattr(template, 'created_at', None)),
+        "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
     }
 
 def serialize_program(program):
@@ -337,6 +338,7 @@ def serialize_program_day(day):
         "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
+        "goals": [serialize_goal(g, include_children=False) for g in day.goals] if hasattr(day, 'goals') else [],
         "is_completed": day.is_completed,
         "sessions": [serialize_session(s) for s in day.completed_sessions if not s.deleted_at]
     }

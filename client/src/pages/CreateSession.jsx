@@ -9,9 +9,7 @@ import {
     SourceSelector,
     ProgramDayPicker,
     TemplatePicker,
-    GoalAssociation,
-    CreateSessionActions,
-    SelectExistingGoalModal
+    CreateSessionActions
 } from '../components/createSession';
 import '../App.css';
 
@@ -35,6 +33,7 @@ function CreateSession() {
     // Data state
     const [templates, setTemplates] = useState([]);
     const [goals, setGoals] = useState([]);
+    const [allGoals, setAllGoals] = useState([]);
     const [programDays, setProgramDays] = useState([]);
     const [programsByName, setProgramsByName] = useState({});
     const [existingImmediateGoals, setExistingImmediateGoals] = useState([]);
@@ -46,15 +45,7 @@ function CreateSession() {
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
-    const [selectedGoalIds, setSelectedGoalIds] = useState([]);
-    const [selectedImmediateGoalIds, setSelectedImmediateGoalIds] = useState([]);
-    const [immediateGoals, setImmediateGoals] = useState([]); // New IGs to create
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
-
-    // Modal state
-    const [showGoalModal, setShowGoalModal] = useState(false);
-    const [showSelectGoalModal, setShowSelectGoalModal] = useState(false);
-    const [creatingGoalForSTG, setCreatingGoalForSTG] = useState(null);
 
     // UI state
     const [loading, setLoading] = useState(true);
@@ -70,15 +61,31 @@ function CreateSession() {
 
     const fetchData = async () => {
         try {
-            const [templatesRes, goalsRes, programDaysRes, activitiesRes, groupsRes] = await Promise.all([
+            const [templatesRes, goalsRes, treeRes, programDaysRes, activitiesRes, groupsRes] = await Promise.all([
                 fractalApi.getSessionTemplates(rootId),
                 fractalApi.getGoalsForSelection(rootId),
+                fractalApi.getGoals(rootId),
                 fractalApi.getActiveProgramDays(rootId),
                 fractalApi.getActivities(rootId),
                 fractalApi.getActivityGroups(rootId)
             ]);
 
             setTemplates(templatesRes.data);
+            setGoals(goalsRes.data || []);
+
+            // Flatten goal tree for comprehensive lookup
+            const flattenGoals = (goal) => {
+                let list = [goal];
+                if (goal.children && goal.children.length > 0) {
+                    goal.children.forEach(child => {
+                        list = [...list, ...flattenGoals(child)];
+                    });
+                }
+                return list;
+            };
+            const fullGoalList = treeRes.data ? flattenGoals(treeRes.data) : [];
+            setAllGoals(fullGoalList);
+
             const allProgramDays = programDaysRes.data || [];
 
             // Deduplicate program days to avoid showing multiple instances of the same training day
@@ -115,26 +122,8 @@ function CreateSession() {
             });
             setProgramsByName(grouped);
 
-            // Set Short Term Goals from optimized endpoint
-            const shortTermGoals = goalsRes.data || [];
-            setGoals(shortTermGoals);
-
-            // Extract all immediate goals for "Select Existing" modal
-            const allImmediateGoals = shortTermGoals.flatMap(stg =>
-                (stg.immediateGoals || []).map(ig => ({
-                    ...ig,
-                    parent_id: stg.id
-                }))
-            );
-            setExistingImmediateGoals(allImmediateGoals);
             setActivityDefinitions(activitiesRes.data || []);
             setActivityGroups(groupsRes.data || []);
-
-            // Pre-select goal from URL if provided
-            const goalIdFromUrl = searchParams.get('goalId');
-            if (goalIdFromUrl && shortTermGoals.some(g => g.id === goalIdFromUrl)) {
-                setSelectedGoalIds([goalIdFromUrl]);
-            }
 
             // Auto-select session source and program if only one option available
             const programNames = Object.keys(grouped);
@@ -220,36 +209,9 @@ function CreateSession() {
         setSelectedProgramSession(null);
     };
 
-    const handleCreateImmediateGoal = (goalData) => {
-        const newGoal = {
-            ...goalData,
-            tempId: crypto.randomUUID(),
-            type: 'ImmediateGoal',
-            isNew: true,
-            parent_id: creatingGoalForSTG?.id || null
-        };
-        setImmediateGoals(prev => [...prev, newGoal]);
-        setShowGoalModal(false);
-        setCreatingGoalForSTG(null);
-    };
-
-    const handleRemoveImmediateGoal = (tempId) => {
-        setImmediateGoals(prev => prev.filter(g => g.tempId !== tempId));
-    };
-
-    const handleOpenCreateGoalModal = (stg) => {
-        setCreatingGoalForSTG(stg);
-        setShowGoalModal(true);
-    };
-
     const handleCreateSession = async () => {
         if (!selectedTemplate) {
             notify.error('Please select a template or program day');
-            return;
-        }
-
-        if (selectedGoalIds.length === 0) {
-            notify.error('Please select at least one short-term goal');
             return;
         }
 
@@ -279,8 +241,6 @@ function CreateSession() {
             const sessionData = {
                 name: selectedTemplate.name,
                 description: selectedTemplate.description || '',
-                parent_ids: selectedGoalIds,
-                immediate_goal_ids: selectedImmediateGoalIds,
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
                 session_start: sessionStart,
                 session_data: {
@@ -304,25 +264,6 @@ function CreateSession() {
 
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSessionId = response.data.id;
-
-            // Create NEW immediate goals in parallel
-            const newImmediateGoals = immediateGoals.filter(g => g.isNew);
-            if (newImmediateGoals.length > 0) {
-                await Promise.all(newImmediateGoals.map(async (goal) => {
-                    const createdGoal = await fractalApi.createGoal(rootId, {
-                        name: goal.name,
-                        description: goal.description || '',
-                        deadline: goal.deadline || null,
-                        type: 'ImmediateGoal',
-                        parent_id: goal.parent_id,
-                        targets: goal.targets || []
-                    });
-
-                    if (createdGoal.data?.id) {
-                        await fractalApi.addSessionGoal(rootId, createdSessionId, createdGoal.data.id, 'immediate');
-                    }
-                }));
-            }
 
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {
@@ -405,65 +346,16 @@ function CreateSession() {
                     />
                 )}
 
-                {/* Step 2: Associate with Goals */}
-                <GoalAssociation
-                    goals={goals}
-                    selectedGoalIds={selectedGoalIds}
-                    selectedImmediateGoalIds={selectedImmediateGoalIds}
-                    immediateGoals={immediateGoals}
-                    onToggleGoal={handleToggleGoal}
-                    onToggleImmediateGoal={handleToggleImmediateGoal}
-                    onRemoveImmediateGoal={handleRemoveImmediateGoal}
-                    onCreateImmediateGoal={handleOpenCreateGoalModal}
-                />
-
                 {/* Step 3: Create Session */}
                 <CreateSessionActions
                     selectedTemplate={selectedTemplate}
                     selectedProgramDay={selectedProgramDay}
-                    selectedGoalIds={selectedGoalIds}
-                    immediateGoals={immediateGoals}
                     creating={creating}
                     onCreateSession={handleCreateSession}
+                    activityDefinitions={activityDefinitions}
+                    goals={allGoals}
                 />
             </div>
-
-            {/* Goal Creation Modal */}
-            <GoalDetailModal
-                isOpen={showGoalModal}
-                onClose={() => {
-                    setShowGoalModal(false);
-                    setCreatingGoalForSTG(null);
-                }}
-                mode="create"
-                onCreate={handleCreateImmediateGoal}
-                parentGoal={creatingGoalForSTG ? {
-                    id: creatingGoalForSTG.id,
-                    name: creatingGoalForSTG.name,
-                    type: 'ShortTermGoal',
-                    attributes: { type: 'ShortTermGoal' }
-                } : null}
-                activityDefinitions={activityDefinitions}
-                activityGroups={activityGroups}
-                rootId={rootId}
-            />
-
-            {/* Select Existing Goal Modal */}
-            <SelectExistingGoalModal
-                isOpen={showSelectGoalModal}
-                existingImmediateGoals={existingImmediateGoals}
-                alreadyAddedGoalIds={immediateGoals.map(g => g.id || g.tempId)}
-                onClose={() => setShowSelectGoalModal(false)}
-                onConfirm={(selectedIds) => {
-                    const goalsToAdd = existingImmediateGoals.filter(g => selectedIds.includes(g.id));
-                    goalsToAdd.forEach(goal => {
-                        if (!immediateGoals.some(g => g.id === goal.id || g.tempId === goal.id)) {
-                            setImmediateGoals(prev => [...prev, { ...goal, tempId: goal.id, isNew: false }]);
-                        }
-                    });
-                    setShowSelectGoalModal(false);
-                }}
-            />
         </div>
     );
 }

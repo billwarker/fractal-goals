@@ -371,11 +371,7 @@ class SessionCreateSchema(BaseModel):
             return v
         return sanitize_string(v)
 
-    @model_validator(mode='after')
-    def check_goal_association(self) -> 'SessionCreateSchema':
-        if not any([self.parent_id, self.parent_ids, self.goal_ids]):
-             raise ValueError("Session must be associated with at least one goal (parent_id, parent_ids, or goal_ids)")
-        return self
+
 
 
 class SessionUpdateSchema(BaseModel):

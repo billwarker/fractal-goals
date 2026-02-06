@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload, subqueryload, selectinload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
-    ActivityDefinition, ProgramDay, ProgramBlock,
+    ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate,
     validate_root_goal, get_all_sessions, get_sessions_for_root,
     get_immediate_goals_for_session, get_session_by_id
 )
@@ -185,16 +185,112 @@ def create_fractal_session(current_user, root_id, validated_data):
         db_session.add(new_session)
         db_session.flush()  # Get the ID before committing
         
-        # Associate with goals via junction table
-        goal_ids = data.get('parent_ids', []) or data.get('goal_ids', [])
-        if data.get('parent_id'):
-            goal_ids.append(data.get('parent_id'))
+        # ----------------------------------------------------------------
+        # AUTOMATIC GOAL INHERITANCE LOGIC
+        # ----------------------------------------------------------------
+        # 1. Gather all potential goal candidates from:
+        #    - Activities in the session (via definition)
+        #    - Session Template (if used)
+        #    - Program Day (if used)
         
-        for goal_id in goal_ids:
-            goal = db_session.query(Goal).filter_by(id=goal_id).first()
-            if goal:
-                goal_type = 'short_term' if goal.type == 'ShortTermGoal' else 'immediate'
-                # Insert into junction table
+        inherited_goals = set()
+        
+        # A. From Activities
+        # Parse activity definitions from session_data
+        activity_def_ids = set()
+        if new_session.attributes:
+            session_dict = models._safe_load_json(new_session.attributes, {})
+            sections = session_dict.get('sections', [])
+            for section in sections:
+                for exercise in section.get('exercises', []):
+                    if exercise.get('activity_id'):
+                        activity_def_ids.add(exercise.get('activity_id'))
+        
+        if activity_def_ids:
+            # Fetch definitions and their associated goals
+            # We need to join to access associated_goals
+            activities = db_session.query(ActivityDefinition).options(
+                joinedload(ActivityDefinition.associated_goals)
+            ).filter(ActivityDefinition.id.in_(activity_def_ids)).all()
+            
+            for act in activities:
+                for goal in act.associated_goals:
+                    if not goal.completed and not goal.deleted_at:
+                        inherited_goals.add(goal)
+
+        # B. From Session Template
+        if new_session.template_id:
+            template = db_session.query(models.SessionTemplate).options(
+                joinedload(models.SessionTemplate.goals)
+            ).filter_by(id=new_session.template_id).first()
+            
+            if template:
+                for goal in template.goals:
+                    if not goal.completed and not goal.deleted_at:
+                        inherited_goals.add(goal)
+        
+        # C. From Program Day
+        program_block_goal_ids = set() # For filtering later
+        if program_day_id:
+            p_day = db_session.query(models.ProgramDay).options(
+                joinedload(models.ProgramDay.goals),
+                joinedload(models.ProgramDay.block)
+            ).filter_by(id=program_day_id).first()
+            
+            if p_day:
+                # Add day's direct goals
+                for goal in p_day.goals:
+                    if not goal.completed and not goal.deleted_at:
+                        inherited_goals.add(goal)
+                
+                # Get block's allowed goals
+                if p_day.block and p_day.block.goal_ids:
+                    # ProgramBlock.goal_ids is a JSON list of IDs
+                    program_block_goal_ids = set(models._safe_load_json(p_day.block.goal_ids, []))
+
+        # ----------------------------------------------------------------
+        # FILTERING
+        # ----------------------------------------------------------------
+        # Filter 1: Program Scope
+        # "For program days, we should be limiting the associations to only be with goals that are within the program"
+        final_goals_to_link = []
+        
+        if program_day_id and program_block_goal_ids:
+            # If in a program context, strict intersection with block goals
+            for goal in inherited_goals:
+                if goal.id in program_block_goal_ids:
+                    final_goals_to_link.append(goal)
+        else:
+            # Otherwise, take all inherited (that are uncompleted)
+             final_goals_to_link = list(inherited_goals)
+
+        # ----------------------------------------------------------------
+        # PERSIST ASOCIATIONS
+        # ----------------------------------------------------------------
+        # Also include any manually passed IDs (if we want to support hybrid, or legacy compat)
+        # Assuming manual IDs override/add to inherited
+        manual_ids = data.get('parent_ids', []) or data.get('goal_ids', [])
+        if data.get('parent_id'):
+            manual_ids.append(data.get('parent_id'))
+            
+        # Deduplicate IDs
+        all_goal_ids_to_link = set(g.id for g in final_goals_to_link)
+        all_goal_ids_to_link.update(manual_ids)
+        
+        for goal_id in all_goal_ids_to_link:
+            # We need to re-fetch or use the goal object to check type if not already known
+            # But we have `final_goals_to_link` objects. For manual_ids we need to fetch.
+            
+            # Optimization: check if already in final_goals_to_link
+            goal_obj = next((g for g in final_goals_to_link if g.id == goal_id), None)
+            
+            if not goal_obj:
+                goal_obj = db_session.query(Goal).filter_by(id=goal_id).first()
+            
+            if goal_obj:
+                goal_type = 'short_term' if goal_obj.type == 'ShortTermGoal' else 'immediate'
+                # Insert if not exists (though insert().values() usually inserts, let's assume standard insert is fine)
+                 # Check existing to prevent PK violation if logic re-runs? (Shouldn't happen on create)
                 db_session.execute(
                     session_goals.insert().values(
                         session_id=new_session.id,
@@ -202,20 +298,26 @@ def create_fractal_session(current_user, root_id, validated_data):
                         goal_type=goal_type
                     )
                 )
-        
-        # Handle immediate goals
+
+        # Handle Immediate Goals (Manual creation is still distinct)
+        # User requirement says "Associate with Goals" section is removed, 
+        # but creating NEW immediate goals might happen elsewhere? 
+        # Assuming we just process what's sent, likely empty list now from frontend.
         immediate_goal_ids = data.get('immediate_goal_ids', [])
         for ig_id in immediate_goal_ids:
             goal = db_session.query(Goal).filter_by(id=ig_id).first()
             if goal and goal.type == 'ImmediateGoal':
-                db_session.execute(
-                    session_goals.insert().values(
-                        session_id=new_session.id,
-                        goal_id=ig_id,
-                        goal_type='immediate'
+                 # Avoid duplicate insert
+                existing = db_session.query(session_goals).filter_by(session_id=new_session.id, goal_id=ig_id).first()
+                if not existing:
+                    db_session.execute(
+                        session_goals.insert().values(
+                            session_id=new_session.id,
+                            goal_id=ig_id,
+                            goal_type='immediate'
+                        )
                     )
-                )
-        
+
         # Update program day completion status if linked to a program day
         if program_day_id:
             from models import ProgramDay

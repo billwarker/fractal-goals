@@ -96,6 +96,22 @@ goal_activity_group_associations = Table(
     Column('created_at', DateTime, default=utc_now)
 )
 
+# Junction table for linking Session Templates to Goals
+session_template_goals = Table(
+    'session_template_goals', Base.metadata,
+    Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, default=utc_now)
+)
+
+# Junction table for linking Program Days to Goals
+program_day_goals = Table(
+    'program_day_goals', Base.metadata,
+    Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, default=utc_now)
+)
+
 class Goal(Base):
     """
     Represents all nodes in the fractal goal tree.
@@ -548,6 +564,14 @@ class SessionTemplate(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)  # Audit trail
     template_data = Column(JSON_TYPE, nullable=False)
     
+    # Associated goals
+    goals = relationship(
+        "Goal",
+        secondary=session_template_goals,
+        backref="session_templates",
+        viewonly=True
+    )
+    
 
 
 
@@ -610,6 +634,14 @@ class ProgramDay(Base):
     block = relationship("ProgramBlock", back_populates="days")
     templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
     completed_sessions = relationship("Session", back_populates="program_day")
+    
+    # Associated goals
+    goals = relationship(
+        "Goal",
+        secondary=program_day_goals,
+        backref="program_days",
+        viewonly=True
+    )
 
     def check_completion(self):
         """Check if all templates have been completed"""
