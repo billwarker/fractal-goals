@@ -98,36 +98,20 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
     newly_completed = []
     
     for target in targets:
-        # Skip already completed targets
+        # Skip already completed
         if target.get('completed'):
             continue
-        
-        activity_id = target.get('activity_id')
-        target_metrics = target.get('metrics', [])
-        
-        if not activity_id or not target_metrics:
-            continue
-        
-        # Check if any instance satisfies this target
-        instances = instances_by_activity.get(activity_id, [])
+            
+        target_type = target.get('type', 'threshold')
         target_achieved = False
         
-        for inst in instances:
-            # Check sets first
-            sets = inst.get('sets', [])
-            if sets:
-                for s in sets:
-                    if _check_metrics_meet_target(target_metrics, s.get('metrics', [])):
-                        target_achieved = True
-                        break
-                if target_achieved:
-                    break
+        if target_type == 'threshold':
+            # Classic logic: Check if CURRENT session meets criteria
+            target_achieved = _evaluate_threshold_target(target, instances_by_activity)
+        elif target_type in ('sum', 'frequency'):
+            # Complex logic: Check if aggregated history meets criteria
+            target_achieved = _evaluate_complex_target(db_session, target, goal, session_id)
             
-            # Check flat metrics
-            if _check_metrics_meet_target(target_metrics, inst.get('metrics', [])):
-                target_achieved = True
-                break
-        
         if target_achieved:
             target['completed'] = True
             target['completed_at'] = format_utc(now)
@@ -140,7 +124,8 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
                 'target_name': target.get('name'),
                 'goal_id': goal.id,
                 'goal_name': goal.name,
-                'session_id': session_id
+                'session_id': session_id,
+                'target_type': target_type
             }))
     
     # Persist updated targets
@@ -161,6 +146,168 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             'auto_completed': True,
             'reason': 'all_targets_achieved'
         }))
+
+
+def _evaluate_threshold_target(target, instances_by_activity):
+    """Evaluate a single-session threshold target."""
+    activity_id = target.get('activity_id')
+    target_metrics = target.get('metrics', [])
+    
+    if not activity_id or not target_metrics:
+        return False
+    
+    instances = instances_by_activity.get(activity_id, [])
+    for inst in instances:
+        # Check sets first
+        sets = inst.get('sets', [])
+        if sets:
+            for s in sets:
+                if _check_metrics_meet_target(target_metrics, s.get('metrics', [])):
+                    return True
+        
+        # Check flat metrics
+        if _check_metrics_meet_target(target_metrics, inst.get('metrics', [])):
+            return True
+            
+    return False
+
+
+def _evaluate_complex_target(db_session, target, goal, current_session_id):
+    """Evaluate accumulation (sum) or frequency targets over a time range."""
+    start_date, end_date = _get_target_date_range(db_session, target)
+    
+    activity_id = target.get('activity_id')
+    if not activity_id:
+        return False
+        
+    # Query relevant activity instances
+    from models import ActivityInstance
+    query = db_session.query(ActivityInstance).filter(
+        ActivityInstance.activity_definition_id == activity_id,
+        ActivityInstance.deleted_at == None
+    )
+    
+    if start_date:
+        query = query.filter(ActivityInstance.created_at >= start_date)
+    if end_date:
+        query = query.filter(ActivityInstance.created_at <= end_date)
+        
+    instances = query.all()
+    
+    if target.get('type') == 'sum':
+        result, value, total_target = _evaluate_sum_target(target, instances)
+        target['current_value'] = value
+        target['target_value'] = total_target
+        target['progress'] = min(100, int((value / total_target * 100))) if total_target > 0 else 0
+        return result
+    elif target.get('type') == 'frequency':
+        result, count = _evaluate_frequency_target(target, instances)
+        target['current_value'] = count
+        target['target_value'] = int(target.get('frequency_count', 0))
+        target['progress'] = min(100, int((count / target['target_value'] * 100))) if target['target_value'] > 0 else 0
+        return result
+        
+    return False
+
+
+def _get_target_date_range(db_session, target):
+    """Resolve start/end dates based on time_scope."""
+    time_scope = target.get('time_scope', 'all_time')
+    
+    if time_scope == 'custom':
+        start = target.get('start_date')
+        end = target.get('end_date')
+        return (
+            datetime.fromisoformat(start) if start else None,
+            datetime.fromisoformat(end) if end else None
+        )
+        
+    elif time_scope == 'program_block':
+        block_id = target.get('linked_block_id')
+        if block_id:
+            from models import ProgramBlock
+            block = db_session.query(ProgramBlock).filter_by(id=block_id).first()
+            if block:
+                # Convert dates to datetimes
+                start = datetime.combine(block.start_date, datetime.min.time()) if block.start_date else None
+                end = datetime.combine(block.end_date, datetime.max.time()) if block.end_date else None
+                return start, end
+                
+    return None, None
+
+
+def _evaluate_sum_target(target, instances):
+    """Sum metric values across all instances and check against target."""
+    target_metrics = target.get('metrics', [])
+    if not target_metrics:
+        return False, 0, 0
+        
+    # Aggegrate actuals
+    # Note: 'Sum' targets usually imply a PRIMARY metric to sum.
+    # If multiple metrics exist, we sum them all?? Or is it an AND condition?
+    # For 'Sum', we usually have one metric like 'Run 100km'.
+    # If there are multiple, let's assume ALL must be met.
+    # We will return the progress of the *first* metric or average?
+    # Let's track the 'lowest' progress to be conservative.
+    
+    totals = {}
+    for inst in instances:
+        # Flatten metrics from sets and instance
+        all_metrics = []
+        if inst.data and isinstance(inst.data, dict) and 'sets' in inst.data:
+             # Add metrics from sets
+             sets = inst.data.get('sets', [])
+             for s in sets:
+                 all_metrics.extend(s.get('metrics', []))
+        
+        # Add instance level metrics (serialized or DB objects?)
+        if inst.metric_values:
+            for mv in inst.metric_values:
+                all_metrics.append({'metric_id': mv.metric_definition_id, 'value': mv.value})
+        
+        # Sum them up
+        for m in all_metrics:
+            mid = m.get('metric_id')
+            val = m.get('value')
+            if mid and val is not None:
+                totals[mid] = totals.get(mid, 0.0) + float(val)
+
+    # Check against targets
+    all_met = True
+    primary_current = 0
+    primary_target = 0
+    
+    for idx, tm in enumerate(target_metrics):
+        mid = tm.get('metric_id')
+        t_val = float(tm.get('value', 0))
+        op = tm.get('operator', '>=')
+        
+        actual = totals.get(mid, 0.0)
+        
+        if idx == 0:
+            primary_current = actual
+            primary_target = t_val
+            
+        if not _check_metric_value(t_val, actual, op):
+            all_met = False
+    
+    return all_met, primary_current, primary_target
+
+
+def _evaluate_frequency_target(target, instances):
+    """Check if enough distinct sessions/days contain the activity."""
+    required_count = int(target.get('frequency_count', 0))
+    if required_count <= 0:
+        return False, 0
+        
+    # Get distinct session IDs
+    session_ids = set()
+    for inst in instances:
+        if inst.session_id:
+            session_ids.add(inst.session_id)
+            
+    count = len(session_ids)
+    return count >= required_count, count
 
 
 @event_bus.on(Events.GOAL_COMPLETED)
@@ -322,6 +469,58 @@ def _check_metrics_meet_target(target_metrics: list, actual_metrics: list) -> bo
             return False
         
         if actual_value < float(target_value):
+            return False
+    
+    return True
+
+
+def _check_metric_value(target_value, actual_value, operator='>='):
+    """Check if actual value meets target value based on operator."""
+    try:
+        t_val = float(target_value)
+        a_val = float(actual_value)
+    except (ValueError, TypeError):
+        return False
+        
+    if operator == '>=':
+        return a_val >= t_val
+    elif operator == '<=':
+        return a_val <= t_val
+    elif operator == '==' or operator == '=':
+        return abs(a_val - t_val) < 0.001  # Float equality with epsilon
+    elif operator == '>':
+        return a_val > t_val
+    elif operator == '<':
+        return a_val < t_val
+    
+    return False
+
+def _check_metrics_meet_target(target_metrics: list, actual_metrics: list) -> bool:
+    """Check if actual metrics meet or exceed all target metrics."""
+    if not target_metrics:
+        return False
+    
+    # Build a map of actual metric values
+    actual_map = {}
+    for m in actual_metrics:
+        metric_id = m.get('metric_id') or m.get('metric_definition_id')
+        if metric_id and m.get('value') is not None:
+            actual_map[metric_id] = m['value']
+    
+    # Check all target metrics are met
+    for tm in target_metrics:
+        metric_id = tm.get('metric_id')
+        target_value = tm.get('value')
+        operator = tm.get('operator', '>=')  # Default to >=
+        
+        if not metric_id or target_value is None:
+            continue
+        
+        actual_value = actual_map.get(metric_id)
+        if actual_value is None:
+            return False
+        
+        if not _check_metric_value(target_value, actual_value, operator):
             return False
     
     return True

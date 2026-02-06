@@ -745,6 +745,7 @@ function GoalDetailModal({
                 rootId={rootId}
                 isEditing={true}
                 viewMode="builder"
+                headerColor="var(--color-text-muted)"
                 initialTarget={targetToEdit}
                 onCloseBuilder={() => {
                     setTargetToEdit(null);

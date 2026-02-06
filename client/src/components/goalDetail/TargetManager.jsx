@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TargetCard from '../TargetCard';
 import notify from '../../utils/notify';
+import { fractalApi } from '../../utils/api';
 
 /**
  * TargetManager Component
@@ -15,6 +16,7 @@ const TargetManager = ({
     associatedActivities,
     isEditing,
     mode,
+    rootId, // Required for fetching programs
     onSave, // Callback to persist changes if needed (e.g. immediate save in view mode)
     // New props for full view mode
     viewMode = 'list', // 'list' | 'builder'
@@ -37,12 +39,34 @@ const TargetManager = ({
     const [targetName, setTargetName] = useState(initialTarget?.name || '');
     const [targetDescription, setTargetDescription] = useState(initialTarget?.description || '');
 
-    // Initialize metrics
+    // Target 2.0 State
+    const [targetType, setTargetType] = useState(initialTarget?.type || 'threshold'); // 'threshold', 'sum', 'frequency'
+    const [timeScope, setTimeScope] = useState(initialTarget?.time_scope || 'all_time'); // 'all_time', 'custom', 'program_block'
+    const [startDate, setStartDate] = useState(initialTarget?.start_date || '');
+    const [endDate, setEndDate] = useState(initialTarget?.end_date || '');
+    const [linkedBlockId, setLinkedBlockId] = useState(initialTarget?.linked_block_id || '');
+    const [frequencyCount, setFrequencyCount] = useState(initialTarget?.frequency_count || 1);
+
+    const [programs, setPrograms] = useState([]);
+
+    // Fetch Programs for Block Selection
+    useEffect(() => {
+        if (timeScope === 'program_block' && rootId && programs.length === 0) {
+            fractalApi.getPrograms(rootId).then(res => {
+                setPrograms(res.data || []);
+            }).catch(err => console.error("Failed to fetch programs", err));
+        }
+    }, [timeScope, rootId, programs.length]);
+
+    // Initialize metrics with operators
     const [metricValues, setMetricValues] = useState(() => {
         const metricsObj = {};
         if (initialTarget?.metrics) {
             initialTarget.metrics.forEach(m => {
-                metricsObj[m.metric_id] = m.value;
+                metricsObj[m.metric_id] = {
+                    value: m.value,
+                    operator: m.operator || '>='
+                };
             });
         }
         return metricsObj;
@@ -65,8 +89,13 @@ const TargetManager = ({
         setTargetName('');
         setTargetDescription('');
         setMetricValues({});
-        // If parent controls view (onOpenBuilder provided), only call parent
-        // Otherwise use internal state
+        setTargetType('threshold');
+        setTimeScope('all_time');
+        setStartDate('');
+        setEndDate('');
+        setLinkedBlockId('');
+        setFrequencyCount(1);
+
         if (onOpenBuilder) {
             onOpenBuilder(null);
         } else {
@@ -79,16 +108,24 @@ const TargetManager = ({
         setSelectedActivityId(target.activity_id || '');
         setTargetName(target.name || '');
         setTargetDescription(target.description || '');
+        setTargetType(target.type || 'threshold');
+        setTimeScope(target.time_scope || 'all_time');
+        setStartDate(target.start_date || '');
+        setEndDate(target.end_date || '');
+        setLinkedBlockId(target.linked_block_id || '');
+        setFrequencyCount(target.frequency_count || 1);
 
         const metricsObj = {};
         if (target.metrics) {
             target.metrics.forEach(m => {
-                metricsObj[m.metric_id] = m.value;
+                metricsObj[m.metric_id] = {
+                    value: m.value,
+                    operator: m.operator || '>='
+                };
             });
         }
         setMetricValues(metricsObj);
-        // If parent controls view (onOpenBuilder provided), only call parent
-        // Otherwise use internal state
+
         if (onOpenBuilder) {
             onOpenBuilder(target);
         } else {
@@ -105,10 +142,13 @@ const TargetManager = ({
         }
     };
 
-    const handleMetricChange = (metricId, value) => {
+    const handleMetricChange = (metricId, field, value) => {
         setMetricValues(prev => ({
             ...prev,
-            [metricId]: value
+            [metricId]: {
+                ...prev[metricId],
+                [field]: value
+            }
         }));
     };
 
@@ -118,9 +158,10 @@ const TargetManager = ({
             return;
         }
 
-        const metrics = Object.entries(metricValues).map(([metric_id, value]) => ({
+        const metrics = Object.entries(metricValues).map(([metric_id, data]) => ({
             metric_id,
-            value: parseFloat(value) || 0
+            value: parseFloat(data.value) || 0,
+            operator: data.operator || '>='
         }));
 
         const target = {
@@ -128,6 +169,12 @@ const TargetManager = ({
             activity_id: selectedActivityId,
             name: targetName || selectedActivity?.name || 'Unnamed Target',
             description: targetDescription,
+            type: targetType,
+            time_scope: timeScope,
+            start_date: startDate,
+            end_date: endDate,
+            linked_block_id: linkedBlockId,
+            frequency_count: parseInt(frequencyCount) || 1,
             metrics
         };
 
@@ -309,6 +356,102 @@ const TargetManager = ({
                     />
                 </div>
 
+                {/* Target Type Selector */}
+                <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        Target Type
+                    </label>
+                    <div style={{ display: 'flex', gap: '4px', background: 'var(--color-bg-input)', padding: '2px', borderRadius: '6px' }}>
+                        {['threshold', 'sum', 'frequency'].map(type => (
+                            <button
+                                key={type}
+                                onClick={() => setTargetType(type)}
+                                style={{
+                                    flex: 1,
+                                    padding: '6px',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    background: targetType === type ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: targetType === type ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: targetType === type ? 600 : 400,
+                                    boxShadow: targetType === type ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                }}
+                            >
+                                {type === 'threshold' ? 'Single Session' : type === 'sum' ? 'Accumulate' : 'Consistency'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Time Scope & Frequency */}
+                {(targetType === 'sum' || targetType === 'frequency') && (
+                    <div style={{ background: 'var(--color-bg-card-hover)', padding: '12px', borderRadius: '6px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                            Time Scope
+                        </label>
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                                <input type="radio" checked={timeScope === 'all_time'} onChange={() => setTimeScope('all_time')} />
+                                All Time
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                                <input type="radio" checked={timeScope === 'program_block'} onChange={() => setTimeScope('program_block')} />
+                                Program Block
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                                <input type="radio" checked={timeScope === 'custom'} onChange={() => setTimeScope('custom')} />
+                                Custom Dates
+                            </label>
+                        </div>
+
+                        {timeScope === 'program_block' && (
+                            <div style={{ marginBottom: '10px' }}>
+                                <select
+                                    value={linkedBlockId}
+                                    onChange={(e) => setLinkedBlockId(e.target.value)}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                >
+                                    <option value="">Select a Block...</option>
+                                    {programs.map(prog => (
+                                        <optgroup key={prog.id} label={prog.name}>
+                                            {prog.blocks?.map(block => (
+                                                <option key={block.id} value={block.id}>{block.name} ({block.start_date || '?'} - {block.end_date || '?'})</option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {timeScope === 'custom' && (
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '11px', color: '#aaa', display: 'block' }}>Start Date</label>
+                                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '11px', color: '#aaa', display: 'block' }}>End Date</label>
+                                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }} />
+                                </div>
+                            </div>
+                        )}
+
+                        {targetType === 'frequency' && (
+                            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
+                                <label style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Required Sessions Count</label>
+                                <input
+                                    type="number"
+                                    value={frequencyCount}
+                                    onChange={e => setFrequencyCount(e.target.value)}
+                                    style={{ marginLeft: '10px', width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Metric Values */}
                 {selectedActivity && selectedActivity.metric_definitions?.length > 0 && (
                     <div>
@@ -337,10 +480,30 @@ const TargetManager = ({
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {/* Operator Selector */}
+                                        <select
+                                            value={metricValues[metric.id]?.operator || '>='}
+                                            onChange={(e) => handleMetricChange(metric.id, 'operator', e.target.value)}
+                                            style={{
+                                                padding: '6px',
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-border)',
+                                                borderRadius: '4px',
+                                                color: 'var(--color-text-primary)',
+                                                fontSize: '13px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value=">=">≥</option>
+                                            <option value=">">&gt;</option>
+                                            <option value="<=">≤</option>
+                                            <option value="<">&lt;</option>
+                                            <option value="==">=</option>
+                                        </select>
                                         <input
                                             type="number"
-                                            value={metricValues[metric.id] || ''}
-                                            onChange={(e) => handleMetricChange(metric.id, e.target.value)}
+                                            value={metricValues[metric.id]?.value || ''}
+                                            onChange={(e) => handleMetricChange(metric.id, 'value', e.target.value)}
                                             placeholder="0"
                                             style={{
                                                 width: '70px',

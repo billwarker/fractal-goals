@@ -27,8 +27,16 @@ export const isTargetAchieved = (target, activityInstance) => {
                 const setMetric = set.metrics.find(m => m.metric_id === targetMetric.metric_id);
                 if (!setMetric || setMetric.value == null) return false;
 
-                // Check if the set metric value meets or exceeds the target
-                return setMetric.value >= targetMetric.value;
+                const operator = targetMetric.operator || '>=';
+                const tVal = parseFloat(targetMetric.value);
+                const sVal = parseFloat(setMetric.value);
+
+                if (operator === '>=') return sVal >= tVal;
+                if (operator === '>') return sVal > tVal;
+                if (operator === '<=') return sVal <= tVal;
+                if (operator === '<') return sVal < tVal;
+                if (operator === '==') return Math.abs(sVal - tVal) < 0.001;
+                return sVal >= tVal; // Default
             });
         });
     }
@@ -39,8 +47,16 @@ export const isTargetAchieved = (target, activityInstance) => {
             const instanceMetric = activityInstance.metrics.find(m => m.metric_id === targetMetric.metric_id);
             if (!instanceMetric || instanceMetric.value == null) return false;
 
-            // Check if the instance metric value meets or exceeds the target
-            return instanceMetric.value >= targetMetric.value;
+            const operator = targetMetric.operator || '>=';
+            const tVal = parseFloat(targetMetric.value);
+            const iVal = parseFloat(instanceMetric.value);
+
+            if (operator === '>=') return iVal >= tVal;
+            if (operator === '>') return iVal > tVal;
+            if (operator === '<=') return iVal <= tVal;
+            if (operator === '<') return iVal < tVal;
+            if (operator === '==') return Math.abs(iVal - tVal) < 0.001;
+            return iVal >= tVal; // Default
         });
     }
 

@@ -151,6 +151,19 @@ class Goal(Base):
     track_activities = Column(Boolean, default=True)
 
     # JSON Plans/Targets
+    # Schema:
+    # {
+    #   "type": "threshold" | "sum" | "frequency",
+    #   "time_scope": "all_time" | "custom" | "program_block",
+    #   "start_date": "ISO8601",
+    #   "end_date": "ISO8601",
+    #   "linked_block_id": "uuid",
+    #   "frequency_days": 7,
+    #   "frequency_count": 3,
+    #   "metrics": [
+    #     { "metric_id": "...", "value": 10, "operator": ">=" }
+    #   ]
+    # }
     targets = Column(JSON_TYPE, nullable=True)
     
     __table_args__ = (

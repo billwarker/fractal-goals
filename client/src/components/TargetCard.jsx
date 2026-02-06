@@ -169,6 +169,32 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 </div>
             </div>
 
+            {/* Progress Bar for Accumulation/Frequency */}
+            {(target.type === 'sum' || target.type === 'frequency') && (
+                <div style={{ paddingLeft: '28px', marginTop: '6px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                        <span>Progress</span>
+                        <span>
+                            {target.current_value !== undefined ? target.current_value : 0} / {target.target_value || target.metrics?.[0]?.value || '?'}
+                        </span>
+                    </div>
+                    <div style={{ height: '6px', width: '100%', background: 'var(--color-bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${Math.min(100, target.progress || 0)}%`,
+                            background: isCompleted ? '#4caf50' : 'var(--color-primary)',
+                            borderRadius: '3px',
+                            transition: 'width 0.5s ease-out'
+                        }} />
+                    </div>
+                    {target.time_scope === 'program_block' && (
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
+                            Linked to Program Block
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Target metrics */}
             <div style={{
                 display: 'flex',
@@ -179,6 +205,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 {target.metrics?.map(metric => {
                     const metricDef = activityDef.metric_definitions?.find(m => m.id === metric.metric_id);
                     if (!metricDef) return null;
+
+                    const operator = metric.operator || '>=';
 
                     return (
                         <div
@@ -191,7 +219,9 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 fontSize: '12px'
                             }}
                         >
-                            <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}:</span>
+                            <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}</span>
+                            {' '}
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
                             {' '}
                             <span style={{ fontWeight: 'bold', color: isCompleted ? '#4caf50' : 'var(--color-text-primary)' }}>
                                 {metric.value} {metricDef.unit}
