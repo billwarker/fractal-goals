@@ -157,6 +157,7 @@ def update_preferences(current_user, validated_data):
 @auth_bp.route('/account/password', methods=['PUT'])
 @token_required
 @validate_request(UserPasswordUpdateSchema)
+@limiter.limit("5 per minute")  # Strict limit for password changes
 def update_password(current_user, validated_data):
     """Update user password."""
     engine = models.get_engine()
@@ -181,6 +182,7 @@ def update_password(current_user, validated_data):
 @auth_bp.route('/account/email', methods=['PUT'])
 @token_required
 @validate_request(UserEmailUpdateSchema)
+@limiter.limit("5 per minute")  # Strict limit for email changes
 def update_email(current_user, validated_data):
     """Update user email."""
     engine = models.get_engine()
@@ -210,6 +212,7 @@ def update_email(current_user, validated_data):
 @auth_bp.route('/account', methods=['DELETE'])
 @token_required
 @validate_request(UserDeleteSchema)
+@limiter.limit("3 per minute")  # Very strict limit for account deletion
 def delete_account(current_user, validated_data):
     """Delete user account."""
     engine = models.get_engine()

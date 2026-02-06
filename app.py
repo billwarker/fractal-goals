@@ -63,20 +63,35 @@ if config.RATELIMIT_STORAGE_URI and config.RATELIMIT_STORAGE_URI != "memory://":
     limiter._storage_uri = config.RATELIMIT_STORAGE_URI
 
 # Initialize Security Headers (Talisman)
-# In development, we disable HTTPS enforcement to allow localhost:8001
-# CSP is set to flexible defaults for now to prevent breaking React Dev Tools
-csp = {
-    'default-src': '\'self\'',
-    'script-src': ['\'self\'', '\'unsafe-inline\'', '\'unsafe-eval\''], # Needed for Vite/React Dev
-    'style-src': ['\'self\'', '\'unsafe-inline\''],
-    'img-src': ['\'self\'', 'data:', 'https:'],
-    'connect-src': ['\'self\'', 'http://localhost:5173', 'https://*.fractalgoals.com'] # Allow frontend dev server
-}
+# In development, we allow unsafe-eval and unsafe-inline for Vite HMR and React DevTools
+# In production, we use a stricter CSP
+if config.ENV == 'production':
+    csp = {
+        'default-src': "'self'",
+        'script-src': ["'self'"],  # No unsafe-inline or unsafe-eval in production
+        'style-src': ["'self'", "'unsafe-inline'"],  # Inline styles still needed for React
+        'img-src': ["'self'", 'data:', 'https:'],
+        'connect-src': ["'self'", 'https://*.fractalgoals.com', 'https://*.sentry.io'],
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'frame-ancestors': "'none'",
+        'base-uri': "'self'",
+        'form-action': "'self'"
+    }
+else:
+    # Development CSP - more permissive for dev tools
+    csp = {
+        'default-src': "'self'",
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  # Needed for Vite/React Dev
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'connect-src': ["'self'", 'http://localhost:5173', 'ws://localhost:5173']  # Allow Vite HMR
+    }
 
 Talisman(
     app, 
     force_https=config.ENV == 'production',
-    content_security_policy=csp
+    content_security_policy=csp,
+    content_security_policy_nonce_in=['script-src'] if config.ENV == 'production' else []
 )
 
 # Configure logging
