@@ -56,6 +56,16 @@ def serialize_activity_instance(instance):
     data_dict = _safe_load_json(instance.data, {})
     metric_values_list = [serialize_metric_value(m) for m in instance.metric_values]
     
+    # Build full group path (e.g., "Pull > Horizontal")
+    group_path = None
+    if instance.definition and instance.definition.group:
+        path_parts = []
+        current_group = instance.definition.group
+        while current_group:
+            path_parts.insert(0, current_group.name)
+            current_group = current_group.parent if hasattr(current_group, 'parent') else None
+        group_path = " > ".join(path_parts) if path_parts else None
+    
     return {
         "id": instance.id,
         "session_id": instance.session_id,
@@ -63,7 +73,7 @@ def serialize_activity_instance(instance):
         "activity_definition_id": instance.activity_definition_id,
         "name": instance.definition.name if instance.definition else "Unknown",
         "definition_name": instance.definition.name if instance.definition else "Unknown",
-        "group_name": instance.definition.group.name if instance.definition and instance.definition.group else None,
+        "group_name": group_path,  # Now includes full path
         "created_at": format_utc(instance.created_at),
         "time_start": format_utc(instance.time_start),
         "time_stop": format_utc(instance.time_stop),
