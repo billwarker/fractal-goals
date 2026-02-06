@@ -227,3 +227,57 @@
 .createFirstBtn:hover {
     background: #45a049;
 }
+
+/* Drag-and-Drop Styles */
+.dropZone {
+    min-height: 60px;
+    border: 2px dashed transparent;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.dropZoneActive {
+    border-color: var(--color-brand-success);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.dropZoneActive::before {
+    content: 'Drop activity here';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--color-brand-success);
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* When group has activities, show subtle indicator */
+.dropZoneActive .grid {
+    opacity: 0.7;
+}
+
+/* Ungrouped drop zone */
+.ungroupedDropZone {
+    border: 2px dashed transparent;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.2s ease;
+}
+
+.ungroupedDropZoneActive {
+    border-color: var(--color-brand-primary);
+    background: rgba(158, 85, 255, 0.1);
+}
+
+/* Empty group drop target */
+.emptyGroupDropTarget {
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

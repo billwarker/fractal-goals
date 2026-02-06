@@ -126,3 +126,19 @@
 .deleteBtn:hover {
     background: #b71c1c;
 }
+
+/* Drag-and-drop styles */
+.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: var(--color-brand-primary);
+}
+
+.card[draggable="true"] {
+    cursor: grab;
+}
+
+.card[draggable="true"]:active {
+    cursor: grabbing;
+}

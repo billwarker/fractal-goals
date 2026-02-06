@@ -16,7 +16,7 @@ import styles from './ManageActivities.module.css'; // Import CSS Module
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, createActivity, deleteActivity, loading, error: contextError,
+    const { activities, fetchActivities, createActivity, updateActivity, deleteActivity, loading, error: contextError,
         activityGroups, fetchActivityGroups, deleteActivityGroup, reorderActivityGroups } = useActivities();
     const { useSessionsQuery } = useSessions();
 
@@ -36,6 +36,10 @@ function ManageActivities() {
 
     // Collapsed state for groups (Set of group IDs)
     const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+
+    // Drag-and-drop state
+    const [draggingActivityId, setDraggingActivityId] = useState(null);
+    const [dragOverGroupId, setDragOverGroupId] = useState(null);
 
     useEffect(() => {
         if (!rootId) {
@@ -224,6 +228,73 @@ function ManageActivities() {
         setShowBuilder(true);
     };
 
+    // Drag-and-drop handlers
+    const handleDragStart = (activityId) => {
+        setDraggingActivityId(activityId);
+    };
+
+    const handleDragEnd = () => {
+        setDraggingActivityId(null);
+        setDragOverGroupId(null);
+    };
+
+    const handleDragOver = (e, groupId) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent bubbling to parent groups
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverGroupId !== groupId) {
+            setDragOverGroupId(groupId);
+        }
+    };
+
+    const handleDragLeave = (e) => {
+        // Only clear if we're leaving the drop zone entirely
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDragOverGroupId(null);
+        }
+    };
+
+    const handleDrop = async (e, targetGroupId) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent bubbling to parent groups
+
+        const activityId = e.dataTransfer.getData('activityId');
+        console.log('Drop event:', { activityId, targetGroupId });
+
+        if (!activityId) {
+            console.log('No activity ID in dataTransfer');
+            return;
+        }
+
+        // Find the activity to check current group
+        const activity = activities.find(a => a.id === activityId);
+        console.log('Found activity:', activity);
+
+        // Check if already in the target group (handle null for ungrouped)
+        const currentGroupId = activity?.group_id || null;
+        const normalizedTargetGroupId = targetGroupId || null;
+
+        if (!activity || currentGroupId === normalizedTargetGroupId) {
+            console.log('Activity not found or already in target group');
+            setDraggingActivityId(null);
+            setDragOverGroupId(null);
+            return;
+        }
+
+        try {
+            console.log('Calling updateActivity:', { rootId, activityId, group_id: normalizedTargetGroupId });
+            await updateActivity(rootId, activityId, { group_id: normalizedTargetGroupId });
+            console.log('Activity moved successfully');
+        } catch (err) {
+            console.error('Failed to move activity:', err);
+            console.error('Error response:', err.response?.data);
+            setError('Failed to move activity to group');
+        }
+
+        setDraggingActivityId(null);
+        setDragOverGroupId(null);
+    };
+
     if (loading) {
         return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading activities...</div>;
     }
@@ -231,6 +302,7 @@ function ManageActivities() {
     // Recursive Group Renderer
     const renderGroup = (group, level = 0) => {
         const isCollapsed = collapsedGroups.has(group.id);
+        const isDragOver = dragOverGroupId === group.id;
 
         // Find children groups
         const childrenGroups = activityGroups.filter(g => g.parent_id === group.id)
@@ -244,7 +316,7 @@ function ManageActivities() {
         return (
             <div
                 key={group.id}
-                className={styles.groupContainer}
+                className={`${styles.groupContainer} ${styles.dropZone} ${isDragOver ? styles.dropZoneActive : ''}`}
                 style={{
                     marginBottom: isRoot ? '40px' : '20px',
                     marginLeft: isRoot ? 0 : '24px',
@@ -252,6 +324,9 @@ function ManageActivities() {
                     backgroundColor: isRoot ? 'var(--color-bg-card-alt)' : 'transparent',
                     padding: isRoot ? '24px' : '12px 0 12px 12px'
                 }}
+                onDragOver={(e) => handleDragOver(e, group.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, group.id)}
             >
                 <div className={styles.groupHeader}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -307,7 +382,7 @@ function ManageActivities() {
 
                         {/* Render Activities */}
                         {groupActivities.length > 0 ? (
-                            <div className={styles.grid}>
+                            <div className={styles.grid} onDragEnd={handleDragEnd}>
                                 {groupActivities.map(activity => (
                                     <ActivityCard
                                         key={activity.id}
@@ -317,13 +392,15 @@ function ManageActivities() {
                                         onDuplicate={handleDuplicate}
                                         onDelete={handleDeleteClick}
                                         isCreating={creating}
+                                        onDragStart={handleDragStart}
+                                        isDragging={draggingActivityId === activity.id}
                                     />
                                 ))}
                             </div>
                         ) : (
                             childrenGroups.length === 0 && (
-                                <div className={styles.emptyGroupState} style={{ padding: '15px' }}>
-                                    No activities in this group
+                                <div className={`${styles.emptyGroupState} ${styles.emptyGroupDropTarget}`} style={{ padding: '15px' }}>
+                                    {isDragOver ? 'Drop activity here' : 'No activities in this group'}
                                 </div>
                             )
                         )}
@@ -373,29 +450,39 @@ function ManageActivities() {
                 {/* 1. Render Root Activity Groups (recursively renders children) */}
                 {rootGroups.map(group => renderGroup(group))}
 
-                {/* 2. Render Ungrouped Activities */}
-                {activities.some(a => !a.group_id) && (
-                    <div className={`${styles.ungroupedSection} ${rootGroups.length === 0 ? styles.noGroups : ''}`}>
-                        {rootGroups.length > 0 && (
-                            <h3 className={styles.ungroupedTitle}>
-                                Ungrouped Activities
-                            </h3>
-                        )}
-                        <div className={styles.grid}>
-                            {activities.filter(a => !a.group_id).map(activity => (
-                                <ActivityCard
-                                    key={activity.id}
-                                    activity={activity}
-                                    lastInstantiated={getLastInstantiated(activity.id)}
-                                    onEdit={handleEditClick}
-                                    onDuplicate={handleDuplicate}
-                                    onDelete={handleDeleteClick}
-                                    isCreating={creating}
-                                />
-                            ))}
-                        </div>
+                {/* 2. Render Ungrouped Activities - also serves as drop zone */}
+                <div
+                    className={`${styles.ungroupedSection} ${rootGroups.length === 0 ? styles.noGroups : ''} ${styles.ungroupedDropZone} ${dragOverGroupId === 'ungrouped' ? styles.ungroupedDropZoneActive : ''}`}
+                    onDragOver={(e) => handleDragOver(e, 'ungrouped')}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, null)}
+                >
+                    {rootGroups.length > 0 && (
+                        <h3 className={styles.ungroupedTitle}>
+                            {dragOverGroupId === 'ungrouped' ? '📥 Drop here to ungroup' : 'Ungrouped Activities'}
+                        </h3>
+                    )}
+                    <div className={styles.grid} onDragEnd={handleDragEnd}>
+                        {activities.filter(a => !a.group_id).map(activity => (
+                            <ActivityCard
+                                key={activity.id}
+                                activity={activity}
+                                lastInstantiated={getLastInstantiated(activity.id)}
+                                onEdit={handleEditClick}
+                                onDuplicate={handleDuplicate}
+                                onDelete={handleDeleteClick}
+                                isCreating={creating}
+                                onDragStart={handleDragStart}
+                                isDragging={draggingActivityId === activity.id}
+                            />
+                        ))}
                     </div>
-                )}
+                    {activities.filter(a => !a.group_id).length === 0 && rootGroups.length > 0 && (
+                        <div className={styles.emptyGroupState} style={{ padding: '15px', marginTop: '10px' }}>
+                            {dragOverGroupId === 'ungrouped' ? 'Drop activity here to ungroup' : 'Drag activities here to ungroup'}
+                        </div>
+                    )}
+                </div>
 
                 {/* Empty State (No activities and no groups) */}
                 {activities.length === 0 && rootGroups.length === 0 && (

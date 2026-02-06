@@ -4,8 +4,18 @@ import styles from './ActivityCard.module.css';
 
 /**
  * Activity Card Component - Display activity as a tile
+ * Supports drag-and-drop to move between groups
  */
-function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelete, isCreating }) {
+function ActivityCard({
+    activity,
+    lastInstantiated,
+    onEdit,
+    onDuplicate,
+    onDelete,
+    isCreating,
+    onDragStart,
+    isDragging
+}) {
     const formatLastUsed = (timestamp) => {
         if (!timestamp) return 'Never used';
 
@@ -28,11 +38,19 @@ function ActivityCard({ activity, lastInstantiated, onEdit, onDuplicate, onDelet
         return `${years} year${years !== 1 ? 's' : ''} ago`;
     };
 
+    const handleDragStart = (e) => {
+        e.dataTransfer.setData('activityId', activity.id);
+        e.dataTransfer.effectAllowed = 'move';
+        if (onDragStart) onDragStart(activity.id);
+    };
+
     return (
         <div
-            className={`${styles.card} ${styles.clickableCard}`}
+            className={`${styles.card} ${styles.clickableCard} ${isDragging ? styles.dragging : ''}`}
             onClick={() => onEdit(activity)}
-            style={{ cursor: 'pointer' }}
+            draggable="true"
+            onDragStart={handleDragStart}
+            style={{ cursor: 'grab' }}
         >
             {/* Header */}
             <div>
