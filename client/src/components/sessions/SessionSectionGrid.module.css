@@ -1,0 +1,36 @@
+/* SessionSectionGrid Styles - Extracted from Sessions.module.css */
+
+.sectionsGrid {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.sectionColumn {
+    background: var(--color-bg-card-alt);
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--color-brand-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+.sectionHeader {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sectionDuration {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 12px;
+}
+
+.exercisesList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}

@@ -1,0 +1,152 @@
+/* ExerciseCard Styles - Extracted from Sessions.module.css */
+
+/* Exercises (Loop) */
+.exerciseCard {
+    padding: 8px;
+    background: var(--color-bg-card);
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+    border: none;
+}
+
+.exerciseCardActivity {
+    border: 1px solid #33691e;
+}
+
+.exerciseHeader {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.completionIcon {
+    font-size: 14px;
+    margin-top: 2px;
+    color: #666;
+}
+
+.completionIconCompleted {
+    color: var(--color-brand-success);
+}
+
+.exerciseTitleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.exerciseName {
+    font-weight: 500;
+    color: var(--color-text-primary);
+    text-decoration: none;
+}
+
+.activityDuration {
+    font-size: 11px;
+    color: var(--color-brand-success);
+    font-weight: bold;
+    font-family: monospace;
+}
+
+/* Activity Data / Metrics */
+.activityData {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.setsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: 2px solid #333;
+    margin-top: 6px;
+}
+
+.setRow {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.setLabel {
+    color: #666;
+    font-size: 11px;
+    width: 40px;
+}
+
+.setLabelWithTopPadding {
+    padding-top: 2px;
+}
+
+.metricsGroup {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.splitGroup {
+    background: var(--color-bg-secondary);
+    padding: 6px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+}
+
+.splitHeader {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.splitMetricsList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metricItem {
+    display: flex;
+    gap: 4px;
+}
+
+.metricName {
+    color: var(--color-text-muted);
+}
+
+.metricValue {
+    font-weight: bold;
+}
+
+.singleMetricsContainer {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.metricBadge {
+    display: flex;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.metricBadgeLabel {
+    color: var(--color-text-muted);
+}
+
+.description {
+    font-size: 11px;
+    color: #888;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.notes {
+    font-size: 11px;
+    color: var(--color-brand-success);
+    font-style: italic;
+}
