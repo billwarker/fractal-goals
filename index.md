@@ -1116,9 +1116,18 @@ From `/my-implementation-plans/features.txt`:
   - Updated `notes` table schema to support polymorphic associations (`context_type`, `context_id`) and specific foreign keys (`activity_instance_id`, `set_index`).
   - Fixed database migration mismatch in development environment (`migrate_notes_schema_dev.py`).
   - Integrated notes synchronization across SessionDetail and SidePane.
-- **Backend Performance:** Optimized `get_session_activities` with eager loading to eliminate N+1 queries. Removed dead code `sync_session_activities`.
-- **Frontend Performance:** Refactored `CreateSession.jsx` to parallelize immediate goal creation requests using `Promise.all`.
-- **Data Fetching Optimization:** Addressed inefficient data loading in `CreateSession.jsx` by implementing a dedicated `goals/selection` endpoint that fetches only active Short-Term and Immediate goals, avoiding full-tree traversal.
+## Project Status
+Fractal Goals is currently in active development. The core fractal goal structure (Ultimate -> Nano) is implemented, along with sessions, program management, and settings.
+Recent focus has been on:
+- **Session Creation**: Auto-associating goals based on template activities and program context.
+- **UI Refinement**: Improving the "Create Session" flow with dynamic goal colors (user-configurable) and "Smart Ring" visualizations.
+- **Performance**: Optimizing database queries and eagerness.
+
+## Recent Changes
+- **Goal Association**: Moved from manual selection to automatic inheritance logic in `sessions_api.py`.
+- **UI Layout**: Reordered Create Session page to prioritize the Create button while showing detailed associated goals below.
+- **Visuals**: Added Smart Goal "bullseye" rings and dynamic coloring based on user settings (`ThemeContext`).
+- **Database**: Added `block_goal_ids` to `ProgramDay` for tighter scoping.al.
 - **Session Display:** Updated `Sessions.jsx` duration calculation to prioritize the difference between Session End and Session Start times, resolving a discrepancy where the displayed duration did not match the visual timeframe.
 - **Goal Detail Display:** Limited the number of practice sessions shown in `GoalDetailModal` (and Sidebar) to the most recent 5, with a count for additional sessions, improving load times and visual clutter.
 - **Refactor "Practice Session" -> "Session" API:** Removed "practice" prefix from UI text, standardizing terminology to "Session" across the application (Sidebar, Modals, Pages, CSS).

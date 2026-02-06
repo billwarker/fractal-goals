@@ -83,6 +83,9 @@ def serialize_goal(goal, include_children=True):
     result = {
         "name": goal.name,
         "id": goal.id,
+        "type": goal.type,  # Hoist type to top level for frontend convenience
+        "is_smart": all(smart_status.values()),
+        "smart_status": smart_status,
         "description": goal.description,
         "deadline": format_utc(goal.deadline),
         "attributes": {
