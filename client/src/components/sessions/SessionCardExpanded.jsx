@@ -15,56 +15,32 @@ import SessionSectionGrid from './SessionSectionGrid';
 import styles from './SessionCardExpanded.module.css';
 
 /**
- * Goals section - displays short-term and immediate goals
+ * Goals section - displays all associated goals
  */
 const GoalsSection = memo(function GoalsSection({
-    shortTermGoals,
-    immediateGoals,
+    allGoals,
     getGoalColor
 }) {
-    if (shortTermGoals.length === 0 && immediateGoals.length === 0) {
+    if (allGoals.length === 0) {
         return null;
     }
 
     return (
         <div className={styles.goalsSection}>
-            {/* Short-Term Goals Group */}
-            {shortTermGoals.length > 0 && (
-                <div className={styles.goalsColumn}>
-                    <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
-                        Short-Term Goals
-                    </div>
-                    <div className={styles.goalsList}>
-                        {shortTermGoals.map(goal => (
-                            <div
-                                key={goal.id}
-                                className={styles.goalTag}
-                                style={{
-                                    border: `1px solid ${getGoalColor('ShortTermGoal')}`,
-                                    color: getGoalColor('ShortTermGoal')
-                                }}
-                            >
-                                {goal.name}
-                            </div>
-                        ))}
-                    </div>
+            <div className={styles.goalsColumn}>
+                <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
+                    Associated Goals
                 </div>
-            )}
-
-            {/* Immediate Goals Group */}
-            {immediateGoals.length > 0 && (
-                <div className={styles.goalsColumn}>
-                    <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
-                        Immediate Goals
-                    </div>
-                    <div className={styles.goalsList}>
-                        {immediateGoals.map(goal => (
+                <div className={styles.goalsList}>
+                    {allGoals.map(goal => {
+                        const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
+                        return (
                             <div
                                 key={goal.id}
                                 className={`${styles.goalTag} ${(goal.completed || goal.attributes?.completed) ? styles.goalTagCompleted : ''}`}
                                 style={{
-                                    border: `1px solid ${getGoalColor('ImmediateGoal')}`,
-                                    color: getGoalColor('ImmediateGoal')
+                                    border: `1px solid ${goalColor}`,
+                                    color: goalColor
                                 }}
                             >
                                 {goal.name}
@@ -72,10 +48,10 @@ const GoalsSection = memo(function GoalsSection({
                                     <span className={styles.checkMark}>✓</span>
                                 )}
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
         </div>
     );
 });
@@ -128,6 +104,59 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const sessionData = session.attributes?.session_data;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
+
+    // Calculate all associated goals (including from activities)
+    const allGoals = useMemo(() => {
+        const seenIds = new Set();
+        const goals = [];
+
+        // Helper to add goal if not already added
+        const addGoal = (goal) => {
+            if (goal && !seenIds.has(goal.id)) {
+                seenIds.add(goal.id);
+                goals.push(goal);
+            }
+        };
+
+        // 1. Direct session goals (short-term and immediate)
+        shortTermGoals.forEach(addGoal);
+        immediateGoals.forEach(addGoal);
+
+        // 2. Goals from activities in the session
+        // Extract activity definition IDs from session sections
+        const activityDefIds = new Set();
+        if (sessionData?.sections) {
+            sessionData.sections.forEach(section => {
+                if (section.activity_ids) {
+                    // activity_ids contains instance IDs, but for legacy sessions we may have activity_id in exercises
+                    section.activity_ids.forEach(id => activityDefIds.add(id));
+                }
+                if (section.exercises) {
+                    section.exercises.forEach(ex => {
+                        if (ex.activity_id) activityDefIds.add(ex.activity_id);
+                    });
+                }
+            });
+        }
+
+        // Find matching definitions and their associated goals
+        // Note: activities prop contains activity definitions
+        activityDefIds.forEach(defId => {
+            const def = activities?.find(d => d.id === defId);
+            if (def && def.associated_goal_ids) {
+                def.associated_goal_ids.forEach(goalId => {
+                    // Try to find the goal object
+                    let goalObj = shortTermGoals.find(g => g.id === goalId);
+                    if (!goalObj) goalObj = immediateGoals.find(g => g.id === goalId);
+                    if (goalObj) {
+                        addGoal(goalObj);
+                    }
+                });
+            }
+        });
+
+        return goals;
+    }, [shortTermGoals, immediateGoals, sessionData?.sections, activities]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -234,8 +263,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 
             {/* Associated Goals Section */}
             <GoalsSection
-                shortTermGoals={shortTermGoals}
-                immediateGoals={immediateGoals}
+                allGoals={allGoals}
                 getGoalColor={getGoalColor}
             />
 

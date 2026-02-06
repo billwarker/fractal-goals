@@ -93,6 +93,8 @@ function SessionSidePane({
                             onGoalClick={onGoalClick}
                             totalDuration={totalDuration}
                             onSessionUpdate={onSessionChange}
+                            activityInstances={activityInstances}
+                            activityDefinitions={activityDefinitions}
                         />
 
                         {/* Session Controls */}
