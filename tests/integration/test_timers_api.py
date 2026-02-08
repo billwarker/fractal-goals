@@ -24,7 +24,7 @@ class TestActivityInstanceCreation:
         root_id = sample_practice_session.root_id
         
         payload = {
-            'practice_session_id': sample_practice_session.id,
+            'session_id': sample_practice_session.id,
             'activity_definition_id': sample_activity_definition.id
         }
         response = authed_client.post(
@@ -34,6 +34,8 @@ class TestActivityInstanceCreation:
         )
         assert response.status_code == 201
         data = json.loads(response.data)
+        assert data['session_id'] == sample_practice_session.id
+        # Verify legacy field is also populated
         assert data['practice_session_id'] == sample_practice_session.id
         assert data['activity_definition_id'] == sample_activity_definition.id
         assert data['time_start'] is None
@@ -42,7 +44,7 @@ class TestActivityInstanceCreation:
     def test_create_instance_missing_fields(self, authed_client, sample_ultimate_goal):
         """Test creating instance with missing required fields."""
         payload = {
-            'practice_session_id': 'some-id'
+            'session_id': 'some-id'
             # Missing activity_definition_id
         }
         response = authed_client.post(
@@ -61,7 +63,7 @@ class TestTimerStartStop:
     def test_start_timer(self, authed_client, db_session, sample_activity_instance):
         """Test starting an activity timer."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -76,7 +78,7 @@ class TestTimerStartStop:
     def test_stop_timer(self, authed_client, db_session, sample_activity_instance):
         """Test stopping an activity timer."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -98,7 +100,7 @@ class TestTimerStartStop:
     def test_stop_timer_never_started(self, authed_client, db_session, sample_activity_instance):
         """Test that stopping a timer that was never started returns error."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -106,10 +108,11 @@ class TestTimerStartStop:
         response = authed_client.post(
             f'/api/{root_id}/activity-instances/{instance_id}/complete'
         )
-        # Should return error (as per recent fix)
-        assert response.status_code == 400
+        # Instant completion is allowed (duration=0)
+        assert response.status_code == 200
         data = json.loads(response.data)
-        assert 'error' in data
+        assert data['completed'] is True
+        assert data['duration_seconds'] == 0
     
     def test_start_timer_creates_instance_if_missing(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test that starting timer creates instance if it doesn't exist."""
@@ -117,7 +120,7 @@ class TestTimerStartStop:
         
         # Create instance first
         payload = {
-            'practice_session_id': sample_practice_session.id,
+            'session_id': sample_practice_session.id,
             'activity_definition_id': sample_activity_definition.id
         }
         response = authed_client.post(
@@ -143,7 +146,7 @@ class TestManualTimeEntry:
     def test_update_instance_times_manually(self, authed_client, db_session, sample_activity_instance):
         """Test manually setting start and stop times."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -168,7 +171,7 @@ class TestManualTimeEntry:
     def test_manual_time_entry_validates_order(self, authed_client, db_session, sample_activity_instance):
         """Test that manual time entry validates stop > start."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -190,7 +193,7 @@ class TestManualTimeEntry:
     def test_update_only_start_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the start time."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -211,7 +214,7 @@ class TestManualTimeEntry:
     def test_update_only_stop_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the stop time."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -243,7 +246,7 @@ class TestTimerDurationCalculation:
     def test_duration_calculated_on_stop(self, authed_client, db_session, sample_activity_instance):
         """Test that duration is calculated when timer is stopped."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -269,7 +272,7 @@ class TestTimerDurationCalculation:
     def test_duration_calculated_on_manual_entry(self, authed_client, db_session, sample_activity_instance):
         """Test that duration is calculated for manual time entry."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -308,7 +311,7 @@ class TestConcurrentTimers:
         instances = []
         for i in range(2):
             payload = {
-                'practice_session_id': sample_practice_session.id,
+                'session_id': sample_practice_session.id,
                 'activity_definition_id': sample_activity_definition.id
             }
             response = authed_client.post(
@@ -344,7 +347,7 @@ class TestTimerEdgeCases:
     def test_start_already_started_timer(self, authed_client, db_session, sample_activity_instance):
         """Test starting a timer that's already running."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
@@ -362,7 +365,7 @@ class TestTimerEdgeCases:
     def test_stop_already_stopped_timer(self, authed_client, db_session, sample_activity_instance):
         """Test stopping a timer that's already stopped."""
         from models import PracticeSession
-        session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         

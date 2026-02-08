@@ -189,7 +189,7 @@ class TestActivityInstance:
         """Test creating an ActivityInstance."""
         instance = ActivityInstance(
             id=str(uuid.uuid4()),
-            practice_session_id=sample_practice_session.id,
+            session_id=sample_practice_session.id,
             activity_definition_id=sample_activity_definition.id,
             root_id=sample_practice_session.root_id,
             created_at=datetime.utcnow()
@@ -198,6 +198,8 @@ class TestActivityInstance:
         db_session.commit()
         
         assert instance.id is not None
+        assert instance.session_id == sample_practice_session.id
+        # Legacy field should be populated automatically
         assert instance.practice_session_id == sample_practice_session.id
         assert instance.activity_definition_id == sample_activity_definition.id
     
@@ -222,6 +224,8 @@ class TestActivityInstance:
         instance_dict = serialize_activity_instance(sample_activity_instance)
         
         assert instance_dict['id'] == sample_activity_instance.id
+        assert 'session_id' in instance_dict
+        # Legacy field support
         assert 'practice_session_id' in instance_dict
         assert 'activity_definition_id' in instance_dict
 

@@ -3,6 +3,7 @@ import pytest
 import json
 import uuid
 from models import MetricValue, ActivityInstance
+from services.serializers import serialize_metric_value
 
 def test_metric_value_to_dict_includes_metric_id(db_session, sample_activity_instance):
     """
@@ -22,7 +23,7 @@ def test_metric_value_to_dict_includes_metric_id(db_session, sample_activity_ins
     db_session.commit()
     
     # Test
-    data = mv.to_dict()
+    data = serialize_metric_value(mv)
     
     # Verify
     assert 'metric_id' in data, "to_dict() must include 'metric_id' key"
@@ -30,7 +31,7 @@ def test_metric_value_to_dict_includes_metric_id(db_session, sample_activity_ins
     assert 'metric_definition_id' in data
     assert data['metric_definition_id'] == metric_def.id
 
-def test_session_hydration_includes_metric_id(client, db_session, sample_activity_instance):
+def test_session_hydration_includes_metric_id(authed_client, db_session, sample_activity_instance):
     """
     Integration test to verify that fetched session data includes metric_id 
     in the hydrated exercises list.
@@ -49,22 +50,21 @@ def test_session_hydration_includes_metric_id(client, db_session, sample_activit
     
     # 2. Setup Session Data structure to trigger hydration
     # The backend looks for "activity_ids" in sections to hydrate ActivityInstances
-    session = sample_activity_instance.practice_session
+    # Note: sections should be at top level of attributes for hydration to work in serialize_session
+    session = sample_activity_instance.session
     session.attributes = json.dumps({
-        "session_data": {
-            "sections": [
-                {
-                    "name": "Integration Test Section",
-                    "activity_ids": [sample_activity_instance.id]
-                }
-            ]
-        }
+        "sections": [
+            {
+                "name": "Integration Test Section",
+                "activity_ids": [sample_activity_instance.id]
+            }
+        ]
     })
     db_session.commit()
     
     # Verify persistence in DB
     from models import ActivityInstance
-    instances = db_session.query(ActivityInstance).filter_by(practice_session_id=session.id).all()
+    instances = db_session.query(ActivityInstance).filter_by(session_id=session.id).all()
     print(f"DEBUG Test DB Instances: {[i.id for i in instances]}")
     assert len(instances) > 0
     assert instances[0].id == sample_activity_instance.id
@@ -72,7 +72,7 @@ def test_session_hydration_includes_metric_id(client, db_session, sample_activit
     # 3. Fetch Session via API
     root_id = sample_activity_instance.root_id
     session_id = session.id
-    resp = client.get(f'/api/{root_id}/sessions/{session_id}')
+    resp = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
     
     assert resp.status_code == 200
     data = resp.json

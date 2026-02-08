@@ -343,7 +343,6 @@ def sample_activity_instance(db_session, sample_practice_session, sample_activit
     instance = ActivityInstance(
         id=str(uuid.uuid4()),
         session_id=sample_practice_session.id,
-        practice_session_id=sample_practice_session.id,
         activity_definition_id=sample_activity_definition.id,
         root_id=sample_practice_session.root_id,
         created_at=datetime.utcnow(),

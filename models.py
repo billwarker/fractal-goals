@@ -501,6 +501,12 @@ class ActivityInstance(Base):
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Auto-populate legacy field from new field if not provided
+        if self.session_id and not self.practice_session_id:
+            self.practice_session_id = self.session_id
+
 
 
 class MetricValue(Base):
