@@ -374,8 +374,14 @@ class SessionCreateSchema(BaseModel):
     @model_validator(mode='after')
     def check_parent_linkage(self) -> 'SessionCreateSchema':
         # Ensure at least one way of linking to a parent goal is provided
-        if not any([self.parent_id, self.parent_ids, self.goal_ids]):
-             raise ValueError('Session must be linked to at least one parent goal (parent_id, parent_ids, or goal_ids)')
+        # OR it's part of a program (indicated by program_context in session_data)
+        
+        is_program_linked = False
+        if self.session_data and 'program_context' in self.session_data:
+            is_program_linked = True
+
+        if not any([self.parent_id, self.parent_ids, self.goal_ids, is_program_linked]):
+             raise ValueError('Session must be linked to at least one parent goal (parent_id, parent_ids, or goal_ids) or be part of a program')
         return self
 
 
