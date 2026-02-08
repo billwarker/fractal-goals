@@ -218,7 +218,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
-        # Emit completion event
+        # Emit completion event - this triggers target evaluation synchronously
         event_bus.emit(Event(Events.ACTIVITY_INSTANCE_COMPLETED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
@@ -229,13 +229,23 @@ def complete_activity_instance(current_user, root_id, instance_id):
             'completed_at': instance.time_stop.isoformat()
         }, source='timers_api.complete_activity_instance'))
         
-        return jsonify(serialize_activity_instance(instance))
+        # Build response with achievement data
+        result = serialize_activity_instance(instance)
+        
+        # Get any targets/goals that were achieved during this completion
+        from services.completion_handlers import get_recent_achievements
+        achievements = get_recent_achievements()
+        result['achieved_targets'] = achievements.get('achieved_targets', [])
+        result['completed_goals'] = achievements.get('completed_goals', [])
+        
+        return jsonify(result)
         
     except Exception as e:
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
 
 
 

@@ -16,9 +16,13 @@ def format_utc(dt):
 
 def calculate_smart_status(goal):
     """Calculate SMART criteria status for a goal."""
-    targets = _safe_load_json(goal.targets, [])
-    if not isinstance(targets, list):
-        targets = []
+    # Use relational targets (preferred) or fall back to JSON for backwards compatibility
+    if hasattr(goal, 'targets_rel') and goal.targets_rel is not None:
+        targets = [t for t in goal.targets_rel if t.deleted_at is None]
+    else:
+        targets = _safe_load_json(goal.targets, [])
+        if not isinstance(targets, list):
+            targets = []
     
     # Achievable: has associated activities OR has associated activity groups OR completed via children
     if goal.track_activities:
@@ -36,6 +40,30 @@ def calculate_smart_status(goal):
         "achievable": is_achievable,
         "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
         "time_bound": goal.deadline is not None
+    }
+
+def serialize_target(target):
+    """Serialize a Target object."""
+    return {
+        "id": target.id,
+        "goal_id": target.goal_id,
+        "root_id": target.root_id,
+        "activity_id": target.activity_id,
+        "name": target.name,
+        "type": target.type or "threshold",
+        "metrics": _safe_load_json(target.metrics, []),
+        "time_scope": target.time_scope or "all_time",
+        "start_date": format_utc(target.start_date),
+        "end_date": format_utc(target.end_date),
+        "linked_block_id": target.linked_block_id,
+        "frequency_days": target.frequency_days,
+        "frequency_count": target.frequency_count,
+        "completed": target.completed or False,
+        "completed_at": format_utc(target.completed_at),
+        "completed_session_id": target.completed_session_id,
+        "completed_instance_id": target.completed_instance_id,
+        "created_at": format_utc(target.created_at),
+        "updated_at": format_utc(target.updated_at)
     }
 
 def serialize_metric_value(metric):
@@ -110,7 +138,7 @@ def serialize_goal(goal, include_children=True):
             "completed_at": format_utc(goal.completed_at),
             "created_at": format_utc(goal.created_at),
             "updated_at": format_utc(goal.updated_at),
-            "targets": _safe_load_json(goal.targets, []),
+            "targets": [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None] if hasattr(goal, 'targets_rel') and goal.targets_rel is not None else _safe_load_json(goal.targets, []),
             "relevance_statement": goal.relevance_statement,
             "completed_via_children": goal.completed_via_children,
             "allow_manual_completion": goal.allow_manual_completion,

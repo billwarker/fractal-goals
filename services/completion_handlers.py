@@ -15,7 +15,7 @@ import json
 
 from services.events import event_bus, Event, Events
 import models
-from models import get_session, Goal, Session, ActivityInstance
+from models import get_session, Goal, Session, ActivityInstance, Target
 from services.serializers import serialize_activity_instance, format_utc
 
 logger = logging.getLogger(__name__)
@@ -88,9 +88,281 @@ def handle_session_completed(event: Event):
         db_session.close()
 
 
+# Thread-local storage for tracking achievements during a request
+import threading
+_achievement_context = threading.local()
+
+
+def get_recent_achievements():
+    """Get achievements tracked during the current request. Called by API endpoints."""
+    return {
+        'achieved_targets': getattr(_achievement_context, 'achieved_targets', []),
+        'completed_goals': getattr(_achievement_context, 'completed_goals', [])
+    }
+
+
+def clear_achievement_context():
+    """Clear achievement tracking. Should be called at start of request."""
+    _achievement_context.achieved_targets = []
+    _achievement_context.completed_goals = []
+
+
+def _track_target_achievement(target_data: dict):
+    """Track a target achievement for the current request."""
+    if not hasattr(_achievement_context, 'achieved_targets'):
+        _achievement_context.achieved_targets = []
+    _achievement_context.achieved_targets.append(target_data)
+
+
+def _track_goal_completion(goal_data: dict):
+    """Track a goal completion for the current request."""
+    if not hasattr(_achievement_context, 'completed_goals'):
+        _achievement_context.completed_goals = []
+    _achievement_context.completed_goals.append(goal_data)
+
+
+@event_bus.on(Events.ACTIVITY_INSTANCE_COMPLETED)
+def handle_activity_instance_completed(event: Event):
+    """
+    When an activity instance is completed, evaluate THRESHOLD targets for linked goals.
+    
+    Only evaluates threshold targets (single-session criteria).
+    Sum/frequency targets are evaluated on session completion.
+    
+    Expected event.data:
+        - instance_id: str
+        - session_id: str
+        - root_id: str
+        - activity_definition_id: str
+        - completed_at: str (ISO datetime)
+    """
+    instance_id = event.data.get('instance_id')
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    activity_id = event.data.get('activity_definition_id')
+    completed_at_str = event.data.get('completed_at')
+    
+    logger.info(f"[ACTIVITY_COMPLETED] Starting handler for instance {instance_id}")
+    logger.info(f"[ACTIVITY_COMPLETED] Event data: session={session_id}, activity={activity_id}")
+    
+    if not all([instance_id, session_id, root_id, activity_id]):
+        logger.warning(f"ACTIVITY_INSTANCE_COMPLETED missing required data: {event.data}")
+        return
+    
+    logger.info(f"Processing activity instance completion: {instance_id} for activity {activity_id}")
+    
+    # Clear achievement context at start
+    clear_achievement_context()
+    
+    db_session = _get_db_session()
+    try:
+        # Get the session
+        session = db_session.query(Session).filter_by(id=session_id).first()
+        if not session:
+            logger.warning(f"Session {session_id} not found")
+            return
+        
+        # Get the completed activity instance
+        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        if not instance:
+            logger.warning(f"Activity instance {instance_id} not found")
+            return
+        
+        # Find goals to evaluate in two ways:
+        # 1. Goals directly linked to the session (via session_goals)
+        # 2. Goals linked to the activity (via activity_goal_associations)
+        goals_to_check = set()
+        
+        # Session-linked goals
+        session_goals = session.goals or []
+        for g in session_goals:
+            goals_to_check.add(g.id)
+        logger.info(f"[ACTIVITY_COMPLETED] Session has {len(session_goals)} directly linked goals")
+        
+        # Activity-linked goals (via activity_goal_associations)
+        from sqlalchemy import text
+        activity_goal_result = db_session.execute(text('''
+            SELECT goal_id FROM activity_goal_associations 
+            WHERE activity_id = :activity_id
+        '''), {'activity_id': activity_id})
+        activity_goal_ids = [row[0] for row in activity_goal_result.fetchall()]
+        
+        for gid in activity_goal_ids:
+            goals_to_check.add(gid)
+        logger.info(f"[ACTIVITY_COMPLETED] Activity has {len(activity_goal_ids)} associated goals")
+        
+        if not goals_to_check:
+            logger.debug(f"No goals to evaluate for activity {activity_id}")
+            return
+        
+        # Fetch all unique goals
+        linked_goals = db_session.query(Goal).filter(Goal.id.in_(goals_to_check)).all()
+        logger.info(f"[ACTIVITY_COMPLETED] Total {len(linked_goals)} unique goals to evaluate")
+        
+        # Build instance data for target evaluation (single instance)
+        instance_data = serialize_activity_instance(instance)
+        instances_by_activity = {activity_id: [instance_data]}
+        logger.info(f"[ACTIVITY_COMPLETED] Instance metrics: {instance_data.get('metrics', [])}")
+        
+        # Parse completed_at time for target timestamp
+        completed_at = None
+        if completed_at_str:
+            try:
+                completed_at = datetime.fromisoformat(completed_at_str.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                completed_at = datetime.now(timezone.utc)
+        else:
+            completed_at = datetime.now(timezone.utc)
+        
+        # Evaluate THRESHOLD targets only for each linked goal
+        for goal in linked_goals:
+            logger.info(f"[ACTIVITY_COMPLETED] Evaluating goal: {goal.name} (id={goal.id})")
+            _evaluate_threshold_targets_for_activity(
+                db_session, goal, instances_by_activity, session_id, 
+                activity_id, completed_at
+            )
+        
+        db_session.commit()
+        logger.info(f"[ACTIVITY_COMPLETED] Committed changes")
+        
+        # Log achievement context
+        achievements = get_recent_achievements()
+        logger.info(f"[ACTIVITY_COMPLETED] Achievements: {achievements}")
+        
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(f"Error handling activity instance completion: {e}")
+    finally:
+        db_session.close()
+
+
+def _evaluate_threshold_targets_for_activity(
+    db_session, goal: Goal, instances_by_activity: dict, 
+    session_id: str, activity_id: str, completed_at: datetime
+):
+    """
+    Evaluate only THRESHOLD targets for a specific activity.
+    
+    This is called when an activity instance is completed, before the session
+    is marked complete. Only evaluates threshold targets that reference the
+    completed activity.
+    
+    Now uses the relational Target model instead of JSON.
+    """
+    # Get relational targets for this goal
+    targets = [t for t in goal.targets_rel if t.deleted_at is None]
+    logger.info(f"[TARGET_EVAL] Goal {goal.name} has {len(targets)} relational targets")
+    
+    if not targets:
+        return
+    
+    newly_completed = []
+    
+    for target in targets:
+        target_name = target.name
+        target_activity = target.activity_id
+        target_type = target.type or 'threshold'
+        
+        logger.info(f"[TARGET_EVAL] Checking target '{target_name}': type={target_type}, activity_id={target_activity}, completed={target.completed}")
+        logger.info(f"[TARGET_EVAL] Comparing target.activity_id={target_activity} vs completed activity_id={activity_id}")
+        
+        # Skip already completed
+        if target.completed:
+            logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - already completed")
+            continue
+        
+        # Only evaluate threshold targets
+        if target_type != 'threshold':
+            logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - not threshold type")
+            continue
+        
+        # Only evaluate if target references this activity
+        if target_activity != activity_id:
+            logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - activity mismatch")
+            continue
+        
+        # Evaluate threshold target - convert Target object to dict for evaluation
+        target_dict = {
+            'id': target.id,
+            'name': target.name,
+            'type': target.type,
+            'activity_id': target.activity_id,
+            'metrics': target.metrics if isinstance(target.metrics, list) else [],
+        }
+        
+        logger.info(f"[TARGET_EVAL] Evaluating '{target_name}' against instances...")
+        if _evaluate_threshold_target(target_dict, instances_by_activity):
+            logger.info(f"[TARGET_EVAL] TARGET ACHIEVED: '{target_name}'")
+            
+            # Update the Target model directly
+            target.completed = True
+            target.completed_at = completed_at
+            target.completed_session_id = session_id
+            instance_list = instances_by_activity.get(activity_id, [])
+            target.completed_instance_id = instance_list[0].get('id') if instance_list else None
+            
+            newly_completed.append(target)
+            
+            # Track for API response
+            _track_target_achievement({
+                'id': target.id,
+                'name': target.name,
+                'goal_id': goal.id,
+                'goal_name': goal.name
+            })
+            
+            # Emit target achieved event
+            event_bus.emit(Event(Events.TARGET_ACHIEVED, {
+                'target_id': target.id,
+                'target_name': target.name,
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'root_id': goal.root_id,  # Required for event logging
+                'session_id': session_id,
+                'target_type': target_type,
+                'triggered_by': 'activity_instance_completed'
+            }))
+            
+            logger.info(f"Target '{target.name}' achieved for goal '{goal.name}'")
+    
+    if not newly_completed:
+        return
+    
+    # No need to persist JSON - Target model updates are tracked by SQLAlchemy
+    
+    # Check if all targets are now complete → auto-complete goal
+    all_targets = [t for t in goal.targets_rel if t.deleted_at is None]
+    all_completed = all(t.completed for t in all_targets) if all_targets else False
+    
+    if all_completed and not goal.completed:
+        goal.completed = True
+        goal.completed_at = completed_at
+        logger.info(f"Auto-completing goal {goal.id} - all {len(all_targets)} targets met")
+        
+        # Track for API response
+        _track_goal_completion({
+            'id': goal.id,
+            'name': goal.name
+        })
+        
+        # Emit goal completed event
+        event_bus.emit(Event(Events.GOAL_COMPLETED, {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id,
+            'auto_completed': True,
+            'reason': 'all_targets_achieved',
+            'triggered_by': 'activity_instance_completed'
+        }))
+
+
 def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, session_id: str):
-    """Evaluate all targets for a goal against activity instances."""
-    targets = json.loads(goal.targets) if goal.targets else []
+    """
+    Evaluate all targets for a goal against activity instances.
+    
+    Now uses the relational Target model instead of JSON.
+    """
+    targets = [t for t in goal.targets_rel if t.deleted_at is None]
     if not targets:
         return
     
@@ -99,44 +371,61 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
     
     for target in targets:
         # Skip already completed
-        if target.get('completed'):
+        if target.completed:
             continue
             
-        target_type = target.get('type', 'threshold')
+        target_type = target.type or 'threshold'
         target_achieved = False
+        
+        # Convert Target object to dict for evaluation
+        target_dict = {
+            'id': target.id,
+            'name': target.name,
+            'type': target.type,
+            'activity_id': target.activity_id,
+            'metrics': target.metrics if isinstance(target.metrics, list) else [],
+            'time_scope': target.time_scope,
+            'start_date': target.start_date,
+            'end_date': target.end_date,
+            'linked_block_id': target.linked_block_id,
+            'frequency_days': target.frequency_days,
+            'frequency_count': target.frequency_count,
+        }
         
         if target_type == 'threshold':
             # Classic logic: Check if CURRENT session meets criteria
-            target_achieved = _evaluate_threshold_target(target, instances_by_activity)
+            target_achieved = _evaluate_threshold_target(target_dict, instances_by_activity)
         elif target_type in ('sum', 'frequency'):
             # Complex logic: Check if aggregated history meets criteria
-            target_achieved = _evaluate_complex_target(db_session, target, goal, session_id)
+            target_achieved = _evaluate_complex_target(db_session, target_dict, goal, session_id)
             
         if target_achieved:
-            target['completed'] = True
-            target['completed_at'] = format_utc(now)
-            target['completed_session_id'] = session_id
+            target.completed = True
+            target.completed_at = now
+            target.completed_session_id = session_id
             newly_completed.append(target)
             
             # Emit target achieved event
             event_bus.emit(Event(Events.TARGET_ACHIEVED, {
-                'target_id': target.get('id'),
-                'target_name': target.get('name'),
+                'target_id': target.id,
+                'target_name': target.name,
                 'goal_id': goal.id,
                 'goal_name': goal.name,
+                'root_id': goal.root_id,
                 'session_id': session_id,
                 'target_type': target_type
             }))
     
-    # Persist updated targets
-    goal.targets = json.dumps(targets)
+    # No need to persist JSON - Target model updates are tracked by SQLAlchemy
     
     # Check if all targets are now complete → auto-complete goal
-    all_completed = all(t.get('completed') for t in targets) if targets else False
+    all_targets = [t for t in goal.targets_rel if t.deleted_at is None]
+    all_completed = all(t.completed for t in all_targets) if all_targets else False
+    
     if all_completed and not goal.completed:
         goal.completed = True
         goal.completed_at = now
-        logger.info(f"Auto-completing goal {goal.id} - all {len(targets)} targets met")
+        logger.info(f"Auto-completing goal {goal.id} - all {len(all_targets)} targets met")
         
         # Emit goal completed event
         event_bus.emit(Event(Events.GOAL_COMPLETED, {

@@ -127,16 +127,19 @@ Goals can be evaluated against SMART criteria with visual indicators:
   - **Dynamic Completion Status:** When manual completion is disabled, the "Mark Complete" button becomes a status badge showing the automatic criteria (e.g., "Complete via Children").
   - **Automatic Target-Based Completion:** When all targets on a goal are achieved, the goal is automatically marked as complete via the event system.
 - **Event-Driven Target Completion Flow:**
-  1. User marks session as complete → `SESSION_COMPLETED` event emitted
-  2. `handle_session_completed` handler evaluates targets for all linked goals
-  3. For each target met, `TARGET_ACHIEVED` event emitted, target marked `completed=true`
+  1. User completes an activity instance → `ACTIVITY_INSTANCE_COMPLETED` event emitted
+  2. `handle_activity_instance_completed` evaluates **threshold** targets for linked goals
+  3. If target is met, `TARGET_ACHIEVED` emitted, target marked `completed=true` with `completed_at`
   4. If ALL targets on a goal are complete → goal auto-completes, `GOAL_COMPLETED` emitted
-  5. `handle_goal_completed` updates parent goals (if `completed_via_children`) and program progress
-  6. Frontend refetches goals to display completion results
+  5. API response includes `achieved_targets` and `completed_goals` arrays
+  6. Frontend shows toast notifications: "🎯 Target achieved: [name]" and "🏆 Goal completed: [name]"
+  7. On session completion, `SESSION_COMPLETED` event evaluates **sum/frequency** targets
+  8. `handle_goal_completed` updates parent goals (if `completed_via_children`) and program progress
 - **Real-Time Target Achievement Tracking:**
-  - During a session, targets are evaluated in real-time against activity instances using the `useTargetAchievements` hook
-  - Toast notifications show "🎯 Target achieved: [name]" when metrics meet target thresholds
-  - On session completion, backend event system persists target completion with `completed_at` and `completed_session_id`
+  - Threshold targets are evaluated immediately when activity instance is completed
+  - Sum/frequency targets are evaluated on session completion (require historical aggregation)
+  - Toast notifications appear directly from API response, eliminating need for polling
+  - `useTargetAchievements` hook still provides frontend-only preview during session
 - **Associated Children View:** `GoalDetailModal` displays a list of child goals at the level below for better context.
 
 **Database Tables:**
@@ -321,7 +324,7 @@ All goal types and practice sessions share this table, differentiated by `type` 
 - `updated_at` (DateTime)
 - `parent_id` (String, FK to goals.id)
 - `root_id` (String) - Reference to ultimate goal
-- `targets` (Text/JSON) - Goal targets for completion tracking
+- `targets` (Text/JSON) - **DEPRECATED** - Now stored in relational `targets` table (legacy column kept for migration safety)
 - `relevance_statement` (Text, nullable) - SMART "R" criterion: How goal helps achieve parent
 - `is_smart` (Boolean) - Whether goal meets all SMART criteria
 - `completed_via_children` (Boolean) - If true, completion is derived from child goals
@@ -505,6 +508,37 @@ Stores annotations on data visualizations.
 - `content` (Text)
 - `created_at` (DateTime)
 - `updated_at` (DateTime)
+
+#### `targets`
+Stores measurable targets attached to goals.
+
+**Fields:**
+- `id` (String, UUID, PK)
+- `goal_id` (String, FK to goals.id) - Parent goal
+- `root_id` (String, FK to goals.id) - Fractal root for scoping
+- `activity_id` (String, FK to activity_definitions.id, nullable) - Linked activity
+- `name` (String)
+- `type` (String) - 'threshold', 'sum', 'frequency'
+- `metrics` (JSON) - Array of metric criteria `[{metric_id, value, operator}]`
+- `time_scope` (String) - 'all_time', 'custom', 'program_block'
+- `start_date` (DateTime, nullable)
+- `end_date` (DateTime, nullable)
+- `linked_block_id` (String, FK to program_blocks.id, nullable)
+- `frequency_days` (Integer, nullable)
+- `frequency_count` (Integer, nullable)
+- `completed` (Boolean)
+- `completed_at` (DateTime, nullable)
+- `completed_session_id` (String, FK to sessions.id, nullable)
+- `completed_instance_id` (String, FK to activity_instances.id, nullable)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+- `deleted_at` (DateTime, nullable) - Soft delete
+
+**Relationships:**
+- Belongs to Goal
+- Belongs to ActivityDefinition (optional)
+- Belongs to completed Session (optional)
+- Belongs to completed ActivityInstance (optional)
 
 #### `session_templates`
 Reusable session templates.

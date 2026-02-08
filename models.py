@@ -215,6 +215,14 @@ class Goal(Base):
         back_populates="associated_goals",
         viewonly=True
     )
+    
+    # Relational targets (migrated from JSON column)
+    targets_rel = relationship(
+        "Target",
+        back_populates="goal",
+        cascade="all, delete-orphan",
+        foreign_keys="Target.goal_id"
+    )
 
     # Business logic methods calculate_smart_status, is_smart_goal and to_dict moved to services/serializers.py
     
@@ -241,6 +249,67 @@ class MicroGoal(Goal):
 
 class NanoGoal(Goal):
     __mapper_args__ = {'polymorphic_identity': 'NanoGoal'}
+
+
+class Target(Base):
+    """
+    Represents a measurable target attached to a goal.
+    
+    Migrated from JSON column (goals.targets) to proper relational model.
+    
+    Types:
+    - threshold: Single-session metric criteria (e.g., "Bench Press >= 100 lbs")
+    - sum: Accumulative total over time scope (e.g., "Total 1000 reps this month")
+    - frequency: Count of occurrences (e.g., "Practice 3x per week")
+    """
+    __tablename__ = 'targets'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
+    
+    name = Column(String, nullable=False)
+    type = Column(String, default='threshold')  # 'threshold', 'sum', 'frequency'
+    
+    # Metrics criteria - JSON array of {metric_id, value, operator}
+    # Example: [{"metric_id": "abc", "value": 100, "operator": ">="}]
+    metrics = Column(JSON_TYPE, nullable=True)
+    
+    # Time scope for evaluation
+    time_scope = Column(String, default='all_time')  # 'all_time', 'custom', 'program_block'
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    linked_block_id = Column(String, ForeignKey('program_blocks.id', ondelete='SET NULL'), nullable=True)
+    
+    # Frequency settings (for 'frequency' type)
+    frequency_days = Column(Integer, nullable=True)  # Time window in days
+    frequency_count = Column(Integer, nullable=True)  # Required occurrences
+    
+    # Completion status
+    completed = Column(Boolean, default=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    completed_session_id = Column(String, ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True)
+    completed_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+    
+    __table_args__ = (
+        sa.Index('ix_targets_goal_deleted', 'goal_id', 'deleted_at'),
+        sa.Index('ix_targets_root_deleted', 'root_id', 'deleted_at'),
+    )
+    
+    # Relationships
+    goal = relationship("Goal", back_populates="targets_rel", foreign_keys=[goal_id])
+    activity = relationship("ActivityDefinition")
+    completed_session = relationship("Session", foreign_keys=[completed_session_id])
+    completed_instance = relationship("ActivityInstance", foreign_keys=[completed_instance_id])
+    
+    def __repr__(self):
+        return f"<Target(id={self.id}, name={self.name}, type={self.type}, completed={self.completed})>"
 
 
 class Session(Base):

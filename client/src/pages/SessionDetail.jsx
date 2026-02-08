@@ -526,6 +526,19 @@ function SessionDetail() {
                     setActivityInstances(prev => prev.map(inst =>
                         inst.id === instanceId ? response.data : inst
                     ));
+
+                    // Check for newly achieved targets (from backend target evaluation)
+                    if (response.data.achieved_targets?.length > 0) {
+                        const names = response.data.achieved_targets.map(t => t.name || 'Target').join(', ');
+                        notify.success(`🎯 Target achieved: ${names}`, { duration: 5000 });
+                    }
+
+                    // Check for completed goals (from backend goal auto-completion)
+                    if (response.data.completed_goals?.length > 0) {
+                        const names = response.data.completed_goals.map(g => g.name || 'Goal').join(', ');
+                        notify.success(`🏆 Goal completed: ${names}`, { duration: 6000 });
+                    }
+
                     // Refresh from server to ensure full consistency
                     await fetchActivityInstances();
                 }

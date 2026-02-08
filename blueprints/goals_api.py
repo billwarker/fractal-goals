@@ -8,7 +8,7 @@ import models
 logger = logging.getLogger(__name__)
 from models import (
     get_session,
-    Goal, Session,
+    Goal, Session, Target,
     get_all_root_goals, get_goal_by_id, get_session_by_id,
     validate_root_goal
 )
@@ -20,11 +20,122 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
-from services.serializers import serialize_goal, calculate_smart_status, format_utc
+from services.serializers import serialize_goal, serialize_target, calculate_smart_status, format_utc
 from extensions import limiter
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
+
+
+def _sync_targets(db_session, goal, incoming_targets: list):
+    """
+    Sync relational Target records with incoming target data.
+    - Creates new targets that don't exist
+    - Updates existing targets
+    - Soft-deletes targets that are no longer present
+    """
+    from datetime import datetime, timezone
+    
+    # Helper sanitizers
+    def _parse_date(val):
+        if not val: return None
+        if isinstance(val, str):
+            if not val.strip(): return None
+            try:
+                # Handle ISO format (e.g. 2026-02-15T00:00:00Z)
+                if 'T' in val: val = val.split('T')[0]
+                return datetime.strptime(val, '%Y-%m-%d')
+            except ValueError:
+                logger.warning(f"Invalid target date format: {val}")
+                return None
+        return val
+
+    def _parse_int(val):
+        if val is None or val == '': return None
+        try: return int(val)
+        except: return None
+
+    def _clean_metrics(val):
+        if not isinstance(val, list): return []
+        cleaned = []
+        for m in val:
+            v_raw = m.get('value', 0)
+            try:
+                v = float(v_raw)
+                import math
+                if not math.isfinite(v): v = 0.0
+            except: v = 0.0
+            
+            cleaned.append({
+                'metric_id': m.get('metric_id'),
+                'value': v,
+                'operator': m.get('operator', '>=')
+            })
+        return cleaned
+
+    try:
+        # Get current active targets for this goal
+        current_targets = {t.id: t for t in goal.targets_rel if t.deleted_at is None}
+        incoming_ids = {t.get('id') for t in incoming_targets if t.get('id')}
+        
+        # Soft-delete targets that were removed
+        for target_id, target in current_targets.items():
+            if target_id not in incoming_ids:
+                target.deleted_at = datetime.now(timezone.utc)
+                logger.debug(f"Soft-deleted target {target_id}")
+        
+        # Create or update targets
+        for target_data in incoming_targets:
+            target_id = target_data.get('id')
+            
+            # Sanitize inputs
+            activity_id = target_data.get('activity_id') or None
+            linked_block_id = target_data.get('linked_block_id') or None
+            start_date = _parse_date(target_data.get('start_date'))
+            end_date = _parse_date(target_data.get('end_date'))
+            freq_days = _parse_int(target_data.get('frequency_days'))
+            freq_count = _parse_int(target_data.get('frequency_count'))
+            metrics = _clean_metrics(target_data.get('metrics'))
+            
+            if target_id and target_id in current_targets:
+                # Update existing target
+                target = current_targets[target_id]
+                target.name = target_data.get('name', target.name)
+                target.activity_id = activity_id
+                target.type = target_data.get('type', target.type)
+                target.metrics = metrics
+                target.time_scope = target_data.get('time_scope', target.time_scope)
+                target.start_date = start_date
+                target.end_date = end_date
+                target.linked_block_id = linked_block_id
+                target.frequency_days = freq_days
+                target.frequency_count = freq_count
+                logger.debug(f"Updated target {target_id}")
+            else:
+                # Create new target
+                new_target = Target(
+                    id=target_id or str(uuid.uuid4()),
+                    goal_id=goal.id,
+                    root_id=goal.root_id or goal.id,
+                    activity_id=activity_id,
+                    name=target_data.get('name', 'Measure'),
+                    type=target_data.get('type', 'threshold'),
+                    metrics=metrics,
+                    time_scope=target_data.get('time_scope', 'all_time'),
+                    start_date=start_date,
+                    end_date=end_date,
+                    linked_block_id=linked_block_id,
+                    frequency_days=freq_days,
+                    frequency_count=freq_count,
+                    completed=target_data.get('completed', False)
+                )
+                db_session.add(new_target)
+                logger.debug(f"Created new target {new_target.id} with activity_id={activity_id}")
+                
+    except Exception as e:
+        logger.exception(f"Error in _sync_targets: {e}")
+        # Re-raise so the endpoint can rollback
+        raise e
 
 
 # ============================================================================
@@ -200,12 +311,13 @@ def update_goal_endpoint(goal_id: str):
                 goal.deadline = deadline
             if 'targets' in data:
                 logger.debug(f"Received targets data: {data['targets']}")
-                goal.targets = json.dumps(data['targets']) if data['targets'] else None
-                logger.debug(f"Stored targets in goal: {goal.targets}")
+                # Sync relational targets
+                _sync_targets(db_session, goal, data['targets'] or [])
             if 'completed_via_children' in data:
                 goal.completed_via_children = data['completed_via_children']
             db_session.commit()
-            logger.debug(f"Committed changes. Goal targets after commit: {goal.targets}")
+            db_session.refresh(goal)
+            logger.debug(f"Committed changes. Goal has {len([t for t in goal.targets_rel if t.deleted_at is None])} active targets")
             
             # Emit goal updated event
             event_bus.emit(Event(Events.GOAL_UPDATED, {
@@ -220,8 +332,8 @@ def update_goal_endpoint(goal_id: str):
         return jsonify({"error": "Goal not found"}), 404
         
     except Exception as e:
+        logger.exception(f"Error in update_goal_endpoint: {e}")
         db_session.rollback()
-        print(f"ERROR: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -229,7 +341,7 @@ def update_goal_endpoint(goal_id: str):
 
 @goals_bp.route('/goals/<goal_id>/targets', methods=['POST'])
 def add_goal_target(goal_id):
-    """Add a target to a goal."""
+    """Add a target to a goal using relational Target model."""
     data = request.get_json()
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -238,24 +350,41 @@ def add_goal_target(goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        current_targets = models._safe_load_json(goal.targets, [])
-        if 'id' not in data:
-            data['id'] = str(uuid.uuid4())
-            
-        current_targets.append(data)
-        goal.targets = json.dumps(current_targets)
+        # Create new Target object
+        target_id = data.get('id') or str(uuid.uuid4())
+        new_target = Target(
+            id=target_id,
+            goal_id=goal_id,
+            root_id=goal.root_id or goal_id,  # For root goals, use goal_id
+            activity_id=data.get('activity_id'),
+            name=data.get('name', 'Measure'),
+            type=data.get('type', 'threshold'),
+            metrics=data.get('metrics', []),
+            time_scope=data.get('time_scope', 'all_time'),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            linked_block_id=data.get('linked_block_id'),
+            frequency_days=data.get('frequency_days'),
+            frequency_count=data.get('frequency_count'),
+            completed=False
+        )
+        
+        db_session.add(new_target)
         db_session.commit()
+        db_session.refresh(new_target)
         
         # Emit target created event
         event_bus.emit(Event(Events.TARGET_CREATED, {
-            'target_id': data['id'],
-            'target_name': data.get('name', 'Measure'),
+            'target_id': new_target.id,
+            'target_name': new_target.name,
             'goal_id': goal.id,
             'goal_name': goal.name,
-            'root_id': goal.root_id
+            'root_id': goal.root_id or goal_id
         }, source='goals_api.add_target'))
         
-        return jsonify({"targets": current_targets, "id": data['id']}), 201
+        # Return all current targets
+        all_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
+        return jsonify({"targets": all_targets, "id": new_target.id}), 201
     except Exception as e:
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -265,7 +394,7 @@ def add_goal_target(goal_id):
 
 @goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['DELETE'])
 def remove_goal_target(goal_id, target_id):
-    """Remove a target from a goal."""
+    """Remove a target from a goal (soft delete)."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
@@ -273,13 +402,18 @@ def remove_goal_target(goal_id, target_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        current_targets = models._safe_load_json(goal.targets, [])
-        new_targets = [t for t in current_targets if t.get('id') != target_id]
+        # Find the target in the relational model
+        target = db_session.query(Target).filter(
+            Target.id == target_id,
+            Target.goal_id == goal_id,
+            Target.deleted_at == None
+        ).first()
         
-        if len(new_targets) == len(current_targets):
-             return jsonify({"error": "Target not found"}), 404
-             
-        goal.targets = json.dumps(new_targets)
+        if not target:
+            return jsonify({"error": "Target not found"}), 404
+        
+        # Soft delete
+        target.deleted_at = datetime.now(timezone.utc)
         db_session.commit()
         
         # Emit target deleted event
@@ -287,10 +421,12 @@ def remove_goal_target(goal_id, target_id):
             'target_id': target_id,
             'goal_id': goal.id,
             'goal_name': goal.name,
-            'root_id': goal.root_id
+            'root_id': goal.root_id or goal_id
         }, source='goals_api.remove_target'))
         
-        return jsonify({"targets": new_targets}), 200
+        # Return remaining targets
+        remaining_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
+        return jsonify({"targets": remaining_targets}), 200
     except Exception as e:
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -727,7 +863,7 @@ def update_fractal_goal(root_id, goal_id):
             else:
                 goal.deadline = None
         if 'targets' in data:
-            goal.targets = json.dumps(data['targets']) if data['targets'] else None
+            _sync_targets(db_session, goal, data['targets'] or [])
             
         if 'parent_id' in data:
             # Allow reparenting (e.g. moving ImmediateGoal between ShortTermGoals)
@@ -759,6 +895,7 @@ def update_fractal_goal(root_id, goal_id):
         return jsonify(serialize_goal(goal, include_children=False)), 200
         
     except Exception as e:
+        logger.exception(f"Error in update_fractal_goal: {e}")
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
