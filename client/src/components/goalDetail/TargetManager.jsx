@@ -672,6 +672,7 @@ const TargetManager = ({
                             <div onClick={() => isEditing && handleOpenEditTarget(target)} style={{ cursor: isEditing ? 'pointer' : 'default' }}>
                                 <TargetCard
                                     target={target}
+                                    isCompleted={target.completed}
                                     activityDefinitions={activityDefinitions}
                                     onEdit={undefined} // Handled by parent div click
                                     onDelete={isEditing ? (e) => {

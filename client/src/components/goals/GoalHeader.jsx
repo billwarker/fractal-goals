@@ -84,7 +84,7 @@ function GoalHeader({
                 )}
                 {mode !== 'create' && isCompleted && (
                     <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                        ✓ Completed
+                        ✓ Completed {goal?.attributes?.completed_at ? `on ${formatDateInTimezone(goal.attributes.completed_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
                     </span>
                 )}
             </div>
