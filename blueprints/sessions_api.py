@@ -147,7 +147,7 @@ def create_fractal_session(current_user, root_id, validated_data):
                 # Ensure UTC
                 return dt.astimezone(timezone.utc)
             except ValueError:
-                print(f"WARNING: Invalid date format received: {dt_str}")
+                logger.warning(f"Invalid date format received: {dt_str}")
                 return None
         
         s_start = parse_datetime(data.get('session_start'))

@@ -266,7 +266,7 @@ def delete_goal_endpoint(goal_id: str):
         
     except Exception as e:
         db_session.rollback()
-        print(f"ERROR: {str(e)}")
+        logger.error(f"Error in delete_goal_endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -488,7 +488,7 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
         
     except Exception as e:
         db_session.rollback()
-        print(f"ERROR: {str(e)}")
+        logger.error(f"Error in update_goal_completion_endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
