@@ -198,11 +198,15 @@ def create_goal(validated_data):
                 current = get_goal_by_id(db_session, current.parent_id)
             new_goal.root_id = current.id
         
+        db_session.add(new_goal)
+        db_session.flush()
+
         # Handle targets if provided
         if validated_data.get('targets'):
             new_goal.targets = json.dumps(validated_data['targets'])
+            # Allow _sync_targets to create the relational records
+            _sync_targets(db_session, new_goal, validated_data['targets'])
         
-        db_session.add(new_goal)
         db_session.commit()
         db_session.refresh(new_goal)
         
@@ -735,11 +739,15 @@ def create_fractal_goal(current_user, root_id, validated_data):
             root_id=root_id  # Set root_id for performance
         )
         
+        db_session.add(new_goal)
+        db_session.flush()
+
         # Handle targets if provided
         if validated_data.get('targets'):
             new_goal.targets = json.dumps(validated_data['targets'])
+            # Allow _sync_targets to create the relational records
+            _sync_targets(db_session, new_goal, validated_data['targets'])
         
-        db_session.add(new_goal)
         db_session.commit()
         db_session.refresh(new_goal)
         

@@ -57,6 +57,7 @@ def activity_instances(current_user, root_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
+                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
@@ -130,6 +131,7 @@ def start_activity_timer(current_user, root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
+                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
@@ -311,6 +313,7 @@ def update_activity_instance(current_user, root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
+                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )

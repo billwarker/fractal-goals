@@ -75,7 +75,7 @@ def app():
     
     # Ensure usage of test database
     if not config.DATABASE_URL or 'test' not in config.DATABASE_URL:
-         pytest.fail("CRITICAL: Running tests against non-test database! Check .env.testing")
+         pytest.fail(f"CRITICAL: Running tests against non-test database: {config.DATABASE_URL}! Check .env.testing (ENV={config.ENV})")
 
     # Patch get_engine to use test database (although config should already point to it)
     original_get_engine = models.get_engine
@@ -343,6 +343,7 @@ def sample_activity_instance(db_session, sample_practice_session, sample_activit
     instance = ActivityInstance(
         id=str(uuid.uuid4()),
         session_id=sample_practice_session.id,
+        practice_session_id=sample_practice_session.id,
         activity_definition_id=sample_activity_definition.id,
         root_id=sample_practice_session.root_id,
         created_at=datetime.utcnow(),

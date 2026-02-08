@@ -19,7 +19,7 @@ import time
 class TestActivityInstanceCreation:
     """Test activity instance creation endpoints."""
     
-    def test_create_activity_instance(self, client, sample_practice_session, sample_activity_definition):
+    def test_create_activity_instance(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test creating an activity instance without starting timer."""
         root_id = sample_practice_session.root_id
         
@@ -27,7 +27,7 @@ class TestActivityInstanceCreation:
             'practice_session_id': sample_practice_session.id,
             'activity_definition_id': sample_activity_definition.id
         }
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/activity-instances',
             data=json.dumps(payload),
             content_type='application/json'
@@ -39,13 +39,13 @@ class TestActivityInstanceCreation:
         assert data['time_start'] is None
         assert data['time_stop'] is None
     
-    def test_create_instance_missing_fields(self, client, sample_ultimate_goal):
+    def test_create_instance_missing_fields(self, authed_client, sample_ultimate_goal):
         """Test creating instance with missing required fields."""
         payload = {
             'practice_session_id': 'some-id'
             # Missing activity_definition_id
         }
-        response = client.post(
+        response = authed_client.post(
             f'/api/{sample_ultimate_goal.id}/activity-instances',
             data=json.dumps(payload),
             content_type='application/json'
@@ -58,14 +58,14 @@ class TestActivityInstanceCreation:
 class TestTimerStartStop:
     """Test timer start and stop functionality."""
     
-    def test_start_timer(self, client, db_session, sample_activity_instance):
+    def test_start_timer(self, authed_client, db_session, sample_activity_instance):
         """Test starting an activity timer."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
         root_id = session.root_id
         instance_id = sample_activity_instance.id
         
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/activity-instances/{instance_id}/start'
         )
         assert response.status_code == 200
@@ -73,7 +73,7 @@ class TestTimerStartStop:
         assert data['time_start'] is not None
         assert data['time_stop'] is None
     
-    def test_stop_timer(self, client, db_session, sample_activity_instance):
+    def test_stop_timer(self, authed_client, db_session, sample_activity_instance):
         """Test stopping an activity timer."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -85,8 +85,8 @@ class TestTimerStartStop:
         db_session.commit()
         
         # Then stop it
-        response = client.post(
-            f'/api/{root_id}/activity-instances/{instance_id}/stop'
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/complete'
         )
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -95,7 +95,7 @@ class TestTimerStartStop:
         assert data['duration_seconds'] is not None
         assert data['duration_seconds'] > 0
     
-    def test_stop_timer_never_started(self, client, db_session, sample_activity_instance):
+    def test_stop_timer_never_started(self, authed_client, db_session, sample_activity_instance):
         """Test that stopping a timer that was never started returns error."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -103,15 +103,15 @@ class TestTimerStartStop:
         instance_id = sample_activity_instance.id
         
         # Try to stop without starting
-        response = client.post(
-            f'/api/{root_id}/activity-instances/{instance_id}/stop'
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/complete'
         )
         # Should return error (as per recent fix)
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
     
-    def test_start_timer_creates_instance_if_missing(self, client, sample_practice_session, sample_activity_definition):
+    def test_start_timer_creates_instance_if_missing(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test that starting timer creates instance if it doesn't exist."""
         root_id = sample_practice_session.root_id
         
@@ -120,7 +120,7 @@ class TestTimerStartStop:
             'practice_session_id': sample_practice_session.id,
             'activity_definition_id': sample_activity_definition.id
         }
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/activity-instances',
             data=json.dumps(payload),
             content_type='application/json'
@@ -129,7 +129,7 @@ class TestTimerStartStop:
         instance_id = instance_data['id']
         
         # Start timer
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/activity-instances/{instance_id}/start'
         )
         assert response.status_code == 200
@@ -140,7 +140,7 @@ class TestTimerStartStop:
 class TestManualTimeEntry:
     """Test manual time entry functionality."""
     
-    def test_update_instance_times_manually(self, client, db_session, sample_activity_instance):
+    def test_update_instance_times_manually(self, authed_client, db_session, sample_activity_instance):
         """Test manually setting start and stop times."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -154,7 +154,7 @@ class TestManualTimeEntry:
             'time_start': start_time.isoformat(),
             'time_stop': stop_time.isoformat()
         }
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/activity-instances/{instance_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -165,7 +165,7 @@ class TestManualTimeEntry:
         assert data['time_stop'] is not None
         assert data['duration_seconds'] is not None
     
-    def test_manual_time_entry_validates_order(self, client, db_session, sample_activity_instance):
+    def test_manual_time_entry_validates_order(self, authed_client, db_session, sample_activity_instance):
         """Test that manual time entry validates stop > start."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -179,7 +179,7 @@ class TestManualTimeEntry:
             'time_start': start_time.isoformat(),
             'time_stop': stop_time.isoformat()
         }
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/activity-instances/{instance_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -187,7 +187,7 @@ class TestManualTimeEntry:
         # Should reject invalid time range
         assert response.status_code in [200, 400, 422]
     
-    def test_update_only_start_time(self, client, db_session, sample_activity_instance):
+    def test_update_only_start_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the start time."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -199,7 +199,7 @@ class TestManualTimeEntry:
         payload = {
             'time_start': start_time.isoformat()
         }
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/activity-instances/{instance_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -208,7 +208,7 @@ class TestManualTimeEntry:
         data = json.loads(response.data)
         assert data['time_start'] is not None
     
-    def test_update_only_stop_time(self, client, db_session, sample_activity_instance):
+    def test_update_only_stop_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the stop time."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -224,7 +224,7 @@ class TestManualTimeEntry:
         payload = {
             'time_stop': stop_time.isoformat()
         }
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/activity-instances/{instance_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -240,7 +240,7 @@ class TestManualTimeEntry:
 class TestTimerDurationCalculation:
     """Test duration calculation for timers."""
     
-    def test_duration_calculated_on_stop(self, client, db_session, sample_activity_instance):
+    def test_duration_calculated_on_stop(self, authed_client, db_session, sample_activity_instance):
         """Test that duration is calculated when timer is stopped."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -256,8 +256,8 @@ class TestTimerDurationCalculation:
         time.sleep(0.1)
         
         # Stop timer
-        response = client.post(
-            f'/api/{root_id}/activity-instances/{instance_id}/stop'
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/complete'
         )
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -266,7 +266,7 @@ class TestTimerDurationCalculation:
         assert data['duration_seconds'] is not None
         assert data['duration_seconds'] > 0
     
-    def test_duration_calculated_on_manual_entry(self, client, db_session, sample_activity_instance):
+    def test_duration_calculated_on_manual_entry(self, authed_client, db_session, sample_activity_instance):
         """Test that duration is calculated for manual time entry."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -281,7 +281,7 @@ class TestTimerDurationCalculation:
             'time_start': start_time.isoformat(),
             'time_stop': stop_time.isoformat()
         }
-        response = client.put(
+        response = authed_client.put(
             f'/api/{root_id}/activity-instances/{instance_id}',
             data=json.dumps(payload),
             content_type='application/json'
@@ -300,7 +300,7 @@ class TestTimerDurationCalculation:
 class TestConcurrentTimers:
     """Test multiple timers running simultaneously."""
     
-    def test_multiple_timers_in_same_session(self, client, sample_practice_session, sample_activity_definition):
+    def test_multiple_timers_in_same_session(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test running multiple timers in the same session."""
         root_id = sample_practice_session.root_id
         
@@ -311,7 +311,7 @@ class TestConcurrentTimers:
                 'practice_session_id': sample_practice_session.id,
                 'activity_definition_id': sample_activity_definition.id
             }
-            response = client.post(
+            response = authed_client.post(
                 f'/api/{root_id}/activity-instances',
                 data=json.dumps(payload),
                 content_type='application/json'
@@ -321,15 +321,15 @@ class TestConcurrentTimers:
         
         # Start both timers
         for instance_id in instances:
-            response = client.post(
+            response = authed_client.post(
                 f'/api/{root_id}/activity-instances/{instance_id}/start'
             )
             assert response.status_code == 200
         
         # Stop both timers
         for instance_id in instances:
-            response = client.post(
-                f'/api/{root_id}/activity-instances/{instance_id}/stop'
+            response = authed_client.post(
+                f'/api/{root_id}/activity-instances/{instance_id}/complete'
             )
             assert response.status_code == 200
             data = json.loads(response.data)
@@ -341,7 +341,7 @@ class TestConcurrentTimers:
 class TestTimerEdgeCases:
     """Test edge cases and error handling for timers."""
     
-    def test_start_already_started_timer(self, client, db_session, sample_activity_instance):
+    def test_start_already_started_timer(self, authed_client, db_session, sample_activity_instance):
         """Test starting a timer that's already running."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -353,13 +353,13 @@ class TestTimerEdgeCases:
         db_session.commit()
         
         # Try to start again
-        response = client.post(
+        response = authed_client.post(
             f'/api/{root_id}/activity-instances/{instance_id}/start'
         )
         # Should either succeed (restart) or return error
         assert response.status_code in [200, 400]
     
-    def test_stop_already_stopped_timer(self, client, db_session, sample_activity_instance):
+    def test_stop_already_stopped_timer(self, authed_client, db_session, sample_activity_instance):
         """Test stopping a timer that's already stopped."""
         from models import PracticeSession
         session = db_session.query(PracticeSession).get(sample_activity_instance.practice_session_id)
@@ -375,20 +375,20 @@ class TestTimerEdgeCases:
         db_session.commit()
         
         # Try to stop again
-        response = client.post(
-            f'/api/{root_id}/activity-instances/{instance_id}/stop'
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/complete'
         )
         # Should either succeed (no-op) or return error
         assert response.status_code in [200, 400]
     
-    def test_timer_with_nonexistent_instance(self, client, sample_ultimate_goal):
+    def test_timer_with_nonexistent_instance(self, authed_client, sample_ultimate_goal):
         """Test timer operations on nonexistent instance."""
-        response = client.post(
+        response = authed_client.post(
             f'/api/{sample_ultimate_goal.id}/activity-instances/nonexistent-id/start'
         )
         assert response.status_code == 400
         
-        response = client.post(
-            f'/api/{sample_ultimate_goal.id}/activity-instances/nonexistent-id/stop'
+        response = authed_client.post(
+            f'/api/{sample_ultimate_goal.id}/activity-instances/nonexistent-id/complete'
         )
         assert response.status_code == 404
