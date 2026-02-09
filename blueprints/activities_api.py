@@ -253,7 +253,7 @@ def get_activities(current_user, root_id):
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        activities = session.query(ActivityDefinition).filter_by(root_id=root_id).order_by(ActivityDefinition.name).all()
+        activities = session.query(ActivityDefinition).filter_by(root_id=root_id).filter(ActivityDefinition.deleted_at.is_(None)).order_by(ActivityDefinition.name).all()
         return jsonify([serialize_activity_definition(a) for a in activities])
     finally:
         session.close()
@@ -521,7 +521,9 @@ def delete_activity(current_user, root_id, activity_id):
         act_id = activity.id
         act_name = activity.name
         
-        session.delete(activity)
+        # Soft delete
+        activity.deleted_at = models.utc_now()
+        # session.delete(activity)
         session.commit()
         
         # Emit activity deleted event
@@ -675,12 +677,13 @@ def get_goal_activities(current_user, root_id, goal_id):
         # Get directly associated activities
         activities_set = {}
         for a in goal.associated_activities:
-            activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id}
+            if not a.deleted_at:
+                activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id}
         
         # Get activities from linked groups
         for group in goal.associated_activity_groups:
             for a in group.activities:
-                if a.id not in activities_set:
+                if a.id not in activities_set and not a.deleted_at:
                     activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id, "from_linked_group": True}
         
         return jsonify(list(activities_set.values()))

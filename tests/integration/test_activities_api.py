@@ -232,3 +232,39 @@ class TestActivities:
         response = authed_client.get(f'/api/{root_id}/activities')
         data = json.loads(response.data)
         assert not any(a['id'] == activity_id for a in data)
+
+    def test_delete_activity_with_instances(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """
+        Test deleting an activity that has instances (Soft Delete).
+        This ensures we don't hit foreign key violations.
+        """
+        root_id = sample_ultimate_goal.id
+        activity_id = sample_activity_definition.id
+        
+        # 1. Create a session and an activity instance using this activity
+        session_payload = {
+            'name': 'Test Session for Deletion',
+            'root_id': root_id,
+            'goal_ids': [root_id], # Link to a goal
+            'goal_type': 'immediate'
+        }
+        res = authed_client.post(f'/api/{root_id}/sessions', json=session_payload)
+        assert res.status_code == 201
+        session_id = res.get_json()['id']
+        
+        # Create instance
+        instance_payload = {
+            'session_id': session_id,
+            'activity_definition_id': activity_id
+        }
+        res = authed_client.post(f'/api/{root_id}/activity-instances', json=instance_payload)
+        assert res.status_code == 201
+        
+        # 2. Try to delete the activity
+        response = authed_client.delete(f'/api/{root_id}/activities/{activity_id}')
+        assert response.status_code == 200
+        
+        # 3. Verify it is hidden from list
+        res = authed_client.get(f'/api/{root_id}/activities')
+        data = res.get_json()
+        assert not any(a['id'] == activity_id for a in data)
