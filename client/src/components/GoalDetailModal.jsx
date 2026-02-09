@@ -159,7 +159,7 @@ function GoalDetailModal({
 
     const handleScroll = (e) => {
         const scrollTop = e.target.scrollTop;
-        setIsScrolled(scrollTop > 20);
+        setIsScrolled(scrollTop > 0);
     };
 
     // Initialize form state from goal - use specific dependencies for completion state
@@ -778,72 +778,77 @@ function GoalDetailModal({
                         })()}
 
 
-                        {/* Updated Metrics Section - Moved above Targets/Children */}
+                        {/* Updated Metrics Section - Borderless 2x2 Grid */}
                         {metrics && (
                             <div className={styles.metricsContainer} style={{ marginTop: '20px' }}>
-                                {/* Header matching Description Label (12px bold) */}
-                                <div className={styles.label} style={{ color: goalColor, marginBottom: '8px', fontSize: '12px', fontWeight: 'bold' }}>
-                                    Metrics
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                    {/* Metric Card: Time */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    columnGap: '24px',
+                                    rowGap: '12px'
+                                }}>
+                                    {/* Metric Item: Time */}
                                     <div
                                         onClick={handleTimeSpentClick}
                                         style={{
-                                            padding: '12px',
-                                            background: 'var(--color-bg-card-alt)',
-                                            border: '1px solid var(--color-border)',
-                                            borderRadius: '6px',
                                             display: 'flex',
-                                            justifyContent: 'space-between',
+                                            justifyContent: 'flex-start',
                                             alignItems: 'center',
                                             cursor: 'pointer',
-                                            transition: 'background 0.2s'
+                                            padding: '4px 0',
+                                            gap: '6px'
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-card-hover)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-bg-card-alt)'}
                                     >
-                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Time Spent</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                        <span style={{
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            color: goalColor,
+                                            textDecoration: 'underline'
+                                        }}>
+                                            Time Spent:
+                                        </span>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                                             {formatDuration(metrics.recursive.sessions_duration_seconds + metrics.recursive.activities_duration_seconds)}
                                         </span>
                                     </div>
 
-                                    {/* Metric Card: Sessions */}
+                                    {/* Metric Item: Sessions */}
                                     <div style={{
-                                        padding: '12px',
-                                        background: 'var(--color-bg-card-alt)',
-                                        border: '1px solid var(--color-border)',
-                                        borderRadius: '6px',
                                         display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
+                                        justifyContent: 'flex-start',
+                                        alignItems: 'center',
+                                        padding: '4px 0',
+                                        gap: '6px'
                                     }}>
-                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Sessions</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: goalColor }}>
+                                            Sessions:
+                                        </span>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                                             {metrics.recursive.sessions_count}
                                         </span>
                                     </div>
 
-                                    {/* Metric Card: Activities */}
+                                    {/* Metric Item: Activities */}
                                     <div
                                         onClick={() => setViewState('activity-associator')}
                                         style={{
-                                            padding: '12px',
-                                            background: 'var(--color-bg-card-alt)',
-                                            border: '1px solid var(--color-border)',
-                                            borderRadius: '6px',
                                             display: 'flex',
-                                            justifyContent: 'space-between',
+                                            justifyContent: 'flex-start',
                                             alignItems: 'center',
                                             cursor: 'pointer',
-                                            transition: 'background 0.2s'
+                                            padding: '4px 0',
+                                            gap: '6px'
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-card-hover)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-bg-card-alt)'}
                                     >
-                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Activities</span>
-                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                        <span style={{
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            color: goalColor,
+                                            textDecoration: 'underline'
+                                        }}>
+                                            Associated Activities:
+                                        </span>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                                             {metrics.recursive.activities_count}
                                         </span>
                                     </div>
@@ -962,6 +967,8 @@ function GoalDetailModal({
                 targets={targets}
                 viewMode="selector"
                 onCloseSelector={() => setViewState('goal')}
+                headerColor={goalColor}
+                onClose={onClose}
                 onCreateActivity={() => {
                     // Reset form state and switch to activity builder view
                     setNewActivityName('');

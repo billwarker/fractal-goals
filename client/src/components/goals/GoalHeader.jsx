@@ -30,7 +30,7 @@ function GoalHeader({
             borderBottom: `2px solid ${goalColor}`,
             position: 'sticky',
             top: '-24px', // Stick to the very top (covering parent padding)
-            background: 'var(--color-bg-card)',
+            background: 'var(--color-bg-surface)',
             zIndex: 20,
             // Negative margins to span full width of modal padding for sticky header
             marginRight: '-24px',

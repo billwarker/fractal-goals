@@ -31,7 +31,8 @@ const ActivityAssociator = ({
     onCreateActivity,
     completedViaChildren = false,
     isAboveShortTermGoal = false,
-    headerColor
+    headerColor,
+    onClose // Callback to close modal entirely
 }) => {
     // STATE
     // "Discovery Mode" determines if we show the "Add/Edit" detailed view
@@ -262,23 +263,95 @@ const ActivityAssociator = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
 
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h3 style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: headerColor || 'var(--color-text-primary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                }}>
-                    Associated Activities
-                </h3>
-                {associatedActivities.length > 0 && (
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {associatedActivities.length} total
-                    </span>
-                )}
+            {/* Header - Styled like GoalHeader */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '10px',
+                paddingBottom: '20px',
+                marginBottom: '24px',
+                borderBottom: `2px solid ${headerColor || 'var(--color-border)'}`,
+                position: 'sticky',
+                top: '-24px',
+                background: 'var(--color-bg-surface)',
+                zIndex: 20,
+                // Negative margins to span full width (assuming parent padding)
+                // ActivityAssociator is rendered inside modal content which has padding.
+                marginRight: '-24px',
+                marginLeft: '-24px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                marginTop: '-24px',
+                paddingTop: '24px',
+                isolation: 'isolate',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Back Button */}
+                    <button
+                        onClick={onCloseSelector}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: headerColor || 'var(--color-text-primary)',
+                            borderRadius: '50%',
+                            transition: 'background 0.2s',
+                            marginRight: '4px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-card-hover)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        title="Back to Goal"
+                    >
+                        <span style={{ fontSize: '24px', lineHeight: 1 }}>←</span>
+                    </button>
+                    <h3 style={{
+                        margin: 0,
+                        fontSize: '24px',
+                        fontWeight: 'bold',
+                        color: headerColor || 'var(--color-text-primary)',
+                        lineHeight: '1.2'
+                    }}>
+                        Associated Activities
+                        {associatedActivities.length > 0 && (
+                            <span style={{
+                                color: 'var(--color-text-muted)',
+                                marginLeft: '8px',
+                                fontSize: 'inherit', // Should inherit 24px
+                                fontWeight: 'inherit' // Should inherit bold
+                            }}>
+                                ({associatedActivities.length})
+                            </span>
+                        )}
+                    </h3>
+                </div>
+
+                {/* Right Side: Close Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#888',
+                                fontSize: '24px',
+                                cursor: 'pointer',
+                                padding: '0',
+                                lineHeight: 1,
+                                height: '24px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* ASSOCIATED CONTENT AREA */}
