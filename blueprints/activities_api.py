@@ -664,7 +664,7 @@ def remove_activity_goal(current_user, root_id, activity_id, goal_id):
 @activities_bp.route('/<root_id>/goals/<goal_id>/activities', methods=['GET'])
 @token_required
 def get_goal_activities(current_user, root_id, goal_id):
-    """Get all activities associated with a goal (including those from linked groups)."""
+    """Get all activities associated with a goal (including those from linked groups and INHERITED from children)."""
     from models import Goal, ActivityGroup
     
     engine = models.get_engine()
@@ -674,17 +674,71 @@ def get_goal_activities(current_user, root_id, goal_id):
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
         
-        # Get directly associated activities
+        # Helper to process a goal and add to map
+        def process_goal(g, activities_map, is_inherited=False, source_name=None):
+            # 1. Direct Activities
+            for a in g.associated_activities:
+                if a.deleted_at:
+                    continue
+                
+                # If already exists (e.g. from parent/direct), we might want to prioritize "Direct" over "Inherited"
+                # But if we are processing parent first (top-down), then "Direct" comes first.
+                # If we process recursively, we should decide priority.
+                # Strategy: "Direct" association overrides "Inherited" for the SAME activity.
+                
+                if a.id not in activities_map:
+                    activities_map[a.id] = {
+                        "id": a.id, 
+                        "name": a.name, 
+                        "description": a.description, 
+                        "group_id": a.group_id,
+                        "is_inherited": is_inherited,
+                        "source_goal_name": source_name if is_inherited else None,
+                        "source_goal_id": g.id if is_inherited else None
+                    }
+                elif not is_inherited and activities_map[a.id]['is_inherited']:
+                    # If we found a direct association but had an inherited one, UPGRADE it to direct
+                    activities_map[a.id]['is_inherited'] = False
+                    activities_map[a.id]['source_goal_name'] = None
+                    activities_map[a.id]['source_goal_id'] = None
+            
+            # 2. Group Activities
+            for group in g.associated_activity_groups:
+                for a in group.activities:
+                    if a.deleted_at:
+                        continue
+                        
+                    if a.id not in activities_map:
+                        activities_map[a.id] = {
+                            "id": a.id, 
+                            "name": a.name, 
+                            "description": a.description, 
+                            "group_id": a.group_id, 
+                            "from_linked_group": True,
+                            "is_inherited": is_inherited,
+                            "source_goal_name": source_name if is_inherited else None,
+                            "source_goal_id": g.id if is_inherited else None
+                        }
+                    elif not is_inherited and activities_map[a.id]['is_inherited']:
+                         # Upgrade to direct if found locally
+                        activities_map[a.id]['is_inherited'] = False
+                        activities_map[a.id]['source_goal_name'] = None
+                        activities_map[a.id]['source_goal_id'] = None
+
         activities_set = {}
-        for a in goal.associated_activities:
-            if not a.deleted_at:
-                activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id}
         
-        # Get activities from linked groups
-        for group in goal.associated_activity_groups:
-            for a in group.activities:
-                if a.id not in activities_set and not a.deleted_at:
-                    activities_set[a.id] = {"id": a.id, "name": a.name, "description": a.description, "group_id": a.group_id, "from_linked_group": True}
+        # 1. Process THIS goal (Direct)
+        process_goal(goal, activities_set, is_inherited=False)
+        
+        # 2. Recursively process descendants (BFS to keep "closest" children? DFS is fine too)
+        # We want to traverse the whole subtree.
+        stack = [goal]
+        while stack:
+            current = stack.pop(0) # BFS
+            for child in current.children:
+                if not child.deleted_at:
+                    process_goal(child, activities_set, is_inherited=True, source_name=child.name)
+                    stack.append(child)
         
         return jsonify(list(activities_set.values()))
     finally:
