@@ -22,6 +22,7 @@ from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 from services.serializers import serialize_goal, serialize_target, calculate_smart_status, format_utc
 from extensions import limiter
+from services.metrics import GoalMetricsService
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -433,6 +434,46 @@ def remove_goal_target(goal_id, target_id):
         return jsonify({"targets": remaining_targets}), 200
     except Exception as e:
         db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])
+def get_goal_metrics(goal_id: str):
+    """Get calculated metrics for a goal (direct and recursive)."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        service = GoalMetricsService(db_session)
+        metrics = service.get_metrics_for_goal(goal_id)
+        
+        if not metrics:
+            return jsonify({"error": "Goal not found"}), 404
+            
+        return jsonify(metrics)
+    except Exception as e:
+        logger.exception(f"Error fetching goal metrics: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/goals/<goal_id>/metrics/daily-durations', methods=['GET'])
+def get_goal_daily_durations(goal_id: str):
+    """Get daily duration metrics for a goal (recursive)."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        service = GoalMetricsService(db_session)
+        metrics = service.get_goal_daily_durations(goal_id)
+        
+        if metrics is None:
+            return jsonify({"error": "Goal not found"}), 404
+            
+        return jsonify(metrics)
+    except Exception as e:
+        logger.exception(f"Error fetching goal daily durations: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()

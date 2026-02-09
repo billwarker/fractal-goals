@@ -8,6 +8,7 @@ import Button from './atoms/Button';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
+import { formatDurationSeconds as formatDuration } from '../utils/formatters';
 import SMARTIndicator from './SMARTIndicator';
 import { fractalApi } from '../utils/api';
 import TargetManager from './goalDetail/TargetManager';
@@ -19,6 +20,7 @@ import GoalHeader from './goals/GoalHeader';
 import GoalSmartSection from './goals/GoalSmartSection';
 import GoalChildrenList from './goals/GoalChildrenList';
 import { useGoalForm } from '../hooks/useGoalForm';
+import GenericGraphModal from './analytics/GenericGraphModal';
 import styles from './GoalDetailModal.module.css';
 
 /**
@@ -103,6 +105,54 @@ function GoalDetailModal({
     const [newActivityGroupId, setNewActivityGroupId] = useState('');
     const [isCreatingActivity, setIsCreatingActivity] = useState(false);
 
+    // Metrics state
+    const [metrics, setMetrics] = useState(null);
+    const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+
+    // Graph Modal State
+    const [graphModalConfig, setGraphModalConfig] = useState(null);
+
+    const handleTimeSpentClick = async () => {
+        try {
+            const response = await fractalApi.getGoalDailyDurations(rootId, depGoalId);
+            const points = response.data.points || [];
+
+            // Transform to Chart.js data
+            const labels = points.map(p => new Date(p.date)); // X-axis dates
+            const sessionData = points.map(p => Math.round(p.session_duration / 60)); // Minutes
+            const activityData = points.map(p => Math.round(p.activity_duration / 60)); // Minutes
+
+            setGraphModalConfig({
+                title: goal?.name || name,
+                goalType: goalType,
+                goalColor: goalColor,
+                graphData: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Session Duration',
+                            data: sessionData
+                        },
+                        {
+                            label: 'Activity Duration',
+                            data: activityData
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Duration (min)' }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error fetching daily durations:", error);
+            notify.error("Failed to load time data");
+        }
+    };
+
     // Initialize form state from goal - use specific dependencies for completion state
     const depGoalId = goal?.attributes?.id || goal?.id;
     const depGoalCompleted = goal?.attributes?.completed;
@@ -157,7 +207,72 @@ function GoalDetailModal({
             }
         };
 
+        const fetchMetrics = async () => {
+            if (mode === 'create' || !depGoalId) {
+                setMetrics(null);
+                return;
+            }
+            setIsLoadingMetrics(true);
+            try {
+                // Use root_id from props if available, otherwise it might be in goal attributes? 
+                // Actually the API endpoint /goals/:id/metrics is global in the blueprint (not under a root prefix in the route definition I added?)
+                // Wait, I added `@goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])`. 
+                // This is under `/api/goals/...`, so it doesn't need root_id in the URL path.
+                // The api.js wrapper I wrote: `axios.get(\`\${API_BASE}/\${rootId}/goals/\${goalId}/metrics\`)`... 
+                // WAIT. My API definition in python was plain `/goals/<goal_id>/metrics` under `goals_bp`, which has `url_prefix='/api'`.
+                // So the URL is `/api/goals/<goal_id>/metrics`.
+                // But my api.js change was: `axios.get(\`\${API_BASE}/\${rootId}/goals/\${goalId}/metrics\`)`.
+                // This is WRONG if I put the endpoint in the global section.
+                // Let me re-verify the python code I wrote.
+                // I wrote: 
+                // @goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])
+                // def get_goal_metrics(goal_id: str):
+                //
+                // This `goals_bp` is `goals_bp = Blueprint('goals', __name__, url_prefix='/api')`.
+                // So the path is `/api/goals/<goal_id>/metrics`.
+                //
+                // My api.js update was:
+                // getGoalMetrics: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/metrics`),
+                // 
+                // This puts `rootId` in the path. `goals_bp` DOES have fractal scoped routes too.
+                // But I added it to the "GLOBAL GOAL ENDPOINTS" section (conceptually, or at least physically in the file).
+                // Let me fix api.js first or change my python code.
+                // Changing python code to be fractal scoped is probably better for consistency if I want to enforce permission checks later, 
+                // but currently `get_goal_metrics` doesn't check ownership (it uses `get_goal_by_id` which is generic).
+                // 
+                // Actually, looking at `goals_api.py`, there is a section `# FRACTAL-SCOPED ROUTES`.
+                // Routes there verify `root` ownership.
+                // My new endpoint just takes `goal_id`.
+                // The `get_goal_endpoint` is also global: `@goals_bp.route('/goals/<goal_id>', methods=['GET'])`.
+                // So my python implementation is consistent with `get_goal_endpoint`.
+                // 
+                // So I should fix `api.js` to NOT include `rootId` in the path, OR update `api.js` to use the global style.
+                // `fractalApi` in `api.js` usually expects `rootId`.
+                // `legacyApi` or `globalApi` might be better places, OR I just fix the URL in `fractalApi` to ignore rootId if I want to keep it there.
+                // BUT, `GoalDetailModal` has access to `rootId`.
+                // 
+                // I will update the `api.js` call in `GoalDetailModal` to match whatever I fix.
+                // I'll assume I will fix `api.js` to be correct (`/goals/${goalId}/metrics`).
+                //
+                // Wait, if I change `api.js` now, I have to do another tool call.
+                // I can just call `axios` directly or fix `api.js` in a separate step.
+                // I'll fix `api.js` in a subsequent step or previous step? I already edited it.
+                // I will fix `api.js` in the next step to be correct.
+                // 
+                // Back to this file... I will use `fractalApi.getGoalMetrics(rootId, depGoalId)`.
+
+                const response = await fractalApi.getGoalMetrics(rootId, depGoalId);
+                setMetrics(response.data);
+            } catch (error) {
+                console.error("Error fetching metrics:", error);
+                setMetrics(null);
+            } finally {
+                setIsLoadingMetrics(false);
+            }
+        };
+
         fetchAssociatedActivities();
+        fetchMetrics();
     }, [rootId, depGoalId, mode]);
 
     // For modal mode, check isOpen
@@ -321,6 +436,16 @@ function GoalDetailModal({
 
         return (
             <>
+                <GenericGraphModal
+                    isOpen={!!graphModalConfig}
+                    onClose={() => setGraphModalConfig(null)}
+                    title={graphModalConfig?.title}
+                    goalType={graphModalConfig?.goalType}
+                    goalColor={graphModalConfig?.goalColor}
+                    graphData={graphModalConfig?.graphData}
+                    options={graphModalConfig?.options}
+                />
+
                 <GoalHeader
                     mode={mode}
                     name={name}
@@ -619,7 +744,7 @@ function GoalDetailModal({
 
                             return (
                                 <div>
-                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor }}>
+                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor, fontSize: '12px' }}>
                                         Associated Programs
                                     </label>
                                     <div className={styles.associatedPrograms}>
@@ -641,29 +766,6 @@ function GoalDetailModal({
                             );
                         })()}
 
-                        {/* Associated Activities Section - View Mode (Read-only) */}
-                        {trackActivities && (
-                            <ActivityAssociator
-                                associatedActivities={associatedActivities}
-                                setAssociatedActivities={setAssociatedActivities}
-                                associatedActivityGroups={associatedActivityGroups}
-                                setAssociatedActivityGroups={setAssociatedActivityGroups}
-                                activityDefinitions={activityDefinitions}
-                                activityGroups={activityGroups}
-                                setActivityGroups={setActivityGroups}
-                                rootId={rootId}
-                                goalId={goalId}
-                                isEditing={false}
-                                targets={targets}
-                                goalName={name}
-                                viewMode="list"
-                                onOpenSelector={() => setViewState('activity-associator')}
-                                completedViaChildren={completedViaChildren}
-                                isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
-                                headerColor={goalColor}
-                            />
-                        )}
-
                         {/* Targets Section - View Mode (Read-only) */}
                         {trackActivities && (
                             <TargetManager
@@ -680,7 +782,6 @@ function GoalDetailModal({
                         )}
 
                         {/* Associated Children Section */}
-                        {/* Associated Children Section */}
                         <GoalChildrenList
                             treeData={treeData}
                             goalId={goalId}
@@ -688,15 +789,83 @@ function GoalDetailModal({
                             childType={childType}
                         />
 
-                        {/* Sessions List */}
-                        <GoalSessionList
-                            goalType={goalType}
-                            sessions={sessions}
-                            goalId={goalId}
-                            rootId={rootId}
-                            onClose={onClose}
-                            headerColor={goalColor}
-                        />
+                        {/* Updated Metrics Section */}
+                        {metrics && (
+                            <div className={styles.metricsContainer} style={{ marginTop: '20px' }}>
+                                {/* Header matching Description Label (12px bold) */}
+                                <div className={styles.label} style={{ color: goalColor, marginBottom: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+                                    Metrics
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    {/* Metric Card: Time */}
+                                    <div
+                                        onClick={handleTimeSpentClick}
+                                        style={{
+                                            padding: '12px',
+                                            background: 'var(--color-bg-card-alt)',
+                                            border: '1px solid var(--color-border)',
+                                            // borderLeft: `4px solid ${goalColor}`, // Removed as per request
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-card-hover)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-bg-card-alt)'}
+                                    >
+                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Time Spent</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                            {formatDuration(metrics.recursive.sessions_duration_seconds + metrics.recursive.activities_duration_seconds)}
+                                        </span>
+                                    </div>
+
+                                    {/* Metric Card: Sessions */}
+                                    <div style={{
+                                        padding: '12px',
+                                        background: 'var(--color-bg-card-alt)',
+                                        border: '1px solid var(--color-border)',
+                                        // borderLeft: `4px solid ${goalColor}`,
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Sessions</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                            {metrics.recursive.sessions_count}
+                                        </span>
+                                    </div>
+
+                                    {/* Metric Card: Activities */}
+                                    <div
+                                        onClick={() => setViewState('activity-associator')}
+                                        style={{
+                                            padding: '12px',
+                                            background: 'var(--color-bg-card-alt)',
+                                            border: '1px solid var(--color-border)',
+                                            // borderLeft: `4px solid ${goalColor}`,
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-card-hover)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-bg-card-alt)'}
+                                    >
+                                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Activities</span>
+                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                                            {metrics.recursive.activities_count}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Sessions List - Removed as per request */}
 
                     </div>
                 )

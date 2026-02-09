@@ -381,6 +381,22 @@ export const fractalApi = {
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
 
     /**
+     * Get all metrics associated with a goal
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     */
+    getGoalMetrics: (rootId, goalId) =>
+        axios.get(`${API_BASE}/goals/${goalId}/metrics`),
+
+    /**
+     * Get daily duration metrics for a goal (recursive)
+     * @param {string} rootId - ID of the fractal
+     * @param {string} goalId - ID of the goal
+     */
+    getGoalDailyDurations: (rootId, goalId) =>
+        axios.get(`${API_BASE}/goals/${goalId}/metrics/daily-durations`),
+
+    /**
      * Link an activity group to a goal (includes all current and future activities in the group)
      * @param {string} rootId - ID of the fractal
      * @param {string} goalId - ID of the goal
