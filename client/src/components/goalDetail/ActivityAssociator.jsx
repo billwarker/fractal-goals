@@ -505,24 +505,26 @@ const ActivityAssociator = ({
                 </div>
             )}
 
-            {/* ============ ASSOCIATED ACTIVITIES ============ */}
-            {(roots.length > 0 || ungrouped.activities.length > 0) ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {roots.map(group => renderGroupContainer(group))}
+            {/* ============ ASSOCIATED ACTIVITIES (selector mode only) ============ */}
+            {isSelectorMode && (
+                (roots.length > 0 || ungrouped.activities.length > 0) ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {roots.map(group => renderGroupContainer(group))}
 
-                    {ungrouped.activities.length > 0 && (
-                        <div className={styles.ungroupedContainer}>
-                            <h4 className={styles.ungroupedTitle}>Ungrouped</h4>
-                            <div className={styles.activityGrid}>
-                                {ungrouped.activities.map(a => renderMiniCard(a))}
+                        {ungrouped.activities.length > 0 && (
+                            <div className={styles.ungroupedContainer}>
+                                <h4 className={styles.ungroupedTitle}>Ungrouped</h4>
+                                <div className={styles.activityGrid}>
+                                    {ungrouped.activities.map(a => renderMiniCard(a))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className={styles.emptyState}>
-                    No activities associated yet. Click below to browse and add activities.
-                </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className={styles.emptyState}>
+                        No activities associated yet. Click below to browse and add activities.
+                    </div>
+                )
             )}
 
             {/* ============ ASSOCIATE BUTTON (selector mode only) ============ */}
@@ -535,8 +537,8 @@ const ActivityAssociator = ({
                 </button>
             )}
 
-            {/* ============ COMPLETION VIA CHILDREN NOTE ============ */}
-            {associatedActivities.length === 0 && isAboveShortTermGoal && !completedViaChildren && (
+            {/* ============ COMPLETION VIA CHILDREN NOTE (selector mode only) ============ */}
+            {isSelectorMode && associatedActivities.length === 0 && isAboveShortTermGoal && !completedViaChildren && (
                 <div className={styles.helperNote}>
                     (Goal implies completion via children unless activities are added)
                 </div>
