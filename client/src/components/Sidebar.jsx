@@ -20,6 +20,7 @@ const Sidebar = ({
     onAddChild,
     onAddSession,
     onToggleCompletion,
+    onGoalSelect,
     // Data props needed for enhanced features
     treeData,
     sessions = [],
@@ -70,6 +71,7 @@ const Sidebar = ({
             displayMode="panel"
             programs={programs}
             activityGroups={activityGroups}
+            onGoalSelect={onGoalSelect}
         />
     );
 };

@@ -333,6 +333,7 @@ function FractalGoals() {
                                         activityDefinitions={activities}
                                         activityGroups={activityGroups}
                                         programs={programs}
+                                        onGoalSelect={handleGoalNameClick}
                                     />
                                 </ErrorBoundary>
                             )}

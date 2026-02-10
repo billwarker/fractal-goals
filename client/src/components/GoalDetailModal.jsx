@@ -53,7 +53,8 @@ function GoalDetailModal({
     // Create mode props
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
-    parentGoal  // Parent goal for context when creating
+    parentGoal,  // Parent goal for context when creating
+    onGoalSelect // Handler for selecting a goal (e.g. child)
 }) {
     const { getGoalColor, getGoalTextColor } = useTheme();
     const navigate = useNavigate();
@@ -874,6 +875,7 @@ function GoalDetailModal({
                             goalId={goalId}
                             goalColor={goalColor}
                             childType={childType}
+                            onGoalSelect={onGoalSelect}
                         />
 
 
