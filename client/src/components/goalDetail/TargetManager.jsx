@@ -638,7 +638,7 @@ const TargetManager = ({
             {renderDeleteConfirm()}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label style={{ display: 'block', margin: 0, fontSize: 'var(--font-size-xs, 12px)', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold', letterSpacing: '0.3px' }}>
+                    <label style={{ display: 'block', margin: 0, fontSize: 'var(--font-size-xs)', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
                         Targets
                     </label>
                     {targets.length > 0 && (
