@@ -513,10 +513,10 @@ const ActivityAssociator = ({
                             >
                                 ←
                             </button>
-                            <h3 className={styles.headerTitle} style={{ color: headerColor || 'var(--color-text-primary)' }}>
-                                Associated Activities
-                            </h3>
                         </div>
+                        <h3 className={styles.headerTitle} style={{ color: headerColor || 'var(--color-text-primary)' }}>
+                            Associated Activities
+                        </h3>
                         <div className={styles.headerRight}>
                             {onClose && (
                                 <button onClick={onClose} className={styles.closeBtn}>×</button>

@@ -75,23 +75,30 @@
 }
 
 .headerTopLine {
+    position: relative;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     width: 100%;
+    min-height: 40px;
 }
 
 .headerLeft {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
-    gap: 4px;
-    /* Reduced gap to bring title closer to arrow */
 }
 
 .headerRight {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
-    gap: 16px;
 }
 
 .backBtn {
@@ -101,26 +108,30 @@
     padding: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: background 0.2s;
-    font-size: 24px;
+    justify-content: flex-start;
     line-height: 1;
-    height: 32px;
-    width: 32px;
-    /* Optical alignment for the arrow icon */
-    transform: translateY(-1px);
+    height: 100%;
+    width: 40px;
+    font-size: 28px;
+    transition: opacity 0.2s;
+    /* Stronger optical alignment to center arrow with capital letters */
+    transform: translateY(-10px);
 }
 
 .backBtn:hover {
-    background: var(--color-bg-card-hover);
+    opacity: 0.7;
 }
 
 .headerTitle {
     margin: 0;
     font-size: 24px;
     font-weight: bold;
-    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1;
+    /* Tighter line height for better centering */
 }
 
 .headerCount {
@@ -134,13 +145,18 @@
     background: transparent;
     border: none;
     color: #888;
-    font-size: 24px;
+    font-size: 28px;
     cursor: pointer;
     padding: 0;
     line-height: 1;
-    height: 24px;
+    height: 100%;
+    width: 40px;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    transition: color 0.2s;
+    /* Match backBtn optical nudge */
+    transform: translateY(-6px);
 }
 
 .closeBtn:hover {
