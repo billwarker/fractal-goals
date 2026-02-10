@@ -20,7 +20,7 @@ function GoalSmartSection({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Description (Specific) */}
             <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--font-size-xs)', color: goalColor, fontWeight: 'bold' }}>
                     Description
                 </label>
                 <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
@@ -34,7 +34,7 @@ function GoalSmartSection({
             {/* Relevance Statement (Relevant) */}
             {showRelevance && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--font-size-xs)', color: goalColor, fontWeight: 'bold' }}>
                         {goalType === 'UltimateGoal'
                             ? "Why does this Ultimate Goal matter to you?"
                             : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || 'var(--color-text-primary)' }}>{parentGoalName}</span>?</span>

@@ -825,7 +825,7 @@ function GoalDetailModal({
 
                             return (
                                 <div>
-                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor, fontSize: '12px' }}>
+                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor, fontSize: 'var(--font-size-xs)' }}>
                                         Associated Programs
                                     </label>
                                     <div className={styles.associatedPrograms}>
@@ -848,9 +848,9 @@ function GoalDetailModal({
                         })()}
 
 
-                        {/* Updated Metrics Section - Borderless 2x2 Grid */}
+                        {/* Updated Metrics Section - Centered between other sections */}
                         {metrics && (
-                            <div className={styles.metricsContainer} style={{ marginTop: '20px' }}>
+                            <div className={styles.metricsContainer}>
                                 <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: '1fr 1fr 1fr',
