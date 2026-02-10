@@ -23,8 +23,8 @@
 }
 
 .inlineSectionLabel {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--font-size-xs, 12px);
+    font-weight: bold;
     letter-spacing: 0.3px;
 }
 

@@ -637,21 +637,37 @@ const TargetManager = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {renderDeleteConfirm()}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ display: 'block', margin: 0, fontSize: '12px', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
-                    Targets ({targets.length})
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ display: 'block', margin: 0, fontSize: 'var(--font-size-xs, 12px)', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold', letterSpacing: '0.3px' }}>
+                        Targets
+                    </label>
+                    {targets.length > 0 && (
+                        <span style={{
+                            fontSize: '11px',
+                            background: 'var(--color-bg-input)',
+                            color: 'var(--color-text-muted)',
+                            padding: '1px 7px',
+                            borderRadius: '10px',
+                            fontWeight: 500
+                        }}>
+                            {targets.length}
+                        </span>
+                    )}
+                </div>
                 {isEditing && (
                     <button
                         onClick={canAddTargets ? handleOpenAddTarget : undefined}
                         disabled={!canAddTargets}
                         style={{
-                            background: canAddTargets ? 'var(--color-bg-card-alt)' : 'var(--color-bg-input)',
-                            border: `1px solid ${canAddTargets ? 'var(--color-border)' : 'transparent'}`,
+                            background: 'transparent',
+                            border: `1.5px solid ${canAddTargets ? '#4caf50' : 'var(--color-border)'}`,
                             borderRadius: '4px',
-                            color: canAddTargets ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+                            color: canAddTargets ? '#4caf50' : 'var(--color-text-muted)',
                             cursor: canAddTargets ? 'pointer' : 'not-allowed',
                             fontSize: '12px',
-                            padding: '2px 6px'
+                            fontWeight: 'bold',
+                            padding: '2px 8px',
+                            transition: 'all 0.2s'
                         }}
                     >
                         + Add Target

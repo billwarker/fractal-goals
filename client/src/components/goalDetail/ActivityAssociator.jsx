@@ -51,17 +51,20 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
-    // Reset selection when closing discovery
+    // Reset selection when closing discovery; collapse all groups by default
     useEffect(() => {
         if (!isDiscoveryActive) {
             setTempSelectedActivities([]);
             setTempSelectedGroups([]);
-            setCollapsedDiscoveryGroups(new Set());
             setShowGroupCreator(false);
             setNewGroupName('');
             setNewGroupParentId('');
+        } else {
+            // Start with all groups collapsed in discovery mode
+            const allGroupIds = new Set(activityGroups.map(g => g.id));
+            setCollapsedDiscoveryGroups(allGroupIds);
         }
-    }, [isDiscoveryActive]);
+    }, [isDiscoveryActive, activityGroups]);
 
     // HANDLERS
     const toggleGroupCollapse = (groupId) => {
@@ -455,10 +458,19 @@ const ActivityAssociator = ({
                     {onOpenSelector && (
                         <button
                             onClick={onOpenSelector}
-                            className={styles.expandBtn}
-                            title="Open full activity selector"
+                            style={{
+                                background: 'transparent',
+                                border: '1.5px solid #4caf50',
+                                borderRadius: '4px',
+                                color: '#4caf50',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                padding: '2px 8px',
+                                transition: 'all 0.2s'
+                            }}
                         >
-                            ↗
+                            + Associate Activities
                         </button>
                     )}
                 </div>
@@ -513,8 +525,8 @@ const ActivityAssociator = ({
                 </div>
             )}
 
-            {/* ============ ASSOCIATE BUTTON ============ */}
-            {!isDiscoveryActive && (
+            {/* ============ ASSOCIATE BUTTON (selector mode only) ============ */}
+            {isSelectorMode && !isDiscoveryActive && (
                 <button
                     onClick={() => setIsDiscoveryActive(true)}
                     className={styles.associateBtn}
@@ -530,8 +542,8 @@ const ActivityAssociator = ({
                 </div>
             )}
 
-            {/* ============ DISCOVERY AREA ============ */}
-            {isDiscoveryActive && (
+            {/* ============ DISCOVERY AREA (selector mode only) ============ */}
+            {isSelectorMode && isDiscoveryActive && (
                 <div className={styles.discoveryContainer}>
                     <h4 className={styles.discoverySectionTitle}>
                         Available Activities & Groups
