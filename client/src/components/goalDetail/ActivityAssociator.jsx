@@ -262,6 +262,14 @@ const ActivityAssociator = ({
             g.children.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
         });
 
+        // Calculate total counts recursively
+        const attachTotalCount = (node) => {
+            node.totalCount = node.activities.length +
+                node.children.reduce((sum, child) => sum + attachTotalCount(child), 0);
+            return node.totalCount;
+        };
+        roots.forEach(attachTotalCount);
+
         return { roots, ungrouped };
     };
 
@@ -303,8 +311,8 @@ const ActivityAssociator = ({
             );
             node.children.forEach(child => attachActivities(child));
             // Count total available (activities + children's activities)
-            node.totalAvailable = node.activities.length +
-                node.children.reduce((sum, c) => sum + (c.totalAvailable || 0), 0);
+            node.totalCount = node.activities.length +
+                node.children.reduce((sum, c) => sum + (c.totalCount || 0), 0);
         };
 
         allRoots.forEach(root => attachActivities(root));
@@ -313,7 +321,7 @@ const ActivityAssociator = ({
         const filterEmpty = (nodes) => {
             return nodes.filter(n => {
                 n.children = filterEmpty(n.children);
-                return n.totalAvailable > 0;
+                return n.totalCount > 0;
             });
         };
 
@@ -404,9 +412,7 @@ const ActivityAssociator = ({
         const toggleFn = isDiscovery ? toggleDiscoveryGroupCollapse : toggleGroupCollapse;
         const isLinked = associatedActivityGroups.some(g => g.id === group.id);
         const isGroupSelected = isDiscovery && tempSelectedGroups.includes(group.id);
-        const activityCount = isDiscovery
-            ? (group.totalAvailable || groupActivities.length)
-            : groupActivities.length;
+        const activityCount = group.totalCount !== undefined ? group.totalCount : groupActivities.length;
 
         return (
             <div
