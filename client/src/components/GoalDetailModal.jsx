@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import notify from '../utils/notify';
 import Input from './atoms/Input';
 import TextArea from './atoms/TextArea';
@@ -96,6 +96,10 @@ function GoalDetailModal({
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [associatedActivityGroups, setAssociatedActivityGroups] = useState([]); // Array of {id, name}
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+    // Snapshots of initial associations for diffing on save
+    const initialActivitiesRef = useRef([]);
+    const initialGroupsRef = useRef([]);
 
     // Inline activity builder form state
     const [newActivityName, setNewActivityName] = useState('');
@@ -203,8 +207,13 @@ function GoalDetailModal({
                     fractalApi.getGoalActivityGroups(rootId, depGoalId)
                 ]);
 
-                setAssociatedActivities(activitiesResponse.data || []);
-                setAssociatedActivityGroups(groupsResponse.data || []);
+                const loadedActivities = activitiesResponse.data || [];
+                const loadedGroups = groupsResponse.data || [];
+                setAssociatedActivities(loadedActivities);
+                setAssociatedActivityGroups(loadedGroups);
+                // Snapshot for diffing on save
+                initialActivitiesRef.current = loadedActivities.map(a => a.id);
+                initialGroupsRef.current = loadedGroups.map(g => g.id);
             } catch (error) {
                 console.error('Error fetching associations:', error);
                 // Fallback to empty if failed, but don't wipe existing if partial failure strictly
@@ -294,7 +303,7 @@ function GoalDetailModal({
         : (goal.attributes?.type || goal.type);
     const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const payload = mode === 'create' ? {
             name,
             description,
@@ -321,6 +330,69 @@ function GoalDetailModal({
             onCreate(payload);
         } else {
             onUpdate(goalId, payload);
+
+            // Persist activity and group associations
+            try {
+                const currentActivityIds = associatedActivities.map(a => a.id);
+                const initialActivityIds = initialActivitiesRef.current;
+
+                // Find added and removed activities
+                const addedActivities = currentActivityIds.filter(id => !initialActivityIds.includes(id));
+                const removedActivities = initialActivityIds.filter(id => !currentActivityIds.includes(id));
+
+                // For each added activity, add this goal to its goal list
+                for (const activityId of addedActivities) {
+                    // Get current goals for the activity, then add ours
+                    try {
+                        const resp = await fractalApi.getActivityGoals(rootId, activityId);
+                        const existingGoalIds = (resp.data || []).map(g => g.id);
+                        if (!existingGoalIds.includes(goalId)) {
+                            await fractalApi.setActivityGoals(rootId, activityId, [...existingGoalIds, goalId]);
+                        }
+                    } catch (err) {
+                        console.error(`Failed to add goal to activity ${activityId}:`, err);
+                    }
+                }
+
+                // For each removed activity, remove this goal from its goal list
+                for (const activityId of removedActivities) {
+                    try {
+                        await fractalApi.removeActivityGoal(rootId, activityId, goalId);
+                    } catch (err) {
+                        console.error(`Failed to remove goal from activity ${activityId}:`, err);
+                    }
+                }
+
+                // Persist group associations
+                const currentGroupIds = associatedActivityGroups.map(g => g.id);
+                const initialGroupIds = initialGroupsRef.current;
+
+                const addedGroups = currentGroupIds.filter(id => !initialGroupIds.includes(id));
+                const removedGroups = initialGroupIds.filter(id => !currentGroupIds.includes(id));
+
+                for (const groupId of addedGroups) {
+                    try {
+                        await fractalApi.linkGoalActivityGroup(rootId, goalId, groupId);
+                    } catch (err) {
+                        console.error(`Failed to link group ${groupId}:`, err);
+                    }
+                }
+
+                for (const groupId of removedGroups) {
+                    try {
+                        await fractalApi.unlinkGoalActivityGroup(rootId, goalId, groupId);
+                    } catch (err) {
+                        console.error(`Failed to unlink group ${groupId}:`, err);
+                    }
+                }
+
+                // Update snapshots to reflect persisted state
+                initialActivitiesRef.current = currentActivityIds;
+                initialGroupsRef.current = currentGroupIds;
+            } catch (err) {
+                console.error('Error persisting activity associations:', err);
+            }
+
             setIsEditing(false);
         }
     };
