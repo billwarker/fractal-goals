@@ -267,6 +267,30 @@ const ActivityAssociator = ({
 
     const { roots, ungrouped } = buildRelevantTree();
 
+    // Calculate direct vs inherited counts
+    const counts = useMemo(() => {
+        let direct = 0;
+        let inherited = 0;
+
+        // Count in tree nodes
+        const countInNode = (node) => {
+            node.activities.forEach(a => {
+                if (a.is_inherited) inherited++;
+                else direct++;
+            });
+            node.children.forEach(countInNode);
+        };
+        roots.forEach(countInNode);
+
+        // Count in ungrouped
+        ungrouped.activities.forEach(a => {
+            if (a.is_inherited) inherited++;
+            else direct++;
+        });
+
+        return { direct, inherited };
+    }, [roots, ungrouped]);
+
     // Build hierarchical discovery tree
     const discoveryTree = useMemo(() => {
         const { roots: allRoots, map } = buildGroupTree(activityGroups);
@@ -479,28 +503,41 @@ const ActivityAssociator = ({
             {/* ============ STICKY HEADER (selector mode only) ============ */}
             {isSelectorMode && (
                 <div className={styles.header} style={{ borderBottom: `2px solid ${headerColor || 'var(--color-border)'}` }}>
-                    <div className={styles.headerLeft}>
-                        <button
-                            onClick={onCloseSelector}
-                            className={styles.backBtn}
-                            style={{ color: headerColor || 'var(--color-text-primary)' }}
-                            title="Back to Goal"
-                        >
-                            ←
-                        </button>
-                        <h3 className={styles.headerTitle} style={{ color: headerColor || 'var(--color-text-primary)' }}>
-                            Associated Activities
-                            {associatedActivities.length > 0 && (
-                                <span className={styles.headerCount}>
-                                    ({associatedActivities.length})
-                                </span>
+                    <div className={styles.headerTopLine}>
+                        <div className={styles.headerLeft}>
+                            <button
+                                onClick={onCloseSelector}
+                                className={styles.backBtn}
+                                style={{ color: headerColor || 'var(--color-text-primary)' }}
+                                title="Back to Goal"
+                            >
+                                ←
+                            </button>
+                            <h3 className={styles.headerTitle} style={{ color: headerColor || 'var(--color-text-primary)' }}>
+                                Associated Activities
+                                {associatedActivities.length > 0 && (
+                                    <span className={styles.headerCount}>
+                                        ({associatedActivities.length})
+                                    </span>
+                                )}
+                            </h3>
+                        </div>
+                        <div className={styles.headerRight}>
+                            {onClose && (
+                                <button onClick={onClose} className={styles.closeBtn}>×</button>
                             )}
-                        </h3>
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {onClose && (
-                            <button onClick={onClose} className={styles.closeBtn}>×</button>
-                        )}
+
+                    <div className={styles.metricsBreakdown} style={{ color: headerColor || 'var(--color-text-primary)' }}>
+                        <div className={styles.metricItem}>
+                            <span className={styles.metricNumber}>{counts.direct}</span>
+                            <span className={styles.metricLabel}>Directly Associated</span>
+                        </div>
+                        <div className={styles.metricItem}>
+                            <span className={styles.metricNumber}>{counts.inherited}</span>
+                            <span className={styles.metricLabel}>Inherited</span>
+                        </div>
                     </div>
                 </div>
             )}

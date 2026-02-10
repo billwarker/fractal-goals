@@ -56,9 +56,8 @@
 /* ============ STICKY HEADER ============ */
 .header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    gap: 12px;
     padding-bottom: 20px;
     margin-bottom: 24px;
     position: sticky;
@@ -75,25 +74,42 @@
     isolation: isolate;
 }
 
+.headerTopLine {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 .headerLeft {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
+    /* Reduced gap to bring title closer to arrow */
+}
+
+.headerRight {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
 .backBtn {
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     transition: background 0.2s;
-    margin-right: 4px;
     font-size: 24px;
     line-height: 1;
+    height: 32px;
+    width: 32px;
+    /* Optical alignment for the arrow icon */
+    transform: translateY(-1px);
 }
 
 .backBtn:hover {
@@ -129,6 +145,33 @@
 
 .closeBtn:hover {
     color: var(--color-text-primary);
+}
+
+/* ============ METRICS BREAKDOWN ============ */
+.metricsBreakdown {
+    display: flex;
+    gap: 24px;
+    padding-left: 36px;
+    /* Align with title (backBtn width + gap) */
+    opacity: 0.9;
+}
+
+.metricItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.metricNumber {
+    font-size: 12px;
+    font-weight: bold;
+    color: inherit;
+}
+
+.metricLabel {
+    font-size: 12px;
+    font-weight: bold;
+    color: inherit;
 }
 
 /* ============ GROUP CONTAINERS ============ */
