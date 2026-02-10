@@ -515,11 +515,6 @@ const ActivityAssociator = ({
                             </button>
                             <h3 className={styles.headerTitle} style={{ color: headerColor || 'var(--color-text-primary)' }}>
                                 Associated Activities
-                                {associatedActivities.length > 0 && (
-                                    <span className={styles.headerCount}>
-                                        ({associatedActivities.length})
-                                    </span>
-                                )}
                             </h3>
                         </div>
                         <div className={styles.headerRight}>
@@ -530,6 +525,10 @@ const ActivityAssociator = ({
                     </div>
 
                     <div className={styles.metricsBreakdown} style={{ color: headerColor || 'var(--color-text-primary)' }}>
+                        <div className={styles.metricItem}>
+                            <span className={styles.metricNumber}>{counts.direct + counts.inherited}</span>
+                            <span className={styles.metricLabel}>Total</span>
+                        </div>
                         <div className={styles.metricItem}>
                             <span className={styles.metricNumber}>{counts.direct}</span>
                             <span className={styles.metricLabel}>Directly Associated</span>

@@ -149,16 +149,16 @@
 
 /* ============ METRICS BREAKDOWN ============ */
 .metricsBreakdown {
-    display: flex;
-    gap: 24px;
-    padding-left: 36px;
-    /* Align with title (backBtn width + gap) */
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    width: 100%;
     opacity: 0.9;
 }
 
 .metricItem {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
     gap: 6px;
 }
 
