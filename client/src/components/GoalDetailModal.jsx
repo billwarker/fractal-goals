@@ -130,10 +130,6 @@ function GoalDetailModal({
                     labels,
                     datasets: [
                         {
-                            label: 'Session Duration',
-                            data: sessionData
-                        },
-                        {
                             label: 'Activity Duration',
                             data: activityData
                         }
@@ -142,7 +138,8 @@ function GoalDetailModal({
                 options: {
                     scales: {
                         y: {
-                            title: { display: true, text: 'Duration (min)' }
+                            title: { display: true, text: 'Duration (min)' },
+                            beginAtZero: true
                         }
                     }
                 }
@@ -783,7 +780,7 @@ function GoalDetailModal({
                             <div className={styles.metricsContainer} style={{ marginTop: '20px' }}>
                                 <div style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
+                                    gridTemplateColumns: '1fr 1fr 1fr',
                                     columnGap: '24px',
                                     rowGap: '12px'
                                 }}>
@@ -792,7 +789,7 @@ function GoalDetailModal({
                                         onClick={handleTimeSpentClick}
                                         style={{
                                             display: 'flex',
-                                            justifyContent: 'flex-start',
+                                            justifyContent: 'center',
                                             alignItems: 'center',
                                             cursor: 'pointer',
                                             padding: '4px 0',
@@ -808,14 +805,14 @@ function GoalDetailModal({
                                             Time Spent:
                                         </span>
                                         <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                            {formatDuration(metrics.recursive.sessions_duration_seconds + metrics.recursive.activities_duration_seconds)}
+                                            {formatDuration(metrics.recursive.activities_duration_seconds)}
                                         </span>
                                     </div>
 
                                     {/* Metric Item: Sessions */}
                                     <div style={{
                                         display: 'flex',
-                                        justifyContent: 'flex-start',
+                                        justifyContent: 'center',
                                         alignItems: 'center',
                                         padding: '4px 0',
                                         gap: '6px'
@@ -833,7 +830,7 @@ function GoalDetailModal({
                                         onClick={() => setViewState('activity-associator')}
                                         style={{
                                             display: 'flex',
-                                            justifyContent: 'flex-start',
+                                            justifyContent: 'center',
                                             alignItems: 'center',
                                             cursor: 'pointer',
                                             padding: '4px 0',
@@ -846,10 +843,10 @@ function GoalDetailModal({
                                             color: goalColor,
                                             textDecoration: 'underline'
                                         }}>
-                                            Associated Activities:
+                                            Activities:
                                         </span>
                                         <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                            {metrics.recursive.activities_count}
+                                            {associatedActivities ? associatedActivities.length : metrics.recursive.activities_count}
                                         </span>
                                     </div>
                                 </div>

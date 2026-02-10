@@ -52,14 +52,16 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     /* 8px */
-    padding: var(--spacing-xl);
-    /* 24px */
+    padding: 24px;
+    /* Explicit 24px to match sticky header negative margins */
     max-width: 700px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
     overflow-x: hidden;
     /* Prevent horizontal scrolling */
+    overflow-wrap: break-word;
+    /* Ensure long words don't force overflow */
     color: var(--color-text-primary);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     /* Border top color is dynamic in JS */
