@@ -91,14 +91,34 @@ const CustomNode = ({ data }) => {
         ? getGoalSecondaryColor('CompletedGoal')
         : getGoalSecondaryColor(data.type);
 
+    // Simple hex to rgba helper
+    const hexToRgba = (hex, alpha) => {
+        if (!hex) return `rgba(255, 215, 0, ${alpha})`; // fallback gold
+        let r = 0, g = 0, b = 0;
+        // Handle shorthand #FFF
+        if (hex.length === 4) {
+            r = parseInt(hex[1] + hex[1], 16);
+            g = parseInt(hex[2] + hex[2], 16);
+            b = parseInt(hex[3] + hex[3], 16);
+        } else if (hex.length === 7) {
+            r = parseInt(hex.slice(1, 3), 16);
+            g = parseInt(hex.slice(3, 5), 16);
+            b = parseInt(hex.slice(5, 7), 16);
+        }
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    const glowColor = isCompleted ? hexToRgba(completedGold, 0.6) : null;
+
     return (
         <div className={styles.nodeContainer}>
             {/* Circle with handles positioned relative to it */}
             <div
-                className={`${styles.nodeCircle} ${isCompleted ? styles.nodeCircleCompleted : ''}`}
+                className={`${styles.nodeCircle}`}
                 style={{
                     background: isSmartGoal ? smartRingFillColor : fillColor,
                     border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
+                    boxShadow: isCompleted ? `0 0 10px ${glowColor}` : undefined,
                 }}
                 onClick={data.onClick}
             >
@@ -171,7 +191,7 @@ const CustomNode = ({ data }) => {
                 }
                 {/* Add Child Button - for all goal types that can have children */}
                 {
-                    data.onAddChild && data.childTypeName && (
+                    !isCompleted && data.onAddChild && data.childTypeName && (
                         <div
                             className={styles.addChildButton}
                             onClick={(e) => {
@@ -287,7 +307,7 @@ const getLineagePath = (treeData, targetNodeId) => {
 };
 
 // Convert tree data to ReactFlow format
-const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = null) => {
+const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = null, completedGoalColor = '#FFD700') => {
     const nodes = [];
     const edges = [];
     const addedNodeIds = new Set();
@@ -351,7 +371,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
                 type: 'straight',
                 className: isCompleted ? 'completed-edge' : '',
                 style: {
-                    stroke: isCompleted ? '#FFD700' : 'var(--color-connection-line)', // Hardcoded gold for completed
+                    stroke: isCompleted ? completedGoalColor : 'var(--color-connection-line)',
                     strokeWidth: isCompleted ? 2.5 : 1.5,
                 },
             });
@@ -395,6 +415,9 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
 
+    const { getGoalColor } = useTheme();
+    const completedGoalColor = getGoalColor('CompletedGoal');
+
     // Expose immediate fade-out function to parent
     React.useImperativeHandle(ref, () => ({
         startFadeOut: () => {
@@ -405,9 +428,9 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
     const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
         if (!treeData) return { nodes: [], edges: [] };
 
-        const { nodes, edges } = convertTreeToFlow(treeData, onNodeClick, onAddChild, selectedNodeId);
+        const { nodes, edges } = convertTreeToFlow(treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor);
         return getLayoutedElements(nodes, edges);
-    }, [treeData, onNodeClick, onAddChild, selectedNodeId]);
+    }, [treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
