@@ -162,19 +162,29 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                 General
                             </div>
                             {activeRootId && (
-                                <div
-                                    onClick={() => setActiveTab('fractal')}
-                                    style={{
+                                <>
+                                    <div style={{
                                         padding: '12px 24px',
-                                        cursor: 'pointer',
-                                        backgroundColor: activeTab === 'fractal' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                        color: activeTab === 'fractal' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                        fontWeight: activeTab === 'fractal' ? 'bold' : 'normal',
-                                        borderLeft: activeTab === 'fractal' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
-                                    }}
-                                >
-                                    This Fractal
-                                </div>
+                                        color: 'var(--color-text-primary)',
+                                        cursor: 'default'
+                                    }}>
+                                        This Fractal
+                                    </div>
+                                    <div
+                                        onClick={() => setActiveTab('fractal_characteristics')}
+                                        style={{
+                                            padding: '8px 24px 8px 24px',
+                                            cursor: 'pointer',
+                                            backgroundColor: activeTab === 'fractal_characteristics' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                            color: activeTab === 'fractal_characteristics' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                            fontWeight: activeTab === 'fractal_characteristics' ? 'bold' : 'normal',
+                                            borderLeft: activeTab === 'fractal_characteristics' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent',
+                                            fontSize: '13px'
+                                        }}
+                                    >
+                                        Goal Characteristics
+                                    </div>
+                                </>
                             )}
                             <div
                                 onClick={() => setActiveTab('account')}
@@ -276,15 +286,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             </div>
                         )}
 
-                        {activeTab === 'fractal' && activeRootId && (
+                        {activeTab === 'fractal_characteristics' && activeRootId && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <section>
                                     <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                        Settings for: {activeFractal?.name || 'This Fractal'}
+                                        Goal Characteristics
                                     </h3>
-                                    <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '24px' }}>
-                                        Override global settings specifically for this fractal.
-                                    </p>
                                     <GoalCharacteristicsSettings scope={activeRootId} />
                                 </section>
                             </div>

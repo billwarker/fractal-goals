@@ -131,18 +131,6 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                 />
                                 {formatGoalType(type)}
                             </div>
-                            {scope !== 'default' && (
-                                <span style={{
-                                    fontSize: '10px',
-                                    padding: '2px 6px',
-                                    borderRadius: '10px',
-                                    backgroundColor: isOverridden ? 'rgba(58, 134, 255, 0.1)' : 'rgba(0,0,0,0.05)',
-                                    color: isOverridden ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-                                    border: `1px solid ${isOverridden ? 'var(--color-brand-primary)' : 'var(--color-border)'}`
-                                }}>
-                                    {isOverridden ? 'Override' : 'Inherited'}
-                                </span>
-                            )}
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
