@@ -15,6 +15,7 @@ import useTargetAchievements from '../hooks/useTargetAchievements';
 import styles from './SessionDetail.module.css'; // New CSS module import
 import notify from '../utils/notify';
 import '../App.css';
+import { useGoals } from '../contexts/GoalsContext';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -85,6 +86,7 @@ function SessionDetail() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
+    const { setActiveRootId } = useGoals();
 
     const [session, setSession] = useState(null);
     const [sessionData, setSessionData] = useState(null); // UI metadata only (section names, notes, ordering)
@@ -302,10 +304,12 @@ function SessionDetail() {
             navigate('/');
             return;
         }
+        setActiveRootId(rootId);
         fetchSession();
         fetchActivities();
         fetchActivityInstances();
-    }, [rootId, sessionId, navigate]);
+        return () => setActiveRootId(null);
+    }, [rootId, sessionId, navigate, setActiveRootId]);
 
     const fetchActivityInstances = async () => {
         try {

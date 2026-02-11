@@ -9,6 +9,7 @@ import { formatDateInTimezone, formatLiteralDate } from '../utils/dateUtils';
 import styles from './Programs.module.css'; // Import CSS Module
 import notify from '../utils/notify';
 import { Heading, Text } from '../components/atoms/Typography';
+import { useGoals } from '../contexts/GoalsContext';
 
 const GOAL_COLORS = {
     Amercement: '#FF6B6B',
@@ -28,6 +29,7 @@ const GOAL_COLORS = {
 function Programs() {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
+    const { setActiveRootId } = useGoals();
     const [showBuilder, setShowBuilder] = useState(false);
     const [programs, setPrograms] = useState([]);
     const [goals, setGoals] = useState([]);
@@ -41,9 +43,11 @@ function Programs() {
 
     useEffect(() => {
         if (rootId) {
+            setActiveRootId(rootId);
             Promise.all([fetchPrograms(), fetchGoals()]);
         }
-    }, [rootId]);
+        return () => setActiveRootId(null);
+    }, [rootId, setActiveRootId]);
 
     // If programId is in URL, fetch and open that program for editing
     useEffect(() => {

@@ -110,9 +110,8 @@ const CustomNode = ({ data }) => {
     };
 
     const glowColor = isCompleted ? hexToRgba(completedGold, 0.6) : null;
-
-    const { goalCharacteristics } = useTheme();
-    const config = goalCharacteristics[data.type] || { icon: 'circle' };
+    const { getScopedCharacteristics } = useTheme();
+    const config = getScopedCharacteristics(data.type);
 
     return (
         <div className={styles.nodeContainer}>

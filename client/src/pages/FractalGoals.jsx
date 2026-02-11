@@ -31,7 +31,8 @@ function FractalGoals() {
         createGoal,
         updateGoal,
         deleteGoal,
-        toggleGoalCompletion
+        toggleGoalCompletion,
+        setActiveRootId
     } = useGoals();
 
     // 1. Data Query (TanStack Query)
@@ -101,11 +102,14 @@ function FractalGoals() {
             navigate('/');
             return;
         }
+        setActiveRootId(rootId);
         fetchSessions(rootId);
         fetchActivities(rootId);
         fetchActivityGroups(rootId);
         fetchPrograms(rootId);
-    }, [rootId, navigate]);
+
+        return () => setActiveRootId(null);
+    }, [rootId, navigate, setActiveRootId]);
 
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {

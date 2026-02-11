@@ -4,6 +4,7 @@ import { DEFAULT_GOAL_CHARACTERISTICS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
 
 import { useAuth } from './AuthContext';
+import { useGoals } from './GoalsContext';
 
 const ThemeContext = createContext();
 
@@ -31,7 +32,8 @@ function adjustBrightness(hex, percent) {
 }
 
 export const ThemeProvider = ({ children }) => {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, setUser } = useAuth();
+    const { activeRootId } = useGoals();
 
     // --- Light/Dark Mode ---
     const [theme, setTheme] = useState(() => {
@@ -42,9 +44,7 @@ export const ThemeProvider = ({ children }) => {
     });
 
     // --- Goal Colors ---
-    // Structure: { UltimateGoal: { primary: '#...', secondary: '#...' }, ... }
     const [goalColors, setGoalColors] = useState(() => {
-        // Default initialization
         const defaults = {};
         Object.keys(GOAL_COLOR_SYSTEM).forEach(key => {
             defaults[key] = {
@@ -53,46 +53,72 @@ export const ThemeProvider = ({ children }) => {
             };
         });
 
-        // Try local storage first as fallback
+        const initial = {
+            default: defaults,
+            fractals: {}
+        };
+
         const savedColors = localStorage.getItem('fractal_goal_colors');
         if (savedColors) {
             try {
                 const parsed = JSON.parse(savedColors);
-                return { ...defaults, ...parsed };
+                // Migration: if parsed is flat (e.g. has UltimateGoal key), wrap it in default
+                if (parsed.UltimateGoal) {
+                    return { ...initial, default: { ...defaults, ...parsed } };
+                }
+                return { ...initial, ...parsed };
             } catch (e) {
                 console.error("Failed to parse saved goal colors", e);
             }
         }
-        return defaults;
+        return initial;
     });
 
     // --- Goal Characteristics ---
     const [goalCharacteristics, setGoalCharacteristics] = useState(() => {
+        const initial = {
+            default: DEFAULT_GOAL_CHARACTERISTICS,
+            fractals: {}
+        };
+
         const saved = localStorage.getItem('fractal_goal_characteristics');
         if (saved) {
             try {
-                return { ...DEFAULT_GOAL_CHARACTERISTICS, ...JSON.parse(saved) };
+                const parsed = JSON.parse(saved);
+                // Migration: if parsed is flat, wrap it in default
+                if (parsed.UltimateGoal) {
+                    return { ...initial, default: { ...DEFAULT_GOAL_CHARACTERISTICS, ...parsed } };
+                }
+                return { ...initial, ...parsed };
             } catch (e) {
                 console.error("Failed to parse saved goal characteristics", e);
             }
         }
-        return DEFAULT_GOAL_CHARACTERISTICS;
+        return initial;
     });
 
     // Sync with User Preferences on Login
     useEffect(() => {
         if (isAuthenticated && user?.preferences) {
             if (user.preferences.goal_colors) {
-                setGoalColors(prev => ({
-                    ...prev,
-                    ...user.preferences.goal_colors
-                }));
+                setGoalColors(prev => {
+                    const incoming = user.preferences.goal_colors;
+                    // Migration helper for incoming data if it's flat
+                    if (incoming.UltimateGoal) {
+                        return { ...prev, default: { ...prev.default, ...incoming } };
+                    }
+                    return { ...prev, ...incoming };
+                });
             }
             if (user.preferences.goal_characteristics) {
-                setGoalCharacteristics(prev => ({
-                    ...prev,
-                    ...user.preferences.goal_characteristics
-                }));
+                setGoalCharacteristics(prev => {
+                    const incoming = user.preferences.goal_characteristics;
+                    // Migration helper for incoming data if it's flat
+                    if (incoming.UltimateGoal) {
+                        return { ...prev, default: { ...prev.default, ...incoming } };
+                    }
+                    return { ...prev, ...incoming };
+                });
             }
         }
     }, [isAuthenticated, user]);
@@ -111,12 +137,14 @@ export const ThemeProvider = ({ children }) => {
         if (isAuthenticated) {
             const savePreferences = async () => {
                 try {
-                    await authApi.updatePreferences({
+                    const res = await authApi.updatePreferences({
                         preferences: {
                             goal_colors: goalColors,
                             goal_characteristics: goalCharacteristics
                         }
                     });
+                    // Update user context with returned data to keep in sync
+                    setUser(res.data);
                 } catch (err) {
                     console.error("Failed to save preferences to user settings", err);
                 }
@@ -135,47 +163,110 @@ export const ThemeProvider = ({ children }) => {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');
     };
 
-    const setGoalColor = (goalType, type, value) => {
-        // type: 'primary' or 'secondary'
-        setGoalColors(prev => ({
-            ...prev,
-            [goalType]: {
-                ...prev[goalType],
-                [type]: value
+    const setGoalColor = (goalType, field, value, scope = 'default') => {
+        setGoalColors(prev => {
+            const next = { ...prev };
+            if (scope === 'default') {
+                next.default = {
+                    ...next.default,
+                    [goalType]: { ...next.default[goalType], [field]: value }
+                };
+            } else {
+                next.fractals = {
+                    ...next.fractals,
+                    [scope]: {
+                        ...(next.fractals[scope] || {}),
+                        [goalType]: {
+                            ...(next.fractals[scope]?.[goalType] || next.default[goalType]),
+                            [field]: value
+                        }
+                    }
+                };
             }
-        }));
-    };
-
-    const setGoalCharacteristic = (goalType, key, value) => {
-        setGoalCharacteristics(prev => ({
-            ...prev,
-            [goalType]: {
-                ...prev[goalType],
-                [key]: value
-            }
-        }));
-    };
-
-    const resetGoalColors = () => {
-        const defaults = {};
-        Object.keys(GOAL_COLOR_SYSTEM).forEach(key => {
-            defaults[key] = {
-                primary: GOAL_COLOR_SYSTEM[key].primary,
-                secondary: GOAL_COLOR_SYSTEM[key].secondary
-            };
+            return next;
         });
-        setGoalColors(defaults);
+    };
+
+    const setGoalCharacteristic = (goalType, key, value, scope = 'default') => {
+        setGoalCharacteristics(prev => {
+            const next = { ...prev };
+            if (scope === 'default') {
+                next.default = {
+                    ...next.default,
+                    [goalType]: { ...next.default[goalType], [key]: value }
+                };
+            } else {
+                next.fractals = {
+                    ...next.fractals,
+                    [scope]: {
+                        ...(next.fractals[scope] || {}),
+                        [goalType]: {
+                            ...(next.fractals[scope]?.[goalType] || next.default[goalType]),
+                            [key]: value
+                        }
+                    }
+                };
+            }
+            return next;
+        });
+    };
+
+    const resetGoalColors = (scope = 'default') => {
+        if (scope === 'default') {
+            const defaults = {};
+            Object.keys(GOAL_COLOR_SYSTEM).forEach(key => {
+                defaults[key] = {
+                    primary: GOAL_COLOR_SYSTEM[key].primary,
+                    secondary: GOAL_COLOR_SYSTEM[key].secondary
+                };
+            });
+            setGoalColors(prev => ({ ...prev, default: defaults }));
+        } else {
+            setGoalColors(prev => {
+                const next = { ...prev };
+                const nextFractals = { ...next.fractals };
+                delete nextFractals[scope];
+                return { ...next, fractals: nextFractals };
+            });
+        }
+    };
+
+    const resetGoalCharacteristics = (scope = 'default') => {
+        if (scope === 'default') {
+            setGoalCharacteristics(prev => ({ ...prev, default: DEFAULT_GOAL_CHARACTERISTICS }));
+        } else {
+            setGoalCharacteristics(prev => {
+                const next = { ...prev };
+                const nextFractals = { ...next.fractals };
+                delete nextFractals[scope];
+                return { ...next, fractals: nextFractals };
+            });
+        }
     };
 
     // --- Helpers (Context Aware) ---
+    const getScopedColors = (goalType) => {
+        if (activeRootId && goalColors.fractals[activeRootId]?.[goalType]) {
+            return { ...goalColors.default[goalType], ...goalColors.fractals[activeRootId][goalType] };
+        }
+        return goalColors.default[goalType];
+    };
+
+    const getScopedCharacteristics = (goalType) => {
+        if (activeRootId && goalCharacteristics.fractals[activeRootId]?.[goalType]) {
+            return { ...goalCharacteristics.default[goalType], ...goalCharacteristics.fractals[activeRootId][goalType] };
+        }
+        return goalCharacteristics.default[goalType];
+    };
+
     const getGoalColor = (goalType) => {
-        if (!goalType || !goalColors[goalType]) return '#4caf50'; // Fallback
-        return goalColors[goalType].primary;
+        const colors = getScopedColors(goalType);
+        return colors?.primary || GOAL_COLOR_SYSTEM[goalType]?.primary || '#4caf50';
     };
 
     const getGoalSecondaryColor = (goalType) => {
-        if (!goalType || !goalColors[goalType]) return '#1a1a1a'; // Fallback
-        return goalColors[goalType].secondary;
+        const colors = getScopedColors(goalType);
+        return colors?.secondary || GOAL_COLOR_SYSTEM[goalType]?.secondary || '#1a1a1a';
     };
 
     // Helper to get dark variant of the *current* goal color
@@ -204,10 +295,13 @@ export const ThemeProvider = ({ children }) => {
             resetGoalColors,
             goalCharacteristics,
             setGoalCharacteristic,
+            resetGoalCharacteristics,
             getGoalColor,
             getGoalSecondaryColor,
             getGoalColorDark,
             getGoalTextColor,
+            getScopedCharacteristics,
+            getScopedColors,
             // Expose logic helpers if needed elsewhere
             adjustBrightness
         }}>

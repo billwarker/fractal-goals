@@ -143,8 +143,12 @@ def update_preferences(current_user, validated_data):
         
         # Deep merge or replace? For now, let's just merge top-level keys
         if isinstance(new_prefs, dict):
-            current_prefs.update(new_prefs)
-            user.preferences = current_prefs
+            updated_prefs = dict(current_prefs)
+            updated_prefs.update(new_prefs)
+            user.preferences = updated_prefs
+            
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(user, 'preferences')
         
         db_session.commit()
         return jsonify(serialize_user(user))

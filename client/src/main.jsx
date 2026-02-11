@@ -88,15 +88,15 @@ createRoot(document.getElementById('root')).render(
             />
             <TimezoneProvider>
               <AuthProvider>
-                <ThemeProvider>
-                  <ActivitiesProvider>
-                    <SessionsProvider>
-                      <GoalsProvider>
+                <GoalsProvider>
+                  <ThemeProvider>
+                    <ActivitiesProvider>
+                      <SessionsProvider>
                         <AppRouter />
-                      </GoalsProvider>
-                    </SessionsProvider>
-                  </ActivitiesProvider>
-                </ThemeProvider>
+                      </SessionsProvider>
+                    </ActivitiesProvider>
+                  </ThemeProvider>
+                </GoalsProvider>
               </AuthProvider>
             </TimezoneProvider>
           </DebugProvider>

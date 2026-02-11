@@ -92,9 +92,13 @@ export function GoalsProvider({ children }) {
         queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
     }, [queryClient]);
 
+    const [activeRootId, setActiveRootId] = React.useState(null);
+
     const value = {
         fractals: fractalsQuery.data || [],
         currentFractal: null, // This will be handled differently in components
+        activeRootId,
+        setActiveRootId,
         loading: fractalsQuery.isLoading,
         error: fractalsQuery.error,
         fetchFractals,

@@ -7,6 +7,7 @@ import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar, SessionCardExpanded } from '../components/sessions';
 import '../App.css';
 import styles from './Sessions.module.css';
+import { useGoals } from '../contexts/GoalsContext';
 
 /**
  * Sessions Page - View and manage practice sessions
@@ -17,6 +18,7 @@ function Sessions() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
+    const { setActiveRootId } = useGoals();
 
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -38,9 +40,11 @@ function Sessions() {
             navigate('/');
             return;
         }
+        setActiveRootId(rootId);
         fetchSessions();
         fetchActivities();
-    }, [rootId, navigate]);
+        return () => setActiveRootId(null);
+    }, [rootId, navigate, setActiveRootId]);
 
     // Scroll to selected session
     useEffect(() => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGoals } from '../../contexts/GoalsContext';
 import { authApi } from '../../utils/api';
 import toast from 'react-hot-toast';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
@@ -19,9 +20,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const { preference, setPreference } = useTimezone();
 
     const [activeTab, setActiveTab] = useState('general');
+    const { isAuthenticated, user, logout } = useAuth();
+    const { activeRootId, fractals } = useGoals();
+
+    const activeFractal = fractals.find(f => f.id === activeRootId);
     const [availableTimezones, setAvailableTimezones] = useState([]);
 
-    const { logout } = useAuth();
     const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
     const [emailData, setEmailData] = useState({ email: '', password: '' });
     const [deleteData, setDeleteData] = useState({ password: '', confirmation: '' });
@@ -157,19 +161,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             >
                                 General
                             </div>
-                            <div
-                                onClick={() => setActiveTab('characteristics')}
-                                style={{
-                                    padding: '12px 24px',
-                                    cursor: 'pointer',
-                                    backgroundColor: activeTab === 'characteristics' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                    color: activeTab === 'characteristics' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                    fontWeight: activeTab === 'characteristics' ? 'bold' : 'normal',
-                                    borderLeft: activeTab === 'characteristics' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
-                                }}
-                            >
-                                Characteristics
-                            </div>
+                            {activeRootId && (
+                                <div
+                                    onClick={() => setActiveTab('fractal')}
+                                    style={{
+                                        padding: '12px 24px',
+                                        cursor: 'pointer',
+                                        backgroundColor: activeTab === 'fractal' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                        color: activeTab === 'fractal' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                        fontWeight: activeTab === 'fractal' ? 'bold' : 'normal',
+                                        borderLeft: activeTab === 'fractal' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                    }}
+                                >
+                                    This Fractal
+                                </div>
+                            )}
                             <div
                                 onClick={() => setActiveTab('account')}
                                 style={{
@@ -198,9 +204,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <section>
                                     <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                        Timezone
+                                        Regional
                                     </h3>
-
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <input
@@ -208,12 +213,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                                 id="match-system-tz"
                                                 checked={preference === 'local'}
                                                 onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setPreference('local');
-                                                    } else {
-                                                        // When unchecking, set to current system timezone explicitly
-                                                        setPreference(Intl.DateTimeFormat().resolvedOptions().timeZone);
-                                                    }
+                                                    if (e.target.checked) setPreference('local');
+                                                    else setPreference(Intl.DateTimeFormat().resolvedOptions().timeZone);
                                                 }}
                                                 style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                             />
@@ -226,9 +227,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         </div>
 
                                         <div style={{ opacity: preference === 'local' ? 0.5 : 1, pointerEvents: preference === 'local' ? 'none' : 'auto' }}>
-                                            <label htmlFor="tz-select" style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-primary)' }}>
-                                                Manual Selection
-                                            </label>
                                             <select
                                                 id="tz-select"
                                                 value={preference === 'local' ? Intl.DateTimeFormat().resolvedOptions().timeZone : preference}
@@ -251,7 +249,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                     </div>
                                 </section>
 
-                                {/* Interface Theme Section */}
                                 <section>
                                     <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
                                         Interface Theme
@@ -279,14 +276,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             </div>
                         )}
 
-
-                        {activeTab === 'characteristics' && (
+                        {activeTab === 'fractal' && activeRootId && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <section>
                                     <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                        Goal Characteristics
+                                        Settings for: {activeFractal?.name || 'This Fractal'}
                                     </h3>
-                                    <GoalCharacteristicsSettings />
+                                    <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '24px' }}>
+                                        Override global settings specifically for this fractal.
+                                    </p>
+                                    <GoalCharacteristicsSettings scope={activeRootId} />
                                 </section>
                             </div>
                         )}

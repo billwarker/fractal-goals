@@ -77,6 +77,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        setUser,
         isAuthenticated: !!token && !!user
     };
 

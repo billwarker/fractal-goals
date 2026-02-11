@@ -724,8 +724,8 @@ function GoalDetailModal({
                             {onToggleCompletion && (() => {
                                 const isManualAllowed = goalCharacteristics[goalType]?.completion_methods?.manual !== false;
                                 const canShowManual = allowManualCompletion && isManualAllowed;
-                                const isTargetsAllowed = goalCharacteristics[goalType]?.completion_methods?.targets !== false;
-                                const isChildrenAllowed = goalCharacteristics[goalType]?.completion_methods?.children !== false;
+                                const isTargetsAllowed = goalCharacteristics[goalType]?.completion_methods?.targets !== false && goalType !== 'NanoGoal';
+                                const isChildrenAllowed = goalCharacteristics[goalType]?.completion_methods?.children !== false && goalType !== 'MicroGoal' && goalType !== 'NanoGoal';
 
                                 return (
                                     <button
@@ -949,13 +949,15 @@ function GoalDetailModal({
                         )}
 
                         {/* Associated Children Section */}
-                        <GoalChildrenList
-                            treeData={treeData}
-                            goalId={goalId}
-                            goalColor={goalColor}
-                            childType={childType}
-                            onGoalSelect={onGoalSelect}
-                        />
+                        {goalType !== 'NanoGoal' && (
+                            <GoalChildrenList
+                                treeData={treeData}
+                                goalId={goalId}
+                                goalColor={goalColor}
+                                childType={childType}
+                                onGoalSelect={onGoalSelect}
+                            />
+                        )}
 
 
 

@@ -186,17 +186,19 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                             />
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} style={{ color: themeColor }}>
-                                Deadline
-                            </label>
-                            <Input
-                                type="date"
-                                value={deadline}
-                                onChange={e => setDeadline(e.target.value)}
-                                fullWidth
-                            />
-                        </div>
+                        {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
+                            <div className={styles.formGroup}>
+                                <label className={styles.label} style={{ color: themeColor }}>
+                                    Deadline
+                                </label>
+                                <Input
+                                    type="date"
+                                    value={deadline}
+                                    onChange={e => setDeadline(e.target.value)}
+                                    fullWidth
+                                />
+                            </div>
+                        )}
 
                         <div className={styles.footer}>
                             <Button

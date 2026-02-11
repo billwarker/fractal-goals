@@ -39,7 +39,7 @@ def calculate_smart_status(goal):
         "measurable": is_measurable,
         "achievable": is_achievable,
         "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
-        "time_bound": goal.deadline is not None
+        "time_bound": goal.deadline is not None or goal.type in ['MicroGoal', 'NanoGoal']
     }
 
 def serialize_target(target):
