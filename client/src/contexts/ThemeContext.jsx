@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GOAL_COLOR_SYSTEM } from '../utils/goalColors';
+import { DEFAULT_GOAL_CHARACTERISTICS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
 
 import { useAuth } from './AuthContext';
@@ -65,13 +66,34 @@ export const ThemeProvider = ({ children }) => {
         return defaults;
     });
 
+    // --- Goal Characteristics ---
+    const [goalCharacteristics, setGoalCharacteristics] = useState(() => {
+        const saved = localStorage.getItem('fractal_goal_characteristics');
+        if (saved) {
+            try {
+                return { ...DEFAULT_GOAL_CHARACTERISTICS, ...JSON.parse(saved) };
+            } catch (e) {
+                console.error("Failed to parse saved goal characteristics", e);
+            }
+        }
+        return DEFAULT_GOAL_CHARACTERISTICS;
+    });
+
     // Sync with User Preferences on Login
     useEffect(() => {
-        if (isAuthenticated && user?.preferences?.goal_colors) {
-            setGoalColors(prev => ({
-                ...prev,
-                ...user.preferences.goal_colors
-            }));
+        if (isAuthenticated && user?.preferences) {
+            if (user.preferences.goal_colors) {
+                setGoalColors(prev => ({
+                    ...prev,
+                    ...user.preferences.goal_colors
+                }));
+            }
+            if (user.preferences.goal_characteristics) {
+                setGoalCharacteristics(prev => ({
+                    ...prev,
+                    ...user.preferences.goal_characteristics
+                }));
+            }
         }
     }, [isAuthenticated, user]);
 
@@ -83,29 +105,31 @@ export const ThemeProvider = ({ children }) => {
     useEffect(() => {
         // Save to localStorage
         localStorage.setItem('fractal_goal_colors', JSON.stringify(goalColors));
+        localStorage.setItem('fractal_goal_characteristics', JSON.stringify(goalCharacteristics));
 
         // Save to backend if logged in
         if (isAuthenticated) {
             const savePreferences = async () => {
                 try {
                     await authApi.updatePreferences({
-                        preferences: { goal_colors: goalColors }
+                        preferences: {
+                            goal_colors: goalColors,
+                            goal_characteristics: goalCharacteristics
+                        }
                     });
                 } catch (err) {
-                    console.error("Failed to save goal colors to user preferences", err);
+                    console.error("Failed to save preferences to user settings", err);
                 }
             };
-            // Debounce or just save? For simplicity, save on every change for now, 
-            // but in production consider debouncing.
-            // Check if colors actually changed from user prefs to avoid loop? 
-            // React state updates handle simple equality checks but deep objects trigger here.
-            // Let's assume the user doesn't tweak colors 100 times a second.
-            if (user?.preferences?.goal_colors && JSON.stringify(user.preferences.goal_colors) === JSON.stringify(goalColors)) {
-                return;
+
+            const colorsChanged = !user?.preferences?.goal_colors || JSON.stringify(user.preferences.goal_colors) !== JSON.stringify(goalColors);
+            const characteristicsChanged = !user?.preferences?.goal_characteristics || JSON.stringify(user.preferences.goal_characteristics) !== JSON.stringify(goalCharacteristics);
+
+            if (colorsChanged || characteristicsChanged) {
+                savePreferences();
             }
-            savePreferences();
         }
-    }, [goalColors, isAuthenticated]);
+    }, [goalColors, goalCharacteristics, isAuthenticated, user?.preferences]);
 
     const toggleTheme = () => {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -118,6 +142,16 @@ export const ThemeProvider = ({ children }) => {
             [goalType]: {
                 ...prev[goalType],
                 [type]: value
+            }
+        }));
+    };
+
+    const setGoalCharacteristic = (goalType, key, value) => {
+        setGoalCharacteristics(prev => ({
+            ...prev,
+            [goalType]: {
+                ...prev[goalType],
+                [key]: value
             }
         }));
     };
@@ -168,6 +202,8 @@ export const ThemeProvider = ({ children }) => {
             goalColors,
             setGoalColor,
             resetGoalColors,
+            goalCharacteristics,
+            setGoalCharacteristic,
             getGoalColor,
             getGoalSecondaryColor,
             getGoalColorDark,

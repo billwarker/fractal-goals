@@ -56,7 +56,7 @@ function GoalDetailModal({
     parentGoal,  // Parent goal for context when creating
     onGoalSelect // Handler for selecting a goal (e.g. child)
 }) {
-    const { getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
     const navigate = useNavigate();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
@@ -721,36 +721,43 @@ function GoalDetailModal({
 
                         {/* Action Buttons - 2x2 Grid */}
                         <div className={styles.actionGrid}>
-                            {onToggleCompletion && (
-                                <button
-                                    onClick={() => {
-                                        if (isCompleted) {
-                                            setViewState('uncomplete-confirm');
-                                        } else if (allowManualCompletion) {
-                                            setViewState('complete-confirm');
-                                        }
-                                    }}
-                                    disabled={!isCompleted && !allowManualCompletion}
-                                    className={styles.btnAction}
-                                    style={{
-                                        background: isCompleted ? '#4caf50' : 'transparent',
-                                        border: `1px solid ${isCompleted ? '#4caf50' : (allowManualCompletion ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
-                                        color: isCompleted ? 'white' : (allowManualCompletion ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
-                                        cursor: (isCompleted || allowManualCompletion) ? 'pointer' : 'default',
-                                        fontWeight: isCompleted ? 'bold' : 'normal',
-                                        opacity: (!isCompleted && !allowManualCompletion) ? 0.8 : 1
-                                    }}
-                                >
-                                    {isCompleted ? '✓ Completed' : (
-                                        allowManualCompletion ? 'Mark Complete' : (
-                                            trackActivities && completedViaChildren ? 'Complete via Children & Targets' :
-                                                trackActivities ? 'Complete via Target(s)' :
-                                                    completedViaChildren ? 'Complete via Children' :
-                                                        'Auto-completing...'
-                                        )
-                                    )}
-                                </button>
-                            )}
+                            {onToggleCompletion && (() => {
+                                const isManualAllowed = goalCharacteristics[goalType]?.completion_methods?.manual !== false;
+                                const canShowManual = allowManualCompletion && isManualAllowed;
+                                const isTargetsAllowed = goalCharacteristics[goalType]?.completion_methods?.targets !== false;
+                                const isChildrenAllowed = goalCharacteristics[goalType]?.completion_methods?.children !== false;
+
+                                return (
+                                    <button
+                                        onClick={() => {
+                                            if (isCompleted) {
+                                                setViewState('uncomplete-confirm');
+                                            } else if (canShowManual) {
+                                                setViewState('complete-confirm');
+                                            }
+                                        }}
+                                        disabled={!isCompleted && !canShowManual}
+                                        className={styles.btnAction}
+                                        style={{
+                                            background: isCompleted ? '#4caf50' : 'transparent',
+                                            border: `1px solid ${isCompleted ? '#4caf50' : (canShowManual ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
+                                            color: isCompleted ? 'white' : (canShowManual ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
+                                            cursor: (isCompleted || canShowManual) ? 'pointer' : 'default',
+                                            fontWeight: isCompleted ? 'bold' : 'normal',
+                                            opacity: (!isCompleted && !canShowManual) ? 0.8 : 1
+                                        }}
+                                    >
+                                        {isCompleted ? '✓ Completed' : (
+                                            canShowManual ? 'Mark Complete' : (
+                                                trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed ? 'Complete via Children & Targets' :
+                                                    trackActivities && isTargetsAllowed ? 'Complete via Target(s)' :
+                                                        completedViaChildren && isChildrenAllowed ? 'Complete via Children' :
+                                                            'Auto-completing...'
+                                            )
+                                        )}
+                                    </button>
+                                );
+                            })()}
 
                             {onAddChild && childType && (
                                 <button
@@ -927,7 +934,7 @@ function GoalDetailModal({
                         )}
 
                         {/* Targets Section - View Mode (Read-only) */}
-                        {trackActivities && (
+                        {trackActivities && goalCharacteristics[goalType]?.completion_methods?.targets !== false && (
                             <TargetManager
                                 targets={targets}
                                 setTargets={setTargets}

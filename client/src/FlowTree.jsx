@@ -13,6 +13,7 @@ import dagre from 'dagre';
 import { isSMART } from './utils/smartHelpers';
 
 import { useTheme } from './contexts/ThemeContext';
+import GoalIcon from './components/atoms/GoalIcon';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
@@ -110,47 +111,44 @@ const CustomNode = ({ data }) => {
 
     const glowColor = isCompleted ? hexToRgba(completedGold, 0.6) : null;
 
+    const { goalCharacteristics } = useTheme();
+    const config = goalCharacteristics[data.type] || { icon: 'circle' };
+
     return (
         <div className={styles.nodeContainer}>
-            {/* Circle with handles positioned relative to it */}
+            {/* Goal Icon with handles positioned relative to it */}
             <div
-                className={`${styles.nodeCircle}`}
-                style={{
-                    background: isSmartGoal ? smartRingFillColor : fillColor,
-                    border: isSmartGoal ? `2.5px solid ${fillColor}` : 'none',
-                    boxShadow: isCompleted ? `0 0 10px ${glowColor}` : undefined,
-                }}
+                className={`${styles.nodeCircleWrapper}`}
                 onClick={data.onClick}
+                style={{
+                    position: 'relative',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
             >
-                {/* SMART Goal Structure: 3 layers (Outer Ring, Middle Ring, Core) */}
-                {isSmartGoal && (
-                    <>
-                        {/* Middle Ring - with secondary color fill */}
-                        <div
-                            className={styles.smartMiddleRing}
-                            style={{
-                                background: smartRingFillColor,
-                                border: `2.5px solid ${fillColor}`,
-                            }}
-                        />
-                        {/* Inner Core */}
-                        <div
-                            className={styles.smartInnerCore}
-                            style={{
-                                background: fillColor,
-                            }}
-                        />
-                    </>
-                )}
+                <GoalIcon
+                    shape={config.icon}
+                    color={fillColor}
+                    secondaryColor={smartRingFillColor}
+                    isSmart={isSmartGoal}
+                    size={30}
+                    className={isCompleted ? styles.nodeCircleCompleted : ''}
+                    style={{
+                        filter: isCompleted ? `drop-shadow(0 0 5px ${glowColor})` : undefined
+                    }}
+                />
 
-                {/* Target Handle - centered on circle */}
+                {/* Target Handle - centered on circle/icon */}
                 <Handle
                     type="target"
                     position={Position.Top}
                     className={styles.handle}
                 />
 
-                {/* Source Handle - centered on circle */}
+                {/* Source Handle - centered on circle/icon */}
                 <Handle
                     type="source"
                     position={Position.Bottom}

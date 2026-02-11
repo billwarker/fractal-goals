@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
+import { validateDeadline } from '../../utils/goalCharacteristics';
 import { useTheme } from '../../contexts/ThemeContext';
 import AddTargetModal from '../AddTargetModal';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
+import toast from 'react-hot-toast';
 import styles from './GoalModal.module.css';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
-    const { getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
@@ -42,6 +45,16 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // Validate deadline against configured characteristics
+        if (deadline) {
+            const validation = validateDeadline(deadline, goalCharacteristics[goalType]);
+            if (!validation.isValid) {
+                toast.error(validation.message);
+                return;
+            }
+        }
+
         onSubmit({
             name,
             description,
@@ -103,8 +116,13 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                 <div>
                                     <div
                                         className={styles.readOnlyType}
-                                        style={{ background: themeColor, color: textColor }}
+                                        style={{ background: themeColor, color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
+                                        <GoalIcon
+                                            shape={goalCharacteristics[goalType]?.icon || 'circle'}
+                                            color={textColor}
+                                            size={18}
+                                        />
                                         {getTypeDisplayName(goalType)}
                                     </div>
                                 </div>
@@ -113,6 +131,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                     value={goalType}
                                     onChange={e => setGoalType(e.target.value)}
                                     className={styles.select}
+                                    style={{ borderLeft: `4px solid ${themeColor}` }}
                                 >
                                     <option value="UltimateGoal">Ultimate Goal</option>
                                     <option value="LongTermGoal">Long Term Goal</option>

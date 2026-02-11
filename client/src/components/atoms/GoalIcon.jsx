@@ -20,33 +20,88 @@ import React from 'react';
  * @param {string} className - Optional CSS class.
  */
 const GoalIcon = ({
+    shape = 'circle',
     color = 'var(--color-primary)',
     secondaryColor = 'var(--color-bg-card)',
     isSmart = false,
     size = 24,
-    className
+    className,
+    style = {}
 }) => {
+    const viewBox = "0 0 100 100";
+
+    const getPath = (s) => {
+        switch (s.toLowerCase()) {
+            case 'square':
+                return {
+                    outer: <rect x="5" y="5" width="90" height="90" rx="8" />,
+                    middle: <rect x="20" y="20" width="60" height="60" rx="6" />,
+                    inner: <rect x="35" y="35" width="30" height="30" rx="4" />,
+                    full: <rect x="0" y="0" width="100" height="100" rx="10" />
+                };
+            case 'triangle':
+                return {
+                    outer: <path d="M50 5 L95 85 L5 85 Z" />,
+                    middle: <path d="M50 25 L80 80 L20 80 Z" />,
+                    inner: <path d="M50 45 L65 75 L35 75 Z" />,
+                    full: <path d="M50 0 L100 90 L0 90 Z" />
+                };
+            case 'diamond':
+                return {
+                    outer: <path d="M50 5 L95 50 L50 95 L5 50 Z" />,
+                    middle: <path d="M50 20 L80 50 L50 80 L20 50 Z" />,
+                    inner: <path d="M50 35 L65 50 L50 65 L35 50 Z" />,
+                    full: <path d="M50 0 L100 50 L50 100 L0 50 Z" />
+                };
+            case 'hexagon':
+                return {
+                    outer: <path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z" />,
+                    middle: <path d="M50 20 L80.6 37.5 L80.6 62.5 L50 80 L19.4 62.5 L19.4 37.5 Z" />,
+                    inner: <path d="M50 35 L67.9 45 L67.9 55 L50 65 L32.1 55 L32.1 45 Z" />,
+                    full: <path d="M50 0 L100 28.9 L100 71.1 L50 100 L0 71.1 L0 28.9 Z" />
+                };
+            case 'star':
+                return {
+                    outer: <path d="M50 5 L64.5 35 L97 40 L73.5 63 L79 95 L50 80 L21 95 L26.5 63 L3 40 L35.5 35 Z" />,
+                    middle: <path d="M50 20 L59.5 40 L81 43 L65.5 58.5 L69 80 L50 70 L31 80 L34.5 58.5 L19 43 L40.5 40 Z" />,
+                    inner: <path d="M50 35 L54.5 45 L65 46.5 L57.5 54 L59 65 L50 60 L41 65 L42.5 54 L35 46.5 L45.5 45 Z" />,
+                    full: <path d="M50 0 L66 33 L100 38 L75 62 L82 97 L50 80 L18 97 L25 62 L0 38 L34 33 Z" />
+                };
+            case 'circle':
+            default:
+                return {
+                    outer: <circle cx="50" cy="50" r="45" />,
+                    middle: <circle cx="50" cy="50" r="30" />,
+                    inner: <circle cx="50" cy="50" r="15" />,
+                    full: <circle cx="50" cy="50" r="50" />
+                };
+        }
+    };
+
+    const paths = getPath(shape);
+
     return (
         <svg
             width={size}
             height={size}
-            viewBox="0 0 30 30"
+            viewBox={viewBox}
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className={className}
+            style={{ display: 'block', pointerEvents: 'none', ...style }}
         >
             {isSmart ? (
                 <>
-                    {/* Outer Ring: secondary fill, primary stroke */}
-                    <circle cx="15" cy="15" r="13.75" fill={secondaryColor} stroke={color} strokeWidth="2.5" />
-                    {/* Middle Ring: secondary fill, primary stroke */}
-                    <circle cx="15" cy="15" r="8.75" fill={secondaryColor} stroke={color} strokeWidth="2.5" />
-                    {/* Inner Core: solid primary */}
-                    <circle cx="15" cy="15" r="5" fill={color} />
+                    {/* Outer Ring */}
+                    {React.cloneElement(paths.outer, { fill: secondaryColor, stroke: color, strokeWidth: "5" })}
+                    {/* Middle Ring */}
+                    {React.cloneElement(paths.middle, { fill: secondaryColor, stroke: color, strokeWidth: "5" })}
+                    {/* Inner Core */}
+                    {React.cloneElement(paths.inner, { fill: color })}
                 </>
             ) : (
-                /* Non-SMART: solid circle */
-                <circle cx="15" cy="15" r="15" fill={color} />
+                /* Non-SMART: solid shape */
+                React.cloneElement(paths.full, { fill: color })
             )}
         </svg>
     );

@@ -33,6 +33,9 @@
 - **Session Program Integration**: Restored the `program_info` and `immediate_goals` fields in session responses by implementing relational hydration in `serialize_session`, ensuring the Sessions page correctly displays linked programs and achieved targets.
 - **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
 - **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.\n- **CSS Consolidation**: Migrated 125+ inline styles in the `SessionDetail` feature area to scoped CSS modules, centralized design tokens, and restored visual fidelity for critical UI elements like the "Add Session" button.
+- **Settings UI Refactor**: Reorganized the `SettingsModal` to improve clarity. Moved "Interface Theme" toggles to the General tab, consolidated all goal-specific settings (Icons, Colors, Deadlines, Completion Methods) into a new "Characteristics" tab, and removed the redundant "Themes" tab.
+- **Rule Enforcement**: Implemented global enforcement of goal characteristics. The "Mark Complete" button and Targets sections in `GoalDetailModal` now dynamically respect the user's global configuration for each goal level.
+- **API Optimization**: Fixed incorrect API paths for `getGoalMetrics` and `getGoalDailyDurations` in the frontend client, resolving issues with metric fetching in the goal detail view.
 
 ---
 

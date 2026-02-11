@@ -4,6 +4,7 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../utils/api';
 import toast from 'react-hot-toast';
+import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
 import { getGoalColorName } from '../../utils/goalColors'; // Still useful for display names
 
 const SettingsModal = ({ isOpen, onClose }) => {
@@ -157,17 +158,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                 General
                             </div>
                             <div
-                                onClick={() => setActiveTab('themes')}
+                                onClick={() => setActiveTab('characteristics')}
                                 style={{
                                     padding: '12px 24px',
                                     cursor: 'pointer',
-                                    backgroundColor: activeTab === 'themes' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                    color: activeTab === 'themes' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                    fontWeight: activeTab === 'themes' ? 'bold' : 'normal',
-                                    borderLeft: activeTab === 'themes' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                    backgroundColor: activeTab === 'characteristics' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: activeTab === 'characteristics' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                    fontWeight: activeTab === 'characteristics' ? 'bold' : 'normal',
+                                    borderLeft: activeTab === 'characteristics' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
                                 }}
                             >
-                                Themes
+                                Characteristics
                             </div>
                             <div
                                 onClick={() => setActiveTab('account')}
@@ -249,11 +250,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         </div>
                                     </div>
                                 </section>
-                            </div>
-                        )}
-
-                        {activeTab === 'themes' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
                                 {/* Interface Theme Section */}
                                 <section>
@@ -280,109 +276,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         </button>
                                     </div>
                                 </section>
+                            </div>
+                        )}
 
-                                {/* Goal Colors Section */}
+
+                        {activeTab === 'characteristics' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <section>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                        <h3 style={{ margin: 0, color: 'var(--color-text-primary)' }}>Goal Colors</h3>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm('Are you sure you want to reset all goal colors to defaults?')) {
-                                                    resetGoalColors();
-                                                }
-                                            }}
-                                            style={{
-                                                fontSize: '12px',
-                                                background: 'transparent',
-                                                border: '1px solid var(--color-brand-danger, #ef4444)',
-                                                color: 'var(--color-brand-danger, #ef4444)',
-                                                padding: '4px 8px',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            Reset to Defaults
-                                        </button>
-                                    </div>
-
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                                        gap: '20px'
-                                    }}>
-                                        {Object.entries(goalColors).map(([type, colors]) => (
-                                            <div
-                                                key={type}
-                                                style={{
-                                                    padding: '16px',
-                                                    border: '1px solid var(--color-border)',
-                                                    borderRadius: '8px',
-                                                    backgroundColor: 'var(--color-bg-card-alt)'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    marginBottom: '12px',
-                                                    fontWeight: 'bold',
-                                                    color: 'var(--color-text-primary)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px'
-                                                }}>
-                                                    {/* Color Preview Dot */}
-                                                    <div style={{
-                                                        width: '12px',
-                                                        height: '12px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: colors.primary,
-                                                        border: '1px solid rgba(0,0,0,0.2)'
-                                                    }}></div>
-                                                    {formatGoalType(type)}
-                                                </div>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                                    {/* Primary Color Input */}
-                                                    <div>
-                                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--color-text-secondary)' }}>Primary</label>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <input
-                                                                type="color"
-                                                                value={colors.primary}
-                                                                onChange={(e) => setGoalColor(type, 'primary', e.target.value)}
-                                                                style={{
-                                                                    cursor: 'pointer',
-                                                                    height: '32px',
-                                                                    width: '100%',
-                                                                    padding: 0,
-                                                                    border: '1px solid var(--color-border)',
-                                                                    borderRadius: '4px'
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Secondary Color Input */}
-                                                    <div>
-                                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--color-text-secondary)' }}>Secondary</label>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <input
-                                                                type="color"
-                                                                value={colors.secondary}
-                                                                onChange={(e) => setGoalColor(type, 'secondary', e.target.value)}
-                                                                style={{
-                                                                    cursor: 'pointer',
-                                                                    height: '32px',
-                                                                    width: '100%',
-                                                                    padding: 0,
-                                                                    border: '1px solid var(--color-border)',
-                                                                    borderRadius: '4px'
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+                                        Goal Characteristics
+                                    </h3>
+                                    <GoalCharacteristicsSettings />
                                 </section>
                             </div>
                         )}

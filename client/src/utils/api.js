@@ -385,7 +385,7 @@ export const fractalApi = {
      * @param {string} rootId - ID of the fractal
      * @param {string} goalId - ID of the goal
      */
-    getGoalMetrics: (rootId, goalId) =>
+    getGoalMetrics: (goalId) =>
         axios.get(`${API_BASE}/goals/${goalId}/metrics`),
 
     /**
@@ -393,7 +393,7 @@ export const fractalApi = {
      * @param {string} rootId - ID of the fractal
      * @param {string} goalId - ID of the goal
      */
-    getGoalDailyDurations: (rootId, goalId) =>
+    getGoalDailyDurations: (goalId) =>
         axios.get(`${API_BASE}/goals/${goalId}/metrics/daily-durations`),
 
     /**

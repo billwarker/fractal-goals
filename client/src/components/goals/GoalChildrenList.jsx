@@ -37,7 +37,7 @@ function GoalChildrenList({
     childType,
     onGoalSelect
 }) {
-    const { getGoalColor, getGoalSecondaryColor } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, goalCharacteristics } = useTheme();
     const node = findGoalById(treeData, goalId);
     const children = node?.children || [];
 
@@ -83,6 +83,7 @@ function GoalChildrenList({
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <GoalIcon
+                                    shape={goalCharacteristics[childType]?.icon || 'circle'}
                                     color={iconColor}
                                     secondaryColor={iconSecondaryColor}
                                     isSmart={childIsSmart}
