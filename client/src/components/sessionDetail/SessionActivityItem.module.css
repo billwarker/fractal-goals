@@ -220,6 +220,27 @@
     margin-top: 14px;
 }
 
+.microGoalActionButton {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 32px;
+    width: 32px;
+    color: var(--color-text-muted);
+}
+
+.microGoalActionButton:hover {
+    background: var(--color-bg-alt);
+    border-color: var(--color-primary);
+    transform: scale(1.05);
+}
+
 .deleteButton {
     background: none;
     border: none;

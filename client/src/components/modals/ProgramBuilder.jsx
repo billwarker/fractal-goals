@@ -62,7 +62,7 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
             const res = await fractalApi.getGoal(rootId, rootId);
             const allGoals = collectGoals(res.data);
             const eligibleGoals = allGoals.filter(g =>
-                ['ShortTermGoal', 'MidTermGoal', 'LongTermGoal', 'UltimateGoal'].includes(g.attributes?.type)
+                ['MidTermGoal', 'LongTermGoal'].includes(g.attributes?.type)
             );
             setGoals(eligibleGoals);
         } catch (err) {
@@ -167,7 +167,7 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
                             </div>
                         ) : (
                             <div className={styles.goalList}>
-                                {['LongTermGoal', 'MidTermGoal', 'ShortTermGoal'].map(goalType => {
+                                {['LongTermGoal', 'MidTermGoal'].map(goalType => {
                                     const typeGoals = goals.filter(g => g.attributes?.type === goalType);
                                     if (typeGoals.length === 0) return null;
 

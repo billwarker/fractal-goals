@@ -104,6 +104,7 @@ function SessionDetail() {
     const [selectedGoal, setSelectedGoal] = useState(null); // For goal detail modal
     const [selectedActivity, setSelectedActivity] = useState(null); // For side pane context
     const [selectedSetIndex, setSelectedSetIndex] = useState(null); // For set-level note context
+    const [sidePaneMode, setSidePaneMode] = useState('details'); // Add side pane mode state
     const [draggedItem, setDraggedItem] = useState(null); // For drag-and-drop between sections
     const isFirstLoad = React.useRef(true); // Track initial load to prevent auto-save on mount
 
@@ -111,6 +112,13 @@ function SessionDetail() {
     const handleActivityFocus = (instance, setIndex = null) => {
         setSelectedActivity(instance);
         setSelectedSetIndex(setIndex);
+    };
+
+    // Handler for Micro Goal button click
+    const handleOpenGoals = (instance) => {
+        setSelectedActivity(instance);
+        setSelectedSetIndex(null);
+        setSidePaneMode('goals');
     };
 
     // Handler for moving activity between sections via drag-and-drop
@@ -1024,6 +1032,7 @@ function SessionDetail() {
                             onAddNote={addNote}
                             onUpdateNote={updateNote}
                             onDeleteNote={deleteNote}
+                            onOpenGoals={handleOpenGoals}
                             // Drag and drop props
                             onMoveActivity={handleMoveActivity}
                             onReorderActivity={handleReorderActivity}
@@ -1061,9 +1070,14 @@ function SessionDetail() {
                         isCompleted={session.attributes?.completed}
                         onDelete={handleDeleteSessionClick}
                         onCancel={() => navigate(`/${rootId}/sessions`)}
+                        onGoalCreated={fetchSession}
+                        targetAchievements={targetAchievements}
+                        achievedTargetIds={achievedTargetIds}
                         onToggleComplete={handleToggleSessionComplete}
 
                         onSave={handleSaveSession}
+                        mode={sidePaneMode}
+                        onModeChange={setSidePaneMode}
                         onSessionChange={(updatedSession) => {
                             setSession(updatedSession);
                             // Update sessionData if datetime fields changed

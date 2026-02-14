@@ -10,7 +10,7 @@ from models import (
     get_session,
     Goal, Session, Target,
     get_all_root_goals, get_goal_by_id, get_session_by_id,
-    validate_root_goal
+    validate_root_goal, session_goals
 )
 from validators import (
     validate_request,
@@ -208,6 +208,14 @@ def create_goal(validated_data):
             # Allow _sync_targets to create the relational records
             _sync_targets(db_session, new_goal, validated_data['targets'])
         
+        # Link to session if session_id provided and it's a MicroGoal
+        if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
+            db_session.execute(session_goals.insert().values(
+                session_id=validated_data['session_id'],
+                goal_id=new_goal.id,
+                goal_type='micro'
+            ))
+        
         db_session.commit()
         db_session.refresh(new_goal)
         
@@ -229,6 +237,43 @@ def create_goal(validated_data):
     except Exception as e:
         db_session.rollback()
         logger.exception("Error creating goal")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/fractal/<root_id>/sessions/<session_id>/micro-goals', methods=['GET'])
+@token_required
+def get_session_micro_goals(current_user, root_id, session_id):
+    """Get all micro goals linked to a session, including their nano children."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        # Verify ownership of fractal
+        root = db_session.query(Goal).filter_by(id=root_id, parent_id=None, owner_id=current_user.id).first()
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+        
+        # Query micro goals linked to session
+        # Junction table query
+        stmt = (
+            select(Goal)
+            .join(session_goals, Goal.id == session_goals.c.goal_id)
+            .where(session_goals.c.session_id == session_id)
+            .where(session_goals.c.goal_type == 'micro')
+            .options(selectinload(Goal.children)) # Load NanoGoals
+        )
+        
+        micro_goals = db_session.execute(stmt).scalars().all()
+        
+        result = [serialize_goal(g) for g in micro_goals]
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.exception("Error fetching session micro goals")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -788,6 +833,14 @@ def create_fractal_goal(current_user, root_id, validated_data):
             new_goal.targets = json.dumps(validated_data['targets'])
             # Allow _sync_targets to create the relational records
             _sync_targets(db_session, new_goal, validated_data['targets'])
+        
+        # Link to session if session_id provided and it's a MicroGoal
+        if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
+            db_session.execute(session_goals.insert().values(
+                session_id=validated_data['session_id'],
+                goal_id=new_goal.id,
+                goal_type='micro'
+            ))
         
         db_session.commit()
         db_session.refresh(new_goal)

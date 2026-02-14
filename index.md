@@ -36,6 +36,10 @@
 - **Settings UI Refactor**: Reorganized the `SettingsModal` to improve clarity. Moved "Interface Theme" toggles to the General tab, consolidated all goal-specific settings (Icons, Colors, Deadlines, Completion Methods) into a new "Characteristics" tab, and removed the redundant "Themes" tab.
 - **Rule Enforcement**: Implemented global enforcement of goal characteristics. The "Mark Complete" button and Targets sections in `GoalDetailModal` now dynamically respect the user's global configuration for each goal level.
 - **API Optimization**: Fixed incorrect API paths for `getGoalMetrics` and `getGoalDailyDurations` in the frontend client, resolving issues with metric fetching in the goal detail view.
+- **Goal Level Enhancements**: Implemented the final two levels of the fractal hierarchy: **Micro Goals** (session-specific focus) and **Nano Goals** (granular checkable sub-tasks).
+- **Session Goals Integration**: Added a dedicated "Goals" tab to the `SessionSidePane` which supports real-time creation and tracking of micro/nano goals linked to the current session.
+- **ProgramBuilder Restriction**: Standardized the `ProgramBuilder` to only allow selection of Mid-Term and Long-Term goals, aligning with the macro-cycle focus of Programs.
+- **Activity Context Actions**: Added a "Micro Goal" action button (🎯) to `SessionActivityItem` to quickly switch side pane context to specific focus areas.
 
 ---
 
@@ -60,13 +64,14 @@
 - Session start/end times with duration tracking
 - Activity instances with timers
 - Session templates for recurring practices
-- **Session-Goal Associations:**
-  - Many-to-many relationship with Goals via `session_goals` junction table
-  - Sessions can be linked to ShortTermGoals (`goal_type='short_term'`)
-  - Sessions can be linked to ImmediateGoals (`goal_type='immediate'`)
-  - CreateSession page allows selecting STGs and their child IGs in a unified flow
-  - SessionDetail header displays associated STGs and IGs with clickable links
-  - GoalDetailModal shows associated sessions for both STGs and IGs
+- **Session-Goal Associations**:
+  - Many-to-many relationship with Goals via `session_goals` junction table.
+  - Sessions can be linked to ShortTermGoals (`goal_type='short_term'`) and ImmediateGoals (`goal_type='immediate'`).
+  - **Micro/Nano Linking**: Sessions can now have multiple **Micro Goals** linked specifically to that session, which in turn hold checkable **Nano Goals**.
+  - **Goals Panel**: Integrated into the `SessionSidePane` to manage these session-local goals without leaving the session context.
+  - CreateSession page allows selecting STGs and their child IGs in a unified flow.
+  - SessionDetail header displays associated STGs and IGs with clickable links.
+  - GoalDetailModal shows associated sessions for both STGs and IGs.
 - **Refactored Session Detail**:
   - Moved **Session Controls** (Complete, Save, Cancel, Delete) to the Side Pane for better ergonomics (2x2 Grid, Badge style).
   - Implemented **Auto-expanding Note Inputs** (Textarea) for better writing experience.

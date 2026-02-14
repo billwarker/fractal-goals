@@ -10,6 +10,7 @@
 import React, { useState, useMemo } from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
+import GoalsPanel from './GoalsPanel';
 import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
 import styles from './SessionSidePane.module.css';
@@ -27,6 +28,9 @@ function SessionSidePane({
     activityDefinitions,  // Activity definitions for lookup
     onNoteAdded,          // Callback when note is added
     onGoalClick,          // Callback when goal badge is clicked
+    onGoalCreated,        // Callback when goal is created
+    targetAchievements,   // Map of target_id -> achievement status
+    achievedTargetIds,    // Set of achieved target IDs
     refreshTrigger,       // Counter to trigger notes refresh
     notes,
     previousNotes,
@@ -40,9 +44,12 @@ function SessionSidePane({
     onToggleComplete,
     onSave,
     isCompleted,
-    onSessionChange
+    onSessionChange,
+    mode = 'details',      // Controlled mode
+    onModeChange           // Callback for mode change
 }) {
-    const [mode, setMode] = useState('details'); // 'details' | 'history'
+    // mode state lifted to parent (SessionDetail)
+
 
     // Get unique activity definitions from current session
     const sessionActivityDefs = useMemo(() => {
@@ -65,13 +72,19 @@ function SessionSidePane({
                 <div className={styles.sidepaneTabs}>
                     <button
                         className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
-                        onClick={() => setMode('details')}
+                        onClick={() => onModeChange('details')}
                     >
                         Details
                     </button>
                     <button
+                        className={`${styles.sidepaneTab} ${mode === 'goals' ? styles.sidepaneTabActive : ''}`}
+                        onClick={() => onModeChange('goals')}
+                    >
+                        Goals
+                    </button>
+                    <button
                         className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
-                        onClick={() => setMode('history')}
+                        onClick={() => onModeChange('history')}
                     >
                         History
                     </button>
@@ -151,6 +164,20 @@ function SessionSidePane({
                             deleteNote={deleteNote}
                         />
                     </div>
+                ) : mode === 'goals' ? (
+                    <GoalsPanel
+                        rootId={rootId}
+                        sessionId={sessionId}
+                        parentGoals={parentGoals}
+                        session={session}
+                        selectedActivity={selectedActivity}
+                        activityInstances={activityInstances}
+                        activityDefinitions={activityDefinitions}
+                        onGoalClick={onGoalClick}
+                        onGoalCreated={onGoalCreated}
+                        targetAchievements={targetAchievements}
+                        achievedTargetIds={achievedTargetIds}
+                    />
                 ) : (
                     <HistoryPanel
                         rootId={rootId}

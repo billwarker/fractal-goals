@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import GoalIcon from '../atoms/GoalIcon';
+import { useTheme } from '../../contexts/ThemeContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { fractalApi } from '../../utils/api';
 import NoteQuickAdd from './NoteQuickAdd';
@@ -36,6 +38,7 @@ function SessionActivityItem({
     onNoteCreated, // Optional callback to trigger refresh
     sessionId, // Explicit session ID
     onFocus, // Added prop - called with (instance, setIndex) to update context
+    onOpenGoals, // Trigger switch to goals tab
     isSelected, // Added prop for styling
     allNotes,
     onAddNote,
@@ -47,6 +50,10 @@ function SessionActivityItem({
 }) {
     // Get timezone from context
     const { timezone } = useTimezone();
+    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+
+    // Characteristics for micro goal icon
+    const microChars = getScopedCharacteristics('MicroGoal');
 
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');
@@ -313,6 +320,23 @@ function SessionActivityItem({
                 </div>
 
                 <div className={styles.activityHeaderRight}>
+                    {/* Micro Goal Action */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenGoals) onOpenGoals(exercise);
+                        }}
+                        className={styles.microGoalActionButton}
+                        title="Add/View Micro Goals"
+                    >
+                        <GoalIcon
+                            shape={microChars.icon || 'circle'}
+                            color={getGoalColor('MicroGoal')}
+                            secondaryColor={getGoalSecondaryColor('MicroGoal')}
+                            size={18}
+                        />
+                    </button>
+
                     {/* Timer Controls - New Design */}
                     {exercise.id && (
                         <>

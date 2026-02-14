@@ -57,6 +57,7 @@ const SessionSection = ({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
+    onOpenGoals,
     // Drag and drop props
     onMoveActivity,
     onReorderActivity,
@@ -162,6 +163,7 @@ const SessionSection = ({
                                 onAddNote={onAddNote}
                                 onUpdateNote={onUpdateNote}
                                 onDeleteNote={onDeleteNote}
+                                onOpenGoals={onOpenGoals}
                                 isDragging={isDragging}
                             />
                         </div>

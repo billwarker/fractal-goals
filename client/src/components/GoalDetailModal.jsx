@@ -119,7 +119,7 @@ function GoalDetailModal({
 
     const handleTimeSpentClick = async () => {
         try {
-            const response = await fractalApi.getGoalDailyDurations(rootId, depGoalId);
+            const response = await fractalApi.getGoalDailyDurations(depGoalId);
             const points = response.data.points || [];
 
             // Transform to Chart.js data
@@ -276,9 +276,8 @@ function GoalDetailModal({
                 // I'll fix `api.js` in a subsequent step or previous step? I already edited it.
                 // I will fix `api.js` in the next step to be correct.
                 // 
-                // Back to this file... I will use `fractalApi.getGoalMetrics(rootId, depGoalId)`.
-
-                const response = await fractalApi.getGoalMetrics(rootId, depGoalId);
+                // Fixed: getGoalMetrics only takes goalId, not rootId
+                const response = await fractalApi.getGoalMetrics(depGoalId);
                 setMetrics(response.data);
             } catch (error) {
                 console.error("Error fetching metrics:", error);

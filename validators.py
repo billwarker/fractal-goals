@@ -228,6 +228,15 @@ class GoalCreateSchema(BaseModel):
     completed_via_children: Optional[bool] = False
     allow_manual_completion: Optional[bool] = True
     track_activities: Optional[bool] = True
+    session_id: Optional[str] = None  # If provided, link goal to session
+    
+    @model_validator(mode='after')
+    def validate_parent_type_constraints(self):
+        if self.type == 'MicroGoal' and not self.parent_id:
+            raise ValueError('MicroGoal must have a parent_id (ImmediateGoal)')
+        if self.type == 'NanoGoal' and not self.parent_id:
+            raise ValueError('NanoGoal must have a parent_id (MicroGoal)')
+        return self
     
     @field_validator('name')
     @classmethod

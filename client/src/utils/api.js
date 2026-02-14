@@ -177,6 +177,14 @@ export const fractalApi = {
     addSessionGoal: (rootId, sessionId, goalId, goalType = 'immediate') =>
         axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/goals`, { goal_id: goalId, goal_type: goalType }),
 
+    /**
+     * Get all micro goals linked to a session, including their nano children
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     */
+    getSessionMicroGoals: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/fractal/${rootId}/sessions/${sessionId}/micro-goals`),
+
 
     // ========== Session Activity Instances (Database-Only Architecture) ==========
 

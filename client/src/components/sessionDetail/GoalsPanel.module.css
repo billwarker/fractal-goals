@@ -1,0 +1,580 @@
+/* GoalsPanel Styles */
+
+.goalsPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+}
+
+/* ═══ Context Section (top area) ═══ */
+
+.contextSection {
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.contextHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.contextLabel {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+}
+
+.clearFilter {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: default;
+    font-size: 11px;
+    padding: 2px;
+}
+
+/* --- Activity Goals List --- */
+
+.activityGoalsList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.activityGoalRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.activityGoalRow:hover {
+    background: var(--color-bg-surface-hover);
+}
+
+.activityGoalInfo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.activityGoalType {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+    line-height: 1.2;
+}
+
+.activityGoalName {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s;
+}
+
+.activityGoalName:hover {
+    color: var(--color-primary);
+}
+
+.noGoalsText {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+/* --- Hierarchy Overview --- */
+
+.hierarchyChain {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hierarchyNode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.hierarchyNodeName {
+    color: var(--color-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s;
+}
+
+.hierarchyNodeName:hover {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+}
+
+.hierarchyNodeLinked {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+/* --- Session Goals (ST + IG rows when no activity) --- */
+
+.sessionGoalsSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ═══ Focus Section (Micro + Nano) ═══ */
+
+.focusSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.sectionHeader {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 4px;
+}
+
+.loadingText {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: 8px 0;
+}
+
+/* ═══ Goal Row (ShortTerm / Immediate) ═══ */
+
+.goalRow {
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: background 0.15s;
+}
+
+.goalRow:hover {
+    background: var(--color-bg-surface-hover);
+}
+
+.goalHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.goalName {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    min-width: 0;
+}
+
+.goalNameClickable {
+    cursor: pointer;
+    transition: color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.goalNameClickable:hover {
+    color: var(--color-primary);
+}
+
+.targetBadge {
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text-muted);
+    padding: 1px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.expandToggle {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.expandedContent {
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Targets --- */
+
+.targetsList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.targetRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-text-secondary, var(--color-text-muted));
+    padding: 2px 0;
+}
+
+.targetRow.targetAchieved {
+    color: var(--color-success, #4caf50);
+}
+
+.targetIndicator {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.targetName {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.noTargets {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* ═══ Micro Goal Rows ═══ */
+
+.microGoalRow {
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.microGoalHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.microGoalCheckbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.microGoalName {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.microGoalName:hover {
+    color: var(--color-primary);
+}
+
+.completedText {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* --- Micro Goal Target Affordance --- */
+
+.microTargetArea {
+    padding-left: 28px;
+}
+
+.microTargetList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.microTargetChip {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    background: var(--color-bg-surface-hover);
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.microTargetChip.microTargetDone {
+    color: var(--color-success, #4caf50);
+}
+
+.addTargetLink {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 0;
+    transition: color 0.15s;
+}
+
+.addTargetLink:hover {
+    color: var(--color-primary);
+}
+
+/* --- Nano Goals --- */
+
+.nanoGoalsContainer {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.nanoGoalRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.nanoGoalCheckbox {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.nanoGoalName {
+    color: var(--color-text-primary);
+}
+
+.nanoQuickAdd {
+    margin-left: 22px;
+    background: none;
+    border: none;
+    border-bottom: 1px dashed var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 12px;
+    padding: 4px 0;
+    outline: none;
+    width: calc(100% - 22px);
+}
+
+.nanoQuickAdd:focus {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-text-primary);
+}
+
+/* ═══ Inline IG Creator ═══ */
+
+.igCreator {
+    background: var(--color-bg-sidebar);
+    border: 1px solid var(--color-warning, #f0ad4e);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideDown 0.2s ease-out;
+}
+
+.igCreatorHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    line-height: 1.4;
+}
+
+.igCreatorInput {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.igCreatorInput:focus {
+    border-color: var(--color-primary);
+}
+
+.igCreatorField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.igCreatorLabel {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+}
+
+.igCreatorSelect {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.igCreatorSelect:focus {
+    border-color: var(--color-primary);
+}
+
+.igCreatorActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.igCreatorSubmit {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.igCreatorSubmit:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.igCreatorSubmit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.igCreatorCancel {
+    padding: 8px 12px;
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.igCreatorCancel:hover {
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
+}
+
+/* ═══ Quick Add ═══ */
+
+.quickAddContainer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--color-bg-sidebar);
+    border: 1px dashed var(--color-border);
+    border-radius: 6px;
+}
+
+.quickAddInput {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--color-text-primary);
+    font-size: 14px;
+}
+
+.quickAddInput::placeholder {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* ═══ Footer Tally ═══ */
+
+.footer {
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-around;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.tallyItem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-primary);
+}
+
+.tallySeparator {
+    opacity: 0.2;
+}
