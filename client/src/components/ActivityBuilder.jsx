@@ -312,37 +312,77 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     </Button>
                                 </div>
 
-                                {/* Selected Goals Display */}
+                                {/* Association Summary */}
                                 {selectedGoalIds.length > 0 && (
-                                    <div className={styles.selectedGoalsContainer}>
-                                        {selectedGoalIds.map(goalId => {
-                                            const goal = allGoals.find(g => g.id === goalId);
-                                            if (!goal) return null;
-                                            const goalColor = getGoalColor(goal.type);
+                                    <div className={styles.associationSummary}>
+                                        {(() => {
+                                            // Helper to check for inherited selection
+                                            const hasSelectedDescendant = (goal) => {
+                                                if (!goal.childrenIds || goal.childrenIds.length === 0) return false;
+                                                return goal.childrenIds.some(childId => {
+                                                    if (selectedGoalIds.includes(childId)) return true;
+                                                    const childGoal = allGoals.find(g => g.id === childId);
+                                                    if (childGoal) return hasSelectedDescendant(childGoal);
+                                                    return false;
+                                                });
+                                            };
+
+                                            // Group counts by type
+                                            const summary = allGoals.reduce((acc, goal) => {
+                                                const isDirect = selectedGoalIds.includes(goal.id);
+                                                const isInherited = !isDirect && hasSelectedDescendant(goal);
+
+                                                if (isDirect || isInherited) {
+                                                    if (!acc[goal.type]) acc[goal.type] = { direct: 0, inherited: 0 };
+                                                    if (isDirect) acc[goal.type].direct++;
+                                                    if (isInherited) acc[goal.type].inherited++;
+                                                }
+                                                return acc;
+                                            }, {});
+
+                                            const order = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal', 'MicroGoal'];
+                                            const typeLabels = {
+                                                'UltimateGoal': 'Ultimate',
+                                                'LongTermGoal': 'Long Term',
+                                                'MidTermGoal': 'Mid Term',
+                                                'ShortTermGoal': 'Short Term',
+                                                'ImmediateGoal': 'Immediate',
+                                                'MicroGoal': 'Micro'
+                                            };
+
                                             return (
-                                                <div
-                                                    key={goalId}
-                                                    className={styles.selectedGoalTag}
-                                                    style={{
-                                                        background: `${goalColor}20`,
-                                                        border: `1px solid ${goalColor}`,
-                                                        color: goalColor
-                                                    }}
-                                                >
-                                                    {goal.name}
-                                                    <span
-                                                        onClick={() => setSelectedGoalIds(prev => prev.filter(id => id !== goalId))}
-                                                        className={styles.removeGoalBtn}
-                                                    >
-                                                        ×
-                                                    </span>
+                                                <div className={styles.summaryGrid}>
+                                                    {order.map(type => {
+                                                        const stats = summary[type];
+                                                        if (!stats) return null;
+
+                                                        const color = getGoalColor(type);
+
+                                                        return (
+                                                            <div key={type} className={styles.summaryItem} style={{ borderColor: color }}>
+                                                                <div className={styles.summaryLabel} style={{ color }}>{typeLabels[type] || type}</div>
+                                                                <div className={styles.summaryCounts}>
+                                                                    {stats.direct > 0 && (
+                                                                        <span className={styles.countDirect} title="Directly Associated">
+                                                                            {stats.direct} Direct
+                                                                        </span>
+                                                                    )}
+                                                                    {stats.inherited > 0 && (
+                                                                        <span className={styles.countInherited} title="Inherited from Selection">
+                                                                            {stats.inherited} Inherited
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             );
-                                        })}
+                                        })()}
                                     </div>
                                 )}
 
-                                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
                                     Goals with associated activities meet the SMART "Achievable" criterion
                                 </div>
                             </div>
