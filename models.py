@@ -553,6 +553,7 @@ class Note(Base):
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
+    nano_goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
     
     # For set-level notes
     set_index = Column(Integer, nullable=True)  # 0-indexed set number

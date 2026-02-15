@@ -62,7 +62,11 @@ const SessionSection = ({
     onMoveActivity,
     onReorderActivity,
     draggedItem,
-    setDraggedItem
+    setDraggedItem,
+    parentGoals,
+    immediateGoals,
+    microGoals,
+    session
 }) => {
     const [viewGroupId, setViewGroupId] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
@@ -165,6 +169,10 @@ const SessionSection = ({
                                 onDeleteNote={onDeleteNote}
                                 onOpenGoals={onOpenGoals}
                                 isDragging={isDragging}
+                                parentGoals={parentGoals}
+                                immediateGoals={immediateGoals}
+                                microGoals={microGoals}
+                                session={session}
                             />
                         </div>
                     );

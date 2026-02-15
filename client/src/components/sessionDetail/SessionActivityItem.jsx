@@ -46,14 +46,101 @@ function SessionActivityItem({
     onDeleteNote,
     // Drag and drop props
     isDragging,
-    dragHandleProps
+    dragHandleProps,
+    // Micro Goal Extensions
+    activeMicroGoal,
+    onCreateNanoGoal,
+    // Goal Context for Smart Creator
+    parentGoals = [],
+    immediateGoals = [],
+    microGoals = [],
+    session,
 }) {
     // Get timezone from context
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
 
-    // Characteristics for micro goal icon
+    // Characteristics for goal icons
     const microChars = getScopedCharacteristics('MicroGoal');
+    const nanoChars = getScopedCharacteristics('NanoGoal');
+    const immediateChars = getScopedCharacteristics('ImmediateGoal');
+
+    // Helper: Determine the next goal action based on activity's current associations
+    const getNextGoalContext = () => {
+        if (!activityDefinition || !activityDefinition.associated_goal_ids) {
+            return { type: 'associate', label: 'Associate to a goal', icon: '🔗', color: 'var(--color-text-secondary)' };
+        }
+
+        const associatedGoalIds = activityDefinition.associated_goal_ids;
+
+        // Check if associated with any Short-Term or Immediate goals
+        const hasShortTermGoal = parentGoals.some(g => associatedGoalIds.includes(g.id));
+        const hasImmediateGoal = (session?.immediate_goals || immediateGoals).some(g => associatedGoalIds.includes(g.id));
+
+        // Case 1: Not associated with STG or IG -> need to associate
+        if (!hasShortTermGoal && !hasImmediateGoal) {
+            // Check if we have ANY associated goals (even outside session context)
+            const associatedGoals = activityDefinition.associated_goals || [];
+
+            if (associatedGoals.length > 0) {
+                // Determine display from the first associated goal
+                const primaryGoal = associatedGoals[0];
+                const goalColor = getGoalColor(primaryGoal.type);
+                const goalSecondaryColor = getGoalSecondaryColor(primaryGoal.type);
+                const chars = getScopedCharacteristics(primaryGoal.type);
+
+                return {
+                    type: 'associate', // Still allows re-associating
+                    label: primaryGoal.name,
+                    icon: chars?.icon || '🔗',
+                    color: goalColor || 'var(--color-text-primary)',
+                    secondaryColor: goalSecondaryColor || 'var(--color-bg-card)',
+                    action: 'associate'
+                };
+            }
+
+            return { type: 'associate', label: 'Associate to a goal', icon: '🔗', color: 'var(--color-text-secondary)' };
+        }
+
+        // Case 2: Has STG but no IG -> create Immediate Goal
+        if (hasShortTermGoal && !hasImmediateGoal) {
+            return {
+                type: 'ImmediateGoal',
+                label: 'Create Immediate Goal',
+                icon: immediateChars.icon || 'diamond',
+                color: getGoalColor('ImmediateGoal'),
+                secondaryColor: getGoalSecondaryColor('ImmediateGoal')
+            };
+        }
+
+        // Case 3: Has IG but no active micro -> create Micro Goal
+        // Check if there's an active micro goal for this activity in the session
+        const hasMicroGoal = microGoals.some(mg =>
+            !mg.completed &&
+            mg.attributes?.session_id === sessionId
+        );
+
+        if (!hasMicroGoal) {
+            return {
+                type: 'MicroGoal',
+                label: 'Create Micro Goal',
+                icon: microChars.icon || 'circle',
+                color: getGoalColor('MicroGoal'),
+                secondaryColor: getGoalSecondaryColor('MicroGoal')
+            };
+        }
+
+        // Case 4: Has active micro -> create Nano Goal (toggle mode)
+        return {
+            type: 'NanoGoal',
+            label: nanoMode ? 'Cancel Nano Note' : 'Add Nano Goal Note',
+            icon: nanoChars.icon || 'star',
+            color: getGoalColor('NanoGoal'),
+            secondaryColor: getGoalSecondaryColor('NanoGoal')
+        };
+    };
+
+    const goalContext = getNextGoalContext();
 
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');
@@ -61,6 +148,14 @@ function SessionActivityItem({
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
+
+    // Nano creation mode
+    const [nanoMode, setNanoMode] = useState(false);
+
+    // Reset nano mode when active micro goal changes (e.g. completes or switch activity)
+    useEffect(() => {
+        if (!activeMicroGoal) setNanoMode(false);
+    }, [activeMicroGoal]);
 
     // Real-time timer effect
     useEffect(() => {
@@ -99,6 +194,12 @@ function SessionActivityItem({
         // Either content or image is required
         if ((!content.trim() && !imageData) || !onAddNote || !exercise.id) return;
 
+        // NEW: Check if in nano mode
+        if (nanoMode && activeMicroGoal) {
+            await handleAddNanoNote(content, imageData);
+            return;
+        }
+
         try {
             await onAddNote({
                 context_type: 'activity_instance',
@@ -115,7 +216,39 @@ function SessionActivityItem({
             // Optional: Deselect set after adding note?
             // setSelectedSetIndex(null); 
         } catch (err) {
-            console.error('Failed to create note', err);
+            console.error("Failed to create note", err);
+        }
+    };
+
+    const handleAddNanoNote = async (content, imageData = null) => {
+        if (!content.trim() && !imageData) return;
+
+        try {
+            // 1. Create the NanoGoal (goal hierarchy)
+            let newNanoGoalId = null;
+            if (onCreateNanoGoal && content.trim()) {
+                // Expect onCreateNanoGoal to return the created goal object
+                const res = await onCreateNanoGoal(activeMicroGoal.id, content.trim());
+                if (res && res.id) newNanoGoalId = res.id;
+            }
+
+            // 2. Create the Note (note timeline)
+            await onAddNote({
+                context_type: 'activity_instance',
+                context_id: exercise.id,
+                session_id: sessionId || exercise.practice_session_id,
+                activity_instance_id: exercise.id,
+                activity_definition_id: activityDefinition?.id,
+                set_index: selectedSetIndex,
+                content: content.trim() || (imageData ? '[Nano Image]' : ''),
+                image_data: imageData,
+                nano_goal_id: newNanoGoalId, // Link note to the nano goal
+                is_nano_goal: true
+            });
+
+            if (onNoteCreated) onNoteCreated();
+        } catch (err) {
+            console.error("Failed to create nano note", err);
         }
     };
 
@@ -320,21 +453,51 @@ function SessionActivityItem({
                 </div>
 
                 <div className={styles.activityHeaderRight}>
-                    {/* Micro Goal Action */}
+                    {/* Smart Goal Creator Button */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (onOpenGoals) onOpenGoals(exercise);
+
+                            if (goalContext.type === 'NanoGoal') {
+                                // Toggle nano mode for existing behavior
+                                setNanoMode(!nanoMode);
+                            } else if (goalContext.type === 'associate') {
+                                // Switch to goals panel to allow association
+                                if (onOpenGoals) {
+                                    onOpenGoals(exercise, {
+                                        type: 'associate',
+                                        activityDefinition: activityDefinition,
+                                        initialSelectedGoalIds: activityDefinition.associated_goal_ids || []
+                                    });
+                                }
+                            } else {
+                                // Open goals panel with context for creating IG or Micro
+                                if (onOpenGoals) {
+                                    onOpenGoals(exercise, {
+                                        suggestedType: goalContext.type,
+                                        activityDefinition: activityDefinition
+                                    });
+                                }
+                            }
                         }}
-                        className={styles.microGoalActionButton}
-                        title="Add/View Micro Goals"
+                        className={`${styles.microGoalActionButton} ${goalContext.type === 'NanoGoal' && nanoMode ? styles.activeNanoMode : ''}`}
+                        title={goalContext.label}
+                        style={{
+                            borderColor: goalContext.color,
+                            color: goalContext.color
+                        }}
                     >
-                        <GoalIcon
-                            shape={microChars.icon || 'circle'}
-                            color={getGoalColor('MicroGoal')}
-                            secondaryColor={getGoalSecondaryColor('MicroGoal')}
-                            size={18}
-                        />
+                        {goalContext.type === 'associate' ? (
+                            <span style={{ fontSize: '14px', lineHeight: 1 }}>{goalContext.icon}</span>
+                        ) : (
+                            <GoalIcon
+                                shape={goalContext.icon}
+                                color={goalContext.color}
+                                secondaryColor={goalContext.secondaryColor}
+                                size={14}
+                            />
+                        )}
+                        <span>{goalContext.label}</span>
                     </button>
 
                     {/* Timer Controls - New Design */}
@@ -647,10 +810,14 @@ function SessionActivityItem({
                     )}
                     <NoteQuickAdd
                         onSubmit={handleAddNote}
-                        placeholder={selectedSetIndex !== null
-                            ? `Note for Set #${selectedSetIndex + 1}...`
-                            : "Add a note about this activity..."
+                        placeholder={nanoMode
+                            ? "Add a nano goal / sub-step..."
+                            : (selectedSetIndex !== null
+                                ? `Note for Set #${selectedSetIndex + 1}...`
+                                : "Add a note about this activity...")
                         }
+                        buttonLabel={nanoMode ? "Add Nano" : "Add Note"}
+                        isNanoMode={nanoMode}
                     />
                 </div>
             </div>

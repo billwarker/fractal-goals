@@ -39,6 +39,8 @@
   --color-brand-success-hover: #059669;
   --color-brand-danger: #ef4444;
   --color-brand-danger-hover: #dc2626;
+  --color-brand-secondary: #9c27b0;
+  --color-brand-secondary-hover: #7b1fa2;
 
   /* Aliases for semantic usage */
   --color-success: var(--color-brand-success);

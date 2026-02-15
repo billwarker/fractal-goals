@@ -337,8 +337,22 @@ def create_activity(current_user, root_id):
                 )
                 session.add(new_split)
         
+        # Handle Goal Associations
+        goal_ids = data.get('goal_ids', [])
+        if goal_ids:
+            from models import Goal, activity_goal_associations
+            for goal_id in goal_ids:
+                goal = session.query(Goal).filter_by(id=goal_id).first()
+                if goal:
+                    session.execute(
+                        activity_goal_associations.insert().values(
+                            activity_id=new_activity.id,
+                            goal_id=goal_id
+                        )
+                    )
+
         session.commit()
-        session.refresh(new_activity) # refresh to load metrics and splits
+        session.refresh(new_activity) # refresh to load metrics, splits, AND goals
         
         # Emit activity created event
         event_bus.emit(Event(Events.ACTIVITY_CREATED, {
@@ -485,9 +499,32 @@ def update_activity(current_user, root_id, activity_id):
             for existing_split in existing_splits:
                 if existing_split.id not in updated_split_ids:
                     session.delete(existing_split)
+
+        # Update goal associations if provided
+        if 'goal_ids' in data:
+            from models import Goal, activity_goal_associations
+            goal_ids = data.get('goal_ids', [])
+            
+            # Clear existing associations
+            session.execute(
+                activity_goal_associations.delete().where(
+                    activity_goal_associations.c.activity_id == activity_id
+                )
+            )
+            
+            # Add new associations
+            for goal_id in goal_ids:
+                goal = session.query(Goal).filter_by(id=goal_id).first()
+                if goal:
+                    session.execute(
+                        activity_goal_associations.insert().values(
+                            activity_id=activity_id,
+                            goal_id=goal_id
+                        )
+                    )
         
         session.commit()
-        session.refresh(activity)  # Refresh to load updated metrics
+        session.refresh(activity)  # Refresh to load updated metrics and goals
         
         # Emit activity updated event
         event_bus.emit(Event(Events.ACTIVITY_UPDATED, {

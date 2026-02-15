@@ -9,6 +9,7 @@ import { useGoals } from '../contexts/GoalsContext';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
+import ActivityAssociationModal from './sessionDetail/ActivityAssociationModal';
 import styles from './ActivityBuilder.module.css';
 
 /**
@@ -39,7 +40,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const [splits, setSplits] = useState([{ name: 'Split #1' }, { name: 'Split #2' }]);
     const [groupId, setGroupId] = useState('');
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
-    const [showGoalSelector, setShowGoalSelector] = useState(false);
+    const [showAssociationModal, setShowAssociationModal] = useState(false);
     const [currentGoalPath, setCurrentGoalPath] = useState([]); // Stack of goal nodes for navigation
 
     // Flatten goal tree for selection
@@ -117,46 +118,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         setSplits([{ name: 'Split #1' }, { name: 'Split #2' }]);
         setGroupId('');
         setSelectedGoalIds([]);
-        setShowGoalSelector(false);
-        setCurrentGoalPath([]); // Repurpose as selected level type
-        setSelectedLevel(null);
-        setError(null);
+
+        setShowAssociationModal(false);
     };
 
-    // Goal level type ordering and display names
-    const GOAL_LEVELS = [
-        { type: 'UltimateGoal', name: 'Ultimate' },
-        { type: 'LongTermGoal', name: 'Long Term' },
-        { type: 'MidTermGoal', name: 'Mid Term' },
-        { type: 'ShortTermGoal', name: 'Short Term' },
-        { type: 'ImmediateGoal', name: 'Immediate' },
-        { type: 'MicroGoal', name: 'Micro' },
-        { type: 'NanoGoal', name: 'Nano' }
-    ];
-
-    // Track which level is currently selected for viewing
-    const [selectedLevel, setSelectedLevel] = useState(null);
-
-    // Group goals by their type/level
-    const getGoalsByLevel = () => {
-        const goalsByLevel = {};
-        GOAL_LEVELS.forEach(level => {
-            goalsByLevel[level.type] = [];
-        });
-
-        allGoals.forEach(goal => {
-            if (goalsByLevel[goal.type]) {
-                goalsByLevel[goal.type].push(goal);
-            }
-        });
-
-        return goalsByLevel;
-    };
-
-    const goalsByLevel = getGoalsByLevel();
-
-    // Get levels that have goals
-    const levelsWithGoals = GOAL_LEVELS.filter(level => goalsByLevel[level.type]?.length > 0);
 
     const handleAddMetric = () => {
         if (metrics.length < 3) {
@@ -217,20 +182,15 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 has_metrics: hasMetrics,
                 metrics_multiplicative: metricsMultiplicative,
                 has_splits: hasSplits,
-                group_id: groupId || null
+                group_id: groupId || null,
+                goal_ids: selectedGoalIds
             };
 
             let result;
             if (editingActivity && editingActivity.id) {
                 result = await updateActivity(rootId, editingActivity.id, dataToSubmit);
-                // Update goal associations
-                await fractalApi.setActivityGoals(rootId, editingActivity.id, selectedGoalIds);
             } else {
                 result = await createActivity(rootId, dataToSubmit);
-                // Set goal associations for new activity
-                if (result && result.id && selectedGoalIds.length > 0) {
-                    await fractalApi.setActivityGoals(rootId, result.id, selectedGoalIds);
-                }
             }
 
             resetForm();
@@ -339,20 +299,17 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     </label>
                                     <Button
                                         type="button"
-                                        onClick={() => {
-                                            setShowGoalSelector(!showGoalSelector);
-                                            if (!showGoalSelector) setSelectedLevel(null);
-                                        }}
+                                        onClick={() => setShowAssociationModal(true)}
                                         variant="ghost"
                                         size="sm"
                                         style={{ color: 'var(--color-brand-primary)' }}
                                     >
-                                        {showGoalSelector ? 'Done' : 'Select Goals'}
+                                        Select Goals
                                     </Button>
                                 </div>
 
                                 {/* Selected Goals Display */}
-                                {selectedGoalIds.length > 0 && !showGoalSelector && (
+                                {selectedGoalIds.length > 0 && (
                                     <div className={styles.selectedGoalsContainer}>
                                         {selectedGoalIds.map(goalId => {
                                             const goal = allGoals.find(g => g.id === goalId);
@@ -378,89 +335,6 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                                 </div>
                                             );
                                         })}
-                                    </div>
-                                )}
-
-                                {/* Goal Level Navigator */}
-                                {showGoalSelector && (
-                                    <div className={styles.goalSelectorArea}>
-                                        {/* Level Badges Row */}
-                                        <div className={styles.levelBadgesRow} style={{ marginBottom: selectedLevel ? '12px' : '0' }}>
-                                            {levelsWithGoals.length === 0 ? (
-                                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                                    No goals available
-                                                </div>
-                                            ) : (
-                                                levelsWithGoals.map(level => {
-                                                    const goalColor = getGoalColor(level.type);
-                                                    const textColor = getGoalTextColor(level.type);
-                                                    const count = goalsByLevel[level.type]?.length || 0;
-                                                    const isActive = selectedLevel === level.type;
-
-                                                    return (
-                                                        <Button
-                                                            key={level.type}
-                                                            type="button"
-                                                            onClick={() => setSelectedLevel(isActive ? null : level.type)}
-                                                            className={`${styles.levelBadge} ${isActive ? styles.levelBadgeActive : styles.levelBadgeInactive}`}
-                                                            style={{
-                                                                background: goalColor,
-                                                                color: textColor,
-                                                                border: isActive ? '2px solid white' : '2px solid transparent',
-                                                                opacity: isActive ? 1 : 0.85
-                                                            }}
-                                                            size="sm"
-                                                        >
-                                                            {level.name} ({count})
-                                                        </Button>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-
-                                        {/* Goals at Selected Level */}
-                                        {selectedLevel && (
-                                            <div className={styles.goalsListLevel}>
-                                                <div className={styles.goalsGrid}>
-                                                    {goalsByLevel[selectedLevel]?.map(goal => {
-                                                        const goalColor = getGoalColor(goal.type);
-                                                        const isSelected = selectedGoalIds.includes(goal.id);
-
-                                                        return (
-                                                            <label
-                                                                key={goal.id}
-                                                                className={styles.goalCheckboxLabel}
-                                                                style={{
-                                                                    background: isSelected ? `${goalColor}25` : 'var(--color-bg-input)',
-                                                                    border: isSelected ? `2px solid ${goalColor}` : '1px solid var(--color-border)'
-                                                                }}
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isSelected}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            setSelectedGoalIds(prev => [...prev, goal.id]);
-                                                                        } else {
-                                                                            setSelectedGoalIds(prev => prev.filter(id => id !== goal.id));
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                <span
-                                                                    className={styles.goalName}
-                                                                    style={{
-                                                                        color: isSelected ? goalColor : 'var(--color-text-muted)',
-                                                                        fontWeight: isSelected ? 'bold' : 'normal'
-                                                                    }}
-                                                                >
-                                                                    {goal.name}
-                                                                </span>
-                                                            </label>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
@@ -655,6 +529,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 onConfirm={() => processSubmission(pendingSubmission)}
                 title="Removing Metrics"
                 message={metricWarningMessage}
+            />
+
+            {/* Association Modal */}
+            <ActivityAssociationModal
+                isOpen={showAssociationModal}
+                onClose={() => setShowAssociationModal(false)}
+                onAssociate={(newGoalIds) => {
+                    setSelectedGoalIds(newGoalIds);
+                }}
+                goals={allGoals}
+                initialActivityName={name}
+                initialSelectedGoalIds={selectedGoalIds}
             />
         </>
     );

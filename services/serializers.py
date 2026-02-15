@@ -122,6 +122,8 @@ def serialize_goal(goal, include_children=True):
         "name": goal.name,
         "id": goal.id,
         "type": goal.type,  # Hoist type to top level for frontend convenience
+        "completed": goal.completed,
+        "completed_at": format_utc(goal.completed_at),
         "is_smart": all(smart_status.values()),
         "smart_status": smart_status,
         "description": goal.description,
@@ -302,7 +304,8 @@ def serialize_activity_definition(activity):
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions],
-        "associated_goal_ids": [g.id for g in activity.associated_goals] if activity.associated_goals else []
+        "associated_goal_ids": [g.id for g in activity.associated_goals] if activity.associated_goals else [],
+        "associated_goals": [{"id": g.id, "name": g.name, "type": g.type} for g in activity.associated_goals] if activity.associated_goals else []
     }
 
 def serialize_metric_definition(metric):
@@ -397,7 +400,9 @@ def serialize_note(note, include_image=False):
         "content": note.content,
         "has_image": note.image_data is not None and len(note.image_data) > 0,
         "created_at": format_utc(note.created_at),
-        "updated_at": format_utc(note.updated_at)
+        "updated_at": format_utc(note.updated_at),
+        "nano_goal_id": note.nano_goal_id,
+        "is_nano_goal": note.nano_goal_id is not None
     }
     if include_image:
         result["image_data"] = note.image_data

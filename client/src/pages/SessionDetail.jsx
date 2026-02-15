@@ -16,6 +16,7 @@ import styles from './SessionDetail.module.css'; // New CSS module import
 import notify from '../utils/notify';
 import '../App.css';
 import { useGoals } from '../contexts/GoalsContext';
+import ActivityAssociationModal from '../components/sessionDetail/ActivityAssociationModal';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -95,6 +96,8 @@ function SessionDetail() {
     const [activities, setActivities] = useState([]);
     const [activityGroups, setActivityGroups] = useState([]);
     const [parentGoals, setParentGoals] = useState([]);
+    const [immediateGoals, setImmediateGoals] = useState([]);
+    const [microGoals, setMicroGoals] = useState([]);
     const [showActivitySelector, setShowActivitySelector] = useState({}); // { sectionIndex: boolean }
     const [selectorState, setSelectorState] = useState({}); // { sectionIndex: groupId | null }
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -108,6 +111,41 @@ function SessionDetail() {
     const [draggedItem, setDraggedItem] = useState(null); // For drag-and-drop between sections
     const isFirstLoad = React.useRef(true); // Track initial load to prevent auto-save on mount
 
+    const [createMicroTrigger, setCreateMicroTrigger] = useState(0);
+    const [goalCreationContext, setGoalCreationContext] = useState(null); // { suggestedType: 'ImmediateGoal' | 'MicroGoal', parentGoalId: string }
+    const [showAssociationModal, setShowAssociationModal] = useState(false);
+    const [associationContext, setAssociationContext] = useState(null);
+
+    // Fetch full goal tree for association modal
+    // We want to allow associating with ANY active goal, not just those currently in the session
+    const { useFractalTreeQuery } = useGoals();
+    const { data: fullGoalTree } = useFractalTreeQuery(rootId);
+
+    // Flatten logic for association modal
+    const allAvailableGoals = React.useMemo(() => {
+        if (!fullGoalTree) return [];
+
+        const goals = [];
+        const processGoal = (g) => {
+            goals.push(g);
+            if (g.children) {
+                g.children.forEach(processGoal);
+            }
+        };
+
+        // Root level might be a single object (the fractal root) or an array
+        // The backend returns a single root object for get_fractal_goals
+        if (Array.isArray(fullGoalTree)) {
+            fullGoalTree.forEach(processGoal);
+        } else if (fullGoalTree && typeof fullGoalTree === 'object') {
+            processGoal(fullGoalTree);
+        }
+
+        // Filter out completed if desired, or keep them. 
+        // For now, let's keep everything
+        return goals.filter(g => !g.completed);
+    }, [fullGoalTree]);
+
     // Handler for activity/set focus changes
     const handleActivityFocus = (instance, setIndex = null) => {
         setSelectedActivity(instance);
@@ -115,10 +153,45 @@ function SessionDetail() {
     };
 
     // Handler for Micro Goal button click
-    const handleOpenGoals = (instance) => {
+    const handleOpenGoals = (instance, context = null) => {
+        if (context?.type === 'associate') {
+            setAssociationContext(context);
+            setShowAssociationModal(true);
+            return;
+        }
+
         setSelectedActivity(instance);
         setSelectedSetIndex(null);
         setSidePaneMode('goals');
+        setGoalCreationContext(context);
+        setCreateMicroTrigger(prev => prev + 1);
+    };
+
+    const handleAssociateActivity = async (goalIds) => {
+        const activityDef = associationContext?.activityDefinition;
+        if (!activityDef) return;
+
+        // Ensure goalIds is an array
+        const idsToAssociate = Array.isArray(goalIds) ? goalIds : [goalIds];
+
+        try {
+            // Use the new endpoint that supports setting all goals at once
+            await fractalApi.setActivityGoals(rootId, activityDef.id, idsToAssociate);
+
+            const count = idsToAssociate.length;
+            notify.success(`Activity associated with ${count} goal${count !== 1 ? 's' : ''} successfully`);
+
+            // Refresh activities to reflect the new association
+            const updatedActivities = await fractalApi.getActivities(rootId);
+            setActivities(updatedActivities.data);
+
+            // Update session data to reflect changes if needed
+            // (Goals might need to be re-fetched if the hierarchy changed significantly, 
+            // but for simple association the activities update should be enough for the UI)
+        } catch (err) {
+            console.error("Failed to associate activity", err);
+            notify.error('Failed to associate activity');
+        }
     };
 
     // Handler for moving activity between sections via drag-and-drop
@@ -406,7 +479,15 @@ function SessionDetail() {
 
             // Store both goal types
             setParentGoals(shortTermGoals);
-            // Store immediate goals in session object (already available via foundSession.immediate_goals)
+            setImmediateGoals(immediateGoals);
+
+            // Fetch micro goals for the session
+            try {
+                const microRes = await fractalApi.getSessionMicroGoals(rootId, sessionId);
+                setMicroGoals(microRes.data || []);
+            } catch (err) {
+                console.error("Failed to fetch session micro goals", err);
+            }
 
             setLoading(false);
         } catch (err) {
@@ -1033,11 +1114,15 @@ function SessionDetail() {
                             onUpdateNote={updateNote}
                             onDeleteNote={deleteNote}
                             onOpenGoals={handleOpenGoals}
-                            // Drag and drop props
                             onMoveActivity={handleMoveActivity}
                             onReorderActivity={handleReorderActivity}
                             draggedItem={draggedItem}
                             setDraggedItem={setDraggedItem}
+                            // Pass goals for context
+                            parentGoals={parentGoals}
+                            immediateGoals={immediateGoals}
+                            microGoals={microGoals}
+                            session={session}
                         />
                     ))}
                 </div>
@@ -1074,7 +1159,8 @@ function SessionDetail() {
                         targetAchievements={targetAchievements}
                         achievedTargetIds={achievedTargetIds}
                         onToggleComplete={handleToggleSessionComplete}
-
+                        createMicroTrigger={createMicroTrigger}
+                        goalCreationContext={goalCreationContext}
                         onSave={handleSaveSession}
                         mode={sidePaneMode}
                         onModeChange={setSidePaneMode}
@@ -1120,6 +1206,18 @@ function SessionDetail() {
                 activityDefinitions={activities}
                 activityGroups={activityGroups}
                 rootId={rootId}
+            />
+
+
+
+            {/* Activity Association Modal */}
+            <ActivityAssociationModal
+                isOpen={showAssociationModal}
+                onClose={() => setShowAssociationModal(false)}
+                onAssociate={handleAssociateActivity}
+                initialActivityName={associationContext?.activityDefinition?.name}
+                initialSelectedGoalIds={associationContext?.initialSelectedGoalIds || []}
+                goals={allAvailableGoals}
             />
 
             {/* Auto-save status indicator */}

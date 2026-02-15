@@ -147,6 +147,16 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                         </span>
                     </div>
                 )}
+
+                {/* Nano Goal Badge */}
+                {note.is_nano_goal && (
+                    <div className={styles.nanoBadgeContainer}>
+                        <span className={styles.nanoBadge}>
+                            Nano Goal
+                        </span>
+                    </div>
+                )}
+
                 <div className={styles.noteItemTime}>
                     {note.set_index !== null && note.set_index !== undefined && (
                         <>

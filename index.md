@@ -40,6 +40,9 @@
 - **Session Goals Integration**: Added a dedicated "Goals" tab to the `SessionSidePane` which supports real-time creation and tracking of micro/nano goals linked to the current session.
 - **ProgramBuilder Restriction**: Standardized the `ProgramBuilder` to only allow selection of Mid-Term and Long-Term goals, aligning with the macro-cycle focus of Programs.
 - **Activity Context Actions**: Added a "Micro Goal" action button (🎯) to `SessionActivityItem` to quickly switch side pane context to specific focus areas.
+- **Micro Goal UI Refinement**: Streamlined the `GoalsPanel` by removing redundant subsections and quick-add inputs when an activity is focused.
+- **Auto-Creation Fix**: Implemented an auto-creation trigger for micro goals when clicking the activity instance button, ensuring the creation flow is seamless and functional.
+- **Goal Persistence Fix**: Hoisted `completed` and `completed_at` fields in the `serialize_goal` function to ensure consistent behavior between backend responses and frontend state expectations.
 
 ---
 

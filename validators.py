@@ -512,6 +512,7 @@ class ActivityDefinitionCreateSchema(BaseModel):
     has_splits: Optional[bool] = False
     metrics: Optional[List[Dict[str, Any]]] = None
     splits: Optional[List[Dict[str, Any]]] = None
+    goal_ids: Optional[List[str]] = None
     
     @field_validator('name')
     @classmethod
@@ -532,6 +533,7 @@ class ActivityDefinitionUpdateSchema(BaseModel):
     has_splits: Optional[bool] = None
     metrics: Optional[List[Dict[str, Any]]] = None
     splits: Optional[List[Dict[str, Any]]] = None
+    goal_ids: Optional[List[str]] = None
 
 
 class ActivityGoalsSetSchema(BaseModel):

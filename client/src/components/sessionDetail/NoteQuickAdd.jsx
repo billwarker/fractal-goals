@@ -8,7 +8,7 @@
 import React, { useState, useRef } from 'react';
 import styles from './NoteQuickAdd.module.css';
 
-function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
+function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false }) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [pastedImage, setPastedImage] = useState(null);
@@ -116,7 +116,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                     onPaste={handlePaste}
                     placeholder={imagePreview ? "Add a caption (optional)..." : placeholder}
                     disabled={isSubmitting}
-                    className={styles.quickAddTextarea}
+                    className={`${styles.quickAddTextarea} ${isNanoMode ? styles.nanoModeInput : ''}`}
                     rows={1}
                 />
                 <button
