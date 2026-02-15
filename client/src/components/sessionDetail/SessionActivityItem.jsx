@@ -67,21 +67,20 @@ function SessionActivityItem({
 
     // Helper: Determine the next goal action based on activity's current associations
     const getNextGoalContext = () => {
-        if (!activityDefinition || !activityDefinition.associated_goal_ids) {
+        if (!activityDefinition) {
             return { type: 'associate', label: 'Associate to a goal', icon: '🔗', color: 'var(--color-text-secondary)' };
         }
 
-        const associatedGoalIds = activityDefinition.associated_goal_ids;
+        const associatedGoalIds = activityDefinition.associated_goal_ids || [];
+        const associatedGoals = activityDefinition.associated_goals || [];
 
         // Check if associated with any Short-Term or Immediate goals
-        const hasShortTermGoal = parentGoals.some(g => associatedGoalIds.includes(g.id));
+        // We use associatedGoals directly check the types of associated goals, regardless of current session context
+        const hasShortTermGoal = associatedGoals.some(g => g.type === 'ShortTermGoal') || parentGoals.some(g => associatedGoalIds.includes(g.id));
         const hasImmediateGoal = (session?.immediate_goals || immediateGoals).some(g => associatedGoalIds.includes(g.id));
 
         // Case 1: Not associated with STG or IG -> need to associate
         if (!hasShortTermGoal && !hasImmediateGoal) {
-            // Check if we have ANY associated goals (even outside session context)
-            const associatedGoals = activityDefinition.associated_goals || [];
-
             if (associatedGoals.length > 0) {
                 // Determine display from the first associated goal
                 const primaryGoal = associatedGoals[0];
