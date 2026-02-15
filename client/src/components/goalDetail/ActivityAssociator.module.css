@@ -349,6 +349,24 @@
     opacity: 0;
 }
 
+.inheritedIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+    flex-shrink: 0;
+    /* Create a small subtle background if needed, or just keep it simple */
+    /* Rotate 180deg to make it look like "coming from above" arrow? Or use the "subdirectory_arrow_right" style */
+    transform: rotate(180deg) scaleX(-1);
+    /* Flips the standard "corner-down-right" icon to be "corner-up-left" ish? No, let's keep it simple. */
+    /* Actually the SVG path I used: move(9,10) -> (4,15) -> (9,20) is an arrow pointing LEFT-DOWN. */
+    /* path d="M20 4v7a4 4 0 0 1-4 4H4" is corner-right-down into arrow. */
+    /* This looks like "coming from parent". */
+    transform: none;
+}
+
 .miniCard:hover .removeBtn {
     opacity: 1;
 }

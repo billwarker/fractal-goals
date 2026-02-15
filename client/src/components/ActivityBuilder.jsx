@@ -46,10 +46,14 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     // Flatten goal tree for selection
     const flattenGoals = (node, goals = []) => {
         if (!node) return goals;
+
+        const childrenIds = node.children ? node.children.map(c => c.id || c.attributes?.id) : [];
+
         goals.push({
             id: node.id || node.attributes?.id,
             name: node.name,
-            type: node.attributes?.type || node.type
+            type: node.attributes?.type || node.type,
+            childrenIds: childrenIds
         });
         if (node.children && node.children.length > 0) {
             node.children.forEach(child => flattenGoals(child, goals));
@@ -532,16 +536,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             />
 
             {/* Association Modal */}
-            <ActivityAssociationModal
-                isOpen={showAssociationModal}
-                onClose={() => setShowAssociationModal(false)}
-                onAssociate={(newGoalIds) => {
-                    setSelectedGoalIds(newGoalIds);
-                }}
-                goals={allGoals}
-                initialActivityName={name}
-                initialSelectedGoalIds={selectedGoalIds}
-            />
+            {showAssociationModal && (
+                <ActivityAssociationModal
+                    isOpen={showAssociationModal}
+                    onClose={() => setShowAssociationModal(false)}
+                    onAssociate={(newGoalIds) => {
+                        setSelectedGoalIds(newGoalIds);
+                    }}
+                    goals={allGoals}
+                    initialActivityName={name}
+                    initialSelectedGoalIds={selectedGoalIds}
+                />
+            )}
         </>
     );
 }

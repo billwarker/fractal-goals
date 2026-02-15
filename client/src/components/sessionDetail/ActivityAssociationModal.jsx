@@ -109,6 +109,18 @@ const ActivityAssociationModal = ({
         }
     };
 
+    // Recursive check if any descendant is selected
+    const hasSelectedDescendant = (goal) => {
+        if (!goal.childrenIds || goal.childrenIds.length === 0) return false;
+        return goal.childrenIds.some(childId => {
+            if (selectedGoalIds.has(childId)) return true;
+            // Find child object to recurse
+            const childGoal = goals.find(g => g.id === childId);
+            if (childGoal) return hasSelectedDescendant(childGoal);
+            return false;
+        });
+    };
+
     // Helper to render section with icon
     const renderSection = (type, typeGoals) => {
         if (!typeGoals || typeGoals.length === 0) return null;
@@ -139,14 +151,37 @@ const ActivityAssociationModal = ({
                     <div className={styles.groupContent}>
                         {typeGoals.map(goal => {
                             const isSelected = selectedGoalIds.has(goal.id);
+                            const isInherited = hasSelectedDescendant(goal);
+
+                            // Determine styles based on state
+                            // Direct selection takes precedence over inheritance visually
+                            let checkboxClass = styles.checkbox;
+                            let rowClass = styles.goalItem; // No more selected styling on row
+
+                            if (isSelected) {
+                                checkboxClass += ` ${styles.checkboxDirect}`;
+                            } else if (isInherited) {
+                                checkboxClass += ` ${styles.checkboxInherited}`;
+                            }
+
                             return (
                                 <div
                                     key={goal.id}
-                                    className={`${styles.goalItem} ${isSelected ? styles.selected : ''}`}
+                                    className={rowClass}
                                     onClick={() => toggleGoalSelection(goal.id)}
                                 >
-                                    <div className={`${styles.checkbox} ${isSelected ? styles.checked : ''}`}>
-                                        {isSelected && '✓'}
+                                    <div className={checkboxClass}>
+                                        {isSelected && (
+                                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                                <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        )}
+                                        {!isSelected && isInherited && (
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleX(-1)', opacity: 0.7 }}>
+                                                <polyline points="15 10 20 15 15 20"></polyline>
+                                                <path d="M4 4v7a4 4 0 0 0 4 4h12"></path>
+                                            </svg>
+                                        )}
                                     </div>
                                     <div className={styles.goalInfo}>
                                         <div className={styles.goalName}>{goal.name}</div>
