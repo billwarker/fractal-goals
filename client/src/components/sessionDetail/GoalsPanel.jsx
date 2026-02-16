@@ -8,6 +8,7 @@ import {
 import GoalRow from './GoalRow';
 import HierarchySection from './HierarchySection';
 import SessionFocusSection from './SessionFocusSection';
+import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
 
 /**
@@ -29,10 +30,14 @@ function GoalsPanel({
     onOpenGoals
 }) {
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+    const { useFractalTreeQuery } = useGoals();
     const [microGoals, setMicroGoals] = useState([]);
     const [expandedGoals, setExpandedGoals] = useState({});
     const [loading, setLoading] = useState(false);
-    const [goalTree, setGoalTree] = useState(null);
+
+    // Shared query cache for goal tree - ensures sync with SessionDetail
+    const { data: goalTree, isLoading: treeLoading } = useFractalTreeQuery(rootId);
+
     const [allShortTermGoals, setAllShortTermGoals] = useState([]);
 
     // Inline IG creator state
@@ -62,19 +67,6 @@ function GoalsPanel({
     }, [rootId, sessionId]);
 
     useEffect(() => { fetchMicroGoals(); }, [fetchMicroGoals]);
-
-    useEffect(() => {
-        if (!rootId) return;
-        const fetchTree = async () => {
-            try {
-                const res = await fractalApi.getGoal(rootId, rootId);
-                setGoalTree(res.data);
-            } catch (err) {
-                console.error("Failed to fetch goal tree", err);
-            }
-        };
-        fetchTree();
-    }, [rootId]);
 
     useEffect(() => {
         if (!rootId) return;

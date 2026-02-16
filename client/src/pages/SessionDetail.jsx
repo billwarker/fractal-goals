@@ -926,19 +926,23 @@ function SessionDetail() {
         setShowBuilder(true);
     };
 
-    const handleActivityCreated = (newActivity) => {
+    const handleActivityCreated = async (newActivity) => {
         if (!newActivity) return;
 
-        // Add to local list of activities
+        // Add to local list of activities optimistically
         setActivities(prev => [...prev, newActivity]);
 
         // If we were trying to add it to a section, do that now
         if (sectionForNewActivity !== null) {
             // Since handleAddActivity looks up by ID from 'activities' state which might not be updated yet
             // We'll manually call the logic inside handleAddActivity but with the new object
-            handleAddActivity(sectionForNewActivity, newActivity.id, newActivity);
+            await handleAddActivity(sectionForNewActivity, newActivity.id, newActivity);
             setSectionForNewActivity(null);
         }
+
+        // Fetch fresh data from backend to ensure we have all fields (especially associated_goal_ids)
+        // This fixes the issue where new activities don't show goals immediately
+        await fetchActivities();
     };
 
     const handleAddActivity = async (sectionIndex, activityId, activityObject = null) => {
