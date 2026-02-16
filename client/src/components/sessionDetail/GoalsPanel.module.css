@@ -71,6 +71,22 @@
     align-items: center;
     gap: 6px;
     opacity: 0.8;
+    padding: 2px 0;
+}
+
+.activeHierarchyNode {
+    opacity: 1;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: 2px 0;
+}
+
+.hierarchyNodeContent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .hierarchyNodeName {
