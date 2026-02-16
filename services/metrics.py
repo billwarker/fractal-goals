@@ -1,5 +1,6 @@
 import logging
 import sqlalchemy as sa
+from datetime import datetime, timezone
 from sqlalchemy import func
 from models import get_session, Goal, Session, ActivityInstance, ActivityDefinition, session_goals, activity_goal_associations
 
@@ -65,7 +66,7 @@ class GoalMetricsService:
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
             Session.deleted_at == None,
-            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
+            sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
         ).first()
         
         rec_sessions_count = sessions_query[0] or 0
@@ -101,7 +102,7 @@ class GoalMetricsService:
             Goal.id.in_(subtree_ids),
             ActivityInstance.deleted_at == None,
             func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= Goal.created_at,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
+            sa.or_(Goal.completed_at == None, func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < Goal.completed_at)
         )
         
         rec_activities_duration = self.db_session.query(
@@ -122,7 +123,7 @@ class GoalMetricsService:
         ).filter(
             session_goals.c.goal_id == goal_id,
             Session.deleted_at == None,
-            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
+            sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
         ).first()
         
         self_sessions_count = self_sessions_query[0] or 0
@@ -147,9 +148,15 @@ class GoalMetricsService:
         ).filter(
             ActivityInstance.activity_definition_id.in_(self_assoc_activity_ids),
             ActivityInstance.deleted_at == None,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= goal.created_at,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(goal.completed_at, sa.text("'9999-12-31'"))
-        ).scalar() or 0
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= goal.created_at
+        )
+        
+        if goal.completed_at:
+            self_activities_duration = self_activities_duration.filter(
+                func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < goal.completed_at
+            )
+            
+        self_activities_duration = self_activities_duration.scalar() or 0
 
         return {
             "id": goal.id,
@@ -220,7 +227,7 @@ class GoalMetricsService:
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
             Session.deleted_at == None,
-            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
+            sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
         ).group_by(
             session_date_col
         ).all()
@@ -242,7 +249,7 @@ class GoalMetricsService:
         ).filter(
             Goal.id.in_(subtree_ids),
             ActivityInstance.deleted_at == None,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
+            sa.or_(Goal.completed_at == None, func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < Goal.completed_at)
         ).group_by(
             activity_date_col
         ).all()
