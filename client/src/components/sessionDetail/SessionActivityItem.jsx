@@ -91,14 +91,9 @@ function SessionActivityItem({
             mg.attributes?.session_id === sessionId
         );
 
+
         if (!hasMicroGoal) {
-            return {
-                type: 'MicroGoal',
-                label: 'Create Micro Goal',
-                icon: microChars.icon || 'circle',
-                color: getGoalColor('MicroGoal'),
-                secondaryColor: getGoalSecondaryColor('MicroGoal')
-            };
+            return null;
         }
 
         // Case 4: Has active micro -> create Nano Goal (toggle mode)
@@ -425,38 +420,41 @@ function SessionActivityItem({
 
                 <div className={styles.activityHeaderRight}>
                     {/* Smart Goal Creator Button */}
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
+                    {/* Smart Goal Creator Button */}
+                    {goalContext && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
 
-                            if (goalContext.type === 'NanoGoal') {
-                                // Toggle nano mode for existing behavior
-                                setNanoMode(!nanoMode);
-                            } else {
-                                // Open goals panel with context for creating IG or Micro
-                                if (onOpenGoals) {
-                                    onOpenGoals(exercise, {
-                                        suggestedType: goalContext.type,
-                                        activityDefinition: activityDefinition
-                                    });
+                                if (goalContext.type === 'NanoGoal') {
+                                    // Toggle nano mode for existing behavior
+                                    setNanoMode(!nanoMode);
+                                } else {
+                                    // Open goals panel with context for creating IG or Micro
+                                    if (onOpenGoals) {
+                                        onOpenGoals(exercise, {
+                                            suggestedType: goalContext.type,
+                                            activityDefinition: activityDefinition
+                                        });
+                                    }
                                 }
-                            }
-                        }}
-                        className={`${styles.microGoalActionButton} ${goalContext.type === 'NanoGoal' && nanoMode ? styles.activeNanoMode : ''}`}
-                        title={goalContext.label}
-                        style={{
-                            borderColor: goalContext.color,
-                            color: goalContext.color
-                        }}
-                    >
-                        <GoalIcon
-                            shape={goalContext.icon}
-                            color={goalContext.color}
-                            secondaryColor={goalContext.secondaryColor}
-                            size={14}
-                        />
-                        <span>{goalContext.label}</span>
-                    </button>
+                            }}
+                            className={`${styles.microGoalActionButton} ${goalContext.type === 'NanoGoal' && nanoMode ? styles.activeNanoMode : ''}`}
+                            title={goalContext.label}
+                            style={{
+                                borderColor: goalContext.color,
+                                color: goalContext.color
+                            }}
+                        >
+                            <GoalIcon
+                                shape={goalContext.icon}
+                                color={goalContext.color}
+                                secondaryColor={goalContext.secondaryColor}
+                                size={14}
+                            />
+                            <span>{goalContext.label}</span>
+                        </button>
+                    )}
 
                     {/* Timer Controls - New Design */}
                     {exercise.id && (
