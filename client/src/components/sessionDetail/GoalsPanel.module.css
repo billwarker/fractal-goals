@@ -210,10 +210,23 @@
 
 .creationRow {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-    margin-top: 2px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0;
+    margin-top: 4px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    padding: 8px;
+    margin-right: 8px;
+}
+
+.creationLabel {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
 }
 
 .creationInput {

@@ -30,7 +30,7 @@ function GoalsPanel({
     onOpenGoals
 }) {
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
-    const { useFractalTreeQuery } = useGoals();
+    const { useFractalTreeQuery, fetchFractalTree } = useGoals();
     const [microGoals, setMicroGoals] = useState([]);
     const [expandedGoals, setExpandedGoals] = useState({});
     const [loading, setLoading] = useState(false);
@@ -302,14 +302,15 @@ function GoalsPanel({
 
             if (activeActivityDef) {
                 try {
-                    await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id);
+                    const currentGoalIds = activeActivityDef.associated_goal_ids || [];
+                    const newIds = [...currentGoalIds, newGoal.id];
+                    await fractalApi.setActivityGoals(rootId, activeActivityDef.id, newIds);
                 } catch (assocErr) {
                     console.error("Failed to associate new sub-goal with activity", assocErr);
                 }
             }
 
-            const treeRes = await fractalApi.getGoal(rootId, rootId);
-            setGoalTree(treeRes.data);
+            fetchFractalTree(rootId);
 
             if (childType === 'MicroGoal' || childType === 'NanoGoal') {
                 fetchMicroGoals();

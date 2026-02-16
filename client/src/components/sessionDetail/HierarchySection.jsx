@@ -87,21 +87,36 @@ function HierarchySection({
                                     className={styles.creationRow}
                                     style={{ paddingLeft: `${(node.depth + 1) * 28}px` }}
                                 >
-                                    <input
-                                        type="text"
-                                        className={styles.creationInput}
-                                        value={subGoalName}
-                                        onChange={(e) => setSubGoalName(e.target.value)}
-                                        placeholder="New goal name..."
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') onConfirmSubGoalCreation();
-                                            if (e.key === 'Escape') onCancelSubGoalCreation();
-                                        }}
-                                    />
-                                    <div className={styles.creationActions}>
-                                        <button onClick={onConfirmSubGoalCreation} className={styles.confirmBtn}>✓</button>
-                                        <button onClick={onCancelSubGoalCreation} className={styles.cancelBtn}>✕</button>
+                                    <div className={styles.creationLabel}>
+                                        New {(() => {
+                                            const typeMap = {
+                                                'UltimateGoal': 'Long Term Goal',
+                                                'LongTermGoal': 'Mid Term Goal',
+                                                'MidTermGoal': 'Short Term Goal',
+                                                'ShortTermGoal': 'Immediate Goal',
+                                                'ImmediateGoal': 'Micro Goal',
+                                                'MicroGoal': 'Nano Goal'
+                                            };
+                                            return typeMap[node.type] || 'Sub-goal';
+                                        })()}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                                        <input
+                                            type="text"
+                                            className={styles.creationInput}
+                                            value={subGoalName}
+                                            onChange={(e) => setSubGoalName(e.target.value)}
+                                            placeholder="Enter goal name..."
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') onConfirmSubGoalCreation();
+                                                if (e.key === 'Escape') onCancelSubGoalCreation();
+                                            }}
+                                        />
+                                        <div className={styles.creationActions}>
+                                            <button onClick={onConfirmSubGoalCreation} className={styles.confirmBtn} title="Confirm">✓</button>
+                                            <button onClick={onCancelSubGoalCreation} className={styles.cancelBtn} title="Cancel">✕</button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
