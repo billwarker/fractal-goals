@@ -20,10 +20,10 @@ function HierarchySection({
     onCancelSubGoalCreation,
     onOpenAssociate
 }) {
-    if (flattenedHierarchy.length === 0) return null;
+    // if (flattenedHierarchy.length === 0) return null; // Removed to allow empty state rendering
 
     const canAddChild = (goalType) => {
-        return goalType !== 'NanoGoal' && goalType !== 'MicroGoal';
+        return goalType !== 'NanoGoal';
     };
 
     return (

@@ -326,6 +326,94 @@ function GoalsPanel({
         }
     };
 
+    // --- Session Activities Derivation ---
+    const sessionActivities = useMemo(() => {
+        if (!session?.attributes?.session_data?.sections || !activityDefinitions.length) return [];
+
+        const uniqueActivityIds = new Set();
+        session.attributes.session_data.sections.forEach(section => {
+            if (section.exercises) {
+                section.exercises.forEach(ex => {
+                    if (ex.type === 'activity' && ex.activity_id) {
+                        uniqueActivityIds.add(ex.activity_id);
+                    }
+                });
+            }
+        });
+
+        return Array.from(uniqueActivityIds)
+            .map(id => activityDefinitions.find(def => def.id === id))
+            .filter(Boolean);
+    }, [session, activityDefinitions]);
+
+    // Unified hierarchy builder
+    const getHierarchy = useCallback((goalIds, mode = 'activity', specificActivityId = null) => {
+        if (!goalTree) return [];
+        const targetGoalIds = new Set(goalIds || []);
+
+        // 1. Get base hierarchy
+        let hierarchy = buildFlattenedGoalTree(goalTree, targetGoalIds, true);
+
+        // 2. Filter MicroGoals
+        // If mode is 'session', take ALL session microgoals
+        // If mode is 'activity', take only linked microgoals
+        const relevantMicroGoals = mode === 'session'
+            ? microGoals
+            : microGoals.filter(m => m.activity_definition_id === specificActivityId);
+
+        if (relevantMicroGoals.length === 0) return hierarchy;
+
+        // 3. Inject MicroGoals
+        const microGoalsByParent = {};
+        relevantMicroGoals.forEach(m => {
+            if (!microGoalsByParent[m.parent_id]) microGoalsByParent[m.parent_id] = [];
+            microGoalsByParent[m.parent_id].push(m);
+        });
+
+        const newHierarchy = [];
+        hierarchy.forEach(node => {
+            newHierarchy.push(node);
+            if (microGoalsByParent[node.id]) {
+                const micros = microGoalsByParent[node.id];
+                micros.forEach(micro => {
+                    const microDepth = (node.depth || 0) + 1;
+                    newHierarchy.push({
+                        ...micro,
+                        depth: microDepth,
+                        isLinked: true,
+                        type: 'MicroGoal'
+                    });
+                    if (micro.children && micro.children.length > 0) {
+                        micro.children.forEach(nano => {
+                            newHierarchy.push({
+                                ...nano,
+                                depth: microDepth + 1,
+                                isLinked: true,
+                                type: 'NanoGoal'
+                            });
+                        });
+                    }
+                });
+            }
+        });
+
+        return newHierarchy;
+    }, [goalTree, microGoals]);
+
+    const sessionHierarchy = useMemo(() => {
+        if (viewMode !== 'session') return [];
+        const allIds = new Set(parentGoals.map(g => g.id)); // Include manually added session goals
+        sessionActivities.forEach(def => {
+            def.associated_goal_ids?.forEach(id => allIds.add(id));
+        });
+        return getHierarchy(Array.from(allIds), 'session');
+    }, [viewMode, sessionActivities, parentGoals, getHierarchy]);
+
+    const activeActivityHierarchy = useMemo(() => {
+        if (!activeActivityDef) return [];
+        return getHierarchy(activeActivityDef.associated_goal_ids, 'activity', activeActivityDef.id);
+    }, [activeActivityDef, getHierarchy]);
+
     const microChars = getScopedCharacteristics('MicroGoal');
     const nanoChars = getScopedCharacteristics('NanoGoal');
     const stChars = getScopedCharacteristics('ShortTermGoal');
@@ -360,7 +448,7 @@ function GoalsPanel({
                         <HierarchySection
                             type="activity"
                             activityDefinition={activeActivityDef}
-                            flattenedHierarchy={flattenedHierarchy}
+                            flattenedHierarchy={activeActivityHierarchy}
                             viewMode={viewMode}
                             onGoalClick={onGoalClick}
                             getScopedCharacteristics={getScopedCharacteristics}
@@ -384,101 +472,38 @@ function GoalsPanel({
                     )}
                 </>
             ) : (
-                <HierarchySection
-                    type="session"
-                    flattenedHierarchy={flattenedHierarchy}
-                    viewMode={viewMode}
-                    onGoalClick={onGoalClick}
-                    getScopedCharacteristics={getScopedCharacteristics}
-                    getGoalColor={getGoalColor}
-                    getGoalSecondaryColor={getGoalSecondaryColor}
-                    completedColor={completedColor}
-                    completedSecondaryColor={completedSecondaryColor}
-                    achievedTargetIds={achievedTargetIds}
-                    creatingSubGoal={creatingSubGoal}
-                    subGoalName={subGoalName}
-                    setSubGoalName={setSubGoalName}
-                    onStartSubGoalCreation={handleStartSubGoalCreation}
-                    onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
-                    onCancelSubGoalCreation={handleCancelSubGoalCreation}
-                />
-            )}
-
-            {(viewMode === 'session' || !isActivityFocused) && (sessionGoals.shortTerm.length > 0 || sessionGoals.immediate.length > 0) && (
-                <div className={styles.sessionGoalsSection}>
-                    {sessionGoals.shortTerm.map(goal => (
-                        <GoalRow
-                            key={goal.id}
-                            goal={goal}
-                            icon={stChars.icon}
-                            color={getGoalColor('ShortTermGoal')}
-                            secondaryColor={getGoalSecondaryColor('ShortTermGoal')}
-                            completedColor={completedColor}
-                            completedSecondaryColor={completedSecondaryColor}
-                            isExpanded={expandedGoals[goal.id]}
-                            onToggle={() => toggleExpand(goal.id)}
-                            onGoalClick={onGoalClick}
-                            targetAchievements={targetAchievements}
-                            achievedTargetIds={achievedTargetIds}
-                        />
-                    ))}
-                    {sessionGoals.immediate.map(goal => (
-                        <GoalRow
-                            key={goal.id}
-                            goal={goal}
-                            icon={immChars.icon}
-                            color={getGoalColor('ImmediateGoal')}
-                            secondaryColor={getGoalSecondaryColor('ImmediateGoal')}
-                            completedColor={completedColor}
-                            completedSecondaryColor={completedSecondaryColor}
-                            isExpanded={expandedGoals[goal.id]}
-                            onToggle={() => toggleExpand(goal.id)}
-                            onGoalClick={onGoalClick}
-                            targetAchievements={targetAchievements}
-                            achievedTargetIds={achievedTargetIds}
-                        />
-                    ))}
+                <div className={styles.sessionHeader}>
+                    {/* Optional Header */}
                 </div>
             )}
 
+            {/* Session View: Unified Hierarchy */}
             {viewMode === 'session' && (
-                <SessionFocusSection
-                    loading={loading}
-                    microGoals={microGoals}
-                    microChars={microChars}
-                    nanoChars={nanoChars}
-                    completedColor={completedColor}
-                    completedSecondaryColor={completedSecondaryColor}
-                    getGoalColor={getGoalColor}
-                    getGoalSecondaryColor={getGoalSecondaryColor}
-                    handleToggleCompletion={handleToggleCompletion}
-                    onGoalClick={onGoalClick}
-                    achievedTargetIds={achievedTargetIds}
-                    handleCreateNanoGoal={handleCreateNanoGoal}
-                    handleCreateMicroGoalWithTarget={handleCreateMicroGoalWithTarget}
-                    showIGCreator={showIGCreator}
-                    igName={igName}
-                    setIGName={setIGName}
-                    igParentId={igParentId}
-                    setIGParentId={setIGParentId}
-                    allShortTermGoals={allShortTermGoals}
-                    handleCreateImmediateGoal={handleCreateImmediateGoal}
-                    igCreating={igCreating}
-                    setShowIGCreator={setShowIGCreator}
-                />
-            )}
-
-            {viewMode === 'session' && (
-                <div className={styles.footer}>
-                    <div className={styles.tallyItem}>
-                        <GoalIcon shape={microChars.icon || 'circle'} color={getGoalColor('MicroGoal')} size={14} />
-                        <span>{microTally.done}/{microTally.total}</span>
-                    </div>
-                    <div className={styles.tallySeparator}>|</div>
-                    <div className={styles.tallyItem}>
-                        <GoalIcon shape={nanoChars.icon || 'star'} color={getGoalColor('NanoGoal')} size={14} />
-                        <span>{nanoTally.done}/{nanoTally.total}</span>
-                    </div>
+                <div className={styles.sessionActivitiesList}>
+                    <HierarchySection
+                        type="session"
+                        flattenedHierarchy={sessionHierarchy}
+                        viewMode="session"
+                        onGoalClick={onGoalClick}
+                        getScopedCharacteristics={getScopedCharacteristics}
+                        getGoalColor={getGoalColor}
+                        getGoalSecondaryColor={getGoalSecondaryColor}
+                        completedColor={completedColor}
+                        completedSecondaryColor={completedSecondaryColor}
+                        achievedTargetIds={achievedTargetIds}
+                        creatingSubGoal={creatingSubGoal}
+                        subGoalName={subGoalName}
+                        setSubGoalName={setSubGoalName}
+                        onStartSubGoalCreation={handleStartSubGoalCreation}
+                        onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                        onCancelSubGoalCreation={handleCancelSubGoalCreation}
+                    />
+                    {sessionHierarchy.length === 0 && (
+                        <div className={styles.emptyState}>
+                            No goals associated with this session. <br />
+                            <small>Select an activity to add goals.</small>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
