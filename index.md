@@ -43,6 +43,7 @@
 - **Micro Goal UI Refinement**: Streamlined the `GoalsPanel` by removing redundant subsections and quick-add inputs when an activity is focused.
 - **Auto-Creation Fix**: Implemented an auto-creation trigger for micro goals when clicking the activity instance button, ensuring the creation flow is seamless and functional.
 - **Goal Persistence Fix**: Hoisted `completed` and `completed_at` fields in the `serialize_goal` function to ensure consistent behavior between backend responses and frontend state expectations.
+- **Session Detail & Associator Refinement**: Improved the activity association flow by ensuring the lineage view updates immediately on goal creation, pre-loading existing associations in the modal, and refining the side pane UI (full-width toggles, header-style association link, uniform goal icons, and standardized text formatting).
 
 ---
 

@@ -1059,6 +1059,13 @@ function SessionDetail() {
         );
     }
 
+    const handleGoalCreated = async () => {
+        await Promise.all([
+            fetchSession(),
+            fetchActivities()
+        ]);
+    };
+
     return (
         <div className={styles.sessionDetailContainer}>
             {/* Main Content Column */}
@@ -1155,7 +1162,7 @@ function SessionDetail() {
                         isCompleted={session.attributes?.completed}
                         onDelete={handleDeleteSessionClick}
                         onCancel={() => navigate(`/${rootId}/sessions`)}
-                        onGoalCreated={fetchSession}
+                        onGoalCreated={handleGoalCreated}
                         targetAchievements={targetAchievements}
                         achievedTargetIds={achievedTargetIds}
                         onToggleComplete={handleToggleSessionComplete}

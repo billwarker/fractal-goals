@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import styles from './ActivityAssociationModal.module.css';
 import GoalIcon from '../atoms/GoalIcon';
@@ -20,6 +20,12 @@ const ActivityAssociationModal = ({
 
     // Multi-select state - initialize with passed IDs
     const [selectedGoalIds, setSelectedGoalIds] = useState(() => new Set(initialSelectedGoalIds));
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedGoalIds(new Set(initialSelectedGoalIds));
+        }
+    }, [isOpen, initialSelectedGoalIds]);
 
     // Collapsible sections state - simplified to track collapsed state (default expanded)
     const [collapsedSections, setCollapsedSections] = useState(new Set());

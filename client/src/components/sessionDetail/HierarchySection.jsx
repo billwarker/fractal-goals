@@ -1,61 +1,64 @@
 import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
-import { parseTargets } from '../../utils/goalUtils';
 import styles from './GoalsPanel.module.css';
 
 function HierarchySection({
+    type = 'activity',
     flattenedHierarchy,
-    viewMode,
     onGoalClick,
     getScopedCharacteristics,
     getGoalColor,
     getGoalSecondaryColor,
     completedColor,
     completedSecondaryColor,
-    achievedTargetIds,
     creatingSubGoal,
     subGoalName,
     setSubGoalName,
     onStartSubGoalCreation,
     onConfirmSubGoalCreation,
-    onCancelSubGoalCreation
+    onCancelSubGoalCreation,
+    onOpenAssociate
 }) {
     if (flattenedHierarchy.length === 0) return null;
 
-    // Helper to check if we can add a child to this node
-    const canAddChild = (type) => {
-        // Simple check based on known types that have children in the view
-        // Adjust vertically if needed
-        return type !== 'NanoGoal' && type !== 'MicroGoal';
-        // Note: MicroGoal CAN have NanoGoal children, but the UI might handle them differently (checklist)
-        // For now, let's allow it if the backend supports it, but restricting Nano might be safer for "Activity" view focus
-        // Actually, the user wanted to "create next goal", which usually implies up to Micro/Nano. 
-        // Let's allow all except Nano.
+    const canAddChild = (goalType) => {
+        return goalType !== 'NanoGoal' && goalType !== 'MicroGoal';
     };
 
     return (
         <div className={styles.contextSection}>
-            <div className={styles.contextLabel}>
-                {viewMode === 'activity' ? 'Working Towards' : 'Goal Hierarchy'}
+            <div className={styles.headerContainer}>
+                <div className={styles.contextLabel}>
+                    {type === 'activity' ? 'Working Towards' : 'Session Goals'}
+                </div>
+                {type === 'activity' && onOpenAssociate && (
+                    <button
+                        className={styles.editLink}
+                        onClick={onOpenAssociate}
+                    >
+                        [edit]
+                    </button>
+                )}
             </div>
-            <div className={styles.hierarchyChain}>
-                {flattenedHierarchy.map((node) => {
-                    const targets = parseTargets(node);
+            <div className={styles.hierarchyList}>
+                {flattenedHierarchy.map((node, index) => {
                     const isCreatingForThisNode = creatingSubGoal?.parentId === node.id;
 
                     return (
-                        <div key={node.id}>
+                        <div key={node.id || `node-${index}`}>
                             <div
                                 className={`${styles.hierarchyNode} ${node.isLinked ? styles.activeHierarchyNode : ''}`}
-                                style={{ paddingLeft: `${node.depth * 14}px` }}
+                                style={{ paddingLeft: `${node.depth * 28}px` }}
                             >
-                                <GoalIcon
-                                    shape={getScopedCharacteristics(node.type)?.icon || 'circle'}
-                                    color={node.completed ? completedColor : getGoalColor(node.type)}
-                                    secondaryColor={node.completed ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
-                                    isSmart={node.is_smart}
-                                    size={node.isLinked && viewMode === 'activity' ? 16 : 12}
-                                />
+                                <div style={{ display: 'flex', alignItems: 'center', height: '16px', minWidth: '16px' }}>
+                                    <GoalIcon
+                                        shape={getScopedCharacteristics(node.type)?.icon || 'circle'}
+                                        color={node.completed ? completedColor : getGoalColor(node.type)}
+                                        secondaryColor={node.completed ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
+                                        isSmart={node.is_smart}
+                                        size={16}
+                                    />
+                                </div>
                                 <div className={styles.hierarchyNodeContent}>
                                     <span
                                         className={`${styles.hierarchyNodeName} ${node.isLinked ? styles.hierarchyNodeLinked : ''}`}
@@ -63,8 +66,6 @@ function HierarchySection({
                                     >
                                         {node.name}
                                     </span>
-
-                                    {/* Add Button */}
                                     {onStartSubGoalCreation && canAddChild(node.type) && (
                                         <button
                                             className={styles.addSubGoalBtn}
@@ -72,7 +73,7 @@ function HierarchySection({
                                                 e.stopPropagation();
                                                 onStartSubGoalCreation(node);
                                             }}
-                                            title="Create sub-goal"
+                                            title="Add Sub-goal"
                                         >
                                             +
                                         </button>
@@ -80,11 +81,10 @@ function HierarchySection({
                                 </div>
                             </div>
 
-                            {/* Inline Creation Form */}
                             {isCreatingForThisNode && (
                                 <div
                                     className={styles.creationRow}
-                                    style={{ paddingLeft: `${(node.depth + 1) * 14}px` }}
+                                    style={{ paddingLeft: `${(node.depth + 1) * 28}px` }}
                                 >
                                     <input
                                         type="text"
@@ -110,6 +110,6 @@ function HierarchySection({
             </div>
         </div>
     );
-}
+};
 
 export default HierarchySection;

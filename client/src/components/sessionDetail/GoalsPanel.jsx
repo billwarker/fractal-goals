@@ -4,7 +4,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { fractalApi } from '../../utils/api';
 import {
     buildFlattenedGoalTree,
-    parseTargets,
 } from '../../utils/goalUtils';
 import GoalRow from './GoalRow';
 import HierarchySection from './HierarchySection';
@@ -284,10 +283,6 @@ function GoalsPanel({
         if (!creatingSubGoal || !subGoalName.trim()) return;
 
         const { parentId, type: parentType } = creatingSubGoal;
-        // Determine child type based on parent type (simple mapping for now, can be imported)
-        // Importing getChildType would be cleaner but for now consistent with helpers logic
-        // Ultimate->LongTerm->MidTerm->ShortTerm->Immediate->Micro->Nano
-        // Importing getChildType from utils if available or redefining map
         const typeMap = {
             'UltimateGoal': 'LongTermGoal',
             'LongTermGoal': 'MidTermGoal',
@@ -299,15 +294,13 @@ function GoalsPanel({
         const childType = typeMap[parentType];
         if (!childType) return;
 
-        setLoading(true); // Or use specific loading state for inline creation to avoid global spinner
+        setLoading(true);
         try {
-            // 1. Create the goal
             const payload = {
                 name: subGoalName.trim(),
                 type: childType,
                 parent_id: parentId,
             };
-            // If it's Immediate or Micro, creating in session context
             if (childType === 'ImmediateGoal' || childType === 'MicroGoal') {
                 payload.session_id = sessionId;
             }
@@ -315,7 +308,6 @@ function GoalsPanel({
             const res = await fractalApi.createGoal(rootId, payload);
             const newGoal = res.data;
 
-            // 2. Associate with activity if applicable
             if (activeActivityDef) {
                 try {
                     await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id);
@@ -324,13 +316,9 @@ function GoalsPanel({
                 }
             }
 
-            // 3. Refresh data or update local state
-            // For now, refreshing relevant parts or relying on onGoalCreated callback
-            // A full tree refresh might be safest for hierarchy updates
             const treeRes = await fractalApi.getGoal(rootId, rootId);
             setGoalTree(treeRes.data);
 
-            // Also refresh specific lists if needed (micro goals, etc.)
             if (childType === 'MicroGoal' || childType === 'NanoGoal') {
                 fetchMicroGoals();
             }
@@ -360,8 +348,8 @@ function GoalsPanel({
     return (
         <div className={styles.goalsPanel}>
             {isActivityFocused ? (
-                <div className={styles.viewToggleContainer}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                <>
+                    <div className={styles.viewToggleContainer}>
                         <button
                             className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
                             onClick={() => setViewMode('activity')}
@@ -376,42 +364,51 @@ function GoalsPanel({
                         </button>
                     </div>
                     {viewMode === 'activity' && (
-                        <button
-                            className={styles.associateBtn}
-                            onClick={() => onOpenGoals && onOpenGoals(selectedActivity, {
+                        <HierarchySection
+                            type="activity"
+                            flattenedHierarchy={flattenedHierarchy}
+                            viewMode={viewMode}
+                            onGoalClick={onGoalClick}
+                            getScopedCharacteristics={getScopedCharacteristics}
+                            getGoalColor={getGoalColor}
+                            getGoalSecondaryColor={getGoalSecondaryColor}
+                            completedColor={completedColor}
+                            completedSecondaryColor={completedSecondaryColor}
+                            achievedTargetIds={achievedTargetIds}
+                            creatingSubGoal={creatingSubGoal}
+                            subGoalName={subGoalName}
+                            setSubGoalName={setSubGoalName}
+                            onStartSubGoalCreation={handleStartSubGoalCreation}
+                            onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                            onCancelSubGoalCreation={handleCancelSubGoalCreation}
+                            onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
                                 type: 'associate',
                                 activityDefinition: activeActivityDef,
                                 initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
                             })}
-                            title="Manage Goal Associations"
-                        >
-                            🔗 Associate
-                        </button>
+                        />
                     )}
-                </div>
+                </>
             ) : (
-                <div className={styles.contextSection}>
-                    <div className={styles.contextLabel}>Session Goals</div>
-                </div>
+                <HierarchySection
+                    type="session"
+                    flattenedHierarchy={flattenedHierarchy}
+                    viewMode={viewMode}
+                    onGoalClick={onGoalClick}
+                    getScopedCharacteristics={getScopedCharacteristics}
+                    getGoalColor={getGoalColor}
+                    getGoalSecondaryColor={getGoalSecondaryColor}
+                    completedColor={completedColor}
+                    completedSecondaryColor={completedSecondaryColor}
+                    achievedTargetIds={achievedTargetIds}
+                    creatingSubGoal={creatingSubGoal}
+                    subGoalName={subGoalName}
+                    setSubGoalName={setSubGoalName}
+                    onStartSubGoalCreation={handleStartSubGoalCreation}
+                    onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                    onCancelSubGoalCreation={handleCancelSubGoalCreation}
+                />
             )}
-
-            <HierarchySection
-                flattenedHierarchy={flattenedHierarchy}
-                viewMode={viewMode}
-                onGoalClick={onGoalClick}
-                getScopedCharacteristics={getScopedCharacteristics}
-                getGoalColor={getGoalColor}
-                getGoalSecondaryColor={getGoalSecondaryColor}
-                completedColor={completedColor}
-                completedSecondaryColor={completedSecondaryColor}
-                achievedTargetIds={achievedTargetIds}
-                creatingSubGoal={creatingSubGoal}
-                subGoalName={subGoalName}
-                setSubGoalName={setSubGoalName}
-                onStartSubGoalCreation={handleStartSubGoalCreation}
-                onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
-                onCancelSubGoalCreation={handleCancelSubGoalCreation}
-            />
 
             {(viewMode === 'session' || !isActivityFocused) && (sessionGoals.shortTerm.length > 0 || sessionGoals.immediate.length > 0) && (
                 <div className={styles.sessionGoalsSection}>
