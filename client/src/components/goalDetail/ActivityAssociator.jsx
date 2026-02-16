@@ -34,7 +34,8 @@ const ActivityAssociator = ({
     completedViaChildren = false,
     isAboveShortTermGoal = false,
     headerColor,
-    onClose
+    onClose,
+    onSave
 }) => {
     const { createActivityGroup, setActivityGroupGoals, fetchActivityGroups } = useActivities();
 
@@ -131,19 +132,25 @@ const ActivityAssociator = ({
         const unique = Array.from(new Map(updated.map(item => [item.id, item])).values());
 
         // Also associate selected groups
+        let finalGroups = associatedActivityGroups;
         if (tempSelectedGroups.length > 0 && setAssociatedActivityGroups) {
             const newGroups = tempSelectedGroups
                 .map(id => activityGroups.find(g => g.id === id))
                 .filter(Boolean);
             const updatedGroups = [...associatedActivityGroups, ...newGroups];
-            const uniqueGroups = Array.from(new Map(updatedGroups.map(g => [g.id, g])).values());
-            setAssociatedActivityGroups(uniqueGroups);
+            finalGroups = Array.from(new Map(updatedGroups.map(g => [g.id, g])).values());
+            setAssociatedActivityGroups(finalGroups);
         }
 
         setAssociatedActivities(unique);
         setTempSelectedActivities([]);
         setTempSelectedGroups([]);
         setIsDiscoveryActive(false);
+
+        // PERSIST if onSave is provided (View Mode persistence)
+        if (onSave) {
+            await onSave(unique, finalGroups);
+        }
 
         const parts = [];
         if (newActivities.length > 0) parts.push(`${newActivities.length} activit${newActivities.length === 1 ? 'y' : 'ies'}`);
@@ -152,7 +159,11 @@ const ActivityAssociator = ({
     };
 
     const handleRemoveActivity = (activityId) => {
-        setAssociatedActivities(prev => prev.filter(a => a.id !== activityId));
+        const next = associatedActivities.filter(a => a.id !== activityId);
+        setAssociatedActivities(next);
+        if (onSave) {
+            onSave(next, associatedActivityGroups);
+        }
     };
 
     const handleCreateGroup = async () => {

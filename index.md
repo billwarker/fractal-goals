@@ -44,6 +44,9 @@
 - **Auto-Creation Fix**: Implemented an auto-creation trigger for micro goals when clicking the activity instance button, ensuring the creation flow is seamless and functional.
 - **Goal Persistence Fix**: Hoisted `completed` and `completed_at` fields in the `serialize_goal` function to ensure consistent behavior between backend responses and frontend state expectations.
 - **Session Detail & Associator Refinement**: Improved the activity association flow by ensuring the lineage view updates immediately on goal creation, pre-loading existing associations in the modal, and refining the side pane UI (full-width toggles, header-style association link, uniform goal icons, and standardized text formatting).
+- **Goal Inheritance Timing Fix**: Updated backend metrics service to filter activity instances by goal creation time, ensuring newly associated goals only inherit time spent *after* their creation.
+- **Activity Association Persistence Fix**: Resolved an issue where associations made in the Goal Detail Modal view mode were not persisting by implementing immediate backend synchronization via a reusable persistence layer.
+- **Goal Detail Data Loading Fix**: Ensured all goal attributes (description, relevance, etc.) load correctly in the Detail Modal by improving data hydration in the goal utility layer.
 
 ---
 
