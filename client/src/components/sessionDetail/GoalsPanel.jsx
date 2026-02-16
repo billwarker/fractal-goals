@@ -354,7 +354,7 @@ function GoalsPanel({
                             className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
                             onClick={() => setViewMode('activity')}
                         >
-                            Activity: {activeActivityDef.name}
+                            Activity
                         </button>
                         <button
                             className={`${styles.viewToggleButton} ${viewMode === 'session' ? styles.activeToggleButton : ''}`}
@@ -366,6 +366,7 @@ function GoalsPanel({
                     {viewMode === 'activity' && (
                         <HierarchySection
                             type="activity"
+                            activityDefinition={activeActivityDef}
                             flattenedHierarchy={flattenedHierarchy}
                             viewMode={viewMode}
                             onGoalClick={onGoalClick}

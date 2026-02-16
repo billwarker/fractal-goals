@@ -4,6 +4,7 @@ import styles from './GoalsPanel.module.css';
 
 function HierarchySection({
     type = 'activity',
+    activityDefinition,
     flattenedHierarchy,
     onGoalClick,
     getScopedCharacteristics,
@@ -29,7 +30,7 @@ function HierarchySection({
         <div className={styles.contextSection}>
             <div className={styles.headerContainer}>
                 <div className={styles.contextLabel}>
-                    {type === 'activity' ? 'Working Towards' : 'Session Goals'}
+                    {type === 'activity' ? (activityDefinition?.name || 'Activity Goals') : 'Session Goals'}
                 </div>
                 {type === 'activity' && onOpenAssociate && (
                     <button
