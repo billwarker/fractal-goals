@@ -1,4 +1,5 @@
 import logging
+import sqlalchemy as sa
 from sqlalchemy import func
 from models import get_session, Goal, Session, ActivityInstance, ActivityDefinition, session_goals, activity_goal_associations
 
@@ -59,9 +60,12 @@ class GoalMetricsService:
             func.sum(Session.total_duration_seconds)
         ).join(
             session_goals, Session.id == session_goals.c.session_id
+        ).join(
+            Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
-            Session.deleted_at == None
+            Session.deleted_at == None,
+            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
         ).first()
         
         rec_sessions_count = sessions_query[0] or 0
@@ -96,7 +100,8 @@ class GoalMetricsService:
         ).filter(
             Goal.id.in_(subtree_ids),
             ActivityInstance.deleted_at == None,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= Goal.created_at
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= Goal.created_at,
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
         )
         
         rec_activities_duration = self.db_session.query(
@@ -112,9 +117,12 @@ class GoalMetricsService:
             func.sum(Session.total_duration_seconds)
         ).join(
             session_goals, Session.id == session_goals.c.session_id
+        ).join(
+            Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id == goal_id,
-            Session.deleted_at == None
+            Session.deleted_at == None,
+            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
         ).first()
         
         self_sessions_count = self_sessions_query[0] or 0
@@ -139,7 +147,8 @@ class GoalMetricsService:
         ).filter(
             ActivityInstance.activity_definition_id.in_(self_assoc_activity_ids),
             ActivityInstance.deleted_at == None,
-            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= goal.created_at
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= goal.created_at,
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(goal.completed_at, sa.text("'9999-12-31'"))
         ).scalar() or 0
 
         return {
@@ -206,9 +215,12 @@ class GoalMetricsService:
             func.sum(Session.total_duration_seconds).label('duration')
         ).join(
             session_goals, Session.id == session_goals.c.session_id
+        ).join(
+            Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
-            Session.deleted_at == None
+            Session.deleted_at == None,
+            func.coalesce(Session.session_start, Session.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
         ).group_by(
             session_date_col
         ).all()
@@ -218,18 +230,19 @@ class GoalMetricsService:
         activity_date_col = func.date(func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at))
         
         # Find all activities associated with the subtree
-        associated_activity_ids = self.db_session.query(
-            activity_goal_associations.c.activity_id
-        ).filter(
-            activity_goal_associations.c.goal_id.in_(subtree_ids)
-        ).distinct()
-        
         activities_query = self.db_session.query(
             activity_date_col.label('date'),
             func.sum(ActivityInstance.duration_seconds).label('duration')
+        ).join(
+            activity_goal_associations,
+            ActivityInstance.activity_definition_id == activity_goal_associations.c.activity_id
+        ).join(
+            Goal,
+            activity_goal_associations.c.goal_id == Goal.id
         ).filter(
-            ActivityInstance.activity_definition_id.in_(associated_activity_ids),
-            ActivityInstance.deleted_at == None
+            Goal.id.in_(subtree_ids),
+            ActivityInstance.deleted_at == None,
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) < func.coalesce(Goal.completed_at, sa.text("'9999-12-31'"))
         ).group_by(
             activity_date_col
         ).all()
