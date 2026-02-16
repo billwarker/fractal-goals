@@ -160,14 +160,14 @@ function GoalsPanel({
                 parent_id: igParentId,
             });
             await fractalApi.addSessionGoal(rootId, sessionId, res.data.id, 'immediate');
-            if (activeActivityDef) {
+            if (viewMode === 'activity' && activeActivityDef) {
                 try { await fractalApi.associateGoalToActivity(rootId, res.data.id, activeActivityDef.id); }
                 catch (linkErr) { console.error("Failed to link new IG to activity", linkErr); }
             }
             setIGName('');
             setIGParentId('');
             setShowIGCreator(false);
-            if (onGoalCreated) onGoalCreated();
+            if (onGoalCreated) onGoalCreated(res.data.name);
         } catch (err) {
             console.error("Failed to create Immediate Goal", err);
         } finally {
@@ -182,9 +182,9 @@ function GoalsPanel({
                 type: 'MicroGoal',
                 parent_id: parentId,
                 session_id: sessionId,
-                activity_definition_id: activeActivityDef?.id
+                activity_definition_id: viewMode === 'activity' ? activeActivityDef?.id : null
             });
-            if (activeActivityDef) {
+            if (viewMode === 'activity' && activeActivityDef) {
                 try { await fractalApi.associateGoalToActivity(rootId, res.data.id, activeActivityDef.id); }
                 catch (linkErr) { console.error("Failed to link new Micro Goal to activity", linkErr); }
             }
@@ -192,7 +192,7 @@ function GoalsPanel({
             setMicroGoals(prev => [...prev, newMicro]);
             setPendingMicroGoal(newMicro);
             setShowMicroTargetBuilder(true);
-            if (onGoalCreated) onGoalCreated();
+            if (onGoalCreated) onGoalCreated(res.data.name);
         } catch (err) {
             console.error("Failed to create micro goal", err);
         }
@@ -252,6 +252,7 @@ function GoalsPanel({
             setMicroGoals(prev => prev.map(m =>
                 m.id === microGoalId ? { ...m, children: [...(m.children || []), res.data] } : m
             ));
+            if (onGoalCreated) onGoalCreated(res.data.name);
         } catch (err) {
             console.error("Failed to create nano goal", err);
         }
@@ -300,7 +301,7 @@ function GoalsPanel({
             const res = await fractalApi.createGoal(rootId, payload);
             const newGoal = res.data;
 
-            if (activeActivityDef) {
+            if (viewMode === 'activity' && activeActivityDef) {
                 try {
                     const currentGoalIds = activeActivityDef.associated_goal_ids || [];
                     const newIds = [...currentGoalIds, newGoal.id];
@@ -317,7 +318,7 @@ function GoalsPanel({
             }
 
             handleCancelSubGoalCreation();
-            if (onGoalCreated) onGoalCreated();
+            if (onGoalCreated) onGoalCreated(newGoal.name);
 
         } catch (err) {
             console.error("Failed to create sub-goal", err);
@@ -491,12 +492,6 @@ function GoalsPanel({
                         completedColor={completedColor}
                         completedSecondaryColor={completedSecondaryColor}
                         achievedTargetIds={achievedTargetIds}
-                        creatingSubGoal={creatingSubGoal}
-                        subGoalName={subGoalName}
-                        setSubGoalName={setSubGoalName}
-                        onStartSubGoalCreation={handleStartSubGoalCreation}
-                        onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
-                        onCancelSubGoalCreation={handleCancelSubGoalCreation}
                     />
                     {sessionHierarchy.length === 0 && (
                         <div className={styles.emptyState}>

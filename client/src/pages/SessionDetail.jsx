@@ -1068,7 +1068,13 @@ function SessionDetail() {
         );
     }
 
-    const handleGoalCreated = async () => {
+    const handleGoalCreated = async (newGoalName) => {
+        if (newGoalName) {
+            notify.success(`Goal "${newGoalName}" created successfully`);
+        } else {
+            notify.success("Goal created successfully");
+        }
+
         await Promise.all([
             fetchSession(),
             fetchActivities()
