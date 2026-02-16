@@ -48,7 +48,8 @@ function SessionSidePane({
     mode = 'details',      // Controlled mode
     onModeChange,          // Callback for mode change
     createMicroTrigger,     // Trigger for auto-creation
-    goalCreationContext
+    goalCreationContext,
+    onOpenGoals
 }) {
     // mode state lifted to parent (SessionDetail)
 
@@ -181,6 +182,7 @@ function SessionSidePane({
                         achievedTargetIds={achievedTargetIds}
                         createMicroTrigger={createMicroTrigger}
                         goalCreationContext={goalCreationContext}
+                        onOpenGoals={onOpenGoals}
                     />
                 ) : (
                     <HistoryPanel

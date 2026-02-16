@@ -80,37 +80,9 @@ function SessionActivityItem({
         const hasImmediateGoal = (session?.immediate_goals || immediateGoals).some(g => associatedGoalIds.includes(g.id));
 
         // Case 1: Not associated with STG or IG -> need to associate
-        if (!hasShortTermGoal && !hasImmediateGoal) {
-            if (associatedGoals.length > 0) {
-                // Determine display from the first associated goal
-                const primaryGoal = associatedGoals[0];
-                const goalColor = getGoalColor(primaryGoal.type);
-                const goalSecondaryColor = getGoalSecondaryColor(primaryGoal.type);
-                const chars = getScopedCharacteristics(primaryGoal.type);
-
-                return {
-                    type: 'associate', // Still allows re-associating
-                    label: primaryGoal.name,
-                    icon: chars?.icon || '🔗',
-                    color: goalColor || 'var(--color-text-primary)',
-                    secondaryColor: goalSecondaryColor || 'var(--color-bg-card)',
-                    action: 'associate'
-                };
-            }
-
-            return { type: 'associate', label: 'Associate to a goal', icon: '🔗', color: 'var(--color-text-secondary)' };
-        }
-
-        // Case 2: Has STG but no IG -> create Immediate Goal
-        if (hasShortTermGoal && !hasImmediateGoal) {
-            return {
-                type: 'ImmediateGoal',
-                label: 'Create Immediate Goal',
-                icon: immediateChars.icon || 'diamond',
-                color: getGoalColor('ImmediateGoal'),
-                secondaryColor: getGoalSecondaryColor('ImmediateGoal')
-            };
-        }
+        // Case 1 & 2: No longer prompting for association here. 
+        // Association is handled in the sidepane.
+        // Fall through to Micro/Nano goal creation.
 
         // Case 3: Has IG but no active micro -> create Micro Goal
         // Check if there's an active micro goal for this activity in the session
@@ -460,15 +432,6 @@ function SessionActivityItem({
                             if (goalContext.type === 'NanoGoal') {
                                 // Toggle nano mode for existing behavior
                                 setNanoMode(!nanoMode);
-                            } else if (goalContext.type === 'associate') {
-                                // Switch to goals panel to allow association
-                                if (onOpenGoals) {
-                                    onOpenGoals(exercise, {
-                                        type: 'associate',
-                                        activityDefinition: activityDefinition,
-                                        initialSelectedGoalIds: activityDefinition.associated_goal_ids || []
-                                    });
-                                }
                             } else {
                                 // Open goals panel with context for creating IG or Micro
                                 if (onOpenGoals) {
@@ -486,16 +449,12 @@ function SessionActivityItem({
                             color: goalContext.color
                         }}
                     >
-                        {goalContext.type === 'associate' ? (
-                            <span style={{ fontSize: '14px', lineHeight: 1 }}>{goalContext.icon}</span>
-                        ) : (
-                            <GoalIcon
-                                shape={goalContext.icon}
-                                color={goalContext.color}
-                                secondaryColor={goalContext.secondaryColor}
-                                size={14}
-                            />
-                        )}
+                        <GoalIcon
+                            shape={goalContext.icon}
+                            color={goalContext.color}
+                            secondaryColor={goalContext.secondaryColor}
+                            size={14}
+                        />
                         <span>{goalContext.label}</span>
                     </button>
 

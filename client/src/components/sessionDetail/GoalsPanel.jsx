@@ -27,6 +27,7 @@ function GoalsPanel({
     achievedTargetIds,
     createMicroTrigger = 0,
     goalCreationContext = null,
+    onOpenGoals
 }) {
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
     const [microGoals, setMicroGoals] = useState([]);
@@ -265,6 +266,85 @@ function GoalsPanel({
         }
     };
 
+    // --- Sub-goal Creation Logic ---
+    const [creatingSubGoal, setCreatingSubGoal] = useState(null); // { parentId: string, type: string }
+    const [subGoalName, setSubGoalName] = useState('');
+
+    const handleStartSubGoalCreation = (node) => {
+        setCreatingSubGoal({ parentId: node.id, type: node.type });
+        setSubGoalName('');
+    };
+
+    const handleCancelSubGoalCreation = () => {
+        setCreatingSubGoal(null);
+        setSubGoalName('');
+    };
+
+    const handleConfirmSubGoalCreation = async () => {
+        if (!creatingSubGoal || !subGoalName.trim()) return;
+
+        const { parentId, type: parentType } = creatingSubGoal;
+        // Determine child type based on parent type (simple mapping for now, can be imported)
+        // Importing getChildType would be cleaner but for now consistent with helpers logic
+        // Ultimate->LongTerm->MidTerm->ShortTerm->Immediate->Micro->Nano
+        // Importing getChildType from utils if available or redefining map
+        const typeMap = {
+            'UltimateGoal': 'LongTermGoal',
+            'LongTermGoal': 'MidTermGoal',
+            'MidTermGoal': 'ShortTermGoal',
+            'ShortTermGoal': 'ImmediateGoal',
+            'ImmediateGoal': 'MicroGoal',
+            'MicroGoal': 'NanoGoal'
+        };
+        const childType = typeMap[parentType];
+        if (!childType) return;
+
+        setLoading(true); // Or use specific loading state for inline creation to avoid global spinner
+        try {
+            // 1. Create the goal
+            const payload = {
+                name: subGoalName.trim(),
+                type: childType,
+                parent_id: parentId,
+            };
+            // If it's Immediate or Micro, creating in session context
+            if (childType === 'ImmediateGoal' || childType === 'MicroGoal') {
+                payload.session_id = sessionId;
+            }
+
+            const res = await fractalApi.createGoal(rootId, payload);
+            const newGoal = res.data;
+
+            // 2. Associate with activity if applicable
+            if (activeActivityDef) {
+                try {
+                    await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id);
+                } catch (assocErr) {
+                    console.error("Failed to associate new sub-goal with activity", assocErr);
+                }
+            }
+
+            // 3. Refresh data or update local state
+            // For now, refreshing relevant parts or relying on onGoalCreated callback
+            // A full tree refresh might be safest for hierarchy updates
+            const treeRes = await fractalApi.getGoal(rootId, rootId);
+            setGoalTree(treeRes.data);
+
+            // Also refresh specific lists if needed (micro goals, etc.)
+            if (childType === 'MicroGoal' || childType === 'NanoGoal') {
+                fetchMicroGoals();
+            }
+
+            handleCancelSubGoalCreation();
+            if (onGoalCreated) onGoalCreated();
+
+        } catch (err) {
+            console.error("Failed to create sub-goal", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const microChars = getScopedCharacteristics('MicroGoal');
     const nanoChars = getScopedCharacteristics('NanoGoal');
     const stChars = getScopedCharacteristics('ShortTermGoal');
@@ -281,18 +361,33 @@ function GoalsPanel({
         <div className={styles.goalsPanel}>
             {isActivityFocused ? (
                 <div className={styles.viewToggleContainer}>
-                    <button
-                        className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
-                        onClick={() => setViewMode('activity')}
-                    >
-                        Activity: {activeActivityDef.name}
-                    </button>
-                    <button
-                        className={`${styles.viewToggleButton} ${viewMode === 'session' ? styles.activeToggleButton : ''}`}
-                        onClick={() => setViewMode('session')}
-                    >
-                        Session
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
+                            onClick={() => setViewMode('activity')}
+                        >
+                            Activity: {activeActivityDef.name}
+                        </button>
+                        <button
+                            className={`${styles.viewToggleButton} ${viewMode === 'session' ? styles.activeToggleButton : ''}`}
+                            onClick={() => setViewMode('session')}
+                        >
+                            Session
+                        </button>
+                    </div>
+                    {viewMode === 'activity' && (
+                        <button
+                            className={styles.associateBtn}
+                            onClick={() => onOpenGoals && onOpenGoals(selectedActivity, {
+                                type: 'associate',
+                                activityDefinition: activeActivityDef,
+                                initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
+                            })}
+                            title="Manage Goal Associations"
+                        >
+                            🔗 Associate
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className={styles.contextSection}>
@@ -310,6 +405,12 @@ function GoalsPanel({
                 completedColor={completedColor}
                 completedSecondaryColor={completedSecondaryColor}
                 achievedTargetIds={achievedTargetIds}
+                creatingSubGoal={creatingSubGoal}
+                subGoalName={subGoalName}
+                setSubGoalName={setSubGoalName}
+                onStartSubGoalCreation={handleStartSubGoalCreation}
+                onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                onCancelSubGoalCreation={handleCancelSubGoalCreation}
             />
 
             {(viewMode === 'session' || !isActivityFocused) && (sessionGoals.shortTerm.length > 0 || sessionGoals.immediate.length > 0) && (

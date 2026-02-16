@@ -1164,6 +1164,7 @@ function SessionDetail() {
                         onSave={handleSaveSession}
                         mode={sidePaneMode}
                         onModeChange={setSidePaneMode}
+                        onOpenGoals={handleOpenGoals}
                         onSessionChange={(updatedSession) => {
                             setSession(updatedSession);
                             // Update sessionData if datetime fields changed

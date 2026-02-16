@@ -474,7 +474,114 @@
     padding: 4px 0;
 }
 
+
 .microQuickAdd::placeholder {
     color: var(--text-tertiary);
     font-style: italic;
+}
+
+/* Sub-goal Creation */
+.addSubGoalBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+
+.hierarchyNode:hover .addSubGoalBtn {
+    opacity: 1;
+}
+
+.addSubGoalBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+}
+
+.creationRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    margin-top: 2px;
+}
+
+.creationInput {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    /* Simulate focus ring using box-shadow for better control */
+    box-shadow: 0 0 0 1px rgba(100, 100, 100, 0.2);
+    max-width: 300px;
+}
+
+.creationInput:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.2);
+}
+
+.creationActions {
+    display: flex;
+    gap: 4px;
+}
+
+.confirmBtn,
+.cancelBtn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.confirmBtn {
+    color: #4caf50;
+}
+
+.confirmBtn:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.cancelBtn {
+    color: var(--text-tertiary);
+}
+
+.cancelBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.associateBtn {
+    background: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    transition: all 0.2s;
+}
+
+.associateBtn:hover {
+    background: var(--primary-color);
+    color: white;
 }
