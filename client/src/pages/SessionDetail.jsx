@@ -1223,6 +1223,7 @@ function SessionDetail() {
                 activityDefinitions={activities}
                 activityGroups={activityGroups}
                 rootId={rootId}
+                onAssociationsChanged={fetchActivities}
             />
 
 

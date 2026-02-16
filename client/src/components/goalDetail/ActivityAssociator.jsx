@@ -161,9 +161,15 @@ const ActivityAssociator = ({
     const handleRemoveActivity = (activityId) => {
         const next = associatedActivities.filter(a => a.id !== activityId);
         setAssociatedActivities(next);
+
         if (onSave) {
             onSave(next, associatedActivityGroups);
         }
+
+        notify.success("Activity association removed");
+        window.dispatchEvent(new CustomEvent('activityAssociationsChanged', {
+            detail: { activityId, goalId }
+        }));
     };
 
     const handleCreateGroup = async () => {

@@ -54,7 +54,8 @@ function GoalDetailModal({
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
     parentGoal,  // Parent goal for context when creating
-    onGoalSelect // Handler for selecting a goal (e.g. child)
+    onGoalSelect, // Handler for selecting a goal (e.g. child)
+    onAssociationsChanged // Callback when activity associations change
 }) {
     const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
     const navigate = useNavigate();
@@ -363,6 +364,15 @@ function GoalDetailModal({
             // Update snapshots to reflect persisted state
             initialActivitiesRef.current = currentActivityIds;
             initialGroupsRef.current = currentGroupIds;
+
+            // Notify parent and fire global events
+            if (onAssociationsChanged) onAssociationsChanged();
+
+            window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
+                detail: { goalId: goalId, rootId: rootId }
+            }));
+
+            notify.success("Goal associations updated");
 
             return true;
         } catch (err) {
