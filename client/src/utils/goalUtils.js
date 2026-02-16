@@ -57,11 +57,16 @@ export const buildFlattenedGoalTree = (node, targetGoalIds, filterCompleted = fa
                 id: node.id,
                 name: node.attributes?.name || node.name,
                 type: node.attributes?.type || node.type,
+                description: node.attributes?.description || node.description,
+                relevance_statement: node.attributes?.relevance_statement,
+                deadline: node.attributes?.deadline || node.deadline,
                 isLinked: isTarget,
                 completed: nodeCompleted,
                 is_smart: node.is_smart,
                 depth,
-                targets: parseTargets(node), // Use our parser here too
+                targets: parseTargets(node),
+                attributes: node.attributes || {},
+                childrenIds: (node.children || []).map(c => c.id),
             },
             ...childrenNodes
         ];

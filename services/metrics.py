@@ -80,24 +80,30 @@ class GoalMetricsService:
         
         # C. Activity Duration
         # Duration of ActivityInstances where the definition is associated with a goal in the subtree
-        # We need to find definitions associated with subtree goals
-        # Then start instances of those definitions
+        # Filter: Only count instances that occurred AFTER the associated goal was created
         
-        # Get all activity IDs associated with subtree goals
-        associated_activity_ids_query = self.db_session.query(
-            activity_goal_associations.c.activity_id
+        # Subquery to find valid activity instance IDs (deduplicated)
+        # An instance is valid if its definition is associated with ANY goal in the subtree
+        # AND the instance started after that specific goal was created
+        valid_instances_query = self.db_session.query(
+            ActivityInstance.id
+        ).join(
+            activity_goal_associations,
+            ActivityInstance.activity_definition_id == activity_goal_associations.c.activity_id
+        ).join(
+            Goal,
+            activity_goal_associations.c.goal_id == Goal.id
         ).filter(
-            activity_goal_associations.c.goal_id.in_(subtree_ids)
-        ).distinct()
+            Goal.id.in_(subtree_ids),
+            ActivityInstance.deleted_at == None,
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= Goal.created_at
+        )
         
-        activity_duration_query = self.db_session.query(
+        rec_activities_duration = self.db_session.query(
             func.sum(ActivityInstance.duration_seconds)
         ).filter(
-            ActivityInstance.activity_definition_id.in_(associated_activity_ids_query),
-            ActivityInstance.deleted_at == None
+            ActivityInstance.id.in_(valid_instances_query)
         ).scalar() or 0
-        
-        rec_activities_duration = activity_duration_query
 
         # 3. Calculate Direct Metrics (Self only)
         # Reuse logic but filter only for goal_id
@@ -121,6 +127,7 @@ class GoalMetricsService:
         ).scalar() or 0
         
         # Self activity duration
+        # Filter: Only count instances that occurred AFTER this goal was created
         self_assoc_activity_ids = self.db_session.query(
             activity_goal_associations.c.activity_id
         ).filter(
@@ -131,7 +138,8 @@ class GoalMetricsService:
             func.sum(ActivityInstance.duration_seconds)
         ).filter(
             ActivityInstance.activity_definition_id.in_(self_assoc_activity_ids),
-            ActivityInstance.deleted_at == None
+            ActivityInstance.deleted_at == None,
+            func.coalesce(ActivityInstance.time_start, ActivityInstance.created_at) >= goal.created_at
         ).scalar() or 0
 
         return {

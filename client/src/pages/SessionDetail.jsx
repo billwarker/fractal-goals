@@ -127,7 +127,12 @@ function SessionDetail() {
 
         const goals = [];
         const processGoal = (g) => {
-            goals.push(g);
+            // Add childrenIds for the association modal's inheritance check
+            const goalWithIds = {
+                ...g,
+                childrenIds: g.children ? g.children.map(c => c.id) : []
+            };
+            goals.push(goalWithIds);
             if (g.children) {
                 g.children.forEach(processGoal);
             }
