@@ -429,53 +429,52 @@ function GoalsPanel({
 
     return (
         <div className={styles.goalsPanel}>
-            {isActivityFocused ? (
-                <>
-                    <div className={styles.viewToggleContainer}>
-                        <button
-                            className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
-                            onClick={() => setViewMode('activity')}
-                        >
-                            Activity
-                        </button>
-                        <button
-                            className={`${styles.viewToggleButton} ${viewMode === 'session' ? styles.activeToggleButton : ''}`}
-                            onClick={() => setViewMode('session')}
-                        >
-                            Session
-                        </button>
+            <div className={styles.viewToggleContainer}>
+                <button
+                    className={`${styles.viewToggleButton} ${viewMode === 'activity' ? styles.activeToggleButton : ''}`}
+                    onClick={() => setViewMode('activity')}
+                >
+                    Activity
+                </button>
+                <button
+                    className={`${styles.viewToggleButton} ${viewMode === 'session' ? styles.activeToggleButton : ''}`}
+                    onClick={() => setViewMode('session')}
+                >
+                    Session
+                </button>
+            </div>
+
+            {viewMode === 'activity' && (
+                isActivityFocused ? (
+                    <HierarchySection
+                        type="activity"
+                        activityDefinition={activeActivityDef}
+                        flattenedHierarchy={activeActivityHierarchy}
+                        viewMode={viewMode}
+                        onGoalClick={onGoalClick}
+                        getScopedCharacteristics={getScopedCharacteristics}
+                        getGoalColor={getGoalColor}
+                        getGoalSecondaryColor={getGoalSecondaryColor}
+                        completedColor={completedColor}
+                        completedSecondaryColor={completedSecondaryColor}
+                        achievedTargetIds={achievedTargetIds}
+                        creatingSubGoal={creatingSubGoal}
+                        subGoalName={subGoalName}
+                        setSubGoalName={setSubGoalName}
+                        onStartSubGoalCreation={handleStartSubGoalCreation}
+                        onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                        onCancelSubGoalCreation={handleCancelSubGoalCreation}
+                        onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
+                            type: 'associate',
+                            activityDefinition: activeActivityDef,
+                            initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
+                        })}
+                    />
+                ) : (
+                    <div className={styles.emptyState}>
+                        Select an activity to see its goal hierarchy.
                     </div>
-                    {viewMode === 'activity' && (
-                        <HierarchySection
-                            type="activity"
-                            activityDefinition={activeActivityDef}
-                            flattenedHierarchy={activeActivityHierarchy}
-                            viewMode={viewMode}
-                            onGoalClick={onGoalClick}
-                            getScopedCharacteristics={getScopedCharacteristics}
-                            getGoalColor={getGoalColor}
-                            getGoalSecondaryColor={getGoalSecondaryColor}
-                            completedColor={completedColor}
-                            completedSecondaryColor={completedSecondaryColor}
-                            achievedTargetIds={achievedTargetIds}
-                            creatingSubGoal={creatingSubGoal}
-                            subGoalName={subGoalName}
-                            setSubGoalName={setSubGoalName}
-                            onStartSubGoalCreation={handleStartSubGoalCreation}
-                            onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
-                            onCancelSubGoalCreation={handleCancelSubGoalCreation}
-                            onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
-                                type: 'associate',
-                                activityDefinition: activeActivityDef,
-                                initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
-                            })}
-                        />
-                    )}
-                </>
-            ) : (
-                <div className={styles.sessionHeader}>
-                    {/* Optional Header */}
-                </div>
+                )
             )}
 
             {/* Session View: Unified Hierarchy */}
