@@ -474,8 +474,13 @@ function GoalsPanel({
                         />
 
                         <TargetsSection
+                            rootId={rootId}
+                            sessionId={sessionId}
                             hierarchy={activeActivityHierarchy}
+                            activeActivityId={activeActivityDef?.id}
                             activityDefinitions={activityDefinitions}
+                            targetAchievements={targetAchievements}
+                            achievedTargetIds={achievedTargetIds}
                         />
                     </>
                 ) : (
@@ -508,10 +513,19 @@ function GoalsPanel({
                                 <small>Select an activity to add goals.</small>
                             </div>
                         )}
+                        <TargetsSection
+                            rootId={rootId}
+                            sessionId={sessionId}
+                            hierarchy={sessionHierarchy}
+                            activeActivityId={null}
+                            activityDefinitions={activityDefinitions}
+                            targetAchievements={targetAchievements}
+                            achievedTargetIds={achievedTargetIds}
+                        />
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 }
 

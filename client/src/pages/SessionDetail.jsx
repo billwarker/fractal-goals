@@ -606,13 +606,14 @@ function SessionDetail() {
                         activity_definition_id: instance.activity_definition_id
                     });
                 } else if (value === 'reset') {
-                    // Reset: update instance in database to clear times
+                    // Reset: update instance in database to clear times and mark incomplete
                     response = await fractalApi.updateActivityInstance(rootId, instanceId, {
                         session_id: sessionId,
                         activity_definition_id: instance.activity_definition_id,
                         time_start: null,
                         time_stop: null,
-                        duration_seconds: null
+                        duration_seconds: null,
+                        completed: false
                     });
                 }
 

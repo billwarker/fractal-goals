@@ -1,39 +1,76 @@
 import React, { useMemo } from 'react';
 import TargetCard from '../TargetCard';
 import styles from './GoalsPanel.module.css';
+import { useGoals } from '../../contexts/GoalsContext';
 
 /**
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
  * Targets are sorted by goal depth (deepest first, e.g., Nano -> Micro -> Immediate -> ShortTerm).
  */
-function TargetsSection({
-    hierarchy,
-    activityDefinitions
-}) {
-    // 1. Extract and Flatten Targets
-    const sortedTargets = useMemo(() => {
-        if (!hierarchy || hierarchy.length === 0) return [];
+function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, activityDefinitions = [], targetAchievements, achievedTargetIds }) {
+    const { useFractalTreeQuery } = useGoals();
+    const { data: goalTree } = useFractalTreeQuery(rootId);
 
-        const allTargets = [];
+    // Flatten all goals and extract targets
+    const allTargets = useMemo(() => {
+        const targets = [];
 
-        hierarchy.forEach(node => {
-            if (node.targets && node.targets.length > 0) {
-                node.targets.forEach(target => {
-                    allTargets.push({
+        // Use either the scoped hierarchy provided or the whole tree
+        const nodesToProcess = hierarchy || (goalTree ? [goalTree] : []);
+        if (nodesToProcess.length === 0) return [];
+
+        const processGoal = (goal, depth = 0) => {
+            // Targets can be in goal.targets or goal.attributes.targets depending on serialization/eager loading
+            const rawTargets = goal.attributes?.targets || goal.targets;
+            let targetsList = [];
+
+            if (Array.isArray(rawTargets)) {
+                targetsList = rawTargets;
+            } else if (typeof rawTargets === 'string' && rawTargets.length > 0) {
+                try {
+                    targetsList = JSON.parse(rawTargets);
+                } catch (e) {
+                    console.error("Failed to parse targets JSON", e);
+                    targetsList = [];
+                }
+            }
+
+            if (targetsList && Array.isArray(targetsList)) {
+                targetsList.forEach(target => {
+                    // Filter by activeActivityId if provided (scoping)
+                    if (activeActivityId && target.activity_id !== activeActivityId) return;
+
+                    // Get real-time achievement status if available
+                    const achievement = targetAchievements?.get(target.id);
+                    // Check if either the activity metrics, the event listener, or the backend says it's achieved
+                    const isCompleted = (achievement ? achievement.achieved : target.completed) || (achievedTargetIds?.has(target.id));
+
+                    targets.push({
                         ...target,
-                        _goalDepth: node.depth,
-                        _goalName: node.name,
-                        _goalType: node.type,
-                        _goalId: node.id
+                        _goalDepth: goal.depth ?? depth, // Use depth from hierarchy node if available
+                        _goalName: goal.name,
+                        _goalType: goal.type,
+                        _goalId: goal.id,
+                        is_completed_realtime: isCompleted
                     });
                 });
             }
-        });
 
-        // 2. Sort by Depth Descending (Deepest first)
-        // If depths are equal, maybe sort by creation time or name? stick to depth for now.
+            // Internal tree traversal only if we are using the goalTree root (hierarchy is null)
+            if (!hierarchy && goal.children && Array.isArray(goal.children)) {
+                goal.children.forEach(child => processGoal(child, depth + 1));
+            }
+        };
+
+        nodesToProcess.forEach(node => processGoal(node, node.depth || 0));
+        return targets;
+    }, [goalTree, hierarchy, targetAchievements, activeActivityId, achievedTargetIds]);
+
+    // 2. Sort by Depth Descending (Deepest first)
+    // If depths are equal, maybe sort by creation time or name? stick to depth for now.
+    const sortedTargets = useMemo(() => {
         return allTargets.sort((a, b) => b._goalDepth - a._goalDepth);
-    }, [hierarchy]);
+    }, [allTargets]);
 
     if (sortedTargets.length === 0) return null;
 
@@ -62,7 +99,7 @@ function TargetsSection({
                         <TargetCard
                             target={target}
                             activityDefinitions={activityDefinitions}
-                            isCompleted={target.completed}
+                            isCompleted={target.is_completed_realtime}
                             isEditMode={false}
                         />
                     </div>
