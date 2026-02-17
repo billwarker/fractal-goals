@@ -7,7 +7,7 @@ import { useGoals } from '../../contexts/GoalsContext';
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
  * Targets are sorted by goal depth (deepest first, e.g., Nano -> Micro -> Immediate -> ShortTerm).
  */
-function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, activityDefinitions = [], targetAchievements, achievedTargetIds }) {
+function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds }) {
     const { useFractalTreeQuery } = useGoals();
     const { data: goalTree } = useFractalTreeQuery(rootId);
 
@@ -37,8 +37,11 @@ function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, activi
 
             if (targetsList && Array.isArray(targetsList)) {
                 targetsList.forEach(target => {
-                    // Filter by activeActivityId if provided (scoping)
+                    // Filter by activeActivityId if provided (scoping to single activity)
                     if (activeActivityId && target.activity_id !== activeActivityId) return;
+
+                    // Filter by allowedActivityIds if provided (scoping to session activities)
+                    if (allowedActivityIds && !allowedActivityIds.has(target.activity_id)) return;
 
                     // Get real-time achievement status if available
                     const achievement = targetAchievements?.get(target.id);

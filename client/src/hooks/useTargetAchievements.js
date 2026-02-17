@@ -101,7 +101,8 @@ export function useTargetAchievements(activityInstances, parentGoals) {
                 totalTargets: targets.length,
                 achievedTargets: achievedForGoal.length,
                 achievedTargetIds: achievedForGoal,
-                allAchieved: targets.length > 0 && achievedForGoal.length === targets.length
+                allAchieved: targets.length > 0 && achievedForGoal.length === targets.length,
+                wasAlreadyCompleted: !!goal.completed
             });
         }
 

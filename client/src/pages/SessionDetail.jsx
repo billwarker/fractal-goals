@@ -244,6 +244,7 @@ function SessionDetail() {
     const {
         targetAchievements,
         achievedTargetIds,
+        goalAchievements,
     } = useTargetAchievements(activityInstances, allGoalsForTargets);
 
     // Track which targets we've already shown notifications for
@@ -352,11 +353,17 @@ function SessionDetail() {
         return () => clearTimeout(timeoutId);
     }, [sessionData, loading, rootId, sessionId]);
 
-    // Detect new target achievements and show toast notification
-    useEffect(() => {
-        if (!achievedTargetIds || achievedTargetIds.size === 0) return;
+    // Track previous states for reversion detection
+    const prevAchievedTargetIdsRef = React.useRef(new Set());
+    const prevCompletedGoalIdsRef = React.useRef(new Set());
 
-        // Find newly achieved targets (achieved but not yet notified)
+    // Detect new target achievements and reversions
+    useEffect(() => {
+        if (!achievedTargetIds || !targetAchievements) return;
+
+        const prevAchieved = prevAchievedTargetIdsRef.current;
+
+        // 1. Detect Newly Achieved Targets
         const newlyAchieved = [];
         for (const targetId of achievedTargetIds) {
             if (!notifiedTargetIds.has(targetId)) {
@@ -369,18 +376,91 @@ function SessionDetail() {
         }
 
         if (newlyAchieved.length > 0) {
-            // Show toast for the new achievement(s)
             const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
             notify.success(`🎯 Target achieved: ${names}`, { duration: 5000 });
 
-            // Add to notified set
             setNotifiedTargetIds(prev => {
                 const newSet = new Set(prev);
                 newlyAchieved.forEach(s => newSet.add(s.target.id));
                 return newSet;
             });
         }
-    }, [achievedTargetIds, notifiedTargetIds, targetAchievements]);
+
+        // 2. Detect Reverted Targets
+        const newlyReverted = [];
+        for (const targetId of prevAchieved) {
+            if (!achievedTargetIds.has(targetId)) {
+                const status = targetAchievements.get(targetId);
+                // Only notify for reversions of targets that were previously achieved/notified
+                if (status) {
+                    newlyReverted.push(status);
+                }
+            }
+        }
+
+        if (newlyReverted.length > 0) {
+            const names = newlyReverted.map(s => s.target.name || 'Target').join(', ');
+            notify.error(`🔙 Target reverted: ${names}`, { duration: 5000 });
+
+            // Remove from notified set so it can be re-achieved
+            setNotifiedTargetIds(prev => {
+                const newSet = new Set(prev);
+                newlyReverted.forEach(s => newSet.delete(s.target.id));
+                return newSet;
+            });
+        }
+
+        // Update ref for next run
+        prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
+    }, [achievedTargetIds, targetAchievements, notifiedTargetIds]);
+
+    // Detect Goal Completion/Uncompletion
+    useEffect(() => {
+        if (!goalAchievements) return;
+
+        const currentCompletedGoals = new Set();
+        goalAchievements.forEach((status, goalId) => {
+            if (status.allAchieved) {
+                currentCompletedGoals.add(goalId);
+            }
+        });
+
+        const prevCompleted = prevCompletedGoalIdsRef.current;
+
+        // 1. Detect Newly Completed Goals
+        const newlyCompleted = [];
+        for (const goalId of currentCompletedGoals) {
+            if (!prevCompleted.has(goalId)) {
+                const status = goalAchievements.get(goalId);
+                // Only notify if it wasn't already completed when the session started/loaded
+                if (status && !status.wasAlreadyCompleted) {
+                    newlyCompleted.push(status);
+                }
+            }
+        }
+
+        if (newlyCompleted.length > 0) {
+            const names = newlyCompleted.map(s => s.goalName).join(', ');
+            notify.success(`🏆 Goal completed: ${names}`, { duration: 6000 });
+        }
+
+        // 2. Detect Uncompleted Goals
+        const newlyUncompleted = [];
+        for (const goalId of prevCompleted) {
+            if (!currentCompletedGoals.has(goalId)) {
+                const status = goalAchievements.get(goalId);
+                newlyUncompleted.push(status);
+            }
+        }
+
+        if (newlyUncompleted.length > 0) {
+            const names = newlyUncompleted.map(s => s.goalName).join(', ');
+            notify.error(`⚠️ Goal uncompleted: ${names}`, { duration: 6000 });
+        }
+
+        // Update ref
+        prevCompletedGoalIdsRef.current = currentCompletedGoals;
+    }, [goalAchievements]);
 
     useEffect(() => {
         if (!rootId || !sessionId) {

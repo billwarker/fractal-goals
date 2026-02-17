@@ -427,6 +427,7 @@ function GoalsPanel({
     const nanoTally = { done: allNanoGoals.filter(g => g.completed).length, total: allNanoGoals.length };
 
     const isActivityFocused = !!activeActivityDef;
+    const sessionActivityIds = useMemo(() => new Set(sessionActivities.map(a => a.id)), [sessionActivities]);
 
     return (
         <div className={styles.goalsPanel}>
@@ -478,6 +479,7 @@ function GoalsPanel({
                             sessionId={sessionId}
                             hierarchy={activeActivityHierarchy}
                             activeActivityId={activeActivityDef?.id}
+                            allowedActivityIds={new Set([activeActivityDef?.id])}
                             activityDefinitions={activityDefinitions}
                             targetAchievements={targetAchievements}
                             achievedTargetIds={achievedTargetIds}
@@ -518,6 +520,7 @@ function GoalsPanel({
                             sessionId={sessionId}
                             hierarchy={sessionHierarchy}
                             activeActivityId={null}
+                            allowedActivityIds={sessionActivityIds}
                             activityDefinitions={activityDefinitions}
                             targetAchievements={targetAchievements}
                             achievedTargetIds={achievedTargetIds}
