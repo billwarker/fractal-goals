@@ -33,14 +33,14 @@ function GoalUncompletionModal({
                 alignItems: 'center',
                 gap: '10px',
                 paddingBottom: '12px',
-                borderBottom: '1px solid #ff9800'
+                borderBottom: '1px solid var(--color-warning, #ff9800)'
             }}>
                 <button
                     onClick={onCancel}
                     style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#888',
+                        color: 'var(--color-text-muted)',
                         fontSize: '18px',
                         cursor: 'pointer',
                         padding: '0 4px'
@@ -48,7 +48,7 @@ function GoalUncompletionModal({
                 >
                     ←
                 </button>
-                <h3 style={{ margin: 0, fontSize: '16px', color: '#ff9800' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-warning, #ff9800)' }}>
                     ⚠ Confirm Mark as Incomplete
                 </h3>
             </div>
@@ -56,17 +56,17 @@ function GoalUncompletionModal({
             {/* Goal Name */}
             <div style={{
                 padding: '14px',
-                background: '#3a3020',
-                border: '1px solid #ff9800',
+                background: 'var(--color-bg-card-alt)',
+                border: '1px solid var(--color-warning, #ff9800)',
                 borderRadius: '6px'
             }}>
-                <div style={{ fontSize: '11px', color: '#ff9800', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-warning, #ff9800)', marginBottom: '4px' }}>
                     Marking as Incomplete:
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                     {goal.name}
                 </div>
-                <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                     Type: {goalType}
                 </div>
             </div>
@@ -74,16 +74,16 @@ function GoalUncompletionModal({
             {/* Originally Completed Date */}
             {completedAt && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                         Was completed on:
                     </label>
                     <div style={{
                         padding: '12px',
-                        background: '#2a2a2a',
-                        border: '1px solid #444',
+                        background: 'var(--color-bg-input)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '4px',
                         fontSize: '14px',
-                        color: '#4caf50'
+                        color: 'var(--color-brand-success, #4caf50)'
                     }}>
                         📅 {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -93,18 +93,18 @@ function GoalUncompletionModal({
             {/* Warning */}
             <div style={{
                 padding: '12px',
-                background: '#3a2a20',
-                border: '1px solid #ff9800',
+                background: 'var(--color-bg-card-alt)',
+                border: '1px solid var(--color-warning, #ff9800)',
                 borderRadius: '4px',
                 fontSize: '13px',
-                color: '#ffcc80'
+                color: 'var(--color-warning, #ffcc80)'
             }}>
                 ⚠️ This will remove the completion status and completion date from this goal.
             </div>
 
             {/* Associated Programs */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                     Programs that will update:
                 </label>
                 {associatedPrograms.length === 0 ? (
@@ -116,16 +116,16 @@ function GoalUncompletionModal({
                         {associatedPrograms.map((program, idx) => (
                             <div key={idx} style={{
                                 padding: '10px 12px',
-                                background: '#252525',
-                                border: '1px solid #555',
+                                background: 'var(--color-bg-input)',
+                                border: '1px solid var(--color-border)',
                                 borderRadius: '4px',
                                 fontSize: '13px',
-                                color: 'white',
+                                color: 'var(--color-text-primary)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px'
                             }}>
-                                <span style={{ color: '#ff9800' }}>📁</span>
+                                <span style={{ color: 'var(--color-warning)' }}>📁</span>
                                 {program.name}
                             </div>
                         ))}
@@ -135,7 +135,7 @@ function GoalUncompletionModal({
 
             {/* Associated Targets */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#aaa' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                     Targets that will be marked incomplete ({targets.length}):
                 </label>
                 {targets.length === 0 ? (
@@ -149,11 +149,11 @@ function GoalUncompletionModal({
                             return (
                                 <div key={target.id} style={{
                                     padding: '10px 12px',
-                                    background: '#252525',
-                                    border: '1px solid #555',
+                                    background: 'var(--color-bg-input)',
+                                    border: '1px solid var(--color-border)',
                                     borderRadius: '4px'
                                 }}>
-                                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'white' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--color-text-primary)' }}>
                                         🎯 {target.name || activity?.name || 'Target'}
                                     </div>
                                 </div>
@@ -164,16 +164,16 @@ function GoalUncompletionModal({
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid #333' }}>
+            <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
                 <button
                     onClick={onCancel}
                     style={{
                         flex: 1,
                         padding: '12px',
                         background: 'transparent',
-                        border: '1px solid #666',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '4px',
-                        color: 'ccc',
+                        color: 'var(--color-text-secondary)',
                         cursor: 'pointer',
                         fontSize: '14px'
                     }}
@@ -185,7 +185,7 @@ function GoalUncompletionModal({
                     style={{
                         flex: 1,
                         padding: '12px',
-                        background: '#ff9800',
+                        background: 'var(--color-warning, #ff9800)',
                         border: 'none',
                         borderRadius: '4px',
                         color: 'white',
