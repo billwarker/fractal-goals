@@ -7,6 +7,7 @@ import {
 } from '../../utils/goalUtils';
 import GoalRow from './GoalRow';
 import HierarchySection from './HierarchySection';
+import TargetsSection from './TargetsSection';
 import SessionFocusSection from './SessionFocusSection';
 import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
@@ -446,61 +447,71 @@ function GoalsPanel({
 
             {viewMode === 'activity' && (
                 isActivityFocused ? (
-                    <HierarchySection
-                        type="activity"
-                        activityDefinition={activeActivityDef}
-                        flattenedHierarchy={activeActivityHierarchy}
-                        viewMode={viewMode}
-                        onGoalClick={onGoalClick}
-                        getScopedCharacteristics={getScopedCharacteristics}
-                        getGoalColor={getGoalColor}
-                        getGoalSecondaryColor={getGoalSecondaryColor}
-                        completedColor={completedColor}
-                        completedSecondaryColor={completedSecondaryColor}
-                        achievedTargetIds={achievedTargetIds}
-                        creatingSubGoal={creatingSubGoal}
-                        subGoalName={subGoalName}
-                        setSubGoalName={setSubGoalName}
-                        onStartSubGoalCreation={handleStartSubGoalCreation}
-                        onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
-                        onCancelSubGoalCreation={handleCancelSubGoalCreation}
-                        onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
-                            type: 'associate',
-                            activityDefinition: activeActivityDef,
-                            initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
-                        })}
-                    />
+                    <>
+                        <HierarchySection
+                            type="activity"
+                            activityDefinition={activeActivityDef}
+                            flattenedHierarchy={activeActivityHierarchy}
+                            viewMode={viewMode}
+                            onGoalClick={onGoalClick}
+                            getScopedCharacteristics={getScopedCharacteristics}
+                            getGoalColor={getGoalColor}
+                            getGoalSecondaryColor={getGoalSecondaryColor}
+                            completedColor={completedColor}
+                            completedSecondaryColor={completedSecondaryColor}
+                            achievedTargetIds={achievedTargetIds}
+                            creatingSubGoal={creatingSubGoal}
+                            subGoalName={subGoalName}
+                            setSubGoalName={setSubGoalName}
+                            onStartSubGoalCreation={handleStartSubGoalCreation}
+                            onConfirmSubGoalCreation={handleConfirmSubGoalCreation}
+                            onCancelSubGoalCreation={handleCancelSubGoalCreation}
+                            onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
+                                type: 'associate',
+                                activityDefinition: activeActivityDef,
+                                initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
+                            })}
+                        />
+
+                        <TargetsSection
+                            hierarchy={activeActivityHierarchy}
+                            activityDefinitions={activityDefinitions}
+                        />
+                    </>
                 ) : (
                     <div className={styles.emptyState}>
                         Select an activity to see its goal hierarchy.
                     </div>
                 )
-            )}
+            )
+            }
 
             {/* Session View: Unified Hierarchy */}
-            {viewMode === 'session' && (
-                <div className={styles.sessionActivitiesList}>
-                    <HierarchySection
-                        type="session"
-                        flattenedHierarchy={sessionHierarchy}
-                        viewMode="session"
-                        onGoalClick={onGoalClick}
-                        getScopedCharacteristics={getScopedCharacteristics}
-                        getGoalColor={getGoalColor}
-                        getGoalSecondaryColor={getGoalSecondaryColor}
-                        completedColor={completedColor}
-                        completedSecondaryColor={completedSecondaryColor}
-                        achievedTargetIds={achievedTargetIds}
-                    />
-                    {sessionHierarchy.length === 0 && (
-                        <div className={styles.emptyState}>
-                            No goals associated with this session. <br />
-                            <small>Select an activity to add goals.</small>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+            {
+                viewMode === 'session' && (
+                    <div className={styles.sessionActivitiesList}>
+                        <HierarchySection
+                            type="session"
+                            flattenedHierarchy={sessionHierarchy}
+                            viewMode="session"
+                            onGoalClick={onGoalClick}
+                            getScopedCharacteristics={getScopedCharacteristics}
+                            getGoalColor={getGoalColor}
+                            getGoalSecondaryColor={getGoalSecondaryColor}
+                            completedColor={completedColor}
+                            completedSecondaryColor={completedSecondaryColor}
+                            achievedTargetIds={achievedTargetIds}
+                        />
+                        {sessionHierarchy.length === 0 && (
+                            <div className={styles.emptyState}>
+                                No goals associated with this session. <br />
+                                <small>Select an activity to add goals.</small>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+        </div >
     );
 }
 
