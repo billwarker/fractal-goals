@@ -436,6 +436,180 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             'reason': 'all_targets_achieved'
         }))
 
+@event_bus.on(Events.ACTIVITY_INSTANCE_UPDATED)
+def handle_activity_instance_updated(event: Event):
+    """
+    When an activity instance is updated, check if it was marked as incomplete or complete.
+    If incomplete → revert any targets achieved by this specific instance.
+    If complete → evaluate threshold targets.
+    """
+    instance_id = event.data.get('instance_id')
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    updated_fields = event.data.get('updated_fields', [])
+    
+    if not instance_id:
+        return
+        
+    db_session = _get_db_session()
+    try:
+        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        if not instance:
+            return
+            
+        # If instance is now incomplete, revert its achievements
+        if not instance.completed:
+            _revert_achievements_for_instance(db_session, instance_id)
+            db_session.commit()
+        # If instance was JUST marked complete, evaluate targets
+        elif 'completed' in updated_fields and instance.completed:
+            logger.info(f"[ACTIVITY_UPDATED] Instance {instance_id} marked complete. Evaluating targets.")
+            
+            # Use same logic as handle_activity_instance_completed but wrapperized
+            _run_evaluation_for_instance(db_session, instance, session_id, root_id)
+            db_session.commit()
+            
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(f"Error handling activity instance update: {e}")
+    finally:
+        db_session.close()
+
+def _run_evaluation_for_instance(db_session, instance, session_id, root_id):
+    """Refactored core evaluation logic to be reused between event handlers."""
+    activity_id = instance.activity_definition_id
+    completed_at = instance.time_stop or datetime.now(timezone.utc)
+    
+    # 1. Clear achievement context
+    clear_achievement_context()
+    
+    # 2. Get the session
+    session = db_session.query(Session).filter_by(id=session_id).first()
+    if not session:
+        return
+
+    # 3. Find goals to check
+    goals_to_check = set()
+    session_goals = session.goals or []
+    for g in session_goals:
+        goals_to_check.add(g.id)
+        
+    from sqlalchemy import text
+    activity_goal_result = db_session.execute(text('''
+        SELECT goal_id FROM activity_goal_associations 
+        WHERE activity_id = :activity_id
+    '''), {'activity_id': activity_id})
+    for row in activity_goal_result.fetchall():
+        goals_to_check.add(row[0])
+        
+    if not goals_to_check:
+        return
+        
+    linked_goals = db_session.query(Goal).filter(Goal.id.in_(goals_to_check)).all()
+    
+    # 4. Evaluate THRESHOLD targets
+    instance_data = serialize_activity_instance(instance)
+    instances_by_activity = {activity_id: [instance_data]}
+    
+    for goal in linked_goals:
+        _evaluate_threshold_targets_for_activity(
+            db_session, goal, instances_by_activity, session_id, 
+            activity_id, completed_at
+        )
+
+@event_bus.on(Events.ACTIVITY_INSTANCE_COMPLETED)
+def handle_activity_instance_completed(event: Event):
+    """
+    When an activity instance is completed, evaluate THRESHOLD targets for linked goals.
+    """
+    instance_id = event.data.get('instance_id')
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    
+    if not all([instance_id, session_id, root_id]):
+        return
+    
+    db_session = _get_db_session()
+    try:
+        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        if not instance:
+            return
+            
+        _run_evaluation_for_instance(db_session, instance, session_id, root_id)
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(f"Error handling activity instance completion: {e}")
+    finally:
+        db_session.close()
+
+
+@event_bus.on(Events.ACTIVITY_INSTANCE_DELETED)
+def handle_activity_instance_deleted(event: Event):
+    """
+    When an activity instance is deleted, revert any targets achieved by it.
+    """
+    instance_id = event.data.get('instance_id')
+    if not instance_id:
+        return
+        
+    db_session = _get_db_session()
+    try:
+        _revert_achievements_for_instance(db_session, instance_id)
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(f"Error handling activity instance deletion: {e}")
+    finally:
+        db_session.close()
+
+def _revert_achievements_for_instance(db_session, instance_id: str):
+    """Internal helper to find and revert targets tied to an instance."""
+    targets = db_session.query(Target).filter_by(
+        completed_instance_id=instance_id,
+        completed=True
+    ).all()
+    
+    for target in targets:
+        logger.info(f"[REVERSION] Reverting target '{target.name}' (id={target.id}) achieved by instance {instance_id}")
+        
+        target.completed = False
+        target.completed_at = None
+        target.completed_session_id = None
+        target.completed_instance_id = None
+        
+        # Emit reversion event
+        event_bus.emit(Event(Events.TARGET_REVERTED, {
+            'target_id': target.id,
+            'target_name': target.name,
+            'goal_id': target.goal_id,
+            'root_id': target.root_id,
+            'instance_id': instance_id
+        }))
+        
+        # If the goal was completed, we might need to revert that too if it was auto-completed
+        # However, goal completion is more complex (could have been manual or met by other targets).
+        # For now, we only revert the target. Reverting goal completion might be destructive 
+        # if the user manually marked it complete.
+        # But if it was 'all_targets_achieved', we should probably un-complete it.
+        goal = target.goal
+        if goal and goal.completed:
+            # Check if any other targets are still incomplete
+            # (We just marked THIS one incomplete, so at least one is definitely incomplete now)
+            all_targets = [t for t in goal.targets_rel if t.deleted_at is None]
+            if not all(t.completed for t in all_targets):
+                logger.info(f"[REVERSION] Goal '{goal.name}' no longer has all targets met. Un-completing.")
+                goal.completed = False
+                goal.completed_at = None
+                
+                event_bus.emit(Event(Events.GOAL_UNCOMPLETED, {
+                    'goal_id': goal.id,
+                    'goal_name': goal.name,
+                    'root_id': goal.root_id,
+                    'reason': 'target_reverted'
+                }))
+
+
 
 def _evaluate_threshold_target(target, instances_by_activity):
     """Evaluate a single-session threshold target."""

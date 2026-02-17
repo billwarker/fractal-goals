@@ -182,6 +182,7 @@ class Events:
     
     # Target events
     TARGET_ACHIEVED = 'target.achieved'
+    TARGET_REVERTED = 'target.reverted'
     TARGET_CREATED = 'target.created'
     TARGET_DELETED = 'target.deleted'
     

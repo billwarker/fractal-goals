@@ -151,7 +151,7 @@ function parseTargets(goal) {
  * This mirrors the logic in targetUtils.js but works with our instance data structure
  */
 function checkTargetAchieved(target, instance) {
-    if (!target || !instance) return false;
+    if (!target || !instance || !instance.completed) return false;
 
     const targetMetrics = target.metrics || [];
     if (targetMetrics.length === 0) return false;

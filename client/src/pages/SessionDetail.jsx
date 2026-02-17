@@ -371,7 +371,7 @@ function SessionDetail() {
         if (newlyAchieved.length > 0) {
             // Show toast for the new achievement(s)
             const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
-            setToastMessage(`🎯 Target achieved: ${names}`);
+            notify.success(`🎯 Target achieved: ${names}`, { duration: 5000 });
 
             // Add to notified set
             setNotifiedTargetIds(prev => {
@@ -379,9 +379,6 @@ function SessionDetail() {
                 newlyAchieved.forEach(s => newSet.add(s.target.id));
                 return newSet;
             });
-
-            // Auto-dismiss toast after 4 seconds
-            setTimeout(() => setToastMessage(null), 4000);
         }
     }, [achievedTargetIds, notifiedTargetIds, targetAchievements]);
 
@@ -1087,27 +1084,6 @@ function SessionDetail() {
             <div className={styles.sessionMainContent}>
 
                 {/* Minimal Header */}
-
-                {/* Toast Notification for Target Achievements */}
-                {toastMessage && (
-                    <div className={styles.toastNotification}>
-                        <span className={styles.toastIcon}>🎯</span>
-                        <div className={styles.toastContent}>
-                            <div className={styles.toastTitle}>
-                                Target Achieved!
-                            </div>
-                            <div className={styles.toastText}>
-                                {toastMessage.replace('🎯 Target achieved: ', '')}
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setToastMessage(null)}
-                            className={styles.toastCloseBtn}
-                        >
-                            ×
-                        </button>
-                    </div>
-                )}
 
                 {/* Sections List */}
                 <div className={styles.sessionSectionsList}>
