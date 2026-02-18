@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
+import styles from './WeeklyBarChart.module.css';
 
 /**
  * WeeklyBarChart - Bar chart showing sessions per week
@@ -184,14 +185,6 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         }
     };
 
-    const getTrendColor = () => {
-        switch (trend) {
-            case 'up': return '#4caf50';
-            case 'down': return '#f44336';
-            default: return 'var(--color-text-muted)';
-        }
-    };
-
     const getTrendText = () => {
         switch (trend) {
             case 'up': return 'Trending up';
@@ -200,114 +193,79 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         }
     };
 
+    const getTrendClassName = () => {
+        switch (trend) {
+            case 'up':
+                return styles.trendUp;
+            case 'down':
+                return styles.trendDown;
+            default:
+                return styles.trendStable;
+        }
+    };
+
     const totalSessions = weeklyData.reduce((sum, w) => sum + w.count, 0);
     const thisWeek = weeklyData[weeklyData.length - 1]?.count || 0;
     const lastWeek = weeklyData[weeklyData.length - 2]?.count || 0;
 
     return (
-        <div style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '20px',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            boxSizing: 'border-box',
-            minHeight: 0
-        }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-            }}>
-                <h3 style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: 'var(--color-text-secondary)'
-                }}>
+        <div className={styles.panel}>
+            <div className={styles.header}>
+                <h3 className={styles.title}>
                     📊 Weekly Sessions
                 </h3>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    color: getTrendColor()
-                }}>
+                <div className={`${styles.trend} ${getTrendClassName()}`}>
                     {getTrendIcon()} {getTrendText()}
                 </div>
             </div>
 
             {/* Quick Stats */}
-            <div style={{
-                display: 'flex',
-                gap: '16px',
-                marginBottom: '20px',
-                padding: '12px 16px',
-                background: 'var(--color-bg-surface)',
-                borderRadius: '6px'
-            }}>
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-brand-primary)' }}>
+            <div className={styles.stats}>
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueBrand}`}>
                         {thisWeek}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <div className={styles.statLabel}>
                         This Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: 'var(--color-border)' }} />
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
+                <div className={styles.statDivider} />
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueSecondary}`}>
                         {lastWeek}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <div className={styles.statLabel}>
                         Last Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: 'var(--color-border)' }} />
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-warning)' }}>
+                <div className={styles.statDivider} />
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueWarning}`}>
                         {averagePerWeek.toFixed(1)}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <div className={styles.statLabel}>
                         Avg/Week
                     </div>
                 </div>
-                <div style={{ width: '1px', background: 'var(--color-border)' }} />
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-success)' }}>
+                <div className={styles.statDivider} />
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueSuccess}`}>
                         {totalSessions}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <div className={styles.statLabel}>
                         Total ({weeks}w)
                     </div>
                 </div>
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+            <div className={styles.chartWrap}>
                 <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
 
             {/* Average line legend */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                marginTop: '12px',
-                fontSize: '11px',
-                color: 'var(--color-text-muted)'
-            }}>
-                <div style={{
-                    width: '20px',
-                    height: '2px',
-                    background: 'rgba(255, 152, 0, 0.5)',
-                    borderStyle: 'dashed'
-                }} />
+            <div className={styles.legend}>
+                <div className={styles.legendLine} />
                 <span>Average ({averagePerWeek.toFixed(1)} sessions/week)</span>
             </div>
         </div>

@@ -35,5 +35,8 @@ jobs:
       - name: Responsive audit
         run: npm run check:responsive
 
+      - name: Maintainability audit
+        run: npm run check:maintainability
+
       - name: Build
         run: npm run build

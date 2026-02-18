@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getShiftedDate } from '../../utils/dateUtils';
+import styles from './StreakTimeline.module.css';
 
 /**
  * StreakTimeline - Visual timeline showing streaks and breaks
@@ -92,18 +93,6 @@ function StreakTimeline({ sessions = [] }) {
 
         let current = 0;
         if (lastSessionDate === today || lastSessionDate === yesterday) {
-            // Count backwards from today
-            let checkDateStr = today;
-            // If we missed today but have yesterday, we start checking from yesterday for the streak
-            if (lastSessionDate === yesterday) checkDateStr = yesterday;
-
-            // Wait, standard streak logic:
-            // If last session was today, streak is ...
-            // If last session was yesterday, streak is ...
-            // The `sortedDates` are contiguous? No.
-            // Loop backwards from last session date (which is contiguous in set)
-
-            // Simpler: iterate back from lastSessionDate
             current = 0;
             let checkD = new Date(lastSessionDate);
             while (sessionDates.has(checkD.toISOString().split('T')[0])) {
@@ -121,7 +110,7 @@ function StreakTimeline({ sessions = [] }) {
             longestStreak: longest,
             totalActiveDays: sortedDates.length
         };
-    }, [sessions]);
+    }, [sessions, timezone]);
 
     // Get recent streaks for display (last 90 days worth)
     const recentStreaks = useMemo(() => {
@@ -137,72 +126,63 @@ function StreakTimeline({ sessions = [] }) {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
+    const getSegmentDateRangeClassName = (segmentType) =>
+        segmentType === 'streak'
+            ? `${styles.segmentDateRange} ${styles.segmentDateRangeStreak}`
+            : `${styles.segmentDateRange} ${styles.segmentDateRangeBreak}`;
+
+    const getBarFillClassName = (length) => {
+        if (length >= 7) return `${styles.barFill} ${styles.barFillLong}`;
+        if (length >= 3) return `${styles.barFill} ${styles.barFillMedium}`;
+        return `${styles.barFill} ${styles.barFillShort}`;
+    };
+
+    const getBadgeClassName = (length) =>
+        length >= 14
+            ? `${styles.badge} ${styles.badgeGreat}`
+            : `${styles.badge} ${styles.badgeNice}`;
+
+    const getBreakLineClassName = (length) =>
+        length >= 7
+            ? `${styles.breakLine} ${styles.breakLineLong}`
+            : `${styles.breakLine} ${styles.breakLineShort}`;
+
     // Calculate width percentages for visualization
     const maxLength = Math.max(...recentStreaks.map(s => s.length), 1);
 
     return (
-        <div style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '20px'
-        }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-            }}>
-                <h3 style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: 'var(--color-text-secondary)'
-                }}>
+        <div className={styles.panel}>
+            <div className={styles.header}>
+                <h3 className={styles.title}>
                     🔥 Streak Timeline
                 </h3>
             </div>
 
             {/* Streak Stats */}
-            <div style={{
-                display: 'flex',
-                gap: '24px',
-                marginBottom: '24px',
-                padding: '16px',
-                background: 'var(--color-bg-surface)',
-                borderRadius: '6px'
-            }}>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{
-                        fontSize: '28px',
-                        fontWeight: 'bold',
-                        color: currentStreak > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                    }}>
+            <div className={styles.stats}>
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueRow} ${currentStreak > 0 ? styles.statValueWarning : styles.statValueMuted}`}>
                         {currentStreak > 0 && '🔥'} {currentStreak}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className={styles.statLabel}>
                         Current Streak
                     </div>
                 </div>
-                <div style={{ width: '1px', background: 'var(--color-border)' }} />
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--color-success)' }}>
+                <div className={styles.statDivider} />
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueSuccess}`}>
                         {longestStreak}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className={styles.statLabel}>
                         Longest Streak
                     </div>
                 </div>
-                <div style={{ width: '1px', background: 'var(--color-border)' }} />
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--color-brand-primary)' }}>
+                <div className={styles.statDivider} />
+                <div className={styles.stat}>
+                    <div className={`${styles.statValue} ${styles.statValueBrand}`}>
                         {totalActiveDays}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div className={styles.statLabel}>
                         Total Active Days
                     </div>
                 </div>
@@ -210,32 +190,14 @@ function StreakTimeline({ sessions = [] }) {
 
             {/* Timeline Visualization */}
             {recentStreaks.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-text-muted)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                    }}>
+                <div className={styles.timeline}>
+                    <div className={styles.timelineHeader}>
                         Recent Activity (Last 90 Days)
                     </div>
                     {recentStreaks.map((segment, index) => (
-                        <div
-                            key={index}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                            }}
-                        >
+                        <div key={index} className={styles.segmentRow}>
                             {/* Date range */}
-                            <div style={{
-                                width: '140px',
-                                fontSize: '11px',
-                                color: segment.type === 'streak' ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
-                                fontFamily: 'monospace'
-                            }}>
+                            <div className={getSegmentDateRangeClassName(segment.type)}>
                                 {segment.type === 'streak'
                                     ? `${formatDate(segment.start)} - ${formatDate(segment.end)}`
                                     : `— ${segment.length} day break —`
@@ -245,34 +207,12 @@ function StreakTimeline({ sessions = [] }) {
                             {/* Visual bar */}
                             {segment.type === 'streak' && (
                                 <>
-                                    <div style={{
-                                        flex: 1,
-                                        height: '24px',
-                                        background: 'var(--color-bg-input)', // Empty track
-                                        borderRadius: '4px',
-                                        overflow: 'hidden',
-                                        position: 'relative'
-                                    }}>
-                                        <div style={{
-                                            width: `${Math.max(10, (segment.length / maxLength) * 100)}%`,
-                                            height: '100%',
-                                            background: segment.length >= 7
-                                                ? 'linear-gradient(90deg, var(--color-success), #8bc34a)'
-                                                : segment.length >= 3
-                                                    ? 'linear-gradient(90deg, var(--color-warning), #ffc107)'
-                                                    : 'var(--color-text-muted)',
-                                            borderRadius: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            paddingLeft: '8px',
-                                            transition: 'width 0.3s ease'
-                                        }}>
-                                            <span style={{
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                color: '#fff', // Keep white for contrast on colored bars
-                                                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                                            }}>
+                                    <div className={styles.barTrack}>
+                                        <div
+                                            className={getBarFillClassName(segment.length)}
+                                            style={{ width: `${Math.max(10, (segment.length / maxLength) * 100)}%` }}
+                                        >
+                                            <span className={styles.barLabel}>
                                                 {segment.length} day{segment.length !== 1 ? 's' : ''}
                                             </span>
                                         </div>
@@ -280,14 +220,7 @@ function StreakTimeline({ sessions = [] }) {
 
                                     {/* Badge for long streaks */}
                                     {segment.length >= 7 && (
-                                        <div style={{
-                                            padding: '4px 8px',
-                                            background: segment.length >= 14 ? 'var(--color-success)' : 'var(--color-warning)',
-                                            borderRadius: '4px',
-                                            fontSize: '10px',
-                                            fontWeight: 600,
-                                            color: '#fff'
-                                        }}>
+                                        <div className={getBadgeClassName(segment.length)}>
                                             {segment.length >= 14 ? '🏆 Great!' : '⭐ Nice!'}
                                         </div>
                                     )}
@@ -296,40 +229,20 @@ function StreakTimeline({ sessions = [] }) {
 
                             {/* Break indicator */}
                             {segment.type === 'break' && (
-                                <div style={{
-                                    flex: 1,
-                                    height: '2px',
-                                    background: segment.length >= 7
-                                        ? 'repeating-linear-gradient(90deg, var(--color-error), var(--color-error) 4px, transparent 4px, transparent 8px)'
-                                        : 'repeating-linear-gradient(90deg, var(--color-text-muted), var(--color-text-muted) 4px, transparent 4px, transparent 8px)',
-                                    opacity: 0.6
-                                }} />
+                                <div className={getBreakLineClassName(segment.length)} />
                             )}
                         </div>
                     ))}
                 </div>
             ) : (
-                <div style={{
-                    textAlign: 'center',
-                    color: 'var(--color-text-muted)',
-                    padding: '40px 20px',
-                    fontSize: '13px'
-                }}>
+                <div className={styles.empty}>
                     No session data available yet. Complete your first session to start tracking streaks!
                 </div>
             )}
 
             {/* Motivational message based on current streak */}
             {currentStreak > 0 && (
-                <div style={{
-                    marginTop: '20px',
-                    padding: '12px 16px',
-                    background: 'linear-gradient(90deg, rgba(255,152,0,0.1), rgba(255,152,0,0.05))',
-                    border: '1px solid rgba(255,152,0,0.2)',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    color: 'var(--color-warning)'
-                }}>
+                <div className={styles.motivation}>
                     🔥 You're on a <strong>{currentStreak}-day streak</strong>!
                     {currentStreak >= longestStreak
                         ? " This is your best streak yet!"

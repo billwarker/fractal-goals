@@ -4,12 +4,12 @@ import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
-import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDateInTimezone, formatLiteralDate } from '../utils/dateUtils';
+import { formatLiteralDate } from '../utils/dateUtils';
 import styles from './Programs.module.css'; // Import CSS Module
 import notify from '../utils/notify';
 import { Heading, Text } from '../components/atoms/Typography';
 import { useGoals } from '../contexts/GoalsContext';
+import { useProgramsPageData } from '../hooks/useProgramsPageData';
 
 const GOAL_COLORS = {
     Amercement: '#FF6B6B',
@@ -31,20 +31,25 @@ function Programs() {
     const navigate = useNavigate();
     const { setActiveRootId } = useGoals();
     const [showBuilder, setShowBuilder] = useState(false);
-    const [programs, setPrograms] = useState([]);
-    const [goals, setGoals] = useState([]);
     const [selectedProgram, setSelectedProgram] = useState(null);
-    const [loading, setLoading] = useState(true);
 
     // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [programToDelete, setProgramToDelete] = useState(null);
     const [deleteSessionCount, setDeleteSessionCount] = useState(0);
 
+    const searchParams = new URL(window.location.href).searchParams;
+    const showAll = searchParams.get('show_all') === 'true';
+    const {
+        programs,
+        goals,
+        loading,
+        refetchPrograms
+    } = useProgramsPageData(rootId);
+
     useEffect(() => {
         if (rootId) {
             setActiveRootId(rootId);
-            Promise.all([fetchPrograms(), fetchGoals()]);
         }
         return () => setActiveRootId(null);
     }, [rootId, setActiveRootId]);
@@ -60,41 +65,14 @@ function Programs() {
         }
     }, [programId, programs]);
 
-    // Check for active program redirection
-    const searchParams = new URL(window.location.href).searchParams;
-    const showAll = searchParams.get('show_all') === 'true';
-
-    const fetchPrograms = async () => {
-        try {
-            const res = await fractalApi.getPrograms(rootId);
-            setPrograms(res.data);
-
-            // Auto-redirect to active program if not suppressed
-            if (!showAll && !programId) {
-                const activeProgram = res.data.find(p => p.is_active);
-                if (activeProgram) {
-                    navigate(`/${rootId}/programs/${activeProgram.id}`, { replace: true });
-                }
+    useEffect(() => {
+        if (!showAll && !programId && programs.length > 0) {
+            const activeProgram = programs.find((program) => program.is_active);
+            if (activeProgram) {
+                navigate(`/${rootId}/programs/${activeProgram.id}`, { replace: true });
             }
-        } catch (err) {
-            console.error('Failed to fetch programs:', err);
-        } finally {
-            setLoading(false);
         }
-    };
-
-    const fetchGoals = async () => {
-        try {
-            const res = await fractalApi.getGoals(rootId);
-            const allGoals = [];
-            const collect = (g) => {
-                allGoals.push(g);
-                if (g.children) g.children.forEach(collect);
-            };
-            if (res.data) collect(res.data);
-            setGoals(allGoals);
-        } catch (err) { console.error(err); }
-    };
+    }, [showAll, programId, programs, navigate, rootId]);
 
     const getGoalDetails = (id) => goals.find(g => g.id === id);
 
@@ -131,8 +109,6 @@ function Programs() {
         }
     };
 
-    const { timezone } = useTimezone();
-
     const formatDate = (dateString, options = {}) => {
         if (!dateString) return '';
         // Use literal formatting to ensure program range and deadline matches intended date
@@ -165,7 +141,7 @@ function Programs() {
             setShowDeleteModal(false);
             setProgramToDelete(null);
             setDeleteSessionCount(0);
-            fetchPrograms(); // Refresh the list
+            refetchPrograms();
         } catch (err) {
             console.error('Failed to delete program:', err);
             notify.error('Failed to delete program: ' + (err.response?.data?.error || err.message));

@@ -1,0 +1,112 @@
+.panel {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-height: 0;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.trend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.trendUp {
+    color: var(--color-success);
+}
+
+.trendDown {
+    color: var(--color-error);
+}
+
+.trendStable {
+    color: var(--color-text-muted);
+}
+
+.stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--color-bg-surface);
+    border-radius: 6px;
+}
+
+.stat {
+    flex: 1;
+}
+
+.statValue {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.statValueBrand {
+    color: var(--color-brand-primary);
+}
+
+.statValueSecondary {
+    color: var(--color-text-secondary);
+}
+
+.statValueWarning {
+    color: var(--color-warning);
+}
+
+.statValueSuccess {
+    color: var(--color-success);
+}
+
+.statLabel {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+.statDivider {
+    width: 1px;
+    background: var(--color-border);
+}
+
+.chartWrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}
+
+.legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.legendLine {
+    width: 20px;
+    height: 2px;
+    background: rgba(255, 152, 0, 0.5);
+    border-style: dashed;
+}

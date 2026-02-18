@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fractalApi } from '../utils/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
+import { useLogsData } from '../hooks/useLogsData';
 import './Logs.css';
 
 /**
@@ -14,11 +14,7 @@ function Logs() {
     const navigate = useNavigate();
     const { timezone } = useTimezone();
 
-    const [logs, setLogs] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
-    const [eventTypes, setEventTypes] = useState([]);
     const pageSize = 50;
 
     // Filter states
@@ -29,42 +25,23 @@ function Logs() {
     useEffect(() => {
         if (!rootId) {
             navigate('/');
-            return;
         }
-        fetchLogs();
-    }, [rootId, page, eventType, startDate, endDate]);
+    }, [rootId, navigate]);
 
-    const fetchLogs = async () => {
-        try {
-            setLoading(true);
-            const offset = (page - 1) * pageSize;
-            const res = await fractalApi.getLogs(rootId, {
-                limit: pageSize,
-                offset: offset,
-                event_type: eventType !== 'all' ? eventType : undefined,
-                start_date: startDate ? new Date(startDate).toISOString() : undefined,
-                end_date: endDate ? new Date(endDate).toISOString() : undefined
-            });
-
-            setLogs(res.data.logs || []);
-            setTotal(res.data.pagination.total || 0);
-            if (res.data.event_types) {
-                setEventTypes(res.data.event_types);
-            }
-        } catch (err) {
-            console.error("Failed to fetch logs:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const {
+        logs,
+        total,
+        eventTypes,
+        isLoading: loading,
+        refetch,
+        clearLogs
+    } = useLogsData(rootId, { page, pageSize, eventType, startDate, endDate });
 
     const handleClearLogs = async () => {
         if (!window.confirm("Are you sure you want to clear all logs? This cannot be undone.")) return;
 
         try {
-            await fractalApi.clearLogs(rootId);
-            setLogs([]);
-            setTotal(0);
+            await clearLogs();
             setPage(1);
         } catch (err) {
             console.error("Failed to clear logs:", err);
@@ -102,7 +79,7 @@ function Logs() {
                     </div>
                 </div>
                 <div className="logs-header-actions">
-                    <button className="refresh-logs-btn" onClick={() => fetchLogs()}>REFRESH</button>
+                    <button className="refresh-logs-btn" onClick={() => refetch()}>REFRESH</button>
                     <button className="clear-logs-btn" onClick={handleClearLogs}>CLEAR ALL</button>
                 </div>
             </div>
