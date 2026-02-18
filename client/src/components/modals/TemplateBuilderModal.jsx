@@ -12,8 +12,7 @@ function TemplateBuilderModal({
     onSave,
     editingTemplate,
     activities,
-    activityGroups = [], // New prop for grouping
-    rootId
+    activityGroups = [] // New prop for grouping
 }) {
     const [currentTemplate, setCurrentTemplate] = useState({
         name: '',
@@ -681,7 +680,7 @@ function TemplateBuilderModal({
                 >
                     <div
                         className={styles.secondaryModalContent}
-                        style={{ maxWidth: '400px' }}
+                        style={{ width: 'min(400px, 90vw)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <h2 className={`${styles.alertTitle} ${alertModal.title === 'Error' ? styles.alertError : ''}`}>

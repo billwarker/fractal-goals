@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useIsMobile from '../../hooks/useIsMobile';
 
 /**
  * AnnotationModal - Modal for creating/editing visualization annotations.
@@ -20,6 +21,7 @@ function AnnotationModal({
 }) {
     const [content, setContent] = useState(initialContent);
     const textareaRef = useRef(null);
+    const isMobile = useIsMobile();
 
     // Focus textarea when modal opens
     useEffect(() => {
@@ -86,9 +88,10 @@ function AnnotationModal({
                 bottom: 0,
                 backgroundColor: 'rgba(0, 0, 0, 0.7)',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: isMobile ? 'flex-end' : 'center',
                 justifyContent: 'center',
-                zIndex: 1000
+                zIndex: 1000,
+                padding: isMobile ? 0 : '16px'
             }}
             onClick={onClose}
         >
@@ -96,10 +99,11 @@ function AnnotationModal({
                 style={{
                     background: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border)',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    width: '500px',
-                    maxWidth: '90vw',
+                    borderRadius: isMobile ? '16px 16px 0 0' : '12px',
+                    padding: isMobile ? '16px' : '24px',
+                    width: isMobile ? '100vw' : 'min(500px, 90vw)',
+                    maxHeight: isMobile ? '85vh' : '90vh',
+                    overflowY: 'auto',
                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
                 }}
                 onClick={e => e.stopPropagation()}
@@ -197,7 +201,8 @@ function AnnotationModal({
                 <div style={{
                     display: 'flex',
                     justifyContent: 'flex-end',
-                    gap: '12px'
+                    gap: '12px',
+                    flexDirection: isMobile ? 'column-reverse' : 'row'
                 }}>
                     <button
                         onClick={onClose}

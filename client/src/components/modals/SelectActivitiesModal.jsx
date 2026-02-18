@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useIsMobile from '../../hooks/useIsMobile';
 
 /**
  * Modal for selecting activities to associate with a goal.
@@ -13,6 +14,7 @@ function SelectActivitiesModal({
     onConfirm
 }) {
     const [tempSelectedActivities, setTempSelectedActivities] = useState([]);
+    const isMobile = useIsMobile();
 
     // Reset selection when modal opens/closes
     useEffect(() => {
@@ -49,8 +51,18 @@ function SelectActivitiesModal({
     });
 
     return (
-        <div className="modal-overlay" onClick={handleClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+        <div className="modal-overlay" onClick={handleClose} style={{ alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : undefined }}>
+            <div
+                className="modal"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    width: isMobile ? '100vw' : 'min(650px, 95vw)',
+                    maxWidth: isMobile ? '100vw' : '650px',
+                    maxHeight: isMobile ? '88vh' : '90vh',
+                    borderRadius: isMobile ? '16px 16px 0 0' : undefined,
+                    marginTop: isMobile ? 'auto' : undefined
+                }}
+            >
                 <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
                     Associate Activities with Goal
                 </h2>
@@ -68,7 +80,7 @@ function SelectActivitiesModal({
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '16px',
-                        maxHeight: '400px',
+                        maxHeight: isMobile ? '50vh' : '400px',
                         overflowY: 'auto',
                         marginBottom: '20px',
                         paddingRight: '8px'
@@ -148,7 +160,7 @@ function SelectActivitiesModal({
                     </div>
                 )}
 
-                <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexDirection: isMobile ? 'column-reverse' : 'row' }}>
                     <button
                         type="button"
                         onClick={handleClose}

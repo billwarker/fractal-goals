@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { fractalApi } from '../../utils/api';
 import AnnotationModal from './AnnotationModal';
+import useIsMobile from '../../hooks/useIsMobile';
 
 /**
  * AnnotatedHeatmap - ActivityHeatmap with annotation support.
@@ -16,6 +17,7 @@ function AnnotatedHeatmap({
 }) {
     const containerRef = useRef(null);
     const cellRefs = useRef({}); // Store refs to each cell for hit detection
+    const isMobile = useIsMobile();
 
     // Annotation state
     const [annotationMode, setAnnotationMode] = useState(false);
@@ -524,9 +526,10 @@ function AnnotatedHeatmap({
                         bottom: 0,
                         backgroundColor: 'rgba(0, 0, 0, 0.7)',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: isMobile ? 'flex-end' : 'center',
                         justifyContent: 'center',
-                        zIndex: 1000
+                        zIndex: 1000,
+                        padding: isMobile ? 0 : '16px'
                     }}
                     onClick={() => setViewingAnnotation(null)}
                 >
@@ -534,10 +537,11 @@ function AnnotatedHeatmap({
                         style={{
                             background: 'var(--color-bg-card)',
                             border: '1px solid var(--color-border)',
-                            borderRadius: '12px',
-                            padding: '24px',
-                            width: '450px',
-                            maxWidth: '90vw'
+                            borderRadius: isMobile ? '16px 16px 0 0' : '12px',
+                            padding: isMobile ? '16px' : '24px',
+                            width: isMobile ? '100vw' : 'min(450px, 90vw)',
+                            maxHeight: isMobile ? '80vh' : '90vh',
+                            overflowY: 'auto'
                         }}
                         onClick={e => e.stopPropagation()}
                     >

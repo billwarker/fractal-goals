@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import AnnotationModal from './AnnotationModal';
 import { fractalApi } from '../../utils/api';
 import notify from '../../utils/notify';
+import useIsMobile from '../../hooks/useIsMobile';
 
 /**
  * AnnotatedChartWrapper - Wraps Chart.js visualizations with annotation support.
@@ -25,6 +26,7 @@ function AnnotatedChartWrapper({
     highlightedAnnotationId
 }) {
     const containerRef = useRef(null);
+    const isMobile = useIsMobile();
 
     // Annotation state
     const [isSelecting, setIsSelecting] = useState(false);
@@ -671,9 +673,10 @@ function AnnotatedChartWrapper({
                         bottom: 0,
                         backgroundColor: 'rgba(0, 0, 0, 0.7)',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: isMobile ? 'flex-end' : 'center',
                         justifyContent: 'center',
-                        zIndex: 1000
+                        zIndex: 1000,
+                        padding: isMobile ? 0 : '16px'
                     }}
                     onClick={() => setViewingAnnotation(null)}
                 >
@@ -681,10 +684,11 @@ function AnnotatedChartWrapper({
                         style={{
                             background: '#1e1e1e',
                             border: '1px solid #333',
-                            borderRadius: '12px',
-                            padding: '24px',
-                            width: '450px',
-                            maxWidth: '90vw'
+                            borderRadius: isMobile ? '16px 16px 0 0' : '12px',
+                            padding: isMobile ? '16px' : '24px',
+                            width: isMobile ? '100vw' : 'min(450px, 90vw)',
+                            maxHeight: isMobile ? '80vh' : '90vh',
+                            overflowY: 'auto'
                         }}
                         onClick={e => e.stopPropagation()}
                     >

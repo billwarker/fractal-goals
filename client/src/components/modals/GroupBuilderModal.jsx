@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import { useGoals } from '../../contexts/GoalsContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { fractalApi } from '../../utils/api';
+import useIsMobile from '../../hooks/useIsMobile';
 
 export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
@@ -11,6 +11,7 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
 
     // Use the query hook to get the fractal tree for goal selection
     const { data: currentFractal } = useFractalTreeQuery(rootId);
+    const isMobile = useIsMobile();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -100,10 +101,16 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'var(--color-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+            background: 'var(--color-overlay)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 1000,
+            padding: isMobile ? 0 : '16px'
         }} onClick={onClose}>
             <div style={{
-                background: 'var(--color-bg-card)', padding: '24px', borderRadius: '8px', width: '500px', maxHeight: '90vh', overflowY: 'auto',
+                background: 'var(--color-bg-card)',
+                padding: isMobile ? '16px' : '24px',
+                borderRadius: isMobile ? '16px 16px 0 0' : '8px',
+                width: isMobile ? '100vw' : 'min(500px, 95vw)',
+                maxHeight: isMobile ? '85vh' : '90vh',
+                overflowY: 'auto',
                 border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: '20px',
                 boxShadow: 'var(--shadow-md)'
             }} onClick={e => e.stopPropagation()}>
@@ -221,7 +228,7 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
                     </div>
 
                     {/* Footer Actions */}
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px', flexDirection: isMobile ? 'column-reverse' : 'row' }}>
                         <button type="button" onClick={onClose} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>Cancel</button>
                         <button type="submit" disabled={loading} style={{ padding: '10px 24px', background: 'var(--color-brand-primary)', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', opacity: loading ? 0.7 : 1, fontWeight: 'bold' }}>
                             {loading ? 'Saving...' : 'Save'}
