@@ -254,6 +254,35 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setLocalSessionData(updatedData);
     }, [localSessionData]);
 
+    const handleAddActivity = useCallback(async (sectionIndex, activityId, activityObject = null) => {
+        const activityDef = activityObject || activities.find(a => a.id === activityId);
+        if (!activityDef) return;
+
+        try {
+            const response = await addActivityMutation.mutateAsync({
+                activity_definition_id: activityDef.id
+            });
+            const newInstance = response.data;
+
+            // Keep local session UI in sync immediately.
+            if (localSessionData?.sections?.[sectionIndex]) {
+                const updatedData = { ...localSessionData };
+                const section = { ...updatedData.sections[sectionIndex] };
+                const activityIds = [...(section.activity_ids || [])];
+                activityIds.push(newInstance.id);
+                section.activity_ids = activityIds;
+                updatedData.sections = [...updatedData.sections];
+                updatedData.sections[sectionIndex] = section;
+                setLocalSessionData(updatedData);
+            }
+
+            setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
+        } catch (err) {
+            console.error('Error adding activity:', err);
+            notify.error(`Failed to add activity: ${err.response?.data?.error || err.message}`);
+        }
+    }, [activities, addActivityMutation, localSessionData]);
+
     const handleToggleSessionComplete = useCallback(async () => {
         if (!session) return;
         const newCompleted = !session.attributes.completed;
@@ -430,7 +459,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         refreshInstances,
         // Handlers
         updateSession: updateSessionMutation.mutate,
-        addActivity: addActivityMutation.mutate,
+        addActivity: handleAddActivity,
         removeActivity: removeActivityMutation.mutate,
         updateInstance: updateInstanceMutation.mutate,
         updateTimer: handleUpdateTimer,
@@ -469,7 +498,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         refreshSession,
         refreshInstances,
         updateSessionMutation.mutate,
-        addActivityMutation.mutate,
+        handleAddActivity,
         removeActivityMutation.mutate,
         updateInstanceMutation.mutate,
         handleUpdateTimer,
