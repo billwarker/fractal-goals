@@ -144,3 +144,45 @@
     font-weight: 800 !important;
     text-decoration: underline !important;
 }
+
+@media (max-width: 768px) {
+    .calendarContainer {
+        min-height: 420px;
+        height: auto;
+        padding: 12px;
+    }
+
+    .headerActions {
+        position: static;
+        width: 100%;
+        margin-bottom: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .customBtn {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 11px;
+    }
+
+    :global(.fc-header-toolbar) {
+        margin-bottom: 12px !important;
+        height: auto !important;
+        align-items: flex-start !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    :global(.fc-toolbar-title) {
+        position: static !important;
+        transform: none !important;
+        font-size: 1rem !important;
+        white-space: normal !important;
+    }
+
+    :global(.fc-toolbar-chunk) {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+}

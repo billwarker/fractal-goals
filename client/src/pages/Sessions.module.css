@@ -112,6 +112,10 @@
     font-weight: 500;
 }
 
+.notesToggleButton {
+    white-space: nowrap;
+}
+
 .divider {
     width: 1px;
     background: #333;
@@ -613,5 +617,9 @@
         border-top: 1px solid var(--color-border);
         max-height: 48vh;
         background: var(--color-bg-sidebar);
+    }
+
+    .notesToggleButton {
+        width: 100%;
     }
 }

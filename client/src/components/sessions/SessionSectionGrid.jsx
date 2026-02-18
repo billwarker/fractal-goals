@@ -8,6 +8,7 @@
 import React, { memo, useMemo } from 'react';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import ExerciseCard from './ExerciseCard';
+import useIsMobile from '../../hooks/useIsMobile';
 import styles from './SessionSectionGrid.module.css';
 
 /**
@@ -87,6 +88,8 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
     activities,
     activityInstances = []
 }) {
+    const isMobile = useIsMobile();
+
     if (!sections || sections.length === 0) {
         return null;
     }
@@ -94,7 +97,7 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
     return (
         <div
             className={styles.sectionsGrid}
-            style={{ gridTemplateColumns: `repeat(${sections.length}, 1fr)` }}
+            style={isMobile ? undefined : { gridTemplateColumns: `repeat(${sections.length}, 1fr)` }}
         >
             {sections.map((section, sectionIndex) => (
                 <SectionColumn

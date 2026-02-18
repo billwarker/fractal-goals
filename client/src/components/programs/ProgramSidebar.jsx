@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { formatDurationSeconds } from '../../utils/formatters';
 import { formatLiteralDate } from '../../utils/dateUtils';
@@ -12,8 +12,11 @@ function ProgramSidebar({
     programGoalSeeds, // Top level goals to display
     onGoalClick, // (goal) => ...
     getGoalDetails, // Function to get full goal details by ID (needed for children)
+    compact = false
 }) {
     const { getGoalColor } = useTheme();
+    const [isMetricsOpen, setIsMetricsOpen] = useState(!compact);
+    const [isGoalsOpen, setIsGoalsOpen] = useState(!compact);
 
     // Recursive renderer
     const renderGoalItem = (goal, parentColors = []) => {
@@ -88,53 +91,82 @@ function ProgramSidebar({
     };
 
     return (
-        <div className={styles.sidebar}>
+        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''}`}>
             {/* Fixed Top Section */}
-            <div className={styles.topSection}>
-                {/* Program Metrics Section */}
-                {programMetrics && (
-                    <div style={{ marginBottom: '24px' }}>
-                        <h3 className={styles.sectionHeader}>Program Metrics</h3>
-                        <div className={styles.metricsList}>
-                            <div className={styles.metricValuePrimary}>
-                                {programMetrics.daysRemaining} Days Remaining
-                            </div>
-                            <div><span className={styles.metricLabel}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
-                            <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>
-                            <div><span className={styles.metricLabel}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
-                        </div>
-                    </div>
-                )}
+            <div className={`${styles.topSection} ${compact ? styles.compactTopSection : ''}`}>
+                <div className={styles.sectionHeaderRow}>
+                    <h3 className={styles.sectionHeader}>Program Metrics</h3>
+                    <button
+                        type="button"
+                        className={styles.collapseButton}
+                        onClick={() => setIsMetricsOpen((prev) => !prev)}
+                        aria-expanded={isMetricsOpen}
+                    >
+                        {isMetricsOpen ? 'Hide' : 'Show'}
+                    </button>
+                </div>
 
-                {/* Current Block Metrics Section */}
-                {activeBlock && blockMetrics && (
-                    <div>
-                        <h3 className={styles.sectionHeader}>Current Block Metrics</h3>
-                        <div className={styles.metricsList}>
-                            <div className={styles.blockHeader}>
-                                <span className={styles.blockName} style={{ color: blockMetrics.color }}>{blockMetrics.name}</span>
-                                <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
-                                    • {blockMetrics.daysRemaining} Days Remaining
-                                </span>
+                {isMetricsOpen && (
+                    <div className={styles.metricsScroll}>
+                        {/* Program Metrics Section */}
+                        {programMetrics && (
+                            <div className={compact ? styles.compactMetricsBlock : ''} style={{ marginBottom: '24px' }}>
+                                <div className={styles.metricsList}>
+                                    <div className={styles.metricValuePrimary}>
+                                        {programMetrics.daysRemaining} Days Remaining
+                                    </div>
+                                    <div><span className={styles.metricLabel}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
+                                    <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>
+                                    <div><span className={styles.metricLabel}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div><span className={styles.metricLabel}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
-                                <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(blockMetrics.totalDuration) : Math.round(blockMetrics.totalDuration / 60) + ' min'}</div>
-                                <div><span className={styles.metricLabel}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                        )}
+
+                        {/* Current Block Metrics Section */}
+                        {activeBlock && blockMetrics && (
+                            <div className={compact ? styles.compactMetricsBlock : ''}>
+                                <h3 className={styles.sectionHeader}>Current Block Metrics</h3>
+                                <div className={styles.metricsList}>
+                                    <div className={styles.blockHeader}>
+                                        <span className={styles.blockName} style={{ color: blockMetrics.color }}>{blockMetrics.name}</span>
+                                        <span style={{ color: blockMetrics.color, fontWeight: 600, fontSize: '16px' }}>
+                                            • {blockMetrics.daysRemaining} Days Remaining
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <div><span className={styles.metricLabel}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
+                                        <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(blockMetrics.totalDuration) : Math.round(blockMetrics.totalDuration / 60) + ' min'}</div>
+                                        <div><span className={styles.metricLabel}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </div>
 
             {/* Scrollable Bottom Section */}
             <div className={styles.bottomSection}>
-                <h3 className={styles.sectionHeader}>Program Goals</h3>
-                <div className={styles.goalsList}>
-                    {programGoalSeeds.length === 0 ? (
-                        <div className={styles.emptyState}>No goals associated</div>
-                    ) : programGoalSeeds.map(goal => renderGoalItem(goal, []))}
+                <div className={styles.sectionHeaderRow}>
+                    <h3 className={styles.sectionHeader}>Program Goals</h3>
+                    <button
+                        type="button"
+                        className={styles.collapseButton}
+                        onClick={() => setIsGoalsOpen((prev) => !prev)}
+                        aria-expanded={isGoalsOpen}
+                    >
+                        {isGoalsOpen ? 'Hide' : 'Show'}
+                    </button>
                 </div>
+                {isGoalsOpen && (
+                    <div className={styles.goalsScroll}>
+                        <div className={styles.goalsList}>
+                            {programGoalSeeds.length === 0 ? (
+                                <div className={styles.emptyState}>No goals associated</div>
+                            ) : programGoalSeeds.map(goal => renderGoalItem(goal, []))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

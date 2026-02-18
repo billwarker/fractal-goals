@@ -8,31 +8,26 @@
  * - Selects session when a note is clicked
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import './SessionNotesSidebar.css';
 
 function SessionNotesSidebar({
-    rootId,
-    selectedSessionId,
     selectedNoteId,
     sessions = [],
     activities = [],
     onSelectSession,
-    onSelectNote
+    onSelectNote,
+    onToggleCollapse,
+    isMobile = false
 }) {
-    const [allNotes, setAllNotes] = useState([]);
     const [viewImage, setViewImage] = useState(null);
     const { timezone } = useTimezone();
-    const scrollContainerRef = useRef(null);
-    const firstNoteRefs = useRef({});
 
-    // Process notes from sessions
-    useEffect(() => {
+    const allNotes = useMemo(() => {
         const notes = [];
-        firstNoteRefs.current = {};
 
         sessions.forEach(session => {
             if (session.notes && session.notes.length > 0) {
@@ -48,7 +43,7 @@ function SessionNotesSidebar({
 
         // Sort descending (newest first)
         notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        setAllNotes(notes);
+        return notes;
     }, [sessions]);
 
     // Format helpers
@@ -95,20 +90,32 @@ function SessionNotesSidebar({
     return (
         <div className="session-notes-sidebar">
             <div className="sidebar-header">
-                <h3 className="sidebar-title">Notes</h3>
-                <div className="sidebar-subtitle">
-                    {allNotes.length} notes total
+                <div>
+                    <h3 className="sidebar-title">Notes</h3>
+                    <div className="sidebar-subtitle">
+                        {allNotes.length} notes total
+                    </div>
                 </div>
+                {onToggleCollapse && (
+                    <button
+                        type="button"
+                        className="sidebar-collapse-button"
+                        onClick={onToggleCollapse}
+                        aria-label="Collapse notes panel"
+                    >
+                        {isMobile ? 'Hide' : 'Collapse'}
+                    </button>
+                )}
             </div>
 
-            <div className="sidebar-content" ref={scrollContainerRef}>
+            <div className="sidebar-content">
                 {allNotes.length === 0 ? (
                     <div className="sidebar-empty">
                         No notes found in any session.
                     </div>
                 ) : (
                     <div className="notes-timeline">
-                        {allNotes.map((note, index) => {
+                        {allNotes.map((note) => {
                             const context = getNoteContext(note);
                             const isSelected = note.id === selectedNoteId;
 

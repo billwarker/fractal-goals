@@ -11,6 +11,7 @@ import moment from 'moment';
  */
 const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, onUnscheduleDay, blocks, sessions }) => {
     const { getGoalColor } = useTheme();
+    const { timezone } = useTimezone();
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);
@@ -67,7 +68,6 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     const scheduledSessions = [];
     const completedSessions = [];
 
-    const { timezone } = useTimezone();
     // Helper to get local date string from a datetime in the selected timezone
     const getLocalDateString = (dateTimeStr) => {
         return getISOYMDInTimezone(dateTimeStr, timezone);

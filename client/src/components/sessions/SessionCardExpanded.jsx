@@ -176,7 +176,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             {/* Top Level: High-level session info */}
             <div className={styles.cardTopLevel}>
                 {/* Session Name (Link) */}
-                <div>
+                <div className={styles.topTitleBlock}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Link
                             to={`/${rootId}/session/${session.id}`}
@@ -196,7 +196,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
 
                 {/* Program */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Program</div>
                     {session.program_info ? (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -216,7 +216,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
 
                 {/* Session Start */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Session Start</div>
                     {sessionData?.session_start ? (
                         <div className={styles.fieldValue}>{formatDate(sessionData.session_start)}</div>
@@ -226,7 +226,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
 
                 {/* Session End */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Session End</div>
                     {sessionData?.session_end ? (
                         <div className={styles.fieldValue}>{formatDate(sessionData.session_end)}</div>
@@ -236,19 +236,19 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
 
                 {/* Last Modified */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Last Modified</div>
                     <div className={styles.fieldValue}>{formatDate(session.attributes?.updated_at)}</div>
                 </div>
 
                 {/* Duration */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Duration</div>
                     <div className={styles.fieldValue} style={{ fontWeight: 500 }}>{duration}</div>
                 </div>
 
                 {/* Template */}
-                <div>
+                <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Template</div>
                     {sessionData?.template_name ? (
                         <span className={styles.templateBadge}>

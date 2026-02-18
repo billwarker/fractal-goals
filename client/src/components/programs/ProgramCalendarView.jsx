@@ -5,13 +5,14 @@ import interactionPlugin from '@fullcalendar/interaction';
 import styles from './ProgramCalendarView.module.css';
 
 function ProgramCalendarView({
-    program,
     calendarEvents,
     blockCreationMode,
     setBlockCreationMode,
     onAddBlockClick,
     onDateSelect,
-    onEventClick
+    onDateClick,
+    onEventClick,
+    isMobile = false
 }) {
     return (
         <div className={styles.calendarContainer}>
@@ -21,7 +22,7 @@ function ProgramCalendarView({
                     onClick={() => setBlockCreationMode(!blockCreationMode)}
                     className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
                 >
-                    {blockCreationMode ? '✓ Block Creation Mode' : 'Select Dates to Add Block'}
+                    {blockCreationMode ? '✓ Add Mode On' : (isMobile ? 'Add by Date' : 'Select Dates to Add Block')}
                 </button>
                 <button
                     onClick={onAddBlockClick}
@@ -37,11 +38,12 @@ function ProgramCalendarView({
                 headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
                 initialDate={new Date()}
                 events={calendarEvents}
-                height="100%"
+                height={isMobile ? 560 : '100%'}
                 dayMaxEvents={5}
                 eventOrder="sortOrder"
                 selectable={true}
                 select={onDateSelect}
+                dateClick={onDateClick}
                 eventClick={onEventClick}
             />
         </div>

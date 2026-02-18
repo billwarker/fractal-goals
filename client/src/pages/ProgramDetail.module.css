@@ -213,6 +213,26 @@
         padding-top: 76px;
     }
 
+    .header {
+        padding: 12px;
+        gap: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    .headerLeft {
+        width: 100%;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .backBtn {
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
     .mainLayout {
         flex-direction: column;
     }
@@ -224,11 +244,47 @@
     }
 
     .programTitle {
-        font-size: 20px;
+        font-size: 18px;
+        line-height: 1.25;
+    }
+
+    .programMeta {
+        font-size: 13px;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .description {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+
+    .headerActions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .viewToggle {
+        width: 100%;
+        padding: 3px;
+    }
+
+    .toggleBtn {
+        flex: 1;
+        min-height: 36px;
+        font-size: 12px;
     }
 
     .editBtn {
-        min-height: 40px;
-        width: 100%;
+        min-height: 36px;
+        width: auto;
+        padding: 8px 12px;
+        font-size: 12px;
     }
 }

@@ -150,3 +150,43 @@
     color: var(--color-brand-success);
     font-style: italic;
 }
+
+@media (max-width: 768px) {
+    .exerciseCard {
+        padding: 10px;
+    }
+
+    .exerciseTitleRow {
+        flex-wrap: wrap;
+        gap: 4px 8px;
+    }
+
+    .activityData {
+        font-size: 11px;
+    }
+
+    .setRow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .setLabel {
+        width: auto;
+        font-size: 10px;
+    }
+
+    .metricsGroup {
+        width: 100%;
+        gap: 8px;
+    }
+
+    .singleMetricsContainer {
+        gap: 8px;
+    }
+
+    .metricBadge {
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+}

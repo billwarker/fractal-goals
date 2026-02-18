@@ -1363,7 +1363,7 @@ html {
 
 @media (max-width: 768px) {
     .top-nav-links {
-        min-height: 76px;
+        min-height: 92px;
         padding: 8px 12px;
         align-items: flex-start;
     }
@@ -1390,7 +1390,7 @@ html {
     .page-container {
         height: 100%;
         min-height: 100%;
-        padding: 94px 12px calc(80px + env(safe-area-inset-bottom, 0px)) 12px;
+        padding: 110px 12px calc(80px + env(safe-area-inset-bottom, 0px)) 12px;
     }
 
     .env-indicator {

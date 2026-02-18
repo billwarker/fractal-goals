@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar, SessionCardExpanded } from '../components/sessions';
+import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
 import styles from './Sessions.module.css';
 import { useGoals } from '../contexts/GoalsContext';
@@ -19,6 +20,7 @@ function Sessions() {
     const navigate = useNavigate();
     const { timezone } = useTimezone();
     const { setActiveRootId } = useGoals();
+    const isMobile = useIsMobile();
 
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -26,6 +28,12 @@ function Sessions() {
     const [activities, setActivities] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
+    const notesPaneStorageKey = `sessions-notes-pane-open:${rootId || 'default'}`;
+    const [isNotesPaneOpen, setIsNotesPaneOpen] = useState(() => {
+        if (typeof window === 'undefined') return true;
+        const stored = window.localStorage.getItem(`sessions-notes-pane-open:${rootId || 'default'}`);
+        return stored == null ? true : stored === 'true';
+    });
     const [sortBy, setSortBy] = useState('start_date');
     const [sortOrder, setSortOrder] = useState('desc');
     const [sessionInstancesById, setSessionInstancesById] = useState({});
@@ -46,6 +54,17 @@ function Sessions() {
         fetchActivities();
         return () => setActiveRootId(null);
     }, [rootId, navigate, setActiveRootId]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const stored = window.localStorage.getItem(notesPaneStorageKey);
+        setIsNotesPaneOpen(stored == null ? true : stored === 'true');
+    }, [notesPaneStorageKey]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(notesPaneStorageKey, String(isNotesPaneOpen));
+    }, [notesPaneStorageKey, isNotesPaneOpen]);
 
     // Scroll to selected session
     useEffect(() => {
@@ -92,7 +111,7 @@ function Sessions() {
         }
     }, [sortBy]);
 
-    const fetchSessions = async (reset = true) => {
+    const fetchSessions = async () => {
         try {
             const res = await fractalApi.getSessions(rootId, { limit: SESSIONS_PER_PAGE, offset: 0 });
             const { sessions: sessionsData, pagination } = res.data;
@@ -186,6 +205,10 @@ function Sessions() {
         setSelectedNoteId(null);
     }, []);
 
+    const totalNotesCount = useMemo(() => {
+        return sessions.reduce((count, session) => count + (session.notes?.length || 0), 0);
+    }, [sessions]);
+
     if (loading) {
         return <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>Loading sessions...</div>;
     }
@@ -254,6 +277,12 @@ function Sessions() {
                         >
                             Manage Activities
                         </button>
+                        <button
+                            onClick={() => setIsNotesPaneOpen((prev) => !prev)}
+                            className={`${styles.secondaryButton} ${styles.notesToggleButton}`}
+                        >
+                            {isNotesPaneOpen ? 'Hide Notes' : `Show Notes${totalNotesCount ? ` (${totalNotesCount})` : ''}`}
+                        </button>
                     </div>
                 </div>
 
@@ -311,17 +340,19 @@ function Sessions() {
             </div>
 
             {/* Right Panel: Notes Sidebar */}
-            <div className={styles.rightPanel}>
-                <SessionNotesSidebar
-                    rootId={rootId}
-                    selectedSessionId={selectedSessionId}
-                    selectedNoteId={selectedNoteId}
-                    sessions={sessions}
-                    activities={activities}
-                    onSelectSession={setSelectedSessionId}
-                    onSelectNote={setSelectedNoteId}
-                />
-            </div>
+            {isNotesPaneOpen && (
+                <div className={styles.rightPanel}>
+                    <SessionNotesSidebar
+                        selectedNoteId={selectedNoteId}
+                        sessions={sessions}
+                        activities={activities}
+                        onSelectSession={setSelectedSessionId}
+                        onSelectNote={setSelectedNoteId}
+                        onToggleCollapse={() => setIsNotesPaneOpen(false)}
+                        isMobile={isMobile}
+                    />
+                </div>
+            )}
         </div>
     );
 }

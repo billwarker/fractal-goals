@@ -6,11 +6,24 @@
     background: var(--color-bg-sidebar);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.compactSidebar {
+    width: 100%;
 }
 
 .topSection {
     padding: 24px;
     border-bottom: 1px solid var(--color-border);
+}
+
+.compactTopSection {
+    padding: 14px 12px;
+}
+
+.compactMetricsBlock {
+    margin-bottom: 12px !important;
 }
 
 .bottomSection {
@@ -25,6 +38,44 @@
     font-size: 12px;
     margin-bottom: 12px;
     letter-spacing: 1px;
+}
+
+.sectionHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sectionHeaderRow .sectionHeader {
+    margin-bottom: 0;
+}
+
+.collapseButton {
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 6px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.collapseButton:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+}
+
+.metricsScroll {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.goalsScroll {
+    max-height: 50vh;
+    overflow-y: auto;
 }
 
 .metricsList {
@@ -182,6 +233,32 @@
     .topSection,
     .bottomSection {
         padding: 12px;
+    }
+
+    .metricsScroll {
+        max-height: 180px;
+    }
+
+    .goalsScroll {
+        max-height: 34vh;
+    }
+
+    .metricsList {
+        font-size: 13px;
+        gap: 3px;
+    }
+
+    .metricValuePrimary {
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+
+    .blockName {
+        font-size: 14px;
+    }
+
+    .metricLabel {
+        font-size: 11px;
     }
 
     .goalsList {

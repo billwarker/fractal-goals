@@ -127,6 +127,45 @@ const NavigationHeader = ({ onOpenSettings }) => {
 
     const isActive = (path) => location.pathname.startsWith(path);
 
+    if (isMobile) {
+        return (
+            <div className="top-nav-links">
+                <div className={styles.mobileNav}>
+                    <div className={styles.mobileTitleRow}>
+                        <span className={`fractal-title ${styles.fractalTitleMobile}`}>{fractalName}</span>
+                        <button
+                            className={`${styles.addSessionBtn} ${styles.mobileTopAddBtn}`}
+                            onClick={() => navigate(`/${rootId}/create-session`)}
+                        >
+                            + ADD SESSION
+                        </button>
+                    </div>
+
+                    <div className={styles.mobileControlsRow}>
+
+                        {navItems.map(item => (
+                            <button
+                                key={item.path}
+                                className={`nav-text-link ${styles.mobileBtn} ${isActive(item.path) ? 'active' : ''}`}
+                                onClick={() => navigate(item.path)}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+
+                        <button className={`nav-text-link ${styles.mobileBtn}`} onClick={onOpenSettings}>
+                            SETTINGS
+                        </button>
+
+                        <button className={`nav-text-link home-link ${styles.mobileBtn}`} onClick={() => navigate('/')}>
+                            EXIT
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="top-nav-links">
             <div className="nav-group">

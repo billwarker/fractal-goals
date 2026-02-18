@@ -22,6 +22,7 @@ import { getChildType } from '../utils/goalHelpers';
 
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramLogic } from '../hooks/useProgramLogic';
+import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
 
 const ProgramDetail = () => {
@@ -29,6 +30,7 @@ const ProgramDetail = () => {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
+    const isMobile = useIsMobile();
 
     // Data Hook (manages program, goals, sessions, etc.)
     // Data Hook (manages program, goals, sessions, etc.)
@@ -127,6 +129,23 @@ const ProgramDetail = () => {
             setSelectedDate(clickedDate);
             setShowDayViewModal(true);
         }
+    };
+
+    const handleDateClick = (clickInfo) => {
+        if (blockCreationMode) {
+            const selectedDate = clickInfo.dateStr;
+            setBlockModalData({
+                name: '',
+                startDate: selectedDate,
+                endDate: selectedDate,
+                color: '#3A86FF'
+            });
+            setShowBlockModal(true);
+            return;
+        }
+
+        setSelectedDate(clickInfo.dateStr);
+        setShowDayViewModal(true);
     };
 
     const handleAddBlockClick = () => {
@@ -702,6 +721,53 @@ const ProgramDetail = () => {
         };
     })() : null;
 
+    const sidebarPanel = (
+        <ProgramSidebar
+            programMetrics={programMetrics}
+            activeBlock={activeBlock}
+            blockMetrics={blockMetrics}
+            programGoalSeeds={programGoalSeeds}
+            onGoalClick={(goal) => {
+                setSelectedGoal(goal);
+                setShowGoalModal(true);
+            }}
+            getGoalDetails={getGoalDetails}
+            compact={isMobile}
+        />
+    );
+
+    const contentPanel = (
+        <div className={`${styles.rightPanel} ${styles.calendarWrapper}`}>
+            {viewMode === 'calendar' ? (
+                <ProgramCalendarView
+                    calendarEvents={calendarEvents}
+                    blockCreationMode={blockCreationMode}
+                    setBlockCreationMode={setBlockCreationMode}
+                    onAddBlockClick={handleAddBlockClick}
+                    onDateSelect={handleDateSelect}
+                    onDateClick={handleDateClick}
+                    onEventClick={handleEventClick}
+                    isMobile={isMobile}
+                />
+            ) : (
+                <ProgramBlockView
+                    blocks={sortedBlocks}
+                    sessions={sessions}
+                    goals={goals}
+                    onEditDay={handleEditDay}
+                    onAttachGoal={handleAttachGoalClick}
+                    onEditBlock={handleEditBlockClick}
+                    onDeleteBlock={handleDeleteBlock}
+                    onAddDay={handleAddDayClick}
+                    onGoalClick={(goal) => {
+                        setSelectedGoal(goal);
+                        setShowGoalModal(true);
+                    }}
+                />
+            )}
+        </div>
+    );
+
     return (
         <div className={styles.container}>
             {/* Header */}
@@ -752,47 +818,17 @@ const ProgramDetail = () => {
 
             {/* Main Content */}
             <div className={styles.mainLayout}>
-                <ProgramSidebar
-                    programMetrics={programMetrics}
-                    activeBlock={activeBlock}
-                    blockMetrics={blockMetrics}
-                    programGoalSeeds={programGoalSeeds}
-                    onGoalClick={(goal) => {
-                        setSelectedGoal(goal);
-                        setShowGoalModal(true);
-                    }}
-                    getGoalDetails={getGoalDetails}
-                />
-
-                {/* Right Panel */}
-                <div className={`${styles.rightPanel} ${styles.calendarWrapper}`}>
-                    {viewMode === 'calendar' ? (
-                        <ProgramCalendarView
-                            program={program}
-                            calendarEvents={calendarEvents}
-                            blockCreationMode={blockCreationMode}
-                            setBlockCreationMode={setBlockCreationMode}
-                            onAddBlockClick={handleAddBlockClick}
-                            onDateSelect={handleDateSelect}
-                            onEventClick={handleEventClick}
-                        />
-                    ) : (
-                        <ProgramBlockView
-                            blocks={sortedBlocks}
-                            sessions={sessions}
-                            goals={goals}
-                            onEditDay={handleEditDay}
-                            onAttachGoal={handleAttachGoalClick}
-                            onEditBlock={handleEditBlockClick}
-                            onDeleteBlock={handleDeleteBlock}
-                            onAddDay={handleAddDayClick}
-                            onGoalClick={(goal) => {
-                                setSelectedGoal(goal);
-                                setShowGoalModal(true);
-                            }}
-                        />
-                    )}
-                </div>
+                {isMobile ? (
+                    <>
+                        {contentPanel}
+                        {sidebarPanel}
+                    </>
+                ) : (
+                    <>
+                        {sidebarPanel}
+                        {contentPanel}
+                    </>
+                )}
             </div>
 
             <ProgramBuilder isOpen={showEditBuilder} onClose={() => setShowEditBuilder(false)} onSave={handleSaveProgram} initialData={program} />

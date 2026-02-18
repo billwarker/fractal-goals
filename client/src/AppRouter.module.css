@@ -37,23 +37,70 @@
     background: var(--color-border);
 }
 
+.mobileNav {
+    display: none;
+}
+
+.mobileTitleRow {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 8px;
+    align-items: center;
+}
+
+.fractalTitleMobile {
+    display: block;
+    margin-right: 0;
+    font-size: 13px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mobileControlsRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+}
+
+.mobileBtn {
+    min-height: 34px !important;
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.mobileTopAddBtn {
+    min-height: 36px !important;
+    font-size: 11px !important;
+    padding: 6px 8px !important;
+    width: 100%;
+    margin-right: 0;
+    white-space: nowrap;
+}
+
 @media (max-width: 768px) {
-    .navContainer {
+    .mobileNav {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
         width: 100%;
-        overflow-x: auto;
-        scrollbar-width: thin;
-        gap: 12px;
-        padding-bottom: 4px;
+    }
+
+    .navContainer {
+        display: none;
     }
 
     .navContainerRight {
-        width: 100%;
-        justify-content: flex-start;
-        margin-left: 0;
-        gap: 10px;
-        overflow-x: auto;
-        scrollbar-width: thin;
-        padding-top: 4px;
+        display: none;
     }
 
     .fractalTitle {
