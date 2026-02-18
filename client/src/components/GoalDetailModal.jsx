@@ -56,7 +56,8 @@ function GoalDetailModal({
     onCreate,  // Function to call when creating a new goal
     parentGoal,  // Parent goal for context when creating
     onGoalSelect, // Handler for selecting a goal (e.g. child)
-    onAssociationsChanged // Callback when activity associations change
+    onAssociationsChanged, // Callback when activity associations change
+    onMobileCollapse
 }) {
     const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
     const navigate = useNavigate();
@@ -431,6 +432,7 @@ function GoalDetailModal({
                     parentGoal={parentGoal}
                     isCompleted={isCompleted}
                     onClose={onClose}
+                    onCollapse={onMobileCollapse}
                     deadline={deadline}
                     isCompact={isScrolled}
                 />

@@ -65,8 +65,45 @@
         min-height: 0;
     }
 
-    .metric-item {
-        font-size: 13px;
-        line-height: 1.2;
+    .mobile-sheet-collapsed-bar {
+        height: 112px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        justify-content: flex-start;
+        padding: 0 20px;
+        padding-right: 190px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-bg-sidebar);
+        flex-shrink: 0;
+        width: 100%;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .mobile-sheet-collapsed-chevron {
+        width: 22px;
+        flex-shrink: 0;
+        font-size: 22px;
+        line-height: 1;
+        color: var(--color-text-secondary);
+    }
+
+    .mobile-sheet-collapsed-title {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.25;
+        letter-spacing: 0.01em;
+        color: var(--collapsed-goal-color, var(--color-text-primary));
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex: 1;
+        margin: 0;
+        align-self: center;
     }
 }

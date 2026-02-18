@@ -14,6 +14,7 @@ function GoalHeader({
     parentGoal,
     isCompleted,
     onClose, // Callback to close modal when navigating
+    onCollapse, // Mobile panel collapse toggle
     deadline,
     headerColor, // New prop for header color
     isCompact = false // Prop to control collapsed state
@@ -53,25 +54,48 @@ function GoalHeader({
                 }}>
                     {mode === 'create' ? (name || 'New Goal') : (name || goal.name)}
                 </div>
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            padding: '0',
-                            lineHeight: 1,
-                            height: '24px',
-                            display: 'flex',
-                            alignItems: 'center'
-                        }}
-                    >
-                        ×
-                    </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {onCollapse && (
+                        <button
+                            onClick={onCollapse}
+                            title="Collapse panel"
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid var(--color-border)',
+                                color: '#888',
+                                fontSize: '16px',
+                                cursor: 'pointer',
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            ▼
+                        </button>
+                    )}
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#888',
+                                fontSize: '24px',
+                                cursor: 'pointer',
+                                padding: '0',
+                                lineHeight: 1,
+                                height: '24px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
             </div>
 
 

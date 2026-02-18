@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -17,6 +17,7 @@ import { useGoals } from '../contexts/GoalsContext';
 function Sessions() {
     const { getGoalColor } = useTheme();
     const { rootId } = useParams();
+    const location = useLocation();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
     const { setActiveRootId } = useGoals();
@@ -53,7 +54,7 @@ function Sessions() {
         fetchSessions();
         fetchActivities();
         return () => setActiveRootId(null);
-    }, [rootId, navigate, setActiveRootId]);
+    }, [rootId, location.key, navigate, setActiveRootId]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;

@@ -281,3 +281,76 @@
     align-items: center;
     justify-content: center;
 }
+
+@media (max-width: 768px) {
+    .header {
+        padding: 102px 12px 12px 12px;
+        margin-bottom: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .title {
+        font-size: 20px;
+        line-height: 1.2;
+    }
+
+    .headerActions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .createGroupBtn,
+    .createActivityBtn {
+        min-height: 40px;
+        font-size: 12px;
+        width: 100%;
+        padding: 8px 10px;
+        min-width: 0;
+    }
+
+    .errorMessage {
+        margin: 0 12px 12px 12px;
+    }
+
+    .content {
+        padding: 0 12px 20px 12px;
+    }
+
+    .groupContainer {
+        margin-bottom: 14px !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
+    }
+
+    .groupHeader {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .groupTitle {
+        font-size: 18px !important;
+        overflow-wrap: anywhere;
+    }
+
+    .groupDescription {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .groupActions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}

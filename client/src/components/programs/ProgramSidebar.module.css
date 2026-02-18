@@ -40,34 +40,6 @@
     letter-spacing: 1px;
 }
 
-.sectionHeaderRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.sectionHeaderRow .sectionHeader {
-    margin-bottom: 0;
-}
-
-.collapseButton {
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text-muted);
-    border-radius: 4px;
-    font-size: 11px;
-    line-height: 1;
-    padding: 6px 8px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.collapseButton:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-}
-
 .metricsScroll {
     max-height: 220px;
     overflow-y: auto;

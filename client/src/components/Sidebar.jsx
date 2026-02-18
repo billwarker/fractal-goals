@@ -26,7 +26,8 @@ const Sidebar = ({
     sessions = [],
     activityDefinitions = [],
     activityGroups = [],
-    programs = []
+    programs = [],
+    onMobileCollapse
 }) => {
 
     // Handler for GoalDetailModal - bridges to the Sidebar's onUpdate prop
@@ -72,6 +73,7 @@ const Sidebar = ({
             programs={programs}
             activityGroups={activityGroups}
             onGoalSelect={onGoalSelect}
+            onMobileCollapse={onMobileCollapse}
         />
     );
 };

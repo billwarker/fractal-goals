@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -10,8 +10,8 @@ import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useDebug } from '../contexts/DebugContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { getChildType } from '../utils/goalHelpers';
-import { calculateMetrics } from '../utils/metricsHelpers';
 import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
 import './FractalGoals.css';
@@ -60,6 +60,7 @@ function FractalGoals() {
     } = useActivities();
 
     const { debugMode } = useDebug();
+    const { getGoalColor } = useTheme();
     const isMobile = useIsMobile();
 
     // Programs State
@@ -81,14 +82,10 @@ function FractalGoals() {
 
     const loading = goalsLoading;
 
-    // Calculate metrics for the overlay (must be before any conditional returns)
-    const metrics = useMemo(() => {
-        return fractalData ? calculateMetrics(fractalData) : null;
-    }, [fractalData]);
-
     // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
+    const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
 
     // Modal state
     const [showGoalModal, setShowGoalModal] = useState(false);
@@ -149,6 +146,7 @@ function FractalGoals() {
     const handleGoalNameClick = (nodeDatum) => {
         setViewingGoal(nodeDatum);
         setSidebarMode('goal-details');
+        if (isMobile) setIsMobilePanelCollapsed(false);
     };
 
     const handleAddChildClick = (nodeDatum) => {
@@ -163,6 +161,7 @@ function FractalGoals() {
         // Show the Goal creation modal
         setSelectedParent(nodeDatum);
         setShowGoalModal(true);
+        if (isMobile) setIsMobilePanelCollapsed(false);
     };
 
     const handleCreateGoal = async (goalData) => {
@@ -219,6 +218,13 @@ function FractalGoals() {
     const minSidebarWidth = isMobile ? '0' : '390px';
     const navSpacerHeight = isMobile ? '76px' : '60px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
+    const sheetTitle = showGoalModal
+        ? 'Create Goal'
+        : (viewingGoal?.name || viewingGoal?.attributes?.name || 'Goal Details');
+    const activeGoalType = showGoalModal
+        ? getChildType(selectedParent?.attributes?.type || selectedParent?.type)
+        : (viewingGoal?.attributes?.type || viewingGoal?.type);
+    const sheetTitleColor = activeGoalType ? getGoalColor(activeGoalType) : 'var(--color-text-primary)';
 
     return (
         <div className="fractal-page-container" style={{
@@ -251,36 +257,12 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    {/* Metrics Overlay - Top Left of Viewport */}
-                    {metrics && (
-                        <div style={{
-                            position: 'absolute',
-                            top: isMobile ? '8px' : '12px',
-                            left: isMobile ? '8px' : '16px',
-                            zIndex: 100,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: isMobile ? '4px' : '6px',
-                            pointerEvents: 'none'
-                        }}>
-                            <div className="metric-item">
-                                {metrics.totalGoals} goals (<span className="metric-completed">{metrics.goalCompletionPercentage}% completed</span>)
-                            </div>
-                            <div className="metric-item">
-                                {metrics.totalDeadlines} deadlines (<span className="metric-missed">{metrics.deadlineMissedPercentage}% missed</span>)
-                            </div>
-                            <div className="metric-item">
-                                {metrics.totalTargets} targets (<span className="metric-completed">{metrics.targetCompletionPercentage}% completed</span>)
-                            </div>
-                        </div>
-                    )}
-
                     <FractalView
                         treeData={fractalData}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
                         onAddChild={handleAddChildClick}
-                        sidebarOpen={isSidebarOpen}
+                        sidebarOpen={isSidebarOpen && !(isMobile && isMobilePanelCollapsed)}
                         key={rootId}
                     />
                 </div>
@@ -290,9 +272,9 @@ function FractalGoals() {
                     <div className="details-window sidebar docked" style={{
                         width: sidebarWidth,
                         minWidth: minSidebarWidth,
-                        height: isMobile ? '100%' : 'calc(100% - 40px)',
+                        height: isMobile ? (isMobilePanelCollapsed ? '112px' : '70vh') : 'calc(100% - 40px)',
                         position: isMobile ? 'absolute' : 'relative',
-                        top: isMobile ? 0 : 'auto',
+                        top: isMobile ? 'auto' : 'auto',
                         right: isMobile ? 0 : 'auto',
                         bottom: isMobile ? 0 : 'auto',
                         left: isMobile ? 0 : 'auto',
@@ -302,50 +284,66 @@ function FractalGoals() {
                         zIndex: isMobile ? 1200 : 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: isMobile ? 0 : '12px',
+                        borderRadius: isMobile ? '12px 12px 0 0' : '12px',
                         boxShadow: 'var(--shadow-md)',
                         backdropFilter: 'blur(10px)'
                     }}>
-                        <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                            {showGoalModal ? (
-                                <GoalDetailModal
-                                    isOpen={true}
-                                    onClose={() => setShowGoalModal(false)}
-                                    mode="create"
-                                    onCreate={handleCreateGoal}
-                                    parentGoal={selectedParent}
-                                    activityDefinitions={activities}
-                                    activityGroups={activityGroups}
-                                    rootId={rootId}
-                                    displayMode="panel"
-                                />
-                            ) : (
-                                <ErrorBoundary>
-                                    <Sidebar
-                                        selectedNode={viewingGoal}
-                                        selectedRootId={rootId}
-                                        onClose={() => {
-                                            setSidebarMode(null);
-                                            setViewingGoal(null);
-                                        }}
-                                        onUpdate={handleUpdateNode}
-                                        onDelete={(node) => setFractalToDelete(node)}
-                                        onAddChild={handleAddChildClick}
-                                        onAddSession={() => {
-                                            const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
-                                            navigate(`/${rootId}/create-session?goalId=${goalId}`);
-                                        }}
-                                        onToggleCompletion={handleToggleCompletion}
-                                        treeData={fractalData}
-                                        sessions={sessions}
+                        {isMobile && isMobilePanelCollapsed && (
+                            <button
+                                type="button"
+                                className="mobile-sheet-collapsed-bar"
+                                onClick={() => setIsMobilePanelCollapsed(false)}
+                                style={{ '--collapsed-goal-color': sheetTitleColor }}
+                            >
+                                <span className="mobile-sheet-collapsed-chevron">▲</span>
+                                <span className="mobile-sheet-collapsed-title">{sheetTitle}</span>
+                            </button>
+                        )}
+
+                        {(!isMobile || !isMobilePanelCollapsed) && (
+                            <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                                {showGoalModal ? (
+                                    <GoalDetailModal
+                                        isOpen={true}
+                                        onClose={() => setShowGoalModal(false)}
+                                        mode="create"
+                                        onCreate={handleCreateGoal}
+                                        parentGoal={selectedParent}
                                         activityDefinitions={activities}
                                         activityGroups={activityGroups}
-                                        programs={programs}
-                                        onGoalSelect={handleGoalNameClick}
+                                        rootId={rootId}
+                                        displayMode="panel"
+                                        onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
                                     />
-                                </ErrorBoundary>
-                            )}
-                        </div>
+                                ) : (
+                                    <ErrorBoundary>
+                                        <Sidebar
+                                            selectedNode={viewingGoal}
+                                            selectedRootId={rootId}
+                                            onClose={() => {
+                                                setSidebarMode(null);
+                                                setViewingGoal(null);
+                                            }}
+                                            onUpdate={handleUpdateNode}
+                                            onDelete={(node) => setFractalToDelete(node)}
+                                            onAddChild={handleAddChildClick}
+                                            onAddSession={() => {
+                                                const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                                                navigate(`/${rootId}/create-session?goalId=${goalId}`);
+                                            }}
+                                            onToggleCompletion={handleToggleCompletion}
+                                            treeData={fractalData}
+                                            sessions={sessions}
+                                            activityDefinitions={activities}
+                                            activityGroups={activityGroups}
+                                            programs={programs}
+                                            onGoalSelect={handleGoalNameClick}
+                                            onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
+                                        />
+                                    </ErrorBoundary>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

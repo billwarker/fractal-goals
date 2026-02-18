@@ -54,6 +54,7 @@ const ProgramDetail = () => {
 
     // View Mode
     const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'blocks'
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // Block Modal State
     const [showBlockModal, setShowBlockModal] = useState(false);
@@ -808,6 +809,12 @@ const ProgramDetail = () => {
                         </button>
                     </div>
                     <button
+                        onClick={() => setIsSidebarOpen((prev) => !prev)}
+                        className={styles.sidebarToggleBtn}
+                    >
+                        {isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+                    </button>
+                    <button
                         onClick={() => setShowEditBuilder(true)}
                         className={styles.editBtn}
                     >
@@ -821,11 +828,11 @@ const ProgramDetail = () => {
                 {isMobile ? (
                     <>
                         {contentPanel}
-                        {sidebarPanel}
+                        {isSidebarOpen && sidebarPanel}
                     </>
                 ) : (
                     <>
-                        {sidebarPanel}
+                        {isSidebarOpen && sidebarPanel}
                         {contentPanel}
                     </>
                 )}

@@ -22,6 +22,11 @@ def token_required(f):
     """Decorator to protect routes with JWT authentication."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Let CORS preflight requests pass through auth checks.
+        # The real request (GET/POST/...) will still require a valid token.
+        if request.method == 'OPTIONS':
+            return ('', 204)
+
         token = None
         if 'Authorization' in request.headers:
             auth_header = request.headers['Authorization']
