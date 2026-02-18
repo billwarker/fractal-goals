@@ -28,6 +28,7 @@ function Sessions() {
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [sortBy, setSortBy] = useState('start_date');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [sessionInstancesById, setSessionInstancesById] = useState({});
 
     // Pagination state
     const [hasMore, setHasMore] = useState(false);
@@ -65,6 +66,23 @@ function Sessions() {
         }
     };
 
+    const fetchSessionInstances = useCallback(async (sessionIds) => {
+        if (!rootId || !Array.isArray(sessionIds) || sessionIds.length === 0) return {};
+        const uniqueIds = Array.from(new Set(sessionIds.filter(Boolean)));
+        const entries = await Promise.all(
+            uniqueIds.map(async (id) => {
+                try {
+                    const res = await fractalApi.getSessionActivities(rootId, id);
+                    return [id, res.data || []];
+                } catch (err) {
+                    console.error(`Failed to fetch activity instances for session ${id}`, err);
+                    return [id, []];
+                }
+            })
+        );
+        return Object.fromEntries(entries);
+    }, [rootId]);
+
     const handleSortChange = useCallback((criteria) => {
         if (sortBy === criteria) {
             setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
@@ -78,8 +96,10 @@ function Sessions() {
         try {
             const res = await fractalApi.getSessions(rootId, { limit: SESSIONS_PER_PAGE, offset: 0 });
             const { sessions: sessionsData, pagination } = res.data;
+            const instancesMap = await fetchSessionInstances(sessionsData.map((session) => session.id));
 
             setSessions(sessionsData);
+            setSessionInstancesById(instancesMap);
             setHasMore(pagination.has_more);
             setTotalSessions(pagination.total);
             setLoading(false);
@@ -99,8 +119,10 @@ function Sessions() {
                 offset: sessions.length
             });
             const { sessions: newSessions, pagination } = res.data;
+            const instancesMap = await fetchSessionInstances(newSessions.map((session) => session.id));
 
             setSessions(prev => [...prev, ...newSessions]);
+            setSessionInstancesById(prev => ({ ...prev, ...instancesMap }));
             setHasMore(pagination.has_more);
         } catch (err) {
             console.error("Failed to load more sessions", err);
@@ -254,6 +276,7 @@ function Sessions() {
                                     getGoalColor={getGoalColor}
                                     timezone={timezone}
                                     formatDate={formatDate}
+                                    sessionActivityInstances={sessionInstancesById[session.id] || []}
                                 />
                             ))}
 

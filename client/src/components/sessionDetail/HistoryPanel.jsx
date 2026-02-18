@@ -22,6 +22,29 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
         }
     }, [selectedActivity]);
 
+    // Keep selection valid for current session activity defs.
+    // If the current selection is no longer present (or there are no activities), clear it.
+    useEffect(() => {
+        const availableIds = new Set(sessionActivityDefs.map((def) => def.id));
+        if (availableIds.size === 0) {
+            if (selectedActivityId !== null) {
+                setSelectedActivityId(null);
+            }
+            return;
+        }
+
+        if (selectedActivity?.activity_definition_id && availableIds.has(selectedActivity.activity_definition_id)) {
+            if (selectedActivityId !== selectedActivity.activity_definition_id) {
+                setSelectedActivityId(selectedActivity.activity_definition_id);
+            }
+            return;
+        }
+
+        if (!selectedActivityId || !availableIds.has(selectedActivityId)) {
+            setSelectedActivityId(sessionActivityDefs[0]?.id || null);
+        }
+    }, [sessionActivityDefs, selectedActivity, selectedActivityId]);
+
     const { history, loading, error } = useActivityHistory(
         rootId,
         selectedActivityId,

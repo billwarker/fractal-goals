@@ -68,6 +68,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     session,
     rootId,
     activities,
+    sessionActivityInstances = [],
     isSelected,
     onSelect,
     getGoalColor,
@@ -96,22 +97,12 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
         shortTermGoals.forEach(addGoal);
         immediateGoals.forEach(addGoal);
 
-        // 2. Goals from activities in the session
-        // Extract activity definition IDs from session sections
-        const activityDefIds = new Set();
-        if (sessionData?.sections) {
-            sessionData.sections.forEach(section => {
-                if (section.activity_ids) {
-                    // activity_ids contains instance IDs, but for legacy sessions we may have activity_id in exercises
-                    section.activity_ids.forEach(id => activityDefIds.add(id));
-                }
-                if (section.exercises) {
-                    section.exercises.forEach(ex => {
-                        if (ex.activity_id) activityDefIds.add(ex.activity_id);
-                    });
-                }
-            });
-        }
+        // 2. Goals from activity definitions currently used in this session
+        const activityDefIds = new Set(
+            sessionActivityInstances
+                .map((instance) => instance.activity_definition_id)
+                .filter(Boolean)
+        );
 
         // Find matching definitions and their associated goals
         // Note: activities prop contains activity definitions
@@ -130,7 +121,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
         });
 
         return goals;
-    }, [shortTermGoals, immediateGoals, sessionData?.sections, activities]);
+    }, [shortTermGoals, immediateGoals, sessionActivityInstances, activities]);
 
     const achievedTargets = useMemo(() => {
         const allAchievables = [...shortTermGoals, ...immediateGoals];
@@ -283,6 +274,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                         <SessionSectionGrid
                             sections={sessionData.sections}
                             activities={activities}
+                            activityInstances={sessionActivityInstances}
                         />
 
                         {/* Session Notes */}

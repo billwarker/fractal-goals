@@ -6,7 +6,7 @@
  */
 
 import React, { memo, useMemo } from 'react';
-import { formatShortDuration, calculateSectionDuration } from '../../hooks/useSessionDuration';
+import { formatShortDuration } from '../../hooks/useSessionDuration';
 import ExerciseCard from './ExerciseCard';
 import styles from './SessionSectionGrid.module.css';
 
@@ -15,16 +15,36 @@ import styles from './SessionSectionGrid.module.css';
  */
 const SectionColumn = memo(function SectionColumn({
     section,
-    sectionIndex,
-    activities
+    activities,
+    activityInstances = []
 }) {
+    const sectionExercises = useMemo(() => {
+        const instanceIds = section.activity_ids || [];
+        if (!instanceIds.length || !activityInstances.length) return [];
+
+        return instanceIds
+            .map((instanceId) => {
+                const instance = activityInstances.find((item) => item.id === instanceId);
+                if (!instance) return null;
+
+                return {
+                    ...instance,
+                    type: 'activity',
+                    activity_id: instance.activity_definition_id,
+                    instance_id: instance.id,
+                    name: instance.name || ''
+                };
+            })
+            .filter(Boolean);
+    }, [section.activity_ids, activityInstances]);
+
     const sectionDuration = useMemo(() => {
-        const seconds = calculateSectionDuration(section);
+        const seconds = sectionExercises.reduce((sum, exercise) => sum + (exercise.duration_seconds || 0), 0);
         if (seconds > 0) {
             return formatShortDuration(seconds);
         }
         return `${section.duration_minutes || 0} min (planned)`;
-    }, [section]);
+    }, [section.duration_minutes, sectionExercises]);
 
     return (
         <div className={styles.sectionColumn}>
@@ -38,9 +58,9 @@ const SectionColumn = memo(function SectionColumn({
             </div>
 
             {/* Exercises - Vertical List */}
-            {section.exercises && section.exercises.length > 0 && (
+            {sectionExercises.length > 0 && (
                 <div className={styles.exercisesList}>
-                    {section.exercises.map((exercise, exerciseIndex) => {
+                    {sectionExercises.map((exercise, exerciseIndex) => {
                         const actDef = exercise.type === 'activity'
                             ? activities.find(a => a.id === exercise.activity_id)
                             : null;
@@ -64,7 +84,8 @@ const SectionColumn = memo(function SectionColumn({
  */
 const SessionSectionGrid = memo(function SessionSectionGrid({
     sections,
-    activities
+    activities,
+    activityInstances = []
 }) {
     if (!sections || sections.length === 0) {
         return null;
@@ -79,8 +100,8 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
                 <SectionColumn
                     key={sectionIndex}
                     section={section}
-                    sectionIndex={sectionIndex}
                     activities={activities}
+                    activityInstances={activityInstances}
                 />
             ))}
         </div>

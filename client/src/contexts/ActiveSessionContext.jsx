@@ -349,11 +349,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     useEffect(() => {
         if (!session) return;
+        if (initializedRef.current && localSessionData) return;
         setLocalSessionData(session.attributes?.session_data || { sections: [] });
         initializedRef.current = true;
         setJustInitialized(true);
         setTimeout(() => setJustInitialized(false), 500); // Guard window
-    }, [session, sessionId]);
+    }, [session, sessionId, localSessionData]);
 
     useEffect(() => {
         console.log('[ActiveSessionProvider] Mounted');
