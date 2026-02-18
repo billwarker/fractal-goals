@@ -12,6 +12,9 @@ from validators import (
 )
 from services.serializers import serialize_user
 from extensions import limiter
+import logging
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -47,7 +50,8 @@ def token_required(f):
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
         except Exception as e:
-            return jsonify({'error': f'Auth error: {str(e)}'}), 401
+            logger.exception("Unexpected error in token_required decorator")
+            return jsonify({'error': 'Internal server error during authentication'}), 500
             
     return decorated
 

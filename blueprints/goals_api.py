@@ -4,6 +4,7 @@ import json
 import uuid
 import logging
 import models
+from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 from models import (
@@ -593,9 +594,9 @@ def get_all_fractals(current_user):
     try:
         # Filter root goals by owner_id with eager loading for SMART status checks
         roots = db_session.query(Goal).options(
-            models.selectinload(Goal.associated_activities),
-            models.selectinload(Goal.associated_activity_groups),
-            models.selectinload(Goal.children) # For max_updated recursion if needed, though recursion might still trigger loads deeply
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups),
+            selectinload(Goal.children) # For max_updated recursion if needed, though recursion might still trigger loads deeply
         ).filter(
             Goal.parent_id == None,
             Goal.owner_id == current_user.id,

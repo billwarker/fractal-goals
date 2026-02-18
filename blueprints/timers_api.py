@@ -38,9 +38,10 @@ def activity_instances(current_user, root_id):
             # Create new activity instance
             data = request.get_json() or {}
             instance_id = data.get('instance_id')
-            # Support both new session_id and legacy practice_session_id
-            session_id = data.get('session_id') or data.get('practice_session_id')
+            # Support session_id
+            session_id = data.get('session_id')
             activity_definition_id = data.get('activity_definition_id')
+
             
             if not instance_id:
                 instance_id = str(uuid.uuid4())
@@ -57,10 +58,10 @@ def activity_instances(current_user, root_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
-                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
+
             db_session.add(instance)
             
             # Get activity name directly from definition
@@ -119,8 +120,9 @@ def start_activity_timer(current_user, root_id, instance_id):
         if not instance:
             # Instance doesn't exist yet - create it
             data = request.get_json(silent=True) or {}
-            # Support both new session_id and legacy practice_session_id
-            session_id = data.get('session_id') or data.get('practice_session_id')
+            # Support session_id
+            session_id = data.get('session_id')
+
             activity_definition_id = data.get('activity_definition_id')
             
             print(f"[START TIMER] Creating new instance - session: {session_id}, activity: {activity_definition_id}")
@@ -131,7 +133,6 @@ def start_activity_timer(current_user, root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
-                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )
@@ -302,8 +303,9 @@ def update_activity_instance(current_user, root_id, instance_id):
         
         if not instance:
             # Create if missing, but we strictly need connection IDs
-            # Support both new session_id and legacy practice_session_id
-            session_id = data.get('session_id') or data.get('practice_session_id')
+            # Support session_id
+            session_id = data.get('session_id')
+
             activity_definition_id = data.get('activity_definition_id')
             
             if not session_id or not activity_definition_id:
@@ -313,7 +315,6 @@ def update_activity_instance(current_user, root_id, instance_id):
             instance = ActivityInstance(
                 id=instance_id,
                 session_id=session_id,
-                practice_session_id=session_id,  # Populate legacy field
                 activity_definition_id=activity_definition_id,
                 root_id=root_id  # Add root_id for performance
             )

@@ -170,7 +170,8 @@ function SessionActivityItem({
             await onAddNote({
                 context_type: 'activity_instance',
                 context_id: exercise.id,
-                session_id: sessionId || exercise.practice_session_id,
+                session_id: sessionId || exercise.session_id,
+
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
                 set_index: selectedSetIndex,
@@ -202,7 +203,8 @@ function SessionActivityItem({
             await onAddNote({
                 context_type: 'activity_instance',
                 context_id: exercise.id,
-                session_id: sessionId || exercise.practice_session_id,
+                session_id: sessionId || exercise.session_id,
+
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
                 set_index: selectedSetIndex,

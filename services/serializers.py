@@ -97,8 +97,8 @@ def serialize_activity_instance(instance):
     return {
         "id": instance.id,
         "session_id": instance.session_id,
-        "practice_session_id": instance.practice_session_id,  # Legacy support
         "activity_definition_id": instance.activity_definition_id,
+
         "name": instance.definition.name if instance.definition else "Unknown",
         "definition_name": instance.definition.name if instance.definition else "Unknown",
         "group_name": group_path,  # Now includes full path

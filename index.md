@@ -47,6 +47,11 @@
 - **Goal Inheritance Timing Fix**: Updated backend metrics service to filter activity instances by goal creation time, ensuring newly associated goals only inherit time spent *after* their creation.
 - **Activity Association Persistence Fix**: Resolved an issue where associations made in the Goal Detail Modal view mode were not persisting by implementing immediate backend synchronization via a reusable persistence layer.
 - **Goal Detail Data Loading Fix**: Ensured all goal attributes (description, relevance, etc.) load correctly in the Detail Modal by improving data hydration in the goal utility layer.
+- [x] **Phase 2: Core Architecture & Cleanup**
+  - [x] **Database Model Refactoring**: Modularized `models.py` into `models/` package.
+  - [x] **Bug Resolution**: Fixed post-refactoring `AttributeError` and improved auth logging.
+  - [ ] **Frontend State Consolidation**: Streamline `SessionDetail` state management.
+  - [ ] **Legacy Code Cleanup**: Remove unused files and directories.
 - **Goal Completion Styling**: Implemented a global "Completed" status styling system. Users can now customize the icon (default: "check") and color for completed goals in Settings.
 - **Relational Accomplishment Filtering**: Refactored the session accomplishments section to use relational data between sessions and target completions, ensuring accurate display of work done during a session even if recorded with a slight delay.
 - **Universal Target Icon**: Implemented a customizable `twelve-point-star` icon as the default for targets across the application.
