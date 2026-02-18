@@ -1,63 +1,12 @@
 import { useCallback } from 'react';
+import {
+    calculateSectionDurationFromInstanceIds,
+    calculateTotalCompletedDuration,
+    formatClockDuration
+} from '../utils/sessionTime';
 
-/**
- * Calculate total duration in seconds for a section based on activity instances
- */
-export function calculateSectionDuration(section, activityInstances) {
-    if (!section || !section.activity_ids || !activityInstances) return 0;
-
-    let totalSeconds = 0;
-    for (const instanceId of section.activity_ids) {
-        const instance = activityInstances.find(inst => inst.id === instanceId);
-        if (instance && instance.duration_seconds != null) {
-            totalSeconds += instance.duration_seconds;
-        }
-    }
-    return totalSeconds;
-}
-
-/**
- * Calculate total completed duration
- * - If session_end is set: use session_end - session_start
- * - If session_end is NULL: sum all section durations
- */
-export function calculateTotalCompletedDuration(sessionData, activityInstances) {
-    if (!sessionData) return 0;
-
-    // Priority 1: If session_end is set, use session_end - session_start
-    if (sessionData.session_end && sessionData.session_start) {
-        const start = new Date(sessionData.session_start);
-        const end = new Date(sessionData.session_end);
-        const diffSeconds = Math.floor((end - start) / 1000);
-        return diffSeconds > 0 ? diffSeconds : 0;
-    }
-
-    // Priority 2: Sum all section durations from activity instances
-    if (!sessionData.sections) return 0;
-
-    let totalSeconds = 0;
-    for (const section of sessionData.sections) {
-        totalSeconds += calculateSectionDuration(section, activityInstances);
-    }
-
-    return totalSeconds;
-}
-
-/**
- * Format duration in seconds to HH:MM:SS or MM:SS format
- */
-export function formatDuration(seconds) {
-    if (seconds == null || seconds === 0) return '--:--';
-
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-        return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
+export const calculateSectionDuration = calculateSectionDurationFromInstanceIds;
+export const formatDuration = formatClockDuration;
 
 /**
  * Hook to manage session timing logic
@@ -100,7 +49,7 @@ export function useSessionTimer(sessionData, setSessionData, activityInstances) 
     }, [sessionData, setSessionData]);
 
     return {
-        formatDuration,
+        formatDuration: formatClockDuration,
         calculateTotalCompletedDuration: () => calculateTotalCompletedDuration(sessionData, activityInstances),
         handleSessionStartChange,
         handleSessionEndChange,

@@ -10,6 +10,7 @@ import styles from './SessionInfoPanel.module.css';
 import notify from '../../utils/notify';
 import { Heading } from '../atoms/Typography';
 import useIsMobile from '../../hooks/useIsMobile';
+import { formatClockDuration } from '../../utils/sessionTime';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
 
@@ -46,13 +47,6 @@ function SessionInfoPanel({
             hour: 'numeric',
             minute: '2-digit'
         });
-    };
-
-    const formatDuration = (seconds) => {
-        if (!seconds) return '—';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${String(secs).padStart(2, '0')}`;
     };
 
     const handleStartEdit = (field, currentDate) => {
@@ -158,7 +152,7 @@ function SessionInfoPanel({
             <div className={styles.sessionInfoSummary}>
                 <div className={styles.sessionInfoRow}>
                     <span className={styles.label}>Duration:</span>
-                    <span className={`${styles.value} ${styles.duration}`}>{formatDuration(totalDuration)}</span>
+                    <span className={`${styles.value} ${styles.duration}`}>{formatClockDuration(totalDuration, '—')}</span>
                 </div>
                 {session.program_info && (
                     <div className={styles.sessionInfoRow}>

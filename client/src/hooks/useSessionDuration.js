@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from 'react';
+import { formatHourMinuteDuration } from '../utils/sessionTime';
 
 /**
  * Format seconds into H:MM or 0:MM format
@@ -15,15 +16,7 @@ import { useMemo } from 'react';
  * @returns {string} Formatted duration string
  */
 export function formatDuration(totalSeconds) {
-    if (!totalSeconds || totalSeconds <= 0) return '-';
-
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-    if (hours > 0) {
-        return `${hours}:${String(minutes).padStart(2, '0')}`;
-    }
-    return `0:${String(minutes).padStart(2, '0')}`;
+    return formatHourMinuteDuration(totalSeconds, '-');
 }
 
 /**

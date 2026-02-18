@@ -5,7 +5,6 @@
 export { default as SessionSidePane } from './SessionSidePane';
 export { default as SessionInfoPanel } from './SessionInfoPanel';
 export { default as SessionSection } from './SessionSection';
-export { default as SessionControls } from './SessionControls';
 export { default as SessionActivityItem } from './SessionActivityItem';
 export { default as NotesPanel } from './NotesPanel';
 export { default as NoteQuickAdd } from './NoteQuickAdd';

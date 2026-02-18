@@ -4,38 +4,7 @@ import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
-
-/**
- * Calculate total duration in seconds for a section based on activity instances
- */
-function calculateSectionDuration(section, activityInstances) {
-    if (!section || !section.activity_ids || !activityInstances) return 0;
-
-    let totalSeconds = 0;
-    for (const instanceId of section.activity_ids) {
-        const instance = activityInstances.find(inst => inst.id === instanceId);
-        if (instance && instance.duration_seconds != null) {
-            totalSeconds += instance.duration_seconds;
-        }
-    }
-    return totalSeconds;
-}
-
-/**
- * Format duration in seconds to HH:MM:SS or MM:SS format
- */
-function formatDuration(seconds) {
-    if (seconds == null || seconds === 0) return '--:--';
-
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-        return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
+import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 
 const SessionSection = ({
     section,
@@ -221,7 +190,7 @@ const SessionSection = ({
                 </Heading>
                 <div className={styles.sectionDuration}>
                     Duration: <span className={styles.durationValue}>
-                        {formatDuration(calculateSectionDuration(section, activityInstances))}
+                        {formatClockDuration(calculateSectionDurationFromInstanceIds(section, activityInstances))}
                     </span>
                     <span className={styles.durationPlanned}>
                         (planned: {section.estimated_duration_minutes || '—'} min)

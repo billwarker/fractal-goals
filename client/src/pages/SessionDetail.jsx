@@ -1,22 +1,20 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fractalApi } from '../utils/api';
 import SessionSection from '../components/sessionDetail/SessionSection';
 import ConfirmationModal from '../components/ConfirmationModal';
 import ActivityBuilder from '../components/ActivityBuilder';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { SessionSidePane } from '../components/sessionDetail';
-import useSessionNotes from '../hooks/useSessionNotes';
 import styles from './SessionDetail.module.css';
-import notify from '../utils/notify';
 import '../App.css';
-import { useGoals } from '../contexts/GoalsContext';
 import ActivityAssociationModal from '../components/sessionDetail/ActivityAssociationModal';
 import StatusState from '../components/common/StatusState';
 import useIsMobile from '../hooks/useIsMobile';
+import { formatClockDuration } from '../utils/sessionTime';
+import { useSessionDetailController } from '../hooks/useSessionDetailController';
 
 // Context
-import { ActiveSessionProvider, useActiveSession } from '../contexts/ActiveSessionContext';
+import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 
 /**
  * Session Detail Page Wrapper
@@ -37,146 +35,47 @@ function SessionDetail() {
 function SessionDetailContent() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
-    const { useFractalTreeQuery } = useGoals();
     const isMobile = useIsMobile();
-
-
-
-    // Consume Active Session Context
     const {
         session,
-        activityInstances,
         activities,
         loading,
         autoSaveStatus,
         sidePaneMode,
         setSidePaneMode,
         refreshSession,
-        refreshInstances,
         localSessionData,
-        groupedActivities,
-        groupMap,
-        targetAchievements,
-        achievedTargetIds,
-        // Handlers
-        updateSession,
-        addActivity,
-        deleteSession,
-        updateInstance,
-        reorderActivity,
-        moveActivity,
         updateGoal,
-        toggleSessionComplete,
-        calculateTotalDuration
-    } = useActiveSession();
-
-    // UI State
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [showBuilder, setShowBuilder] = useState(false);
-    const [sectionForNewActivity, setSectionForNewActivity] = useState(null);
-    const [selectedGoal, setSelectedGoal] = useState(null);
-    const [selectedActivity, setSelectedActivity] = useState(null);
-    const [selectedSetIndex, setSelectedSetIndex] = useState(null);
-    const [showAssociationModal, setShowAssociationModal] = useState(false);
-    const [associationContext, setAssociationContext] = useState(null);
-    const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
-
-    // Pre-calculate full goal tree for association
-    const { data: fullGoalTree } = useFractalTreeQuery(rootId);
-
-    const allAvailableGoals = useMemo(() => {
-        if (!fullGoalTree) return [];
-        const goals = [];
-        const processGoal = (g) => {
-            const goalWithIds = { ...g, childrenIds: g.children ? g.children.map(c => c.id) : [] };
-            goals.push(goalWithIds);
-            if (g.children) g.children.forEach(processGoal);
-        };
-        if (Array.isArray(fullGoalTree)) fullGoalTree.forEach(processGoal);
-        else if (fullGoalTree && typeof fullGoalTree === 'object') processGoal(fullGoalTree);
-        return goals.filter(g => !g.completed);
-    }, [fullGoalTree]);
-
-    // Local Handlers
-    const handleActivityFocus = (instance, setIndex = null) => {
-        setSelectedActivity(instance);
-        setSelectedSetIndex(setIndex);
-    };
-
-    const handleOpenGoals = (instance, context = null) => {
-        if (context?.type === 'associate') {
-            setAssociationContext(context);
-            setShowAssociationModal(true);
-            return;
-        }
-        setSelectedActivity(instance);
-        setSelectedSetIndex(null);
-        setSidePaneMode('goals');
-        if (isMobile) {
-            setIsMobilePaneOpen(true);
-        }
-    };
-
-    const handleAssociateActivity = async (goalIds) => {
-        const activityDef = associationContext?.activityDefinition;
-        if (!activityDef) return;
-        const idsToAssociate = Array.isArray(goalIds) ? goalIds : [goalIds];
-        try {
-            await fractalApi.setActivityGoals(rootId, activityDef.id, idsToAssociate);
-            notify.success(`Activity associated successfully`);
-            refreshSession();
-        } catch (err) {
-            notify.error('Failed to associate activity');
-        }
-    };
-
-    const handleOpenActivityBuilder = (sectionIndex) => {
-        setSectionForNewActivity(sectionIndex);
-        setShowBuilder(true);
-    };
-
-    const handleActivityCreated = async (newActivity) => {
-        if (!newActivity) return;
-        if (sectionForNewActivity !== null) {
-            addActivity(sectionForNewActivity, newActivity.id, newActivity);
-            setSectionForNewActivity(null);
-        }
-    };
-
-    const handleDeleteSessionClick = () => setShowDeleteConfirm(true);
-    const handleConfirmDelete = async () => {
-        await deleteSession();
-        navigate(`/${rootId}/sessions`);
-    };
-
-    const handleSaveSession = () => {
-        notify.success('Session saved successfully');
-        navigate(`/${rootId}/sessions`);
-    };
-
-    // Notes Hook (Keeping for now as it's quite specialized)
-    const {
-        notes: sessionNotes,
+        calculateTotalDuration,
+        showDeleteConfirm,
+        setShowDeleteConfirm,
+        showBuilder,
+        setShowBuilder,
+        selectedGoal,
+        setSelectedGoal,
+        selectedActivity,
+        selectedSetIndex,
+        showAssociationModal,
+        setShowAssociationModal,
+        associationContext,
+        isMobilePaneOpen,
+        setIsMobilePaneOpen,
+        allAvailableGoals,
+        sessionNotes,
         previousNotes,
         previousSessionNotes,
         addNote,
         updateNote,
         deleteNote,
-        refreshNotes
-    } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
-
-    useEffect(() => {
-        if (!isMobile) {
-            setIsMobilePaneOpen(false);
-        }
-    }, [isMobile]);
-
-    const formatDuration = (seconds) => {
-        if (!seconds || Number.isNaN(seconds)) return '--:--';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${String(secs).padStart(2, '0')}`;
-    };
+        refreshNotes,
+        handleActivityFocus,
+        handleOpenGoals,
+        handleAssociateActivity,
+        handleOpenActivityBuilder,
+        handleActivityCreated,
+        handleConfirmDelete,
+        handleSaveSession
+    } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
 
     if (loading) {
         return (
@@ -222,7 +121,7 @@ function SessionDetailContent() {
                             </span>
                         </div>
                         <div className={styles.mobileSessionMeta}>
-                            <span>Duration {formatDuration(totalDuration)}</span>
+                            <span>Duration {formatClockDuration(totalDuration)}</span>
                             <button
                                 type="button"
                                 className={styles.mobileOpenPaneButton}
@@ -266,7 +165,7 @@ function SessionDetailContent() {
                         addNote={addNote}
                         updateNote={updateNote}
                         deleteNote={deleteNote}
-                        onDelete={handleDeleteSessionClick}
+                        onDelete={() => setShowDeleteConfirm(true)}
                         onCancel={() => navigate(`/${rootId}/sessions`)}
                         onGoalCreated={refreshSession}
                         onSave={handleSaveSession}
@@ -310,7 +209,7 @@ function SessionDetailContent() {
                             addNote={addNote}
                             updateNote={updateNote}
                             deleteNote={deleteNote}
-                            onDelete={handleDeleteSessionClick}
+                            onDelete={() => setShowDeleteConfirm(true)}
                             onCancel={() => navigate(`/${rootId}/sessions`)}
                             onGoalCreated={refreshSession}
                             onSave={handleSaveSession}
