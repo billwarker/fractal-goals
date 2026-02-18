@@ -2,41 +2,30 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
-import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { fractalApi } from '../../utils/api';
 import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
 import styles from './SessionInfoPanel.module.css';
 import notify from '../../utils/notify';
 import { Heading } from '../atoms/Typography';
-import useIsMobile from '../../hooks/useIsMobile';
 import { formatClockDuration } from '../../utils/sessionTime';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
 
-function SessionInfoPanel({
-    onGoalClick,
-}) {
+function SessionInfoPanel() {
     // Context
     const {
         rootId,
         session,
         localSessionData: sessionData,
-        parentGoals,
-        activityInstances,
-        activities: activityDefinitions,
         updateSession,
         calculateTotalDuration
     } = useActiveSession();
 
     const totalDuration = calculateTotalDuration();
-    const isMobile = useIsMobile();
-    const { getGoalColor } = useTheme();
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
     const [editValue, setEditValue] = useState('');
     const [saving, setSaving] = useState(false);
-    const [showAllGoals, setShowAllGoals] = useState(false);
     const { timezone } = useTimezone();
 
     const formatDate = (dateString) => {
@@ -86,51 +75,9 @@ function SessionInfoPanel({
         }
     };
 
-    // Calculate all associated goals from various sources (matching CreateSession logic)
-    const allAssociatedGoals = React.useMemo(() => {
-        const seenIds = new Set();
-        const goals = [];
-
-        // Helper to add goal if not already added
-        const addGoal = (goal) => {
-            if (goal && !seenIds.has(goal.id)) {
-                seenIds.add(goal.id);
-                goals.push(goal);
-            }
-        };
-
-        // 1. Direct session goals (short-term and immediate)
-        parentGoals?.forEach(addGoal);
-        session?.immediate_goals?.forEach(addGoal);
-
-        // 2. Goals from activities in the session
-        // Get unique activity definition IDs from session instances
-        const activityDefIds = new Set(activityInstances.map(inst => inst.activity_definition_id));
-
-        // Find matching definitions and their associated goals
-        activityDefIds.forEach(defId => {
-            const def = activityDefinitions.find(d => d.id === defId);
-            if (def && def.associated_goal_ids) {
-                def.associated_goal_ids.forEach(goalId => {
-                    // Try to find the goal object - check parentGoals and immediate_goals
-                    let goalObj = parentGoals?.find(g => g.id === goalId);
-                    if (!goalObj) goalObj = session?.immediate_goals?.find(g => g.id === goalId);
-
-                    // Only add if we found the actual goal object
-                    if (goalObj) {
-                        addGoal(goalObj);
-                    }
-                });
-            }
-        });
-
-        return goals;
-    }, [parentGoals, session?.immediate_goals, activityInstances, activityDefinitions]);
-
     // Determine values safely
     const startTime = session?.session_start || sessionData?.session_start;
     const endTime = session?.session_end || sessionData?.session_end;
-    const goalsToRender = isMobile && !showAllGoals ? allAssociatedGoals.slice(0, 6) : allAssociatedGoals;
 
     return (
         <div className={styles.sessionInfoPanel}>
@@ -250,43 +197,6 @@ function SessionInfoPanel({
                         </div>
                     </div>
 
-                    {/* Goals section - unified view of all associated goals */}
-                    {allAssociatedGoals.length > 0 && (
-                        <div className={styles.sessionInfoGoals}>
-                            <div className={styles.goalsGroup}>
-                                <div className={styles.goalsHeaderRow}>
-                                    <span className={styles.goalsLabel}>Associated Goals:</span>
-                                    {isMobile && allAssociatedGoals.length > 6 && (
-                                        <button
-                                            type="button"
-                                            className={styles.goalsViewAllButton}
-                                            onClick={() => setShowAllGoals(prev => !prev)}
-                                        >
-                                            {showAllGoals ? 'Collapse' : 'View all'}
-                                        </button>
-                                    )}
-                                </div>
-                                <div className={styles.goalsBadges}>
-                                    {goalsToRender.map(goal => {
-                                        const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
-                                        return (
-                                            <div
-                                                key={goal.id}
-                                                className={styles.goalBadge}
-                                                style={{
-                                                    borderColor: goalColor,
-                                                    color: goalColor
-                                                }}
-                                                onClick={() => onGoalClick?.(goal)}
-                                            >
-                                                {goal.name}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </>
             )}
         </div>

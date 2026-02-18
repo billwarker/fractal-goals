@@ -22,6 +22,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const [draggedItem, setDraggedItem] = useState(null);
     const initializedRef = useRef(false);
     const [justInitialized, setJustInitialized] = useState(false);
+    const previousSessionKeyRef = useRef(null);
 
     // 1. Queries
     const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refreshSession } = useQuery({
@@ -333,13 +334,26 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [rootId, setActiveRootId]);
 
     useEffect(() => {
-        if (session && !initializedRef.current) {
-            setLocalSessionData(session.attributes?.session_data || { sections: [] });
-            initializedRef.current = true;
-            setJustInitialized(true);
-            setTimeout(() => setJustInitialized(false), 500); // Guard window
+        const sessionKey = `${rootId || ''}:${sessionId || ''}`;
+        if (previousSessionKeyRef.current !== sessionKey) {
+            previousSessionKeyRef.current = sessionKey;
+            initializedRef.current = false;
+            setLocalSessionData(null);
+            setAutoSaveStatus('');
+            setShowActivitySelector({});
+            setDraggedItem(null);
+            setNotifiedTargetIds(new Set());
+            setSidePaneMode('details');
         }
-    }, [session]);
+    }, [rootId, sessionId]);
+
+    useEffect(() => {
+        if (!session) return;
+        setLocalSessionData(session.attributes?.session_data || { sections: [] });
+        initializedRef.current = true;
+        setJustInitialized(true);
+        setTimeout(() => setJustInitialized(false), 500); // Guard window
+    }, [session, sessionId]);
 
     useEffect(() => {
         console.log('[ActiveSessionProvider] Mounted');

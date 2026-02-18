@@ -30,7 +30,8 @@ function GoalsPanel({
         rootId,
         sessionId,
         session,
-        parentGoals,
+        localSessionData,
+        activityInstances,
         activities: activityDefinitions,
         targetAchievements,
         achievedTargetIds,
@@ -111,18 +112,10 @@ function GoalsPanel({
         const targetGoalIds = new Set(
             viewMode === 'activity' && activeActivityDef
                 ? activeActivityDef.associated_goal_ids || []
-                : [
-                    ...parentGoals.map(g => g.id),
-                    ...(session?.immediate_goals || []).map(g => g.id),
-                ]
+                : (session?.immediate_goals || []).map(g => g.id)
         );
         return buildFlattenedGoalTree(goalTree, targetGoalIds, viewMode === 'activity');
-    }, [goalTree, parentGoals, session, activeActivityDef, viewMode]);
-
-    const sessionGoals = useMemo(() => ({
-        shortTerm: parentGoals,
-        immediate: session?.immediate_goals || [],
-    }), [parentGoals, session]);
+    }, [goalTree, session, activeActivityDef, viewMode]);
 
     const toggleExpand = (goalId) => {
         setExpandedGoals(prev => ({ ...prev, [goalId]: !prev[goalId] }));
@@ -314,26 +307,26 @@ function GoalsPanel({
 
     // --- Session Activities Derivation ---
     const sessionActivities = useMemo(() => {
-        if (!session?.attributes?.session_data?.sections || !activityDefinitions.length) return [];
+        if (!localSessionData?.sections || !activityDefinitions.length || !activityInstances.length) return [];
 
-        const uniqueActivityIds = new Set();
-        session.attributes.session_data.sections.forEach(section => {
-            if (section.exercises) {
-                section.exercises.forEach(ex => {
-                    if (ex.type === 'activity' && ex.activity_id) {
-                        uniqueActivityIds.add(ex.activity_id);
-                    }
-                });
-            }
-        });
+        const sectionInstanceIds = new Set(
+            localSessionData.sections.flatMap((section) => section.activity_ids || [])
+        );
 
-        return Array.from(uniqueActivityIds)
-            .map(id => activityDefinitions.find(def => def.id === id))
+        const uniqueDefinitionIds = new Set(
+            activityInstances
+                .filter((instance) => sectionInstanceIds.has(instance.id))
+                .map((instance) => instance.activity_definition_id)
+                .filter(Boolean)
+        );
+
+        return Array.from(uniqueDefinitionIds)
+            .map((id) => activityDefinitions.find((def) => def.id === id))
             .filter(Boolean);
-    }, [session, activityDefinitions]);
+    }, [localSessionData, activityDefinitions, activityInstances]);
 
     // Unified hierarchy builder
-    const getHierarchy = useCallback((goalIds, mode = 'activity', specificActivityId = null) => {
+    const getHierarchy = useCallback((goalIds, mode = 'activity', specificActivityId = null, allowedSessionActivityDefIds = null) => {
         if (!goalTree) return [];
         const targetGoalIds = new Set(goalIds || []);
 
@@ -344,7 +337,10 @@ function GoalsPanel({
         // If mode is 'session', take ALL session microgoals
         // If mode is 'activity', take only linked microgoals
         const relevantMicroGoals = mode === 'session'
-            ? microGoals
+            ? microGoals.filter((microGoal) => {
+                if (!allowedSessionActivityDefIds) return false;
+                return allowedSessionActivityDefIds.has(microGoal.activity_definition_id);
+            })
             : microGoals.filter(m => m.activity_definition_id === specificActivityId);
 
         if (relevantMicroGoals.length === 0) return hierarchy;
@@ -388,12 +384,14 @@ function GoalsPanel({
 
     const sessionHierarchy = useMemo(() => {
         if (viewMode !== 'session') return [];
-        const allIds = new Set(parentGoals.map(g => g.id)); // Include manually added session goals
+        const allIds = new Set();
+        const sessionActivityDefIds = new Set();
         sessionActivities.forEach(def => {
+            sessionActivityDefIds.add(def.id);
             def.associated_goal_ids?.forEach(id => allIds.add(id));
         });
-        return getHierarchy(Array.from(allIds), 'session');
-    }, [viewMode, sessionActivities, parentGoals, getHierarchy]);
+        return getHierarchy(Array.from(allIds), 'session', null, sessionActivityDefIds);
+    }, [viewMode, sessionActivities, getHierarchy]);
 
     const activeActivityHierarchy = useMemo(() => {
         if (!activeActivityDef) return [];

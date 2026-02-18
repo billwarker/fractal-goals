@@ -113,9 +113,7 @@ function SessionSidePane({
                 {mode === 'details' ? (
                     <div className={styles.detailsView}>
                         {/* Session Metadata Panel */}
-                        <SessionInfoPanel
-                            onGoalClick={onGoalClick}
-                        />
+                        <SessionInfoPanel />
 
                         {/* Session Controls */}
                         <div className={styles.sidebarActions}>
