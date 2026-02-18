@@ -5,6 +5,7 @@ import uuid
 import logging
 import models
 from sqlalchemy.orm import selectinload
+from sqlalchemy import inspect
 
 logger = logging.getLogger(__name__)
 from models import (
@@ -35,6 +36,27 @@ from services.analytics_cache import get_analytics, set_analytics
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
+
+_SESSION_GOALS_HAS_SOURCE = None
+
+
+def _session_goals_supports_source(db_session):
+    global _SESSION_GOALS_HAS_SOURCE
+    if _SESSION_GOALS_HAS_SOURCE is None:
+        cols = inspect(db_session.bind).get_columns('session_goals')
+        _SESSION_GOALS_HAS_SOURCE = any(c.get('name') == 'association_source' for c in cols)
+    return _SESSION_GOALS_HAS_SOURCE
+
+
+def _session_goal_insert_values(db_session, session_id, goal_id, goal_type, association_source):
+    values = {
+        'session_id': session_id,
+        'goal_id': goal_id,
+        'goal_type': goal_type,
+    }
+    if _session_goals_supports_source(db_session):
+        values['association_source'] = association_source
+    return values
 
 
 def _sync_targets(db_session, goal, incoming_targets: list):
@@ -224,10 +246,13 @@ def create_goal(validated_data):
         # Link to session if session_id provided and it's a MicroGoal
         if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
             db_session.execute(session_goals.insert().values(
-                session_id=validated_data['session_id'],
-                goal_id=new_goal.id,
-                goal_type='MicroGoal',
-                association_source='micro_goal'
+                **_session_goal_insert_values(
+                    db_session,
+                    validated_data['session_id'],
+                    new_goal.id,
+                    'MicroGoal',
+                    'micro_goal'
+                )
             ))
         
         db_session.commit()
@@ -880,10 +905,13 @@ def create_fractal_goal(current_user, root_id, validated_data):
         # Link to session if session_id provided and it's a MicroGoal
         if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
             db_session.execute(session_goals.insert().values(
-                session_id=validated_data['session_id'],
-                goal_id=new_goal.id,
-                goal_type='MicroGoal',
-                association_source='micro_goal'
+                **_session_goal_insert_values(
+                    db_session,
+                    validated_data['session_id'],
+                    new_goal.id,
+                    'MicroGoal',
+                    'micro_goal'
+                )
             ))
         
         db_session.commit()

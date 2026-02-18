@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import logging
 import uuid
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from sqlalchemy.orm import selectinload, joinedload
 from models import (
     Session, Goal, ActivityInstance, MetricValue, session_goals,
@@ -28,6 +28,23 @@ def _parse_iso_datetime_strict(value):
 class SessionService:
     def __init__(self, db_session):
         self.db_session = db_session
+        self._session_goals_has_source = None
+
+    def _session_goals_supports_source(self):
+        if self._session_goals_has_source is None:
+            cols = inspect(self.db_session.bind).get_columns('session_goals')
+            self._session_goals_has_source = any(c.get('name') == 'association_source' for c in cols)
+        return self._session_goals_has_source
+
+    def _session_goal_insert_values(self, session_id, goal_id, goal_type, association_source):
+        values = {
+            'session_id': session_id,
+            'goal_id': goal_id,
+            'goal_type': goal_type,
+        }
+        if self._session_goals_supports_source():
+            values['association_source'] = association_source
+        return values
 
     def _derive_session_goals_from_activities(self, session_obj):
         """Derive display goals from session activities when persisted links are missing."""
@@ -245,10 +262,9 @@ class SessionService:
         for goal_id, goal_obj in inherited_goal_map.items():
             self.db_session.execute(
                 session_goals.insert().values(
-                    session_id=new_session.id,
-                    goal_id=goal_id,
-                    goal_type=goal_obj.type,
-                    association_source='activity'
+                    **self._session_goal_insert_values(
+                        new_session.id, goal_id, goal_obj.type, 'activity'
+                    )
                 )
             )
             linked_goal_ids.add(goal_id)
@@ -265,10 +281,9 @@ class SessionService:
                 continue
             self.db_session.execute(
                 session_goals.insert().values(
-                    session_id=new_session.id,
-                    goal_id=goal_id,
-                    goal_type=goal_obj.type,
-                    association_source='manual'
+                    **self._session_goal_insert_values(
+                        new_session.id, goal_id, goal_obj.type, 'manual'
+                    )
                 )
             )
             linked_goal_ids.add(goal_id)
@@ -288,10 +303,9 @@ class SessionService:
             if ig_id not in linked_goal_ids:
                 self.db_session.execute(
                     session_goals.insert().values(
-                        session_id=new_session.id,
-                        goal_id=ig_id,
-                        goal_type=goal.type,
-                        association_source='manual'
+                        **self._session_goal_insert_values(
+                            new_session.id, ig_id, goal.type, 'manual'
+                        )
                     )
                 )
                 linked_goal_ids.add(ig_id)

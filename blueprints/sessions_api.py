@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 import models
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import select
+from sqlalchemy import select, inspect, text
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
@@ -28,6 +28,28 @@ from services.session_service import SessionService
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
+
+
+_SESSION_GOALS_HAS_SOURCE = None
+
+
+def _session_goals_supports_source(db_session):
+    global _SESSION_GOALS_HAS_SOURCE
+    if _SESSION_GOALS_HAS_SOURCE is None:
+        cols = inspect(db_session.bind).get_columns('session_goals')
+        _SESSION_GOALS_HAS_SOURCE = any(c.get('name') == 'association_source' for c in cols)
+    return _SESSION_GOALS_HAS_SOURCE
+
+
+def _session_goal_insert_values(db_session, session_id, goal_id, goal_type, association_source):
+    values = {
+        'session_id': session_id,
+        'goal_id': goal_id,
+        'goal_type': goal_type,
+    }
+    if _session_goals_supports_source(db_session):
+        values['association_source'] = association_source
+    return values
 
 
 # ============================================================================
@@ -271,18 +293,17 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
                 continue
             if program_goal_ids and goal.id not in program_goal_ids:
                 continue
-            existing = db_session.query(session_goals).filter_by(
-                session_id=session_id,
-                goal_id=goal.id
+            existing = db_session.execute(
+                text("SELECT 1 FROM session_goals WHERE session_id = :session_id AND goal_id = :goal_id LIMIT 1"),
+                {"session_id": session_id, "goal_id": goal.id}
             ).first()
             if existing:
                 continue
             db_session.execute(
                 session_goals.insert().values(
-                    session_id=session_id,
-                    goal_id=goal.id,
-                    goal_type=goal.type,
-                    association_source='activity'
+                    **_session_goal_insert_values(
+                        db_session, session_id, goal.id, goal.type, 'activity'
+                    )
                 )
             )
 

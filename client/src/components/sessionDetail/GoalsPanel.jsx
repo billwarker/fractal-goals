@@ -61,6 +61,7 @@ function GoalsPanel({
     const [showParentSelector, setShowParentSelector] = useState(false);
     const [pendingMicroGoalName, setPendingMicroGoalName] = useState('');
     const [viewMode, setViewMode] = useState('session');
+    const [resolvedActivityGoalIds, setResolvedActivityGoalIds] = useState([]);
 
     // microGoals now comes from context (TanStack Query)
 
@@ -99,13 +100,49 @@ function GoalsPanel({
 
     const activeActivityDef = useMemo(() => {
         if (!selectedActivity) return null;
-        return activityDefinitions.find(d => d.id === selectedActivity.activity_definition_id) || null;
+        const selectedDefId = selectedActivity.activity_definition_id || selectedActivity.activity_id || null;
+        if (!selectedDefId) return null;
+
+        const found = activityDefinitions.find(d => d.id === selectedDefId) || null;
+        if (found) return found;
+
+        // Fallback for stale/soft-deleted definitions still present in session instances.
+        return {
+            id: selectedDefId,
+            name: selectedActivity.name || selectedActivity.definition_name || 'Activity',
+            associated_goal_ids: selectedActivity.associated_goal_ids || [],
+        };
     }, [selectedActivity, activityDefinitions]);
 
     useEffect(() => {
         if (selectedActivity) setViewMode('activity');
         else setViewMode('session');
     }, [selectedActivity]);
+
+    useEffect(() => {
+        const selectedDefId = selectedActivity?.activity_definition_id || selectedActivity?.activity_id;
+        const localIds = activeActivityDef?.associated_goal_ids || [];
+        setResolvedActivityGoalIds(localIds);
+
+        if (!selectedDefId || localIds.length > 0) return;
+
+        let cancelled = false;
+        const loadActivityGoals = async () => {
+            try {
+                const res = await fractalApi.getActivityGoals(rootId, selectedDefId);
+                const ids = (res.data || []).map(g => g.id).filter(Boolean);
+                if (!cancelled) setResolvedActivityGoalIds(ids);
+            } catch (err) {
+                if (!cancelled) setResolvedActivityGoalIds([]);
+                console.error('Failed to load activity goals for selected activity', err);
+            }
+        };
+        loadActivityGoals();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [rootId, selectedActivity, activeActivityDef]);
 
     const flattenedHierarchy = useMemo(() => {
         if (!goalTree) return [];
@@ -395,8 +432,8 @@ function GoalsPanel({
 
     const activeActivityHierarchy = useMemo(() => {
         if (!activeActivityDef) return [];
-        return getHierarchy(activeActivityDef.associated_goal_ids, 'activity', activeActivityDef.id);
-    }, [activeActivityDef, getHierarchy]);
+        return getHierarchy(resolvedActivityGoalIds, 'activity', activeActivityDef.id);
+    }, [activeActivityDef, resolvedActivityGoalIds, getHierarchy]);
 
     const microChars = getScopedCharacteristics('MicroGoal');
     const nanoChars = getScopedCharacteristics('NanoGoal');
@@ -408,7 +445,7 @@ function GoalsPanel({
     const allNanoGoals = microGoals.flatMap(m => m.children || []);
     const nanoTally = { done: allNanoGoals.filter(g => g.completed).length, total: allNanoGoals.length };
 
-    const isActivityFocused = !!activeActivityDef;
+    const isActivityFocused = !!selectedActivity;
     const sessionActivityIds = useMemo(() => new Set(sessionActivities.map(a => a.id)), [sessionActivities]);
 
     return (
@@ -452,7 +489,7 @@ function GoalsPanel({
                             onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
                                 type: 'associate',
                                 activityDefinition: activeActivityDef,
-                                initialSelectedGoalIds: activeActivityDef.associated_goal_ids || []
+                                initialSelectedGoalIds: resolvedActivityGoalIds
                             })}
                         />
 
