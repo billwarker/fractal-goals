@@ -385,6 +385,7 @@ Recent focus has been on:
 - **Performance**: Optimizing database queries and eagerness.
 
 ## Recent Changes
+- **Goal Characteristics Renaming**: Renamed the "Goal Styling" tab in the Settings Modal to "Goal Characteristics" for consistency with the section heading.
 - **Goal Association**: Moved from manual selection to automatic inheritance logic in `sessions_api.py`.
 - **UI Layout**: Reordered Create Session page to prioritize the Create button while showing detailed associated goals below.
 - **Visuals**: Added Smart Goal "bullseye" rings and dynamic coloring based on user settings (`ThemeContext`).
@@ -720,7 +721,7 @@ When making changes, update these files as needed:
 
 ---
 
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18
 **Version:** 2.0.0 (Refactored Architecture)
 **Maintained By:** Project AI Agents
 

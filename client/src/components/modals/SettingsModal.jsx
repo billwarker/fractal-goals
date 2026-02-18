@@ -172,7 +172,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                     borderLeft: activeTab === 'styling' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
                                 }}
                             >
-                                Goal Styling
+                                Goal Characteristics
                             </div>
                             <div
                                 onClick={() => setActiveTab('account')}
