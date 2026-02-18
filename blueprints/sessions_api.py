@@ -26,19 +26,10 @@ from validators import (
 from blueprints.auth_api import token_required
 from services import event_bus, Event, Events
 from services.serializers import serialize_session, serialize_activity_instance, serialize_goal
+from services.session_service import SessionService
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-# Helper functions removed: sync_session_activities (Dead Code / N+1 Query Issue)
-
-
-# Helper functions removed: check_and_complete_goals (Dead Code)
 
 
 # ============================================================================
@@ -75,44 +66,15 @@ def get_fractal_sessions(current_user, root_id):
     """Get sessions for a specific fractal if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Parse pagination parameters
-        limit = min(int(request.args.get('limit', 10)), 50)  # Max 50 per request
+        limit = min(int(request.args.get('limit', 10)), 50)
         offset = int(request.args.get('offset', 0))
         
-        # Get total count for pagination info
-        base_query = db_session.query(Session).filter(
-            Session.root_id == root_id, 
-            Session.deleted_at == None
-        )
-        total_count = base_query.count()
-        
-        # Use selectinload (not joinedload) to avoid Cartesian product with multiple collections
-        sessions = base_query.options(
-            selectinload(Session.goals),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
-        ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
-        
-        # Don't include image data in list view for performance (prevents multi-MB responses)
-        result = [serialize_session(s, include_image_data=False) for s in sessions]
-        
-        return jsonify({
-            "sessions": result,
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "total": total_count,
-                "has_more": offset + len(result) < total_count
-            }
-        })
+        result, error, status = service.get_fractal_sessions(root_id, current_user.id, limit, offset)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error in get_fractal_sessions: {str(e)}")
         logger.error(traceback.format_exc())
@@ -128,239 +90,13 @@ def create_fractal_session(current_user, root_id, validated_data):
     """Create a new session within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Get request data - already validated by decorator
-        data = validated_data
-        
-        # Parse dates - Strict ISO-8601
-        def parse_datetime(dt_str):
-            if not dt_str or not isinstance(dt_str, str):
-                return None
-            
-            try:
-                # Strict ISO format (handle Z for UTC)
-                dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-                # Ensure UTC
-                return dt.astimezone(timezone.utc)
-            except ValueError:
-                logger.warning(f"Invalid date format received: {dt_str}")
-                return None
-        
-        s_start = parse_datetime(data.get('session_start'))
-        s_end = parse_datetime(data.get('session_end'))
-
-        # Parse session_data
-        session_data = models._safe_load_json(data.get('session_data'), {})
-        
-        program_context = session_data.get('program_context', {})
-
-        # Create the session
-        new_session = Session(
-            name=data.get('name', 'Untitled Session'),
-            description=data.get('description', ''),
-            root_id=root_id,
-            duration_minutes=int(data['duration_minutes']) if data.get('duration_minutes') is not None else None,
-            session_start=s_start,
-            session_end=s_end,
-            total_duration_seconds=int(data['total_duration_seconds']) if data.get('total_duration_seconds') is not None else None,
-            template_id=data.get('template_id')
-        )
-        
-        # Handle attributes
-        new_session.attributes = models._safe_load_json(session_data, {})
-        
-        # Extract program_day_id from program_context if present
-        program_day_id = None
-        if new_session.attributes:
-            session_data_dict = models._safe_load_json(new_session.attributes, {})
-            program_context = session_data_dict.get('program_context')
-            if program_context and 'day_id' in program_context:
-                program_day_id = program_context['day_id']
-                new_session.program_day_id = program_day_id
-        
-        db_session.add(new_session)
-        db_session.flush()  # Get the ID before committing
-        
-        # ----------------------------------------------------------------
-        # AUTOMATIC GOAL INHERITANCE LOGIC
-        # ----------------------------------------------------------------
-        # 1. Gather all potential goal candidates from:
-        #    - Activities in the session (via definition)
-        #    - Session Template (if used)
-        #    - Program Day (if used)
-        
-        inherited_goals = set()
-        
-        # A. From Activities
-        # Parse activity definitions from session_data
-        activity_def_ids = set()
-        if new_session.attributes:
-            session_dict = models._safe_load_json(new_session.attributes, {})
-            sections = session_dict.get('sections', [])
-            for section in sections:
-                for exercise in section.get('exercises', []):
-                    if exercise.get('activity_id'):
-                        activity_def_ids.add(exercise.get('activity_id'))
-        
-        if activity_def_ids:
-            # Fetch definitions and their associated goals
-            # We need to join to access associated_goals
-            activities = db_session.query(ActivityDefinition).options(
-                joinedload(ActivityDefinition.associated_goals)
-            ).filter(ActivityDefinition.id.in_(activity_def_ids)).all()
-            
-            for act in activities:
-                for goal in act.associated_goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
-
-        # B. From Session Template
-        if new_session.template_id:
-            template = db_session.query(models.SessionTemplate).options(
-                joinedload(models.SessionTemplate.goals)
-            ).filter_by(id=new_session.template_id).first()
-            
-            if template:
-                for goal in template.goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
-        
-        # C. From Program Day
-        program_block_goal_ids = set() # For filtering later
-        if program_day_id:
-            p_day = db_session.query(models.ProgramDay).options(
-                joinedload(models.ProgramDay.goals),
-                joinedload(models.ProgramDay.block)
-            ).filter_by(id=program_day_id).first()
-            
-            if p_day:
-                # Add day's direct goals
-                for goal in p_day.goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
-                
-                # Get block's allowed goals
-                if p_day.block and p_day.block.goal_ids:
-                    # ProgramBlock.goal_ids is a JSON list of IDs
-                    program_block_goal_ids = set(models._safe_load_json(p_day.block.goal_ids, []))
-
-        # ----------------------------------------------------------------
-        # FILTERING
-        # ----------------------------------------------------------------
-        # Filter 1: Program Scope
-        # "For program days, we should be limiting the associations to only be with goals that are within the program"
-        final_goals_to_link = []
-        
-        if program_day_id and program_block_goal_ids:
-            # If in a program context, strict intersection with block goals
-            for goal in inherited_goals:
-                if goal.id in program_block_goal_ids:
-                    final_goals_to_link.append(goal)
-        else:
-            # Otherwise, take all inherited (that are uncompleted)
-             final_goals_to_link = list(inherited_goals)
-
-        # ----------------------------------------------------------------
-        # PERSIST ASOCIATIONS
-        # ----------------------------------------------------------------
-        # Also include any manually passed IDs (if we want to support hybrid, or legacy compat)
-        # Assuming manual IDs override/add to inherited
-        manual_ids = data.get('parent_ids', []) or data.get('goal_ids', [])
-        if data.get('parent_id'):
-            manual_ids.append(data.get('parent_id'))
-            
-        # Deduplicate IDs
-        all_goal_ids_to_link = set(g.id for g in final_goals_to_link)
-        all_goal_ids_to_link.update(manual_ids)
-        
-        for goal_id in all_goal_ids_to_link:
-            # We need to re-fetch or use the goal object to check type if not already known
-            # But we have `final_goals_to_link` objects. For manual_ids we need to fetch.
-            
-            # Optimization: check if already in final_goals_to_link
-            goal_obj = next((g for g in final_goals_to_link if g.id == goal_id), None)
-            
-            if not goal_obj:
-                goal_obj = db_session.query(Goal).filter_by(id=goal_id).first()
-            
-            if goal_obj:
-                goal_type = 'short_term' if goal_obj.type == 'ShortTermGoal' else 'immediate'
-                # Insert if not exists (though insert().values() usually inserts, let's assume standard insert is fine)
-                 # Check existing to prevent PK violation if logic re-runs? (Shouldn't happen on create)
-                db_session.execute(
-                    session_goals.insert().values(
-                        session_id=new_session.id,
-                        goal_id=goal_id,
-                        goal_type=goal_type
-                    )
-                )
-
-        # Handle Immediate Goals (Manual creation is still distinct)
-        # User requirement says "Associate with Goals" section is removed, 
-        # but creating NEW immediate goals might happen elsewhere? 
-        # Assuming we just process what's sent, likely empty list now from frontend.
-        immediate_goal_ids = data.get('immediate_goal_ids', [])
-        for ig_id in immediate_goal_ids:
-            goal = db_session.query(Goal).filter_by(id=ig_id).first()
-            if goal and goal.type == 'ImmediateGoal':
-                 # Avoid duplicate insert
-                existing = db_session.query(session_goals).filter_by(session_id=new_session.id, goal_id=ig_id).first()
-                if not existing:
-                    db_session.execute(
-                        session_goals.insert().values(
-                            session_id=new_session.id,
-                            goal_id=ig_id,
-                            goal_type='immediate'
-                        )
-                    )
-
-        # Update program day completion status if linked to a program day
-        if program_day_id:
-            from models import ProgramDay
-            program_day = db_session.query(ProgramDay).filter_by(id=program_day_id).first()
-            if program_day:
-                program_day.is_completed = program_day.check_completion()
-        
-        db_session.commit()
-        
-        # FORCE UPDATE session_start/end because sometimes time is stripped
-        if s_start or s_end:
-            from sqlalchemy import text
-            params = {'id': new_session.id}
-            update_clauses = []
-            if s_start:
-                update_clauses.append("session_start = :start")
-                params['start'] = s_start
-            if s_end:
-                update_clauses.append("session_end = :end")
-                params['end'] = s_end
-            
-            if update_clauses:
-                sql = f"UPDATE sessions SET {', '.join(update_clauses)} WHERE id = :id"
-                db_session.execute(text(sql), params)
-                db_session.commit()
-        
-        # Refresh to load the goals relationship
-        db_session.refresh(new_session)
-        
-        # Emit session created event
-        event_bus.emit(Event(Events.SESSION_CREATED, {
-            'session_id': new_session.id,
-            'session_name': new_session.name,
-            'root_id': root_id,
-            'goal_ids': [g.id for g in new_session.goals]
-        }, source='sessions_api.create_session'))
-
-        # Return the created session
-        result = serialize_session(new_session)
-        return jsonify(result), 201
-        
+        result, error, status = service.create_session(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result), status
     except Exception as e:
-        db_session.rollback()
         logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
@@ -374,131 +110,13 @@ def update_session(current_user, root_id, session_id, validated_data):
     """Update a session's details."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Get the session
-        session = db_session.query(Session).filter(
-            Session.id == session_id,
-            Session.root_id == root_id,
-            Session.deleted_at == None
-        ).first()
-        
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        
-        # Get update data - already validated by decorator
-        data = validated_data
-        
-        # Update fields if provided
-        if 'name' in data:
-            session.name = data['name']
-        
-        if 'description' in data:
-            session.description = data['description']
-        
-        if 'duration_minutes' in data:
-            session.duration_minutes = data['duration_minutes']
-        
-        if 'completed' in data:
-            session.completed = data['completed']
-            if data['completed']:
-                session.completed_at = datetime.now(timezone.utc)
-                # Emit session completed event - triggers target evaluation cascade
-                # Note: We emit after commit below to ensure DB state is consistent
-        
-        # Update session analytics fields
-        if 'session_start' in data:
-            if isinstance(data['session_start'], str):
-                try:
-                    s_str = data['session_start'].replace('Z', '+00:00')
-                    # Handle YYYY-MM-DD
-                    if len(s_str) == 10:
-                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                    else:
-                        dt = datetime.fromisoformat(s_str)
-                        if dt.tzinfo is None:
-                            dt = dt.replace(tzinfo=timezone.utc)
-                        else:
-                            dt = dt.astimezone(timezone.utc)
-                    session.session_start = dt
-                except ValueError:
-                    logger.warning(f"Invalid session_start format: {data['session_start']}")
-            else:
-                session.session_start = data['session_start']
-        
-        if 'session_end' in data:
-            if isinstance(data['session_end'], str):
-                try:
-                    s_str = data['session_end'].replace('Z', '+00:00')
-                    # Handle YYYY-MM-DD
-                    if len(s_str) == 10:
-                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                    else:
-                        dt = datetime.fromisoformat(s_str)
-                        if dt.tzinfo is None:
-                            dt = dt.replace(tzinfo=timezone.utc)
-                        else:
-                            dt = dt.astimezone(timezone.utc)
-                    session.session_end = dt
-                except ValueError:
-                    logger.warning(f"Invalid session_end format: {data['session_end']}")
-            else:
-                session.session_end = data['session_end']
-        
-        if 'total_duration_seconds' in data:
-            session.total_duration_seconds = data['total_duration_seconds']
-        
-        if 'template_id' in data:
-            session.template_id = data['template_id']
-        
-        if 'session_data' in data:
-            val = data['session_data']
-            session.attributes = models._safe_load_json(val, val)
-        
-        db_session.commit()
-        
-        # Emit session updated event
-        try:
-            event_bus.emit(Event(
-                Events.SESSION_UPDATED,
-                {
-                    'session_id': session.id,
-                    'session_name': session.name,
-                    'root_id': root_id,
-                    'updated_fields': list(data.keys())
-                },
-                source='sessions_api.update_session'
-            ))
-        except Exception as e:
-            logger.error(f"Error emitting SESSION_UPDATED event: {e}")
-
-        # Emit session completed event AFTER commit to ensure consistent state
-        # This triggers the cascade: target evaluation → goal completion → program updates
-        if data.get('completed') and session.completed:
-            try:
-                event_bus.emit(Event(
-                    Events.SESSION_COMPLETED,
-                    {
-                        'session_id': session.id,
-                        'session_name': session.name,
-                        'root_id': root_id
-                    },
-                    source='sessions_api.update_session'
-                ))
-                logger.info(f"Emitted SESSION_COMPLETED event for session {session.id}")
-            except Exception as event_error:
-                # Don't fail the request if event handling fails
-                logger.error(f"Error emitting SESSION_COMPLETED event: {event_error}")
-        
-        # Return updated session
-        result = serialize_session(session)
-        return jsonify(result)
-        
+        result, error, status = service.update_session(root_id, session_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result), status
     except Exception as e:
-        db_session.rollback()
         logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
@@ -511,26 +129,15 @@ def get_session_endpoint(current_user, root_id, session_id):
     """Get a session by ID if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        # Check ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        # Use selectinload for collections to avoid Cartesian product
-        session = db_session.query(Session).options(
-            selectinload(Session.goals),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
-        ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
-        
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        # Include full image data for single session detail view
-        return jsonify(serialize_session(session, include_image_data=True))
+        result, error, status = service.get_session_details(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Error getting session")
+        return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
 
@@ -541,37 +148,13 @@ def delete_session_endpoint(current_user, root_id, session_id):
     """Delete a session."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Get the session
-        session = db_session.query(Session).filter(
-            Session.id == session_id,
-            Session.root_id == root_id,
-            Session.deleted_at == None
-        ).first()
-        
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        
-        # Soft Delete
-        session_name = session.name
-        session.deleted_at = datetime.now(timezone.utc)
-        db_session.commit()
-        
-        # Emit session deleted event
-        event_bus.emit(Event(Events.SESSION_DELETED, {
-            'session_id': session_id,
-            'session_name': session_name,
-            'root_id': root_id
-        }, source='sessions_api.delete_session'))
-        
-        return jsonify({"message": "Session deleted successfully"})
-        
+        result, error, status = service.delete_session(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result), status
     except Exception as e:
-        db_session.rollback()
         logger.exception("An error occurred")
         return jsonify({"error": str(e)}), 500
     finally:
@@ -806,217 +389,11 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
             'root_id': root_id
         }, source='sessions_api.remove_activity_from_session'))
         
-        return jsonify({"message": "Activity instance deleted successfully"})
+        return jsonify({"message": "Activity instance removed"})
         
     except Exception as e:
         db_session.rollback()
         logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
-
-
-@sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics', methods=['PUT'])
-@token_required
-def update_activity_metrics(current_user, root_id, session_id, instance_id):
-    """Update metric values for an activity instance."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
-    try:
-        # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Get the activity instance
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(
-            id=instance_id,
-            session_id=session_id
-        ).first()
-        
-        if not instance:
-            return jsonify({"error": "Activity instance not found"}), 404
-        
-        data = request.get_json()
-        metrics = data.get('metrics', [])
-        
-        # Update or create metric values
-        for metric_data in metrics:
-            metric_id = metric_data.get('metric_id')
-            split_id = metric_data.get('split_id')
-            value = metric_data.get('value')
-            
-            if not metric_id or value is None or str(value).strip() == '':
-                continue
-            
-            try:
-                float_val = float(value)
-                
-                # Find existing metric value
-                query = db_session.query(MetricValue).filter_by(
-                    activity_instance_id=instance_id,
-                    metric_definition_id=metric_id
-                )
-                
-                if split_id:
-                    query = query.filter_by(split_definition_id=split_id)
-                else:
-                    query = query.filter_by(split_definition_id=None)
-                
-                metric_val = query.first()
-                
-                if metric_val:
-                    metric_val.value = float_val
-                else:
-                    new_metric = MetricValue(
-                        activity_instance_id=instance_id,
-                        metric_definition_id=metric_id,
-                        split_definition_id=split_id,
-                        root_id=root_id,  # Add root_id for performance
-                        value=float_val
-                    )
-                    db_session.add(new_metric)
-            except ValueError:
-                continue
-        
-        # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
-        activity_name = activity_def.name if activity_def else 'Unknown'
-        db_session.commit()
-        
-        # Emit activity metrics updated event
-        event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
-            'instance_id': instance_id,
-            'activity_definition_id': instance.activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': session_id,
-            'root_id': root_id,
-            'metrics_count': len(metrics)
-        }, source='sessions_api.update_activity_metrics'))
-        
-        return jsonify(serialize_activity_instance(instance))
-        
-    except Exception as e:
-        db_session.rollback()
-        logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
-
-
-# ============================================================================
-# SESSION-GOAL ASSOCIATION ENDPOINTS
-# ============================================================================
-
-@sessions_bp.route('/<root_id>/sessions/<session_id>/goals', methods=['GET'])
-@token_required
-def get_session_goals(current_user, root_id, session_id):
-    """Get all goals associated with a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
-    try:
-        # Verify ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        session = get_session_by_id(db_session, session_id)
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        
-        # Get goals via the junction table
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
-        stmt = select(Goal, session_goals.c.goal_type).options(
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups)
-        ).join(
-            session_goals, Goal.id == session_goals.c.goal_id
-        ).where(session_goals.c.session_id == session_id)
-        
-        results = db_session.execute(stmt).all()
-        
-        goals_list = []
-        for goal, goal_type in results:
-            goal_dict = serialize_goal(goal, include_children=False)
-            goal_dict['association_type'] = goal_type
-            goals_list.append(goal_dict)
-        
-        return jsonify(goals_list)
-        
-    finally:
-        db_session.close()
-
-
-@sessions_bp.route('/<root_id>/sessions/<session_id>/goals', methods=['POST'])
-@token_required
-@validate_request(SessionGoalAssociationSchema)
-def add_goal_to_session(current_user, root_id, session_id, validated_data):
-    """Associate a goal with a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
-    try:
-        # Verify ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        session = get_session_by_id(db_session, session_id)
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        
-        data = validated_data
-        goal_id = data.get('goal_id')
-        goal_type = data.get('goal_type', 'short_term')  # 'short_term' or 'immediate'
-        
-        if not goal_id:
-            return jsonify({"error": "goal_id required"}), 400
-        
-        goal = db_session.query(Goal).filter_by(id=goal_id).first()
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-        
-        # Insert into junction table
-        db_session.execute(
-            session_goals.insert().values(
-                session_id=session_id,
-                goal_id=goal_id,
-                goal_type=goal_type
-            )
-        )
-        
-        db_session.commit()
-        return jsonify({"message": "Goal associated with session"}), 201
-        
-    except Exception as e:
-        db_session.rollback()
-        logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        db_session.close()
-
-
-@sessions_bp.route('/<root_id>/sessions/<session_id>/goals/<goal_id>', methods=['DELETE'])
-@token_required
-def remove_goal_from_session(current_user, root_id, session_id, goal_id):
-    """Remove a goal association from a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
-    try:
-        # Verify ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        db_session.execute(
-            session_goals.delete().where(
-                session_goals.c.session_id == session_id,
-                session_goals.c.goal_id == goal_id
-            )
-        )
-        db_session.commit()
-        return jsonify({"message": "Goal removed from session"})
-        
-    except Exception as e:
-        db_session.rollback()
-        logger.exception("An error occurred in remove_goal_from_session")
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
