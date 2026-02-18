@@ -10,7 +10,6 @@ import React, { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
-import { formatDateInTimezone } from '../../utils/dateUtils';
 import GoalIcon from '../atoms/GoalIcon';
 import { useTheme } from '../../contexts/ThemeContext';
 import SessionSectionGrid from './SessionSectionGrid';
@@ -72,7 +71,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     isSelected,
     onSelect,
     getGoalColor,
-    timezone,
     formatDate
 }) {
     const { getScopedCharacteristics } = useTheme();
@@ -135,7 +133,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             // and is currently marked as completed.
             return achieved.target.completed;
         });
-    }, [session, shortTermGoals]);
+    }, [session, shortTermGoals, immediateGoals]);
 
     const completedGoals = useMemo(() => {
         // Goals are accomplishments if they are completed AND 
