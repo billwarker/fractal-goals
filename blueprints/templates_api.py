@@ -13,6 +13,7 @@ from validators import (
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema
 )
 from blueprints.auth_api import token_required
+from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root
 from services.events import event_bus, Event, Events
 from services.serializers import serialize_session_template
 
@@ -30,11 +31,15 @@ def get_session_templates(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        templates = session.query(SessionTemplate).filter_by(root_id=root_id).all()
+        templates_q = session.query(SessionTemplate).filter_by(root_id=root_id)
+        limit, offset = parse_optional_pagination(request, max_limit=500)
+        if limit is not None:
+            templates_q = templates_q.offset(offset).limit(limit)
+        templates = templates_q.all()
         result = [serialize_session_template(template) for template in templates]
         return jsonify(result)
         
@@ -49,7 +54,7 @@ def get_session_template(current_user, root_id, template_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -71,7 +76,7 @@ def create_session_template(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -101,7 +106,7 @@ def create_session_template(current_user, root_id, validated_data):
     except Exception as e:
         session.rollback()
         logger.exception("Error creating session template")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Template API request failed")
     finally:
         session.close()
 
@@ -114,7 +119,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -144,7 +149,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
     except Exception as e:
         session.rollback()
         logger.exception("Error updating session template")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Template API request failed")
     finally:
         session.close()
 
@@ -156,7 +161,7 @@ def delete_session_template(current_user, root_id, template_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -172,6 +177,6 @@ def delete_session_template(current_user, root_id, template_id):
     except Exception as e:
         session.rollback()
         logger.exception("Error deleting session template")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Template API request failed")
     finally:
         session.close()

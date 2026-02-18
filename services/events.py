@@ -30,6 +30,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class EventBus:
     def __init__(self):
         self._handlers: Dict[str, List[Callable[[Event], None]]] = {}
         self._enabled = True
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="event-bus")
     
     def on(self, event_name: str):
         """
@@ -121,6 +123,19 @@ class EventBus:
                 logger.exception(f"Error in handler {handler.__name__} for event {event.name}: {e}")
         
         return results
+
+    def emit_async(self, event: Event) -> None:
+        """
+        Emit an event on a background pool.
+        Fire-and-forget path for non-critical events.
+        """
+        if not self._enabled:
+            return
+        try:
+            self._executor.submit(self.emit, event)
+        except RuntimeError:
+            # Fallback when shutting down.
+            self.emit(event)
     
     def _get_matching_handlers(self, event_name: str) -> List[Callable]:
         """Get all handlers that match the event name (including wildcards)."""

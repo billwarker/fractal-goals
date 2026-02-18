@@ -12,6 +12,7 @@ from models import (
     validate_root_goal
 )
 from blueprints.auth_api import token_required
+from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root
 from services.events import event_bus, Event, Events
 from services.serializers import serialize_activity_instance
 
@@ -32,7 +33,7 @@ def activity_instances(current_user, root_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -84,7 +85,7 @@ def activity_instances(current_user, root_id):
             db_session.commit()
             
             # Emit event
-            event_bus.emit(Event(Events.ACTIVITY_INSTANCE_CREATED, {
+            event_bus.emit_async(Event(Events.ACTIVITY_INSTANCE_CREATED, {
                 'instance_id': instance.id,
                 'activity_definition_id': activity_definition_id,
                 'activity_name': activity_name,
@@ -96,22 +97,28 @@ def activity_instances(current_user, root_id):
         
         else:  # GET
             # Get all sessions for this fractal
-            sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).all()
-            session_ids = [s.id for s in sessions]
+            sessions = db_session.query(Session.id).filter(
+                Session.root_id == root_id,
+                Session.deleted_at == None
+            ).all()
+            session_ids = [sid for (sid,) in sessions]
             if not session_ids:
                 return jsonify([])
-            
-            # Get all activity instances for these sessions
-            instances = db_session.query(ActivityInstance).filter(
+
+            instances_q = db_session.query(ActivityInstance).filter(
                 ActivityInstance.session_id.in_(session_ids),
                 ActivityInstance.deleted_at == None
-            ).all()
+            )
+            limit, offset = parse_optional_pagination(request, max_limit=1000)
+            if limit is not None:
+                instances_q = instances_q.offset(offset).limit(limit)
+            instances = instances_q.all()
             
             return jsonify([serialize_activity_instance(inst) for inst in instances])
         
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error listing/creating activity instances")
     finally:
         db_session.close()
 
@@ -124,7 +131,7 @@ def start_activity_timer(current_user, root_id, instance_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -180,7 +187,7 @@ def start_activity_timer(current_user, root_id, instance_id):
         db_session.commit()
         
         # Emit event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        event_bus.emit_async(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,
@@ -192,9 +199,8 @@ def start_activity_timer(current_user, root_id, instance_id):
         return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
-        logger.exception("Error starting activity timer")
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error starting activity timer")
     finally:
         db_session.close()
 
@@ -207,7 +213,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -267,7 +273,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
         
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error completing activity instance")
     finally:
         db_session.close()
 
@@ -314,7 +320,7 @@ def update_activity_instance(current_user, root_id, instance_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -404,7 +410,7 @@ def update_activity_instance(current_user, root_id, instance_id):
         db_session.commit()
         
         # Emit event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        event_bus.emit_async(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,
@@ -416,8 +422,7 @@ def update_activity_instance(current_user, root_id, instance_id):
         return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
-        logger.exception("Unexpected error updating activity instance")
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Unexpected error updating activity instance")
     finally:
         db_session.close()

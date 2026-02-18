@@ -1,0 +1,51 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "blueprints/**"
+      - "services/**"
+      - "models/**"
+      - "tests/**"
+      - "requirements*.txt"
+      - "pytest.ini"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENV: testing
+      DATABASE_URL: sqlite:///fractal_goals_test.db
+      JWT_SECRET_KEY: test-secret-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Lint Syntax
+        run: |
+          python -m compileall blueprints services models
+
+      - name: Run Unit Tests
+        run: |
+          python -m pytest tests/unit -q
+
+      - name: Run Integration Tests
+        run: |
+          python -m pytest tests/integration -q

@@ -8,6 +8,7 @@ from validators import (
 )
 from services.programs import ProgramService
 from blueprints.auth_api import token_required
+from blueprints.api_utils import internal_error
 from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def get_programs(current_user, root_id):
         return jsonify(programs)
     except Exception as e:
         logger.exception("Error getting programs")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -56,7 +57,7 @@ def get_program(current_user, root_id, program_id):
         return jsonify(program)
     except Exception as e:
         logger.exception("Error getting program")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -81,7 +82,7 @@ def create_program(current_user, root_id, validated_data):
     except Exception as e:
         session.rollback()
         logger.exception("Error creating program")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -106,7 +107,7 @@ def update_program(current_user, root_id, program_id, validated_data):
     except Exception as e:
         session.rollback()
         logger.exception("Error updating program")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -132,7 +133,7 @@ def delete_program(current_user, root_id, program_id):
          return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -152,7 +153,7 @@ def get_program_session_count(current_user, root_id, program_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -176,7 +177,7 @@ def add_block_day(current_user, root_id, program_id, block_id):
     except Exception as e:
         session.rollback()
         logger.exception("Error adding block day")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -199,7 +200,7 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id):
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -221,7 +222,7 @@ def delete_block_day(current_user, root_id, program_id, block_id, day_id):
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -244,7 +245,7 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id):
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -263,7 +264,7 @@ def get_active_program_days(current_user, root_id):
         return jsonify(days or [])
     except Exception as e:
         logger.exception("Error getting active program days")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()
 
@@ -287,6 +288,6 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id):
     except Exception as e:
         session.rollback()
         logger.exception("Error attaching goal to block")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Program API request failed")
     finally:
         session.close()

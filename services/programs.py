@@ -143,8 +143,8 @@ class ProgramService:
             description=validated_data.get('description', ''),
             start_date=start_date,
             end_date=end_date,
-            goal_ids=json.dumps(validated_data.get('selectedGoals', [])),
-            weekly_schedule=json.dumps(schedule_list),
+            goal_ids=validated_data.get('selectedGoals', []),
+            weekly_schedule=schedule_list,
             is_active=validated_data.get('is_active', True)
         )
         
@@ -186,11 +186,11 @@ class ProgramService:
         if 'end_date' in validated_data:
             program.end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
         if 'selectedGoals' in validated_data:
-            program.goal_ids = json.dumps(validated_data['selectedGoals'])
+            program.goal_ids = validated_data['selectedGoals']
         
         if 'weeklySchedule' in validated_data:
             schedule_list = validated_data['weeklySchedule']
-            program.weekly_schedule = json.dumps(schedule_list)
+            program.weekly_schedule = schedule_list
             ProgramService._sync_program_structure(session, program, schedule_list)
             
         if 'is_active' in validated_data:
@@ -619,4 +619,3 @@ class ProgramService:
                 'program_name': program.name,
                 'root_id': program.root_id
             }, source='ProgramService._check_program_completion'))
-

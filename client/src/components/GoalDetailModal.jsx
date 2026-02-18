@@ -19,6 +19,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalSmartSection from './goals/GoalSmartSection';
 import GoalChildrenList from './goals/GoalChildrenList';
+import { getParentGoalInfo } from './goals/goalDetailUtils';
 import { useGoalForm } from '../hooks/useGoalForm';
 import GenericGraphModal from './analytics/GenericGraphModal';
 import styles from './GoalDetailModal.module.css';
@@ -232,52 +233,6 @@ function GoalDetailModal({
             }
             setIsLoadingMetrics(true);
             try {
-                // Use root_id from props if available, otherwise it might be in goal attributes? 
-                // Actually the API endpoint /goals/:id/metrics is global in the blueprint (not under a root prefix in the route definition I added?)
-                // Wait, I added `@goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])`. 
-                // This is under `/api/goals/...`, so it doesn't need root_id in the URL path.
-                // The api.js wrapper I wrote: `axios.get(\`\${API_BASE}/\${rootId}/goals/\${goalId}/metrics\`)`... 
-                // WAIT. My API definition in python was plain `/goals/<goal_id>/metrics` under `goals_bp`, which has `url_prefix='/api'`.
-                // So the URL is `/api/goals/<goal_id>/metrics`.
-                // But my api.js change was: `axios.get(\`\${API_BASE}/\${rootId}/goals/\${goalId}/metrics\`)`.
-                // This is WRONG if I put the endpoint in the global section.
-                // Let me re-verify the python code I wrote.
-                // I wrote: 
-                // @goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])
-                // def get_goal_metrics(goal_id: str):
-                //
-                // This `goals_bp` is `goals_bp = Blueprint('goals', __name__, url_prefix='/api')`.
-                // So the path is `/api/goals/<goal_id>/metrics`.
-                //
-                // My api.js update was:
-                // getGoalMetrics: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/metrics`),
-                // 
-                // This puts `rootId` in the path. `goals_bp` DOES have fractal scoped routes too.
-                // But I added it to the "GLOBAL GOAL ENDPOINTS" section (conceptually, or at least physically in the file).
-                // Let me fix api.js first or change my python code.
-                // Changing python code to be fractal scoped is probably better for consistency if I want to enforce permission checks later, 
-                // but currently `get_goal_metrics` doesn't check ownership (it uses `get_goal_by_id` which is generic).
-                // 
-                // Actually, looking at `goals_api.py`, there is a section `# FRACTAL-SCOPED ROUTES`.
-                // Routes there verify `root` ownership.
-                // My new endpoint just takes `goal_id`.
-                // The `get_goal_endpoint` is also global: `@goals_bp.route('/goals/<goal_id>', methods=['GET'])`.
-                // So my python implementation is consistent with `get_goal_endpoint`.
-                // 
-                // So I should fix `api.js` to NOT include `rootId` in the path, OR update `api.js` to use the global style.
-                // `fractalApi` in `api.js` usually expects `rootId`.
-                // `legacyApi` or `globalApi` might be better places, OR I just fix the URL in `fractalApi` to ignore rootId if I want to keep it there.
-                // BUT, `GoalDetailModal` has access to `rootId`.
-                // 
-                // I will update the `api.js` call in `GoalDetailModal` to match whatever I fix.
-                // I'll assume I will fix `api.js` to be correct (`/goals/${goalId}/metrics`).
-                //
-                // Wait, if I change `api.js` now, I have to do another tool call.
-                // I can just call `axios` directly or fix `api.js` in a separate step.
-                // I'll fix `api.js` in a subsequent step or previous step? I already edited it.
-                // I will fix `api.js` in the next step to be correct.
-                // 
-                // Fixed: getGoalMetrics only takes goalId, not rootId
                 const response = await fractalApi.getGoalMetrics(depGoalId);
                 setMetrics(response.data);
             } catch (error) {
@@ -451,43 +406,7 @@ function GoalDetailModal({
         associatedActivityIds.includes(a.id)
     );
 
-    // Find parent goal name and type for SMART relevance question
-    const findParentGoalInfo = () => {
-        if (mode === 'create' && parentGoal) {
-            return {
-                name: parentGoal.name,
-                type: parentGoal.attributes?.type || parentGoal.type
-            };
-        }
-
-        const parentId = goal?.attributes?.parent_id;
-        if (!parentId || !treeData) return null;
-
-        // Recursively search the tree for the parent
-        const findNode = (node, targetId) => {
-            if (!node) return null;
-            const nodeId = node.id || node.attributes?.id;
-            if (nodeId === targetId) return node;
-
-            if (node.children && node.children.length > 0) {
-                for (const child of node.children) {
-                    const found = findNode(child, targetId);
-                    if (found) return found;
-                }
-            }
-            return null;
-        };
-
-        const parentNode = findNode(treeData, parentId);
-        if (!parentNode) return null;
-
-        return {
-            name: parentNode.name,
-            type: parentNode.attributes?.type || parentNode.type
-        };
-    };
-
-    const parentGoalInfo = findParentGoalInfo();
+    const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
 

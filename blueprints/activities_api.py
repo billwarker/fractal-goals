@@ -14,6 +14,7 @@ from validators import (
     ActivityGoalsSetSchema, GroupReorderSchema
 )
 from blueprints.auth_api import token_required
+from blueprints.api_utils import parse_optional_pagination, require_owned_root
 from services.events import event_bus, Event, Events
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition
@@ -36,7 +37,7 @@ def get_activity_groups(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -53,7 +54,7 @@ def create_activity_group(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -94,7 +95,7 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -134,7 +135,7 @@ def delete_activity_group(current_user, root_id, group_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -176,7 +177,7 @@ def reorder_activity_groups(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -206,7 +207,7 @@ def set_activity_group_goals(current_user, root_id, group_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -268,11 +269,17 @@ def get_activities(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        activities = session.query(ActivityDefinition).filter_by(root_id=root_id).filter(ActivityDefinition.deleted_at.is_(None)).order_by(ActivityDefinition.name).all()
+        activities_q = session.query(ActivityDefinition).filter_by(root_id=root_id).filter(
+            ActivityDefinition.deleted_at.is_(None)
+        ).order_by(ActivityDefinition.name)
+        limit, offset = parse_optional_pagination(request, max_limit=500)
+        if limit is not None:
+            activities_q = activities_q.offset(offset).limit(limit)
+        activities = activities_q.all()
         return jsonify([serialize_activity_definition(a) for a in activities])
     finally:
         session.close()
@@ -284,7 +291,7 @@ def create_activity(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -395,7 +402,7 @@ def update_activity(current_user, root_id, activity_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -568,7 +575,7 @@ def delete_activity(current_user, root_id, activity_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -612,7 +619,7 @@ def get_activity_goals(current_user, root_id, activity_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -635,7 +642,7 @@ def set_activity_goals(current_user, root_id, activity_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -695,7 +702,7 @@ def remove_activity_goal(current_user, root_id, activity_id, goal_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -742,7 +749,7 @@ def get_goal_activities(current_user, root_id, goal_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -834,7 +841,7 @@ def get_goal_activity_groups(current_user, root_id, goal_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -857,7 +864,7 @@ def link_goal_activity_group(current_user, root_id, goal_id, group_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
@@ -908,7 +915,7 @@ def unlink_goal_activity_group(current_user, root_id, goal_id, group_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        root = require_owned_root(session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 

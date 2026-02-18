@@ -14,6 +14,17 @@ from services.serializers import serialize_session
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_iso_datetime_strict(value):
+    """Parse strict ISO-8601 datetime into UTC-aware datetime."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("must be an ISO-8601 string")
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 class SessionService:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -77,17 +88,12 @@ class SessionService:
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        # Parse dates
-        def parse_datetime(dt_str):
-            if not dt_str or not isinstance(dt_str, str): return None
-            try:
-                dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-                return dt.astimezone(timezone.utc)
-            except ValueError:
-                return None
-        
-        s_start = parse_datetime(data.get('session_start'))
-        s_end = parse_datetime(data.get('session_end'))
+        # Parse dates (strict ISO-8601)
+        try:
+            s_start = _parse_iso_datetime_strict(data.get('session_start')) if 'session_start' in data else None
+            s_end = _parse_iso_datetime_strict(data.get('session_end')) if 'session_end' in data else None
+        except ValueError:
+            return None, "Invalid datetime format. Use ISO-8601 (e.g. 2026-02-18T15:30:00Z)", 400
 
         session_data = models._safe_load_json(data.get('session_data'), {})
 
@@ -267,34 +273,16 @@ class SessionService:
                 session.completed_at = datetime.now(timezone.utc)
         
         if 'session_start' in data:
-            if isinstance(data['session_start'], str):
-                try:
-                    s_str = data['session_start'].replace('Z', '+00:00')
-                    if len(s_str) == 10:
-                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                    else:
-                        dt = datetime.fromisoformat(s_str)
-                        dt = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-                    session.session_start = dt
-                except ValueError:
-                    pass
-            else:
-                session.session_start = data['session_start']
+            try:
+                session.session_start = _parse_iso_datetime_strict(data['session_start'])
+            except ValueError:
+                return None, "Invalid session_start format. Use ISO-8601.", 400
         
         if 'session_end' in data:
-            if isinstance(data['session_end'], str):
-                try:
-                    s_str = data['session_end'].replace('Z', '+00:00')
-                    if len(s_str) == 10:
-                        dt = datetime.strptime(s_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                    else:
-                        dt = datetime.fromisoformat(s_str)
-                        dt = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-                    session.session_end = dt
-                except ValueError:
-                    pass
-            else:
-                session.session_end = data['session_end']
+            try:
+                session.session_end = _parse_iso_datetime_strict(data['session_end'])
+            except ValueError:
+                return None, "Invalid session_end format. Use ISO-8601.", 400
         
         if 'total_duration_seconds' in data:
             session.total_duration_seconds = data['total_duration_seconds']

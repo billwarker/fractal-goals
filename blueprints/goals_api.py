@@ -20,6 +20,7 @@ from validators import (
     parse_date_string
 )
 from blueprints.auth_api import token_required
+from blueprints.api_utils import require_owned_root, get_goal_in_root, internal_error
 from services import event_bus, Event, Events
 from services.serializers import serialize_goal, serialize_target, calculate_smart_status, format_utc
 from extensions import limiter
@@ -205,9 +206,9 @@ def create_goal(validated_data):
 
         # Handle targets if provided
         if validated_data.get('targets'):
-            new_goal.targets = json.dumps(validated_data['targets'])
-            # Allow _sync_targets to create the relational records
+            # Source of truth: relational Target rows.
             _sync_targets(db_session, new_goal, validated_data['targets'])
+            new_goal.targets = None
         
         # Link to session if session_id provided and it's a MicroGoal
         if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
@@ -237,8 +238,7 @@ def create_goal(validated_data):
         
     except Exception as e:
         db_session.rollback()
-        logger.exception("Error creating goal")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error creating goal")
     finally:
         db_session.close()
 
@@ -254,7 +254,7 @@ def get_session_micro_goals(current_user, root_id, session_id):
     db_session = get_session(engine)
     try:
         # Verify ownership of fractal
-        root = db_session.query(Goal).filter_by(id=root_id, parent_id=None, owner_id=current_user.id).first()
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -275,7 +275,7 @@ def get_session_micro_goals(current_user, root_id, session_id):
         
     except Exception as e:
         logger.exception("Error fetching session micro goals")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -314,7 +314,7 @@ def delete_goal_endpoint(goal_id: str):
     except Exception as e:
         db_session.rollback()
         logger.error(f"Error in delete_goal_endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -385,7 +385,7 @@ def update_goal_endpoint(goal_id: str):
     except Exception as e:
         logger.exception(f"Error in update_goal_endpoint: {e}")
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -438,7 +438,7 @@ def add_goal_target(goal_id):
         return jsonify({"targets": all_targets, "id": new_target.id}), 201
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -480,7 +480,7 @@ def remove_goal_target(goal_id, target_id):
         return jsonify({"targets": remaining_targets}), 200
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -510,7 +510,7 @@ def get_goal_metrics(current_user, goal_id: str):
         return jsonify(metrics)
     except Exception as e:
         logger.exception(f"Error fetching goal metrics: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -540,7 +540,7 @@ def get_goal_daily_durations(current_user, goal_id: str):
         return jsonify(metrics)
     except Exception as e:
         logger.exception(f"Error fetching goal daily durations: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -606,7 +606,7 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None):
     except Exception as e:
         db_session.rollback()
         logger.error(f"Error in update_goal_completion_endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -691,7 +691,7 @@ def create_fractal(current_user, validated_data):
     except Exception as e:
         db_session.rollback()
         logger.exception("Error creating fractal")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -720,7 +720,7 @@ def delete_fractal(current_user, root_id):
         
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -749,7 +749,7 @@ def get_fractal_goals(current_user, root_id):
 
         if not root:
             # Fallback to simple validation if the complex query fails or returns nothing
-            root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+            root = require_owned_root(db_session, root_id, current_user.id)
             if not root:
                 return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -759,7 +759,7 @@ def get_fractal_goals(current_user, root_id):
         
     except Exception as e:
         logger.exception("Error fetching fractal tree")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -817,7 +817,7 @@ def get_active_goals_for_selection(current_user, root_id):
         
     except Exception as e:
         logger.exception("Error fetching selection goals")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
@@ -861,9 +861,9 @@ def create_fractal_goal(current_user, root_id, validated_data):
 
         # Handle targets if provided
         if validated_data.get('targets'):
-            new_goal.targets = json.dumps(validated_data['targets'])
-            # Allow _sync_targets to create the relational records
+            # Source of truth: relational Target rows.
             _sync_targets(db_session, new_goal, validated_data['targets'])
+            new_goal.targets = None
         
         # Link to session if session_id provided and it's a MicroGoal
         if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
@@ -890,8 +890,7 @@ def create_fractal_goal(current_user, root_id, validated_data):
         
     except Exception as e:
         db_session.rollback()
-        logger.exception("Error creating fractal goal")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error creating fractal goal")
     finally:
         db_session.close()
 
@@ -904,12 +903,12 @@ def get_fractal_goal(current_user, root_id, goal_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the goal
-        goal = db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goal = get_goal_in_root(db_session, root_id, goal_id)
         
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
@@ -929,7 +928,7 @@ def delete_fractal_goal(current_user, root_id, goal_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -960,7 +959,7 @@ def delete_fractal_goal(current_user, root_id, goal_id):
         
     except Exception as e:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error deleting fractal goal")
     finally:
         db_session.close()
 
@@ -972,7 +971,7 @@ def update_fractal_goal(current_user, root_id, goal_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -1004,6 +1003,7 @@ def update_fractal_goal(current_user, root_id, goal_id):
                 goal.deadline = None
         if 'targets' in data:
             _sync_targets(db_session, goal, data['targets'] or [])
+            goal.targets = None
             
         if 'parent_id' in data:
             # Allow reparenting (e.g. moving ImmediateGoal between ShortTermGoals)
@@ -1035,9 +1035,8 @@ def update_fractal_goal(current_user, root_id, goal_id):
         return jsonify(serialize_goal(goal, include_children=False)), 200
         
     except Exception as e:
-        logger.exception(f"Error in update_fractal_goal: {e}")
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error updating fractal goal")
     finally:
         db_session.close()
 
@@ -1061,7 +1060,7 @@ def get_goal_analytics(current_user, root_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -1253,8 +1252,7 @@ def get_goal_analytics(current_user, root_id):
         })
         
     except Exception as e:
-        logger.exception("Error fetching goal analytics")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error fetching goal analytics")
     finally:
         db_session.close()
 
@@ -1295,7 +1293,7 @@ def evaluate_goal_targets(current_user, root_id, goal_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
@@ -1416,7 +1414,7 @@ def evaluate_goal_targets(current_user, root_id, goal_id):
     except Exception as e:
         db_session.rollback()
         logger.exception("Error evaluating targets")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 
