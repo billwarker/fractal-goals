@@ -734,40 +734,46 @@ def _update_program_progress(db_session, goal: Goal):
     
     # Scope to the same fractal to avoid scanning unrelated blocks.
     goal_root_id = goal.root_id or goal.id
-    blocks = (
-        db_session.query(ProgramBlock)
+    block_rows = (
+        db_session.query(ProgramBlock.program_id, ProgramBlock.goal_ids)
         .join(Program, Program.id == ProgramBlock.program_id)
         .filter(Program.root_id == goal_root_id)
         .all()
     )
 
     program_ids = set()
-    for block in blocks:
-        # Parse goal_ids from JSON
-        block_goal_ids = json.loads(block.goal_ids) if block.goal_ids else []
+    for program_id, block_goal_ids_raw in block_rows:
+        block_goal_ids = models._safe_load_json(block_goal_ids_raw, [])
         if goal.id in block_goal_ids:
-            program_ids.add(block.program_id)
-    
-    for program_id in program_ids:
-        program = db_session.query(Program).filter_by(id=program_id).first()
-        if program:
-            # Recalculate program progress
-            _recalculate_program_progress(db_session, program)
+            program_ids.add(program_id)
+
+    if not program_ids:
+        return
+
+    programs = db_session.query(Program).filter(Program.id.in_(program_ids)).all()
+    for program in programs:
+        _recalculate_program_progress(db_session, program)
 
 
 def _recalculate_program_progress(db_session, program):
     """Recalculate the completion percentage for a program."""
     from models import ProgramBlock
     
-    # Get all goals linked to this program's blocks via JSON field
-    blocks = db_session.query(ProgramBlock).filter_by(program_id=program.id).all()
+    # Fetch only what we need from blocks to reduce object hydration overhead.
+    block_goal_rows = db_session.query(ProgramBlock.goal_ids).filter_by(program_id=program.id).all()
     
     all_goal_ids = set()
-    for block in blocks:
-        block_goal_ids = json.loads(block.goal_ids) if block.goal_ids else []
+    for (block_goal_ids_raw,) in block_goal_rows:
+        block_goal_ids = models._safe_load_json(block_goal_ids_raw, [])
         all_goal_ids.update(block_goal_ids)
     
     if not all_goal_ids:
+        if hasattr(program, 'goals_completed'):
+            program.goals_completed = 0
+        if hasattr(program, 'goals_total'):
+            program.goals_total = 0
+        if hasattr(program, 'completion_percentage'):
+            program.completion_percentage = 0
         return
     
     # Count completed goals
