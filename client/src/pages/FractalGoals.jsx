@@ -49,7 +49,6 @@ function FractalGoals() {
 
     const {
         data: sessions = [],
-        isLoading: sessionsLoading
     } = useSessionsQuery(rootId);
 
     const {
@@ -65,18 +64,14 @@ function FractalGoals() {
 
     // Programs State
     const [programs, setPrograms] = useState([]);
-    const [programsLoading, setProgramsLoading] = useState(false);
 
     const fetchPrograms = async (id) => {
         try {
-            setProgramsLoading(true);
             const { fractalApi } = await import('../utils/api');
             const res = await fractalApi.getPrograms(id);
             setPrograms(res.data || []);
         } catch (err) {
             console.error("Failed to fetch programs:", err);
-        } finally {
-            setProgramsLoading(false);
         }
     };
 

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useGoals } from '../contexts/GoalsContext';
 import GoalIcon from './atoms/GoalIcon';
 import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
+import useIsMobile from '../hooks/useIsMobile';
 
 const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
     const {
@@ -14,13 +14,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
         resetGoalCharacteristics
     } = useTheme();
 
-    const { fractals } = useGoals();
-
-    const activeFractalName = React.useMemo(() => {
-        if (scope === 'default') return 'Global Defaults';
-        const f = fractals.find(fr => fr.id === scope);
-        return f ? f.name : 'This Fractal';
-    }, [scope, fractals]);
+    const isMobile = useIsMobile();
 
     // Helper to get data for current scope with fallback to default
     const getDisplayData = (goalType) => {
@@ -102,7 +96,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                 <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px', marginTop: 0 }}>
                     These colors apply to all goals and targets once they are completed.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Primary (Text & Icons)</label>
                         <input
@@ -152,7 +146,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
             )}
 
             {GOAL_TYPE_ORDER.map((type) => {
-                const { char, color, isOverridden } = getDisplayData(type);
+                const { char, color } = getDisplayData(type);
                 if (!char) return null;
 
                 return (
@@ -219,7 +213,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                 <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
                                     Colors
                                 </label>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Primary</label>
                                         <input
@@ -245,19 +239,19 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                             {type !== 'MicroGoal' && type !== 'NanoGoal' && type !== 'Target' && type !== 'Completed' ? (
                                 <div className="characteristic-details" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {/* Relative Deadlines */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
                                         {['min', 'max'].map(limitType => (
                                             <div key={limitType}>
                                                 <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
                                                     {limitType.charAt(0).toUpperCase() + limitType.slice(1)} Relative Deadline
                                                 </label>
-                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                <div style={{ display: 'flex', gap: '8px', flexDirection: isMobile ? 'column' : 'row' }}>
                                                     <input
                                                         type="number"
                                                         value={char.deadlines[limitType].value}
                                                         onChange={(e) => handleDeadlineChange(type, limitType, 'value', e.target.value)}
                                                         style={{
-                                                            width: '60px',
+                                                            width: isMobile ? '100%' : '60px',
                                                             padding: '6px',
                                                             borderRadius: '4px',
                                                             border: '1px solid var(--color-border)',
@@ -291,7 +285,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                         <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
                                             Valid Completion Methods
                                         </label>
-                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
                                             {Object.entries(char.completion_methods).map(([method, enabled]) => (
                                                 <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
                                                     <input
