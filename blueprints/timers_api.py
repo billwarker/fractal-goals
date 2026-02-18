@@ -187,7 +187,7 @@ def start_activity_timer(current_user, root_id, instance_id):
         db_session.commit()
         
         # Emit event
-        event_bus.emit_async(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,
@@ -410,7 +410,7 @@ def update_activity_instance(current_user, root_id, instance_id):
         db_session.commit()
         
         # Emit event
-        event_bus.emit_async(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,

@@ -16,13 +16,8 @@ def format_utc(dt):
 
 def calculate_smart_status(goal):
     """Calculate SMART criteria status for a goal."""
-    # Use relational targets (preferred) or fall back to JSON for backwards compatibility
-    if hasattr(goal, 'targets_rel') and goal.targets_rel is not None:
-        targets = [t for t in goal.targets_rel if t.deleted_at is None]
-    else:
-        targets = _safe_load_json(goal.targets, [])
-        if not isinstance(targets, list):
-            targets = []
+    # Source of truth: relational targets.
+    targets = [t for t in (goal.targets_rel or []) if t.deleted_at is None]
     
     # Achievable: has associated activities OR has associated activity groups OR completed via children
     if goal.track_activities:
@@ -140,7 +135,7 @@ def serialize_goal(goal, include_children=True):
             "completed_at": format_utc(goal.completed_at),
             "created_at": format_utc(goal.created_at),
             "updated_at": format_utc(goal.updated_at),
-            "targets": [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None] if hasattr(goal, 'targets_rel') and goal.targets_rel is not None else _safe_load_json(goal.targets, []),
+            "targets": [serialize_target(t) for t in (goal.targets_rel or []) if t.deleted_at is None],
             "relevance_statement": goal.relevance_statement,
             "completed_via_children": goal.completed_via_children,
             "allow_manual_completion": goal.allow_manual_completion,
