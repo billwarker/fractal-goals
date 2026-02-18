@@ -279,3 +279,50 @@
     color: var(--color-text-primary);
     font-weight: bold;
 }
+
+@media (max-width: 1024px) {
+    .header {
+        padding: 80px 20px 16px 20px;
+    }
+
+    .content {
+        padding: 16px 20px 24px 20px;
+    }
+
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 92px 12px 12px 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .title {
+        font-size: 24px;
+    }
+
+    .newProgramBtn {
+        min-height: 40px;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .content {
+        padding: 12px;
+        padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .card {
+        padding: 14px;
+    }
+}

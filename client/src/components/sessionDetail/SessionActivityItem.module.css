@@ -467,3 +467,57 @@
     padding-left: 12px;
     border-left: 1px solid var(--color-border);
 }
+
+@media (max-width: 768px) {
+    .activityCard {
+        padding: 12px;
+    }
+
+    .activityHeader {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .activityHeaderLeft {
+        align-items: flex-start;
+    }
+
+    .activityHeaderRight {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .timerFieldContainer {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    .timerInput {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .startButton,
+    .stopButton,
+    .completeButton,
+    .completedBadge,
+    .resetButton {
+        margin-top: 0;
+        min-height: 36px;
+    }
+
+    .contentArea {
+        padding-left: 0;
+        margin-top: 12px;
+    }
+
+    .singleMetricsContainer {
+        gap: 12px;
+    }
+
+    .singleMetricGroup {
+        width: 100%;
+    }
+}

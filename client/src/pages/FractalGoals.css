@@ -50,3 +50,23 @@
 .details-window.docked {
     flex-shrink: 0;
 }
+
+@media (max-width: 768px) {
+    .fractal-page-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .fractal-main-layout {
+        overflow: hidden;
+    }
+
+    .fractal-view-wrapper {
+        min-height: 0;
+    }
+
+    .metric-item {
+        font-size: 13px;
+        line-height: 1.2;
+    }
+}

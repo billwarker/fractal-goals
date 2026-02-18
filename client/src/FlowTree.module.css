@@ -132,3 +132,27 @@
     height: 100%;
     transition: opacity 200ms ease-in-out;
 }
+
+@media (max-width: 768px) {
+    .nodeTextContainer {
+        margin-left: 8px;
+    }
+
+    .nodeLabel {
+        font-size: 12px;
+        max-width: 132px;
+    }
+
+    .nodeLabelUltimate {
+        font-size: 13px;
+    }
+
+    .timingContainer {
+        font-size: 10px;
+        gap: 4px;
+    }
+
+    .addChildButton {
+        font-size: 10px;
+    }
+}

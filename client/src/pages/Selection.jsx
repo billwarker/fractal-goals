@@ -8,6 +8,7 @@ import AuthModal from '../components/modals/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useTheme } from '../contexts/ThemeContext';
+import useIsMobile from '../hooks/useIsMobile';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -25,6 +26,7 @@ function Selection() {
 
     const { user, logout, isAuthenticated } = useAuth();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor } = useTheme();
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -137,6 +139,9 @@ function Selection() {
     const headerSecondaryColor = getGoalSecondaryColor(headerType);
     const headerTextColor = getGoalTextColor(headerType);
     const isDarkText = headerTextColor === '#1a1a1a';
+    const smartBorderWidth = isMobile ? 16 : 24;
+    const smartMiddleSize = isMobile ? 130 : 186;
+    const smartInnerSize = isMobile ? 64 : 94;
 
     if (loading) {
         return <div className={styles.loadingContainer}>Loading fractals...</div>;
@@ -154,7 +159,7 @@ function Selection() {
                         // Normal Goal: Primary (Fill) with App-BG Border (cutout effect)
                         backgroundColor: isHeaderSmart ? headerSecondaryColor : headerColor,
                         border: isHeaderSmart
-                            ? `24px solid ${headerColor}`
+                            ? `${smartBorderWidth}px solid ${headerColor}`
                             : `5px solid var(--color-bg-app)`, // Default cutout
                         boxShadow: isHeaderSmart ? 'none' : '0 0 50px rgba(0, 0, 0, 0.5)',
                         position: 'relative',
@@ -172,11 +177,11 @@ function Selection() {
                             <div
                                 style={{
                                     position: 'absolute',
-                                    width: '186px',
-                                    height: '186px',
+                                    width: `${smartMiddleSize}px`,
+                                    height: `${smartMiddleSize}px`,
                                     borderRadius: '50%',
                                     backgroundColor: headerSecondaryColor,
-                                    border: `24px solid ${headerColor}`,
+                                    border: `${smartBorderWidth}px solid ${headerColor}`,
                                     top: '50%',
                                     left: '50%',
                                     transform: 'translate(-50%, -50%)',
@@ -190,8 +195,8 @@ function Selection() {
                             <div
                                 style={{
                                     position: 'absolute',
-                                    width: '94px',
-                                    height: '94px',
+                                    width: `${smartInnerSize}px`,
+                                    height: `${smartInnerSize}px`,
                                     borderRadius: '50%',
                                     backgroundColor: headerColor,
                                     top: '50%',
@@ -209,7 +214,7 @@ function Selection() {
                             // Ensure text is visible on top of dark core
                             color: isHeaderSmart ? '#FFFFFF' : headerTextColor,
                             textShadow: isHeaderSmart ? '0 2px 10px rgba(0,0,0,0.8)' : (isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)'),
-                            fontSize: isHeaderSmart ? '2.2rem' : '28px', // Larger text for SMART to pop
+                            fontSize: isHeaderSmart ? (isMobile ? '1.5rem' : '2.2rem') : (isMobile ? '1.5rem' : '28px'),
                             zIndex: 10, // Text on top
                             position: 'relative',
                             maxWidth: '90%',

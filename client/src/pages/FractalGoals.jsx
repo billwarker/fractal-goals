@@ -12,6 +12,7 @@ import { useActivities } from '../contexts/ActivitiesContext';
 import { useDebug } from '../contexts/DebugContext';
 import { getChildType } from '../utils/goalHelpers';
 import { calculateMetrics } from '../utils/metricsHelpers';
+import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
 import './FractalGoals.css';
 
@@ -59,6 +60,7 @@ function FractalGoals() {
     } = useActivities();
 
     const { debugMode } = useDebug();
+    const isMobile = useIsMobile();
 
     // Programs State
     const [programs, setPrograms] = useState([]);
@@ -213,8 +215,9 @@ function FractalGoals() {
         );
     }
 
-    const sidebarWidth = '32.5vw';
-    const minSidebarWidth = '390px';
+    const sidebarWidth = isMobile ? '100%' : '32.5vw';
+    const minSidebarWidth = isMobile ? '0' : '390px';
+    const navSpacerHeight = isMobile ? '76px' : '60px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
 
     return (
@@ -226,7 +229,7 @@ function FractalGoals() {
             overflow: 'hidden'
         }}>
             {/* Nav Padding Spacer */}
-            <div style={{ height: '60px', flexShrink: 0 }} />
+            <div style={{ height: navSpacerHeight, flexShrink: 0 }} />
 
             <div className="fractal-main-layout" style={{
                 display: 'flex',
@@ -252,12 +255,12 @@ function FractalGoals() {
                     {metrics && (
                         <div style={{
                             position: 'absolute',
-                            top: '12px',
-                            left: '16px',
+                            top: isMobile ? '8px' : '12px',
+                            left: isMobile ? '8px' : '16px',
                             zIndex: 100,
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '6px',
+                            gap: isMobile ? '4px' : '6px',
                             pointerEvents: 'none'
                         }}>
                             <div className="metric-item">
@@ -287,18 +290,19 @@ function FractalGoals() {
                     <div className="details-window sidebar docked" style={{
                         width: sidebarWidth,
                         minWidth: minSidebarWidth,
-                        height: 'calc(100% - 40px)', // Vertical margin
-                        position: 'relative', // Keep in flex flow
-                        top: 'auto',
-                        right: 'auto',
-                        bottom: 'auto',
-                        margin: '20px', // Floating margin
+                        height: isMobile ? '100%' : 'calc(100% - 40px)',
+                        position: isMobile ? 'absolute' : 'relative',
+                        top: isMobile ? 0 : 'auto',
+                        right: isMobile ? 0 : 'auto',
+                        bottom: isMobile ? 0 : 'auto',
+                        left: isMobile ? 0 : 'auto',
+                        margin: isMobile ? 0 : '20px',
                         border: '1px solid var(--color-border)',
                         background: 'var(--color-bg-sidebar)',
-                        zIndex: 10,
+                        zIndex: isMobile ? 1200 : 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: '12px',
+                        borderRadius: isMobile ? 0 : '12px',
                         boxShadow: 'var(--shadow-md)',
                         backdropFilter: 'blur(10px)'
                     }}>

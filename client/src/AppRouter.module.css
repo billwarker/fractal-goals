@@ -5,6 +5,7 @@
     display: flex;
     align-items: center;
     gap: 20px;
+    min-width: 0;
 }
 
 .navContainerRight {
@@ -34,4 +35,45 @@
     height: 20px;
     width: 1px;
     background: var(--color-border);
+}
+
+@media (max-width: 768px) {
+    .navContainer {
+        width: 100%;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        gap: 12px;
+        padding-bottom: 4px;
+    }
+
+    .navContainerRight {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
+        gap: 10px;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        padding-top: 4px;
+    }
+
+    .fractalTitle {
+        font-size: 13px;
+        margin-right: 6px;
+        max-width: 160px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .addSessionBtn {
+        font-size: 12px;
+        padding: 8px 12px;
+        margin-right: 0;
+        white-space: nowrap;
+        min-height: 40px;
+    }
+
+    .navSeparator {
+        height: 16px;
+    }
 }

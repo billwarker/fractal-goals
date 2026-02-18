@@ -290,3 +290,60 @@
     color: var(--color-text-disabled);
     font-style: italic;
 }
+
+@media (max-width: 1024px) {
+    .logs-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 80px 20px 16px 20px;
+    }
+
+    .header-main {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .logs-filters {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+    }
+
+    .logs-page-body {
+        padding: 16px 20px 24px 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .logs-page-header {
+        padding: 92px 12px 12px 12px;
+    }
+
+    .logs-header-actions {
+        width: 100%;
+    }
+
+    .refresh-logs-btn,
+    .clear-logs-btn {
+        min-height: 40px;
+        flex: 1;
+    }
+
+    .logs-page-body {
+        padding: 12px;
+        padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .logs-list-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .logs-grid-header,
+    .log-item {
+        min-width: 760px;
+    }
+}

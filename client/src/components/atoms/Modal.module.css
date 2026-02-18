@@ -98,3 +98,23 @@
         opacity: 1;
     }
 }
+
+@media (max-width: 768px) {
+    .container {
+        width: calc(100% - 16px);
+        max-height: calc(100vh - 16px);
+    }
+
+    .content {
+        border-radius: var(--border-radius-lg);
+    }
+
+    .header {
+        padding: 12px;
+    }
+
+    .body {
+        padding: 12px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+}

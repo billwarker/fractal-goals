@@ -110,3 +110,16 @@
     border-radius: 4px;
     border: 1px solid #333;
 }
+
+@media (max-width: 768px) {
+    .session-notes-sidebar {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+        max-height: 45vh;
+    }
+
+    .sidebar-header {
+        padding-top: 12px;
+    }
+}

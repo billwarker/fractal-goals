@@ -14,6 +14,7 @@ import { isSMART } from './utils/smartHelpers';
 
 import { useTheme } from './contexts/ThemeContext';
 import GoalIcon from './components/atoms/GoalIcon';
+import useIsMobile from './hooks/useIsMobile';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
@@ -205,20 +206,20 @@ const nodeTypes = {
 };
 
 // Dagre layout algorithm for tree structure
-const getLayoutedElements = (nodes, edges, direction = 'TB') => {
+const getLayoutedElements = (nodes, edges, direction = 'TB', compact = false) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
     // Width/height should account for the node display size + margin
-    const nodeWidth = 250;
-    const nodeHeight = 80;
+    const nodeWidth = compact ? 190 : 250;
+    const nodeHeight = compact ? 70 : 80;
 
     dagreGraph.setGraph({
         rankdir: direction,
-        nodesep: 100,
-        ranksep: 100,
-        marginx: 50,
-        marginy: 50,
+        nodesep: compact ? 56 : 100,
+        ranksep: compact ? 70 : 100,
+        marginx: compact ? 16 : 50,
+        marginy: compact ? 20 : 50,
     });
 
     nodes.forEach((node) => {
@@ -406,6 +407,7 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
 const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarOpen, selectedNodeId }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
+    const isMobile = useIsMobile();
 
     const { getGoalColor } = useTheme();
     const completedGoalColor = getGoalColor('Completed');
@@ -421,8 +423,8 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
         if (!treeData) return { nodes: [], edges: [] };
 
         const { nodes, edges } = convertTreeToFlow(treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor);
-        return getLayoutedElements(nodes, edges);
-    }, [treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor]);
+        return getLayoutedElements(nodes, edges, 'TB', isMobile);
+    }, [treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor, isMobile]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
@@ -438,7 +440,7 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
         if (rfInstance) {
             setIsVisible(false); // Hide during centering
             const timer = setTimeout(() => {
-                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 200 });
                 // Show after fitView completes
                 setTimeout(() => setIsVisible(true), 200);
             }, 100); // Minimal delay for layout settling
@@ -450,10 +452,10 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
     useEffect(() => {
         if (rfInstance && layoutedNodes.length > 0) {
             requestAnimationFrame(() => {
-                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 200 });
             });
         }
-    }, [layoutedNodes.length, rfInstance]);
+    }, [layoutedNodes.length, rfInstance, isMobile]);
 
     // Re-center with fade transition when sidebar toggles or selected node changes
     useEffect(() => {
@@ -463,14 +465,14 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
 
             // Wait for fade-out, then fit view, then fade back in
             const timer = setTimeout(() => {
-                rfInstance.fitView({ padding: 0.2, duration: 200 });
+                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 200 });
                 // Fade back in after fitView animation completes
                 setTimeout(() => setIsVisible(true), 220);
             }, 220); // Wait for fade-out transition (200ms) + small buffer
 
             return () => clearTimeout(timer);
         }
-    }, [sidebarOpen, selectedNodeId, rfInstance]);
+    }, [sidebarOpen, selectedNodeId, rfInstance, isMobile]);
 
     return (
         <div
@@ -485,10 +487,13 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
                 nodeTypes={nodeTypes}
                 onInit={setRfInstance}
                 fitView
+                fitViewOptions={{ padding: isMobile ? 0.08 : 0.2 }}
                 attributionPosition="bottom-left"
-                minZoom={0.1}
-                maxZoom={2}
+                minZoom={isMobile ? 0.06 : 0.1}
+                maxZoom={isMobile ? 1.6 : 2}
                 nodesConnectable={false}
+                panOnScroll
+                zoomOnScroll
                 defaultEdgeOptions={{
                     type: 'straight',
                     style: { stroke: 'var(--color-connection-line)', strokeWidth: 1.5 }

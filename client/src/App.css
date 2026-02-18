@@ -12,7 +12,8 @@ html {
     width: 100%;
     height: 100%;
     font-family: var(--font-family);
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
     background-color: var(--color-bg-app);
     color: var(--color-text-primary);
 }
@@ -21,6 +22,7 @@ html {
     display: flex;
     width: 100vw;
     height: 100vh;
+    max-width: 100%;
 }
 
 .main-content {
@@ -496,6 +498,7 @@ html {
         linear-gradient(var(--color-grid) 1px, transparent 1px),
         linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
     background-size: 20px 20px;
+    overflow-x: clip;
 }
 
 .top-section {
@@ -1100,14 +1103,15 @@ html {
     top: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    min-height: 60px;
     z-index: 1000;
     background: var(--color-bg-header);
     border-bottom: 1px solid var(--color-border);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
-    padding: 0 40px;
+    padding: 0 32px;
+    overflow: hidden;
 }
 
 .nav-group {
@@ -1115,6 +1119,7 @@ html {
     align-items: center;
     gap: 20px;
     width: 100%;
+    min-width: 0;
 }
 
 .fractal-title {
@@ -1147,6 +1152,8 @@ html {
     letter-spacing: 0.5px;
     padding: 5px 0;
     border-bottom: 2px solid transparent;
+    min-height: 40px;
+    white-space: nowrap;
 }
 
 .nav-text-link:hover {
@@ -1327,9 +1334,70 @@ html {
     height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 80px 40px 20px 40px;
+    padding: 80px 32px 20px 32px;
     /* Top padding increased for header */
     box-sizing: border-box;
+}
+
+.responsive-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-safe-bottom {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 1024px) {
+    .top-nav-links {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .page-container {
+        padding: 76px 20px 20px 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .top-nav-links {
+        min-height: 76px;
+        padding: 8px 12px;
+        align-items: flex-start;
+    }
+
+    .nav-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+    }
+
+    .nav-text-link {
+        font-size: 12px;
+        min-height: 36px;
+    }
+
+    .nav-separator {
+        display: none;
+    }
+
+    .content-container {
+        background-size: 16px 16px;
+    }
+
+    .page-container {
+        height: 100%;
+        min-height: 100%;
+        padding: 94px 12px calc(80px + env(safe-area-inset-bottom, 0px)) 12px;
+    }
+
+    .env-indicator {
+        bottom: 86px;
+        right: 8px;
+        font-size: 10px;
+    }
 }
 
 /* Environment Indicator */

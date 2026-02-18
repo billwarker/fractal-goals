@@ -379,6 +379,60 @@
     color: #ccc;
 }
 
+@media (max-width: 1024px) {
+    .pageHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 80px 20px 16px 20px;
+    }
+
+    .headerControls {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .actionButtons {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .sessionsList {
+        padding: 16px 20px 24px 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .pageContainer {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .leftPanel {
+        min-height: 0;
+    }
+
+    .pageHeader {
+        padding: 92px 12px 12px 12px;
+        position: sticky;
+        top: 0;
+    }
+
+    .sessionsList {
+        padding: 12px;
+        padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+        background-size: 16px 16px;
+    }
+
+    .filterButton,
+    .sortButton,
+    .primaryButton,
+    .secondaryButton {
+        min-height: 40px;
+        font-size: 12px;
+    }
+}
+
 .setsContainer {
     display: flex;
     flex-direction: column;
@@ -550,4 +604,14 @@
     border-left: 1px solid #333;
     background: #1a1a1a;
     overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    .rightPanel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+        max-height: 48vh;
+        background: var(--color-bg-sidebar);
+    }
 }

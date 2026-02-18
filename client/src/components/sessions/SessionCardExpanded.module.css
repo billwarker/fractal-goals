@@ -168,3 +168,35 @@
     padding: 40px;
     color: var(--color-text-muted);
 }
+
+@media (max-width: 1024px) {
+    .cardTopLevel {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 14px;
+    }
+
+    .goalsSection {
+        gap: 14px;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    .cardTopLevel {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .cardBottomLevel {
+        padding: 12px;
+    }
+
+    .goalsSection {
+        padding: 10px 12px;
+    }
+
+    .sessionNotes {
+        padding: 10px;
+    }
+}

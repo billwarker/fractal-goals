@@ -222,3 +222,41 @@
     margin-bottom: 15px;
     font-weight: 300;
 }
+
+@media (max-width: 768px) {
+    .container {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .headerContainer {
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+
+    .goalNodeCircle {
+        width: 200px;
+        height: 200px;
+        border-width: 4px !important;
+    }
+
+    .title {
+        font-size: 22px;
+        letter-spacing: 1px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+        max-width: none;
+        gap: 12px;
+        padding: 0 12px;
+    }
+
+    .card {
+        aspect-ratio: auto;
+        min-height: 144px;
+    }
+
+    .card:hover .deleteBtn {
+        opacity: 1;
+    }
+}

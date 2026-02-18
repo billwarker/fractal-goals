@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import axios from 'axios';
 import { globalApi, fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './context/HeaderContext';
+import useIsMobile from './hooks/useIsMobile';
 import styles from './AppRouter.module.css';
 import './App.css';
 
@@ -81,6 +82,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
     const { headerActions } = useHeader();
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
+    const isMobile = useIsMobile();
 
     // Extract rootId from current path
     const pathParts = location.pathname.split('/');
@@ -153,7 +155,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
                 {/* Right Side: Actions and Exit */}
                 <div className={styles.navContainerRight}>
                     {/* Render Page Specific Actions */}
-                    {headerActions && (
+                    {!isMobile && headerActions && (
                         <>
                             <div className={`nav-separator ${styles.navSeparator}`}></div>
                             {headerActions}
@@ -162,12 +164,12 @@ const NavigationHeader = ({ onOpenSettings }) => {
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button className="nav-text-link" onClick={onOpenSettings}>
-                        SETTINGS
+                        {isMobile ? 'SET' : 'SETTINGS'}
                     </button>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button className="nav-text-link home-link" onClick={() => navigate('/')}>
-                        EXIT TO HOME
+                        {isMobile ? 'EXIT' : 'EXIT TO HOME'}
                     </button>
                 </div>
             </div>
