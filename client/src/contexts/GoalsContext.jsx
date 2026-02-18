@@ -94,7 +94,7 @@ export function GoalsProvider({ children }) {
 
     const [activeRootId, setActiveRootId] = React.useState(null);
 
-    const value = {
+    const value = React.useMemo(() => ({
         fractals: fractalsQuery.data || [],
         currentFractal: null, // This will be handled differently in components
         activeRootId,
@@ -110,7 +110,22 @@ export function GoalsProvider({ children }) {
         toggleGoalCompletion: (rootId, goalId, completed) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed }),
         // New Query-specific additions
         useFractalTreeQuery
-    };
+    }), [
+        fractalsQuery.data,
+        fractalsQuery.isLoading,
+        fractalsQuery.error,
+        activeRootId,
+        fetchFractals,
+        fetchFractalTree,
+        // Mutations are stable, but good practice to include or omit consistently. 
+        // We'll trust react-query stable callbacks, but for safety include them or their stable parts.
+        // Actually, createFractalMutation.mutateAsync is stable.
+        createFractalMutation.mutateAsync,
+        createGoalMutation.mutateAsync,
+        updateGoalMutation.mutateAsync,
+        deleteGoalMutation.mutateAsync,
+        toggleGoalCompletionMutation.mutateAsync,
+    ]);
 
     return (
         <GoalsContext.Provider value={value}>

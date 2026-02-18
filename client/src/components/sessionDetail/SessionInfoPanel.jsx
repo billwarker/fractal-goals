@@ -10,17 +10,24 @@ import styles from './SessionInfoPanel.module.css';
 import notify from '../../utils/notify';
 import { Heading } from '../atoms/Typography';
 
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
+
 function SessionInfoPanel({
-    session,
-    sessionData,
-    parentGoals,
-    rootId,
     onGoalClick,
-    totalDuration,
-    onSessionUpdate,
-    activityInstances = [],
-    activityDefinitions = []
 }) {
+    // Context
+    const {
+        rootId,
+        session,
+        localSessionData: sessionData,
+        parentGoals,
+        activityInstances,
+        activities: activityDefinitions,
+        updateSession,
+        calculateTotalDuration
+    } = useActiveSession();
+
+    const totalDuration = calculateTotalDuration();
     const { getGoalColor } = useTheme();
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
@@ -71,11 +78,7 @@ function SessionInfoPanel({
             const field = editingField === 'start' ? 'session_start' : 'session_end';
             const payload = { [field]: isoString };
 
-            const response = await fractalApi.updateSession(rootId, session.id, payload);
-
-            if (onSessionUpdate) {
-                onSessionUpdate(response.data);
-            }
+            await updateSession(payload);
 
             setEditingField(null);
         } catch (error) {

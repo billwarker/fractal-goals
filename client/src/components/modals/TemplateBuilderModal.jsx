@@ -141,7 +141,8 @@ function TemplateBuilderModal({
 
         const updatedSections = [...currentTemplate.sections];
         const activitiesToAdd = selectedActivities.map(actId => {
-            const activity = activities.find(a => a.id === actId);
+            const activity = Array.isArray(activities) ? activities.find(a => a.id === actId) : null;
+            if (!activity) return null;
             return {
                 activity_id: activity.id,
                 name: activity.name,
@@ -534,8 +535,8 @@ function TemplateBuilderModal({
                                     // MODE 1: GROUP SELECTION
                                     <div className={styles.groupsGrid}>
                                         {/* Activity Groups */}
-                                        {activityGroups.map(group => {
-                                            const groupActivities = activities.filter(a => a.group_id === group.id);
+                                        {(Array.isArray(activityGroups) ? activityGroups : []).map(group => {
+                                            const groupActivities = Array.isArray(activities) ? activities.filter(a => a.group_id === group.id) : [];
                                             const selectedCountInGroup = groupActivities.filter(a => selectedActivities.includes(a.id)).length;
 
                                             return (
@@ -563,7 +564,7 @@ function TemplateBuilderModal({
 
                                         {/* Ungrouped */}
                                         {(() => {
-                                            const ungroupedActs = activities.filter(a => !a.group_id);
+                                            const ungroupedActs = Array.isArray(activities) ? activities.filter(a => !a.group_id) : [];
                                             const selectedCountInUngrouped = ungroupedActs.filter(a => selectedActivities.includes(a.id)).length;
 
                                             return (

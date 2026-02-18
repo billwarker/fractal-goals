@@ -20,7 +20,8 @@
 
 ### Phase 2: Core Architecture (Current)
 - **Database Refactoring:** Split monolithic `models.py` into domain-specific modules (`models/user.py`, `models/goal.py`, etc.).
-- **Backend Stability:** Fixed critical recursion/serialization bugs and improved error logging for authentication.
+- **Frontend State Consolidation:** Centralized session detail logic into `ActiveSessionContext.jsx`, eliminating significant prop drilling and standardizing state management with TanStack Query.
+- **Backend Stability:** Fixed critical recursion/serialization bugs, improved error logging, and resolved session retrieval API gaps.
 - **Legacy Cleanup:** Removed deprecated `PracticeSession` aliases and unused fields.
 
 ### Key Features Added (v1.x)

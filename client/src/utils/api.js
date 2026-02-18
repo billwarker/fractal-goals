@@ -144,6 +144,13 @@ export const fractalApi = {
     },
 
     /**
+     * Get a specific practice session by ID
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session to fetch
+     */
+    getSession: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}`),
+
+    /**
      * Create a new practice session within a fractal
      * @param {string} rootId - ID of the fractal
      * @param {Object} data - {parent_ids, immediate_goals, description}

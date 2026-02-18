@@ -9,6 +9,8 @@ import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
 
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
+
 /**
  * Format duration in seconds to MM:SS format
  */
@@ -26,39 +28,64 @@ function formatDuration(seconds) {
  */
 function SessionActivityItem({
     exercise,
-    activityDefinition,
-    onUpdate,
-    onToggleComplete,
-    onDelete,
+    onFocus, // Called with (instance, setIndex) to update context
+    isSelected,
     onReorder,
     canMoveUp,
     canMoveDown,
     showReorderButtons,
-    rootId,
-    onNoteCreated, // Optional callback to trigger refresh
-    sessionId, // Explicit session ID
-    onFocus, // Added prop - called with (instance, setIndex) to update context
-    onOpenGoals, // Trigger switch to goals tab
-    isSelected, // Added prop for styling
+    onNoteCreated,
     allNotes,
     onAddNote,
     onUpdateNote,
     onDeleteNote,
-    // Drag and drop props
+    onOpenGoals,
     isDragging,
-    dragHandleProps,
-    // Micro Goal Extensions
-    activeMicroGoal,
-    onCreateNanoGoal,
-    // Goal Context for Smart Creator
-    parentGoals = [],
-    immediateGoals = [],
-    microGoals = [],
-    session,
 }) {
+    // Context
+    const {
+        rootId,
+        sessionId,
+        activities,
+        updateInstance,
+        updateTimer,
+        removeActivity,
+        parentGoals,
+        immediateGoals,
+        microGoals,
+        session,
+        refreshSession,
+    } = useActiveSession();
+
+    const activityDefinition = Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null;
+    const onDelete = () => removeActivity(exercise.id);
+    const onUpdate = (key, value) => {
+        if (key === 'timer_action') {
+            updateTimer(exercise.id, value);
+        } else {
+            updateInstance({ instanceId: exercise.id, updates: { [key]: value } });
+        }
+    };
+
     // Get timezone from context
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+
+    // Find active micro goal for this activity in the current session
+    const activeMicroGoal = microGoals.find(mg =>
+        !mg.completed &&
+        mg.attributes?.session_id === sessionId &&
+        activityDefinition?.associated_goal_ids?.includes(mg.parent_id)
+    );
+
+    const onCreateNanoGoal = async (parentId, name) => {
+        return await createGoal({
+            name,
+            type: 'NanoGoal',
+            parent_id: parentId,
+            attributes: { session_id: sessionId }
+        });
+    };
 
     // Characteristics for goal icons
     const microChars = getScopedCharacteristics('MicroGoal');
@@ -68,7 +95,7 @@ function SessionActivityItem({
     // Helper: Determine the next goal action based on activity's current associations
     const getNextGoalContext = () => {
         if (!activityDefinition) {
-            return { type: 'associate', label: 'Associate to a goal', icon: '🔗', color: 'var(--color-text-secondary)' };
+            return null;
         }
 
         const associatedGoalIds = activityDefinition.associated_goal_ids || [];
@@ -76,8 +103,9 @@ function SessionActivityItem({
 
         // Check if associated with any Short-Term or Immediate goals
         // We use associatedGoals directly check the types of associated goals, regardless of current session context
-        const hasShortTermGoal = associatedGoals.some(g => g.type === 'ShortTermGoal') || parentGoals.some(g => associatedGoalIds.includes(g.id));
-        const hasImmediateGoal = (session?.immediate_goals || immediateGoals).some(g => associatedGoalIds.includes(g.id));
+        const hasShortTermGoal = (Array.isArray(associatedGoals) && associatedGoals.some(g => g.type === 'ShortTermGoal')) || (Array.isArray(parentGoals) && parentGoals.some(g => associatedGoalIds.includes(g.id)));
+        const iGoals = Array.isArray(session?.immediate_goals) ? session.immediate_goals : (Array.isArray(immediateGoals) ? immediateGoals : []);
+        const hasImmediateGoal = iGoals.some(g => associatedGoalIds.includes(g.id));
 
         // Case 1: Not associated with STG or IG -> need to associate
         // Case 1 & 2: No longer prompting for association here. 
@@ -86,13 +114,7 @@ function SessionActivityItem({
 
         // Case 3: Has IG but no active micro -> create Micro Goal
         // Check if there's an active micro goal for this activity in the session
-        const hasMicroGoal = microGoals.some(mg =>
-            !mg.completed &&
-            mg.attributes?.session_id === sessionId
-        );
-
-
-        if (!hasMicroGoal) {
+        if (!activeMicroGoal) {
             return null;
         }
 
@@ -127,7 +149,7 @@ function SessionActivityItem({
     useEffect(() => {
         let intervalId;
 
-        const updateTimer = () => {
+        const updateTimerLocal = () => {
             if (exercise.time_start && !exercise.time_stop) {
                 const start = new Date(exercise.time_start);
                 const now = new Date();
@@ -138,9 +160,9 @@ function SessionActivityItem({
 
         if (exercise.time_start && !exercise.time_stop) {
             // Initial update
-            updateTimer();
+            updateTimerLocal();
             // Start interval
-            intervalId = setInterval(updateTimer, 1000);
+            intervalId = setInterval(updateTimerLocal, 1000);
         } else if (exercise.duration_seconds != null) {
             // Use stored duration if available (completed)
             setRealtimeDuration(exercise.duration_seconds);
@@ -392,16 +414,6 @@ function SessionActivityItem({
                             >
                                 ▼
                             </button>
-                        </div>
-                    )}
-                    {/* Drag Handle */}
-                    {dragHandleProps && (
-                        <div
-                            {...dragHandleProps}
-                            className={styles.dragHandle}
-                            title="Drag to reorder"
-                        >
-                            ⋮⋮
                         </div>
                     )}
                     <div

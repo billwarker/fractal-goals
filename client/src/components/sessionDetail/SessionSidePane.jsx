@@ -7,7 +7,7 @@
  * - History: View previous activity instance metrics
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import GoalsPanel from './GoalsPanel';
@@ -15,22 +15,14 @@ import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
 import styles from './SessionSidePane.module.css';
 
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
+
 function SessionSidePane({
-    rootId,
-    sessionId,
-    session,              // Session object for info panel
-    sessionData,          // Session data (dates, template, etc.)
-    parentGoals,          // Short-term goals
-    totalDuration,        // Total completed duration in seconds
     selectedActivity,     // Currently focused activity instance (for context)
     selectedSetIndex,     // Currently focused set index (null = whole activity)
-    activityInstances,    // All activity instances in session
-    activityDefinitions,  // Activity definitions for lookup
     onNoteAdded,          // Callback when note is added
     onGoalClick,          // Callback when goal badge is clicked
     onGoalCreated,        // Callback when goal is created
-    targetAchievements,   // Map of target_id -> achievement status
-    achievedTargetIds,    // Set of achieved target IDs
     refreshTrigger,       // Counter to trigger notes refresh
     notes,
     previousNotes,
@@ -39,11 +31,9 @@ function SessionSidePane({
     updateNote,
     deleteNote,
     // Control Props
-    onDelete,
     onCancel,
-    onToggleComplete,
     onSave,
-    isCompleted,
+    onDelete,              // Trigger for confirmation modal
     onSessionChange,
     mode = 'details',      // Controlled mode
     onModeChange,          // Callback for mode change
@@ -51,8 +41,22 @@ function SessionSidePane({
     goalCreationContext,
     onOpenGoals
 }) {
-    // mode state lifted to parent (SessionDetail)
+    // Context
+    const {
+        rootId,
+        sessionId,
+        session,
+        activityInstances,
+        activities: activityDefinitions,
+        targetAchievements,
+        achievedTargetIds,
+        toggleSessionComplete: onToggleComplete,
+    } = useActiveSession();
 
+    // Derived values
+    const isCompleted = session?.attributes?.completed;
+
+    // mode state lifted to parent (SessionDetail)
 
     // Get unique activity definitions from current session
     const sessionActivityDefs = useMemo(() => {
@@ -92,8 +96,6 @@ function SessionSidePane({
                         History
                     </button>
                 </div>
-
-
             </div>
 
             {/* Mode Content */}
@@ -102,15 +104,7 @@ function SessionSidePane({
                     <div className={styles.detailsView}>
                         {/* Session Metadata Panel */}
                         <SessionInfoPanel
-                            session={session}
-                            sessionData={sessionData}
-                            parentGoals={parentGoals}
-                            rootId={rootId}
                             onGoalClick={onGoalClick}
-                            totalDuration={totalDuration}
-                            onSessionUpdate={onSessionChange}
-                            activityInstances={activityInstances}
-                            activityDefinitions={activityDefinitions}
                         />
 
                         {/* Session Controls */}
@@ -169,17 +163,9 @@ function SessionSidePane({
                     </div>
                 ) : mode === 'goals' ? (
                     <GoalsPanel
-                        rootId={rootId}
-                        sessionId={sessionId}
-                        parentGoals={parentGoals}
-                        session={session}
                         selectedActivity={selectedActivity}
-                        activityInstances={activityInstances}
-                        activityDefinitions={activityDefinitions}
                         onGoalClick={onGoalClick}
                         onGoalCreated={onGoalCreated}
-                        targetAchievements={targetAchievements}
-                        achievedTargetIds={achievedTargetIds}
                         createMicroTrigger={createMicroTrigger}
                         goalCreationContext={goalCreationContext}
                         onOpenGoals={onOpenGoals}

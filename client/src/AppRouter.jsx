@@ -74,135 +74,133 @@ const calculateGoalAge = (createdAt) => {
 
 import SettingsModal from './components/modals/SettingsModal';
 
-function App() {
+// Navigation header component defined outside of App to avoid re-declaration
+const NavigationHeader = ({ onOpenSettings }) => {
     const navigate = useNavigate();
     const location = useLocation();
-
-    const [loading, setLoading] = useState(true);
+    const { headerActions } = useHeader();
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
+
+    // Extract rootId from current path
+    const pathParts = location.pathname.split('/');
+    const rootId = pathParts[1]; // First part after /
+
+    useEffect(() => {
+        if (rootId && rootId !== 'assets' && rootId !== 'vite.svg' && rootId !== 'session' && rootId !== 'manage-activities' && rootId !== 'manage-session-templates' && rootId !== 'create-session' && rootId !== 'analytics' && rootId !== 'logs') {
+            if (fractalNameCache[rootId]) {
+                setFractalName(fractalNameCache[rootId]);
+            } else {
+                fractalApi.getGoal(rootId, rootId) // Fetch root goal to get name
+                    .then(res => {
+                        if (res.data && res.data.name) {
+                            const name = res.data.name;
+                            setFractalName(name);
+                            // Update cache
+                            setFractalNameCache(prev => ({
+                                ...prev,
+                                [rootId]: name
+                            }));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to fetch fractal name:', err);
+                    });
+            }
+        } else if (!rootId || rootId === '') {
+            setFractalName('Fractal Goals');
+        }
+    }, [rootId]); // Remove fractalNameCache from dependencies
+
+    // Only show nav if we're on a fractal page
+    if (!rootId || rootId === '') return null;
+
+    const navItems = [
+        { path: `/${rootId}/goals`, label: 'GOALS' },
+        { path: `/${rootId}/programs`, label: 'PROGRAMS' },
+        { path: `/${rootId}/sessions`, label: 'SESSIONS' },
+        { path: `/${rootId}/analytics`, label: 'ANALYTICS' },
+        { path: `/${rootId}/logs`, label: 'LOGS' }
+    ];
+
+    const isActive = (path) => location.pathname.startsWith(path);
+
+    return (
+        <div className="top-nav-links">
+            <div className="nav-group">
+                {/* Left Side: Title and Primary Nav */}
+                <div className={styles.navContainer}>
+                    <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
+
+                    <button
+                        className={styles.addSessionBtn}
+                        onClick={() => navigate(`/${rootId}/create-session`)}
+                    >
+                        + ADD SESSION
+                    </button>
+
+                    {navItems.map(item => (
+                        <button
+                            key={item.path}
+                            className={`nav-text-link ${isActive(item.path) ? 'active' : ''}`}
+                            onClick={() => navigate(item.path)}
+                        >
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Right Side: Actions and Exit */}
+                <div className={styles.navContainerRight}>
+                    {/* Render Page Specific Actions */}
+                    {headerActions && (
+                        <>
+                            <div className={`nav-separator ${styles.navSeparator}`}></div>
+                            {headerActions}
+                        </>
+                    )}
+
+                    <div className={`nav-separator ${styles.navSeparator}`}></div>
+                    <button className="nav-text-link" onClick={onOpenSettings}>
+                        SETTINGS
+                    </button>
+
+                    <div className={`nav-separator ${styles.navSeparator}`}></div>
+                    <button className="nav-text-link home-link" onClick={() => navigate('/')}>
+                        EXIT TO HOME
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+function App() {
+    const location = useLocation();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
         if (pathname === '/') return 'Selection';
-        if (pathname.endsWith('/goals')) return 'Goals';
-        if (pathname.endsWith('/programs')) return 'Programs';
-        if (pathname.includes('/programs/')) return 'Program Detail';
-        if (pathname.endsWith('/sessions')) return 'Sessions';
+        if (pathname.includes('/goals')) return 'Goals';
+        if (pathname.includes('/programs')) return 'Programs';
+        if (pathname.includes('/sessions')) return 'Sessions';
         if (pathname.includes('/session/')) return 'Session Detail';
-        if (pathname.endsWith('/analytics')) return 'Analytics';
-        if (pathname.endsWith('/logs')) return 'Logs';
-        if (pathname.endsWith('/create-session')) return 'Create Session';
-        if (pathname.endsWith('/manage-session-templates')) return 'Manage Templates';
-        if (pathname.endsWith('/manage-activities')) return 'Manage Activities';
+        if (pathname.includes('/analytics')) return 'Analytics';
+        if (pathname.includes('/logs')) return 'Logs';
+        if (pathname.includes('/create-session')) return 'Create Session';
+        if (pathname.includes('/manage-session-templates')) return 'Manage Templates';
+        if (pathname.includes('/manage-activities')) return 'Manage Activities';
         return null;
     };
 
     usePageTitle(getPageTitle(location.pathname));
 
-    // Navigation header component
-    const NavigationHeader = () => {
-        const { headerActions } = useHeader();
-
-        // Extract rootId from current path
-        const pathParts = location.pathname.split('/');
-        const rootId = pathParts[1]; // First part after /
-
-        // Fetch fractal name on component mount or rootId change
-        useEffect(() => {
-            if (rootId && rootId !== 'assets' && rootId !== 'vite.svg') {
-                if (fractalNameCache[rootId]) {
-                    setFractalName(fractalNameCache[rootId]);
-                } else {
-                    fractalApi.getGoal(rootId, rootId) // Fetch root goal to get name
-                        .then(res => {
-                            if (res.data && res.data.name) {
-                                setFractalName(res.data.name);
-                                // Update cache
-                                setFractalNameCache(prev => ({
-                                    ...prev,
-                                    [rootId]: res.data.name
-                                }));
-                            }
-                        })
-                        .catch(err => {
-                            console.error('Failed to fetch fractal name:', err);
-                        });
-                }
-            } else {
-                setFractalName('Fractal Goals');
-            }
-        }, [rootId]);
-
-        // Only show nav if we're on a fractal page
-        if (!rootId || rootId === '') return null;
-
-        const navItems = [
-            { path: `/${rootId}/goals`, label: 'GOALS' },
-            { path: `/${rootId}/programs`, label: 'PROGRAMS' },
-            { path: `/${rootId}/sessions`, label: 'SESSIONS' },
-            { path: `/${rootId}/analytics`, label: 'ANALYTICS' },
-            { path: `/${rootId}/logs`, label: 'LOGS' }
-        ];
-
-        return (
-            <div className="top-nav-links">
-                <div className="nav-group">
-                    {/* Left Side: Title and Primary Nav */}
-                    <div className={styles.navContainer}>
-                        <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
-
-                        <button
-                            className={styles.addSessionBtn}
-                            onClick={() => navigate(`/${rootId}/create-session`)}
-                        >
-                            + ADD SESSION
-                        </button>
-
-                        {navItems.map(item => (
-                            <button
-                                key={item.path}
-                                className={`nav-text-link ${location.pathname === item.path ? 'active' : ''}`}
-                                onClick={() => navigate(item.path)}
-                            >
-                                {item.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Right Side: Actions and Exit */}
-                    <div className={styles.navContainerRight}>
-                        {/* Add Session removed from here */}
-
-                        {/* Render Page Specific Actions */}
-                        {headerActions && (
-                            <>
-                                <div className={`nav-separator ${styles.navSeparator}`}></div>
-                                {headerActions}
-                            </>
-                        )}
-
-                        <div className={`nav-separator ${styles.navSeparator}`}></div>
-                        <button className="nav-text-link" onClick={() => setIsSettingsOpen(true)}>
-                            SETTINGS
-                        </button>
-
-                        <div className={`nav-separator ${styles.navSeparator}`}></div>
-                        <button className="nav-text-link home-link" onClick={() => navigate('/')}>
-                            EXIT TO HOME
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <HeaderProvider>
             <div className="app-container">
                 {location.pathname !== '/' && (
-                    <NavigationHeader />
+                    <NavigationHeader onOpenSettings={() => setIsSettingsOpen(true)} />
                 )}
 
                 <div className="content-container">

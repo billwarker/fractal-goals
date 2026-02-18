@@ -49,7 +49,7 @@ function GoalDetailModal({
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
     programs: programsRaw = [],  // For showing associated programs on completion
-    activityGroups: activityGroupsRaw = [],  // For activities modal grouping
+    activityGroups: activityGroupsRaw,  // For activities modal grouping
     // Create mode props
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
@@ -65,8 +65,6 @@ function GoalDetailModal({
     const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : [];
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
-    // Normalize activityGroups to always be an array (handles null case) - use state so we can update it
-    // Normalize activityGroups to always be an array (handles null case) - use state so we can update it
     const [activityGroups, setActivityGroups] = useState(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
     const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
 
@@ -186,9 +184,11 @@ function GoalDetailModal({
         }
     }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
 
-    // Sync activityGroups when prop changes
+    // Sync activityGroups when prop changes (only if valid array provided)
     useEffect(() => {
-        setActivityGroups(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
+        if (activityGroupsRaw && Array.isArray(activityGroupsRaw)) {
+            setActivityGroups(activityGroupsRaw);
+        }
     }, [activityGroupsRaw]);
 
     const refreshAssociations = async () => {

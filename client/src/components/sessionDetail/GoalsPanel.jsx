@@ -12,29 +12,36 @@ import SessionFocusSection from './SessionFocusSection';
 import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
 
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
+
 /**
  * GoalsPanel - Displays goals relevant to the current session scope.
  */
 function GoalsPanel({
-    rootId,
-    sessionId,
-    parentGoals = [],
-    session,
     selectedActivity,
-    activityDefinitions = [],
     onGoalClick,
     onGoalCreated,
-    targetAchievements,
-    achievedTargetIds,
     createMicroTrigger = 0,
     goalCreationContext = null,
     onOpenGoals
 }) {
+    // Context
+    const {
+        rootId,
+        sessionId,
+        session,
+        parentGoals,
+        activities: activityDefinitions,
+        targetAchievements,
+        achievedTargetIds,
+        updateGoal,
+        createGoal,
+        refreshSession,
+        microGoals,
+    } = useActiveSession();
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
     const { useFractalTreeQuery, fetchFractalTree } = useGoals();
-    const [microGoals, setMicroGoals] = useState([]);
     const [expandedGoals, setExpandedGoals] = useState({});
-    const [loading, setLoading] = useState(false);
 
     // Shared query cache for goal tree - ensures sync with SessionDetail
     const { data: goalTree, isLoading: treeLoading } = useFractalTreeQuery(rootId);
@@ -54,20 +61,7 @@ function GoalsPanel({
     const [pendingMicroGoalName, setPendingMicroGoalName] = useState('');
     const [viewMode, setViewMode] = useState('session');
 
-    const fetchMicroGoals = useCallback(async () => {
-        if (!rootId || !sessionId) return;
-        setLoading(true);
-        try {
-            const res = await fractalApi.getSessionMicroGoals(rootId, sessionId);
-            setMicroGoals(res.data || []);
-        } catch (err) {
-            console.error("Failed to fetch session micro goals", err);
-        } finally {
-            setLoading(false);
-        }
-    }, [rootId, sessionId]);
-
-    useEffect(() => { fetchMicroGoals(); }, [fetchMicroGoals]);
+    // microGoals now comes from context (TanStack Query)
 
     useEffect(() => {
         if (!rootId) return;
@@ -136,15 +130,7 @@ function GoalsPanel({
 
     const handleToggleCompletion = async (goal, completed) => {
         try {
-            await fractalApi.toggleGoalCompletion(rootId, goal.id, completed);
-            if (goal.type === 'MicroGoal') {
-                setMicroGoals(prev => prev.map(g => g.id === goal.id ? { ...g, completed } : g));
-            } else if (goal.type === 'NanoGoal') {
-                setMicroGoals(prev => prev.map(m => ({
-                    ...m,
-                    children: m.children?.map(n => n.id === goal.id ? { ...n, completed } : n)
-                })));
-            }
+            await toggleGoalCompletion(goal.id, completed);
             if (onGoalCreated) onGoalCreated();
         } catch (err) {
             console.error("Failed to toggle goal completion", err);
@@ -155,20 +141,21 @@ function GoalsPanel({
         if (!igName.trim() || !igParentId) return;
         setIGCreating(true);
         try {
-            const res = await fractalApi.createGoal(rootId, {
+            const newGoal = await createGoal({
                 name: igName.trim(),
                 type: 'ImmediateGoal',
                 parent_id: igParentId,
             });
-            await fractalApi.addSessionGoal(rootId, sessionId, res.data.id, 'immediate');
+            await fractalApi.addSessionGoal(rootId, sessionId, newGoal.id, 'immediate');
             if (viewMode === 'activity' && activeActivityDef) {
-                try { await fractalApi.associateGoalToActivity(rootId, res.data.id, activeActivityDef.id); }
+                try { await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id); }
                 catch (linkErr) { console.error("Failed to link new IG to activity", linkErr); }
             }
             setIGName('');
             setIGParentId('');
             setShowIGCreator(false);
-            if (onGoalCreated) onGoalCreated(res.data.name);
+            refreshSession(); // Invalidate session to show new IG
+            if (onGoalCreated) onGoalCreated(newGoal.name);
         } catch (err) {
             console.error("Failed to create Immediate Goal", err);
         } finally {
@@ -178,22 +165,22 @@ function GoalsPanel({
 
     const handleCreateMicroGoalWithParent = async (name, parentId) => {
         try {
-            const res = await fractalApi.createGoal(rootId, {
+            const newGoalData = await createGoal({
                 name,
                 type: 'MicroGoal',
                 parent_id: parentId,
-                session_id: sessionId,
+                attributes: { session_id: sessionId }, // New format: session_id in attributes
                 activity_definition_id: viewMode === 'activity' ? activeActivityDef?.id : null
             });
             if (viewMode === 'activity' && activeActivityDef) {
-                try { await fractalApi.associateGoalToActivity(rootId, res.data.id, activeActivityDef.id); }
+                try { await fractalApi.associateGoalToActivity(rootId, newGoalData.id, activeActivityDef.id); }
                 catch (linkErr) { console.error("Failed to link new Micro Goal to activity", linkErr); }
             }
-            const newMicro = { ...res.data, children: [] };
-            setMicroGoals(prev => [...prev, newMicro]);
-            setPendingMicroGoal(newMicro);
+
+            // Refetch is handled by createGoal invalidation in context
+            setPendingMicroGoal(newGoalData);
             setShowMicroTargetBuilder(true);
-            if (onGoalCreated) onGoalCreated(res.data.name);
+            if (onGoalCreated) onGoalCreated(newGoalData.name);
         } catch (err) {
             console.error("Failed to create micro goal", err);
         }
@@ -245,15 +232,12 @@ function GoalsPanel({
     const handleCreateNanoGoal = async (microGoalId, name) => {
         if (!name.trim()) return;
         try {
-            const res = await fractalApi.createGoal(rootId, {
+            const newGoal = await createGoal({
                 name,
                 type: 'NanoGoal',
                 parent_id: microGoalId,
             });
-            setMicroGoals(prev => prev.map(m =>
-                m.id === microGoalId ? { ...m, children: [...(m.children || []), res.data] } : m
-            ));
-            if (onGoalCreated) onGoalCreated(res.data.name);
+            if (onGoalCreated) onGoalCreated(newGoal.name);
         } catch (err) {
             console.error("Failed to create nano goal", err);
         }

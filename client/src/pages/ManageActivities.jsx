@@ -267,7 +267,7 @@ function ManageActivities() {
         }
 
         // Find the activity to check current group
-        const activity = activities.find(a => a.id === activityId);
+        const activity = Array.isArray(activities) ? activities.find(a => a.id === activityId) : null;
         console.log('Found activity:', activity);
 
         // Check if already in the target group (handle null for ungrouped)
@@ -309,7 +309,7 @@ function ManageActivities() {
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
         // Find activities in this group
-        const groupActivities = activities.filter(a => a.group_id === group.id);
+        const groupActivities = Array.isArray(activities) ? activities.filter(a => a.group_id === group.id) : [];
 
         const isRoot = level === 0;
 
@@ -465,7 +465,7 @@ function ManageActivities() {
                         </h3>
                     )}
                     <div className={styles.grid} onDragEnd={handleDragEnd}>
-                        {activities.filter(a => !a.group_id).map(activity => (
+                        {(Array.isArray(activities) ? activities.filter(a => !a.group_id) : []).map(activity => (
                             <ActivityCard
                                 key={activity.id}
                                 activity={activity}
@@ -479,7 +479,7 @@ function ManageActivities() {
                             />
                         ))}
                     </div>
-                    {activities.filter(a => !a.group_id).length === 0 && rootGroups.length > 0 && (
+                    {(Array.isArray(activities) ? activities.filter(a => !a.group_id) : []).length === 0 && rootGroups.length > 0 && (
                         <div className={styles.emptyGroupState} style={{ padding: '15px', marginTop: '10px' }}>
                             {dragOverGroupId === 'ungrouped' ? 'Drop activity here to ungroup' : 'Drag activities here to ungroup'}
                         </div>

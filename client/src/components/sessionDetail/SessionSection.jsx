@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -38,41 +39,44 @@ function formatDuration(seconds) {
 const SessionSection = ({
     section,
     sectionIndex,
-    activityInstances,
-    onDeleteActivity,
-    onUpdateActivity,
     onFocusActivity,
     selectedActivityId,
-    rootId,
-    showActivitySelector,
-    onToggleActivitySelector,
-    onAddActivity,
     onOpenActivityBuilder,
-    groupedActivities,
-    groupMap,
-    activities,
     onNoteCreated,
-    sessionId,
     allNotes,
     onAddNote,
     onUpdateNote,
     onDeleteNote,
     onOpenGoals,
-    // Drag and drop props
-    onMoveActivity,
-    onReorderActivity,
-    draggedItem,
-    setDraggedItem,
-    parentGoals,
-    immediateGoals,
-    microGoals,
-    session
 }) => {
+    // Context
+    const {
+        rootId,
+        sessionId,
+        activityInstances,
+        activities,
+        groupMap,
+        groupedActivities,
+        showActivitySelector,
+        setShowActivitySelector,
+        draggedItem,
+        setDraggedItem,
+        addActivity,
+        removeActivity,
+        updateInstance,
+        moveActivity,
+        reorderActivity,
+        parentGoals,
+        immediateGoals,
+        microGoals,
+        session
+    } = useActiveSession();
+
     const [viewGroupId, setViewGroupId] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
     // Filter ungrouped activities
-    const ungroupedActivities = activities.filter(a => !a.group_id);
+    const ungroupedActivities = Array.isArray(activities) ? activities.filter(a => !a.group_id) : [];
 
     // Drag handlers for the section (drop target)
     const handleDragOver = (e) => {
@@ -95,7 +99,7 @@ const SessionSection = ({
 
         if (draggedItem && draggedItem.sourceSectionIndex !== sectionIndex) {
             // Move activity from source section to this section
-            onMoveActivity(
+            moveActivity(
                 draggedItem.sourceSectionIndex,
                 sectionIndex,
                 draggedItem.instanceId
@@ -129,7 +133,7 @@ const SessionSection = ({
                 {section.activity_ids?.map((instanceId) => {
                     const instance = activityInstances.find(i => i.id === instanceId);
                     if (!instance) return null;
-                    const definition = activities.find(a => a.id === instance.activity_definition_id);
+                    const definition = Array.isArray(activities) ? activities.find(a => a.id === instance.activity_definition_id) : null;
                     const isDragging = draggedItem?.instanceId === instanceId;
 
                     return (
@@ -151,28 +155,21 @@ const SessionSection = ({
                         >
                             <SessionActivityItem
                                 exercise={instance}
-                                activityDefinition={definition}
-                                onDelete={() => onDeleteActivity(sectionIndex, instanceId)}
-                                onUpdate={(key, value) => onUpdateActivity(instanceId, { [key]: value })}
+                                onDelete={() => removeActivity(instanceId)}
+                                onUpdate={(key, value) => updateInstance({ instanceId, updates: { [key]: value } })}
                                 onFocus={(instance, setIndex) => onFocusActivity(instance, setIndex)}
                                 isSelected={selectedActivityId === instanceId}
-                                rootId={rootId}
-                                onReorder={(direction) => onReorderActivity(sectionIndex, section.activity_ids.indexOf(instanceId), direction)}
+                                onReorder={(direction) => reorderActivity(sectionIndex, section.activity_ids.indexOf(instanceId), direction)}
                                 canMoveUp={section.activity_ids.indexOf(instanceId) > 0}
                                 canMoveDown={section.activity_ids.indexOf(instanceId) < section.activity_ids.length - 1}
                                 showReorderButtons={true}
                                 onNoteCreated={onNoteCreated}
-                                sessionId={sessionId}
                                 allNotes={allNotes}
                                 onAddNote={onAddNote}
                                 onUpdateNote={onUpdateNote}
                                 onDeleteNote={onDeleteNote}
                                 onOpenGoals={onOpenGoals}
                                 isDragging={isDragging}
-                                parentGoals={parentGoals}
-                                immediateGoals={immediateGoals}
-                                microGoals={microGoals}
-                                session={session}
                             />
                         </div>
                     );
@@ -186,7 +183,7 @@ const SessionSection = ({
                 )}
 
                 {/* Add Activity Button / Selector */}
-                {showActivitySelector ? (
+                {showActivitySelector[sectionIndex] ? (
                     <div className={styles.activitySelector}>
                         <div className={styles.selectorHeader}>
                             <span className={styles.selectorTitle}>
@@ -205,7 +202,7 @@ const SessionSection = ({
                                 )}
                                 <button
                                     onClick={() => {
-                                        onToggleActivitySelector(false);
+                                        setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
                                         setViewGroupId(null); // Reset on close
                                     }}
                                     className={styles.closeButton}
@@ -252,7 +249,7 @@ const SessionSection = ({
                                 {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
                                     <button
                                         key={act.id}
-                                        onClick={() => onAddActivity(sectionIndex, act.id)}
+                                        onClick={() => addActivity(sectionIndex, act.id)}
                                         className={styles.activityButton}
                                     >
                                         <span>+</span> {act.name}
@@ -279,7 +276,7 @@ const SessionSection = ({
                     </div>
                 ) : (
                     <button
-                        onClick={() => onToggleActivitySelector(true)}
+                        onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
                         className={styles.addActivityButton}
                     >
                         + Add Activity
