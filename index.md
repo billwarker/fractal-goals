@@ -9,166 +9,48 @@
 
 ## Project Overview
 
-**Fractal Goals** is a hierarchical goal tracking and practice session management system. It uses a fractal pattern where each goal can have children, creating a tree structure from ultimate life goals down to nano-level tasks. The system includes practice session tracking with customizable activities, metrics, timers, and reusable templates.
+**Fractal Goals** is a hierarchical goal tracking system that connects ultimate life goals down to granular practice sessions.
 
-**Tech Stack:**
-- **Backend:** Flask + SQLAlchemy + JWT Auth + Pydantic validation (port 8001)
-- **Frontend:** React 19.2.0 + Vite + React Router + ReactFlow (port 5173)
-### 3. Local Development Data Flow
-- **Frontend**: Runs on port `5173` (Vite) -> Proxies/Requests to `http://localhost:8001/api`
-- **Backend**: Runs on port `8001` (Flask) -> Connects to Local Docker PostgreSQL (`localhost:5432`)
-- **Database**: PostgreSQL container (user: `fractal`, db: `fractal_goals`)
-- **Migrations:** Alembic for database schema versioning
+**Core Tech Stack:**
+- **Backend:** Flask (Port 8001) with SQLAlchemy (PostgreSQL/SQLite) & JWT Auth.
+- **Frontend:** React 19 + Vite (Port 5173) with ReactFlow for visualization.
+- **Infrastructure:** Docker for database, Alembic for migrations.
 
-## Recent Updates
-- Implemented JWT-based Authentication system with Login/Signup modals
-- Enforced data isolation by linking fractal roots to users via `owner_id`
-- Secured **ALL** API blueprints using `@token_required` decorator
-- Created `AuthContext` for global frontend user/session management
-- Refactored Program logic into `ProgramService`
-- **Service Layer Refactor**: Implemented `services/serializers.py` to decouple API responses from database models, standardized JSON handling, and enforced strict Pydantic validation across all blueprints.
-- **Session Data & Backend Stability**: Resolved a critical regression where sessions were not appearing in the list due to backend crashes and double-nested `session_data` JSON. Standardized the merge of DB timing columns into the attributes payload and fixed missing imports in the sessions API.
-- **Notes Regression Fix**: Resolved issues with missing notes by updating `serialize_note` to include critical context IDs (`session_id`, `activity_instance_id`, etc.) and ensuring nested notes are included in Session and ProgramDay payloads.
-- **Activity Name Visibility**: Fixed empty activity headers by adding the `name` field to `serialize_activity_instance` and ensuring `ActivityDefinition` is eager-loaded in all session API endpoints.
-- **Session Program Integration**: Restored the `program_info` and `immediate_goals` fields in session responses by implementing relational hydration in `serialize_session`, ensuring the Sessions page correctly displays linked programs and achieved targets.
-- **Program Day Representation**: Implemented nested session templates and completion-based checkmarks in Calendar and Block views.
-- **Component Refactoring**: Decomposed `GoalDetailModal.jsx` and `ProgramDetail.jsx` into smaller sub-components and extracted business logic into custom hooks (`useGoalForm`, `useProgramData`) to improve maintainability.\n- **CSS Consolidation**: Migrated 125+ inline styles in the `SessionDetail` feature area to scoped CSS modules, centralized design tokens, and restored visual fidelity for critical UI elements like the "Add Session" button.
-- **Settings UI Refactor**: Reorganized the `SettingsModal` to improve clarity. Moved "Interface Theme" toggles to the General tab, consolidated all goal-specific settings (Icons, Colors, Deadlines, Completion Methods) into a new "Characteristics" tab, and removed the redundant "Themes" tab.
-- **Rule Enforcement**: Implemented global enforcement of goal characteristics. The "Mark Complete" button and Targets sections in `GoalDetailModal` now dynamically respect the user's global configuration for each goal level.
-- **API Optimization**: Fixed incorrect API paths for `getGoalMetrics` and `getGoalDailyDurations` in the frontend client, resolving issues with metric fetching in the goal detail view.
-- **Goal Level Enhancements**: Implemented the final two levels of the fractal hierarchy: **Micro Goals** (session-specific focus) and **Nano Goals** (granular checkable sub-tasks).
-- **Session Goals Integration**: Added a dedicated "Goals" tab to the `SessionSidePane` which supports real-time creation and tracking of micro/nano goals linked to the current session.
-- **ProgramBuilder Restriction**: Standardized the `ProgramBuilder` to only allow selection of Mid-Term and Long-Term goals, aligning with the macro-cycle focus of Programs.
-- **Activity Context Actions**: Added a "Micro Goal" action button (🎯) to `SessionActivityItem` to quickly switch side pane context to specific focus areas.
-- **Micro Goal UI Refinement**: Streamlined the `GoalsPanel` by removing redundant subsections and quick-add inputs when an activity is focused.
-- **Auto-Creation Fix**: Implemented an auto-creation trigger for micro goals when clicking the activity instance button, ensuring the creation flow is seamless and functional.
-- **Goal Persistence Fix**: Hoisted `completed` and `completed_at` fields in the `serialize_goal` function to ensure consistent behavior between backend responses and frontend state expectations.
-- **Session Detail & Associator Refinement**: Improved the activity association flow by ensuring the lineage view updates immediately on goal creation, pre-loading existing associations in the modal, and refining the side pane UI (full-width toggles, header-style association link, uniform goal icons, and standardized text formatting).
-- **Goal Inheritance Timing Fix**: Updated backend metrics service to filter activity instances by goal creation time, ensuring newly associated goals only inherit time spent *after* their creation.
-- **Activity Association Persistence Fix**: Resolved an issue where associations made in the Goal Detail Modal view mode were not persisting by implementing immediate backend synchronization via a reusable persistence layer.
-- **Goal Detail Data Loading Fix**: Ensured all goal attributes (description, relevance, etc.) load correctly in the Detail Modal by improving data hydration in the goal utility layer.
-- [x] **Phase 2: Core Architecture & Cleanup**
-  - [x] **Database Model Refactoring**: Modularized `models.py` into `models/` package.
-  - [x] **Bug Resolution**: Fixed post-refactoring `AttributeError` and improved auth logging.
-  - [ ] **Frontend State Consolidation**: Streamline `SessionDetail` state management.
-  - [ ] **Legacy Code Cleanup**: Remove unused files and directories.
-- **Goal Completion Styling**: Implemented a global "Completed" status styling system. Users can now customize the icon (default: "check") and color for completed goals in Settings.
-- **Relational Accomplishment Filtering**: Refactored the session accomplishments section to use relational data between sessions and target completions, ensuring accurate display of work done during a session even if recorded with a slight delay.
-- **Universal Target Icon**: Implemented a customizable `twelve-point-star` icon as the default for targets across the application.
+## Status & Recent Changes
+
+### Phase 2: Core Architecture (Current)
+- **Database Refactoring:** Split monolithic `models.py` into domain-specific modules (`models/user.py`, `models/goal.py`, etc.).
+- **Backend Stability:** Fixed critical recursion/serialization bugs and improved error logging for authentication.
+- **Legacy Cleanup:** Removed deprecated `PracticeSession` aliases and unused fields.
+
+### Key Features Added (v1.x)
+- **Micro/Nano Goals:** Added sub-session granularity for detailed tracking.
+- **Service Layer:** Introduced `SessionService` and `ProgramService` to decouple logic from blueprints.
+- **Event-Driven Architecture:** Implemented a global Event Bus for cascading updates (e.g., Session Complete -> Target Achieved -> Goal Complete).
+- **SMART Goals:** Integrated SMART criteria tracking with visual indicators in the visualization tree.
+- **Timezone Support:** Global timezone handling for accurate session verification.
 
 ---
 
 ## Core Features
 
-### 0. Authentication & User Accounts
-- **JWT-Based Auth**: Secure signup and login using JSON Web Tokens.
-- **Data Isolation**: All data is scoped to the user. Users can only see and modify fractal roots (and descendant data) that they own.
-- **Auth Guard**: Frontend components and backend API endpoints are protected; unauthenticated users are redirected to the Login/Signup modal.
-- **Session Persistence**: User sessions persist across page refreshes via `localStorage` and automatic token renewal logic.
-- **Ownership Verification**: Backend verification ensures that even if a user knows an ID, they cannot access data they don't own.
-
-### 1. Hierarchical Goal Management
-- 7-level goal hierarchy: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
-- Visual tree representation using ReactFlow
-- Goal completion tracking with targets
-- Goal age calculation and display
-- **Note:** Sessions are now managed separately from the goal hierarchy
-
-### 2. Session Management
-- **Sessions are stored in a separate `sessions` table** (not part of the goal tree)
-- Session start/end times with duration tracking
-- Activity instances with timers
-- Session templates for recurring practices
-- **Session-Goal Associations**:
-  - Many-to-many relationship with Goals via `session_goals` junction table.
-  - Sessions can be linked to ShortTermGoals (`goal_type='short_term'`) and ImmediateGoals (`goal_type='immediate'`).
-  - **Micro/Nano Linking**: Sessions can now have multiple **Micro Goals** linked specifically to that session, which in turn hold checkable **Nano Goals**.
-  - **Goals Panel**: Integrated into the `SessionSidePane` to manage these session-local goals without leaving the session context.
-  - CreateSession page allows selecting STGs and their child IGs in a unified flow.
-  - SessionDetail header displays associated STGs and IGs with clickable links.
-  - GoalDetailModal shows associated sessions for both STGs and IGs.
-- **Refactored Session Detail**:
-  - Moved **Session Controls** (Complete, Save, Cancel, Delete) to the Side Pane for better ergonomics (2x2 Grid, Badge style).
-  - Implemented **Auto-expanding Note Inputs** (Textarea) for better writing experience.
-  - Enhanced **Activity History** to display notes with timestamps and set badges for each previous instance.
-  - Refined **Side Pane UI**: Removed redundant context indicator, improved "Details" tab layout with collapsible metadata.
-  - **Click-to-Select Activity**: Activities cards are now selectable by clicking anywhere on the card.
-  - **Click-to-Deselect Set**: Click on activity header/name to clear set selection and return context to whole activity.
-  - **Activity Reordering**: Up/down arrow buttons for within-section reordering; drag-and-drop for between-section moves.
-  - **Note Separation**: SidePane is for session-level notes only; activity/set notes are in the activity cards.
-  - **Editable Metadata**: Edit Session Start/End times directly in Side Pane.
-  - **Previous Notes**: Side pane shows session-level notes from last 3 sessions; History tab limits activity instances to last 3.
-
-### 3. Activity System
-- Reusable activity definitions organized by groups
-- Customizable metrics (weight, reps, distance, etc.)
-- Split support (e.g., left/right for exercises)
-- Set-based tracking
-- Multiplicative metrics for derived values
-- Activity instances track actual performance in sessions
-
-### 4. Time Tracking
-- Activity-level timers with start/stop functionality
-- Manual time entry support
-- Duration calculation and display
-- Session-level time analytics
-
-### 5. Templates
-- Reusable session templates
-- Template creation from existing sessions
-- Template editing and management
-
-### 6. Programs (Composable Session Templates)
-- Create reusable practice session templates with components
-- Component types: Warm-up, Drill, Practice, Cool-down
-- Visual template builder with drag-and-drop ordering
-- JSON export for template sharing
-- Load and edit existing templates
-
-### 7. Multi-Environment Support
-- Development, Testing, and Production environments
-- Separate databases per environment (goals_dev.db, goals_test.db, goals.db)
-- Environment-specific configuration via .env files
-- Environment indicator in UI
-
-### 8. SMART Goals
-Goals can be evaluated against SMART criteria with visual indicators:
-- **S**pecific: Goal has a description
-- **M**easurable: Goal has targets attached
-- **A**chievable: Goal has activities associated (via `activity_goal_associations` table)
-- **R**elevant: User provided a relevance statement explaining how goal helps achieve parent
-- **T**ime-bound: Goal has a deadline
-
-**Visual Indicators:**
-- `SMARTIndicator` component shows "SMART" text with each letter colored based on criterion status
-- `FlowTree` nodes display an outer glowing ring for goals meeting all SMART criteria
-- `GoalDetailModal` includes the SMART indicator in the header and a "Relevance" field in edit mode
-- **Conditional Completion Logic:** Goals can customize how progress is measured:
-  - **Activities & Targets:** Track specific performance data.
-  - **Completed via Children:** Completion is derived from child goal status (for goals above `ShortTermGoal`).
-  - **Manual Completion:** Allow users to manually toggle completion status in the modal.
-  - **Dynamic Completion Status:** When manual completion is disabled, the "Mark Complete" button becomes a status badge showing the automatic criteria (e.g., "Complete via Children").
-  - **Automatic Target-Based Completion:** When all targets on a goal are achieved, the goal is automatically marked as complete via the event system.
-- **Event-Driven Target Completion Flow:**
-  1. User completes an activity instance → `ACTIVITY_INSTANCE_COMPLETED` event emitted
-  2. `handle_activity_instance_completed` evaluates **threshold** targets for linked goals
-  3. If target is met, `TARGET_ACHIEVED` emitted, target marked `completed=true` with `completed_at`
-  4. If ALL targets on a goal are complete → goal auto-completes, `GOAL_COMPLETED` emitted
-  5. API response includes `achieved_targets` and `completed_goals` arrays
-  6. Frontend shows toast notifications: "🎯 Target achieved: [name]" and "🏆 Goal completed: [name]"
-  7. On session completion, `SESSION_COMPLETED` event evaluates **sum/frequency** targets
-  8. `handle_goal_completed` updates parent goals (if `completed_via_children`) and program progress
-- **Real-Time Target Achievement Tracking:**
-  - Threshold targets are evaluated immediately when activity instance is completed
-  - Sum/frequency targets are evaluated on session completion (require historical aggregation)
-  - Toast notifications appear directly from API response, eliminating need for polling
-  - `useTargetAchievements` hook still provides frontend-only preview during session
-- **Associated Children View:** `GoalDetailModal` displays a list of child goals at the level below for better context.
-
-**Database Tables:**
-- `goals.relevance_statement` - Stores the user's explanation of goal relevance
-- `goals.is_smart` - Boolean flag computed when goal is saved
-- `activity_goal_associations` - Junction table linking activities to goals (for "A" criterion)
+1.  **Hierarchical Goals:** 7-level fractal tree (Ultimate -> Nano) visualized with ReactFlow.
+2.  **Session Management:**
+    -   Track practice sessions with start/stop timers and duration logic.
+    -   Link sessions to goals (ShortTerm/Immediate/Micro) via `session_goals`.
+    -   **Goals Panel:** Integrated side-pane for managing session-specific Micro/Nano goals.
+3.  **Activity System:**
+    -   Reusable definitions with custom metrics (reps, weight, distance).
+    -   Supports sets, splits (left/right), and multiplicative metrics.
+4.  **Programs & Templates:**
+    -   Create reusable session templates.
+    -   Build macro-cycles (Programs) with meso-cycles (Blocks) and micro-cycles (Days).
+5.  **SMART Goals:**
+    -   Visual indicators for Specific, Measurable, Achievable, Relevant, Time-bound criteria.
+    -   Automatic completion via target achievement events.
+6.  **Analytics & Visualization:**
+    -   Heatmaps, line graphs, and scatter plots with interactive annotations.
+    -   Event-driven logging for full audit history.
 
 ### 9. Database & Migrations
 
@@ -318,713 +200,34 @@ Captures and persists all application events to the database for auditing and hi
 
 ## Database Schema
 
-#### `event_logs`
-Stores history of all application events.
-- `id` (PK, UUID)
-- `root_id` (FK to goals.id)
-- `event_type` (String, e.g., 'session.completed')
-- `entity_type` (String, e.g., 'session')
-- `entity_id` (String)
-- `description` (Text, human-readable)
-- `payload` (JSON, full event data)
-- `source` (String)
-- `timestamp` (DateTime)
-
-### Core Tables
-
-#### `goals` (Single Table Inheritance)
-All goal types and practice sessions share this table, differentiated by `type` column.
-
-**Common Fields:**
-- `id` (String, UUID, PK)
-- `type` (String) - Goal type discriminator
-- `name` (String)
-- `description` (String)
-- `deadline` (DateTime, nullable)
-- `completed` (Boolean)
-- `completed_at` (DateTime, nullable) - When goal was marked complete
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-- `parent_id` (String, FK to goals.id)
-- `root_id` (String) - Reference to ultimate goal
-- `targets` (Text/JSON) - **DEPRECATED** - Now stored in relational `targets` table (legacy column kept for migration safety)
-- `relevance_statement` (Text, nullable) - SMART "R" criterion: How goal helps achieve parent
-- `is_smart` (Boolean) - Whether goal meets all SMART criteria
-- `completed_via_children` (Boolean) - If true, completion is derived from child goals
-- `track_activities` (Boolean) - If true, goal tracks activities and targets
-- `allow_manual_completion` (Boolean) - If true, goal can be manually marked as complete
-
-**PracticeSession-Specific Fields:**
-- `duration_minutes` (Integer)
-- `session_start` (DateTime)
-- `session_end` (DateTime)
-- `total_duration_seconds` (Integer)
-- `template_id` (String)
-- `attributes` (Text/JSON) - Flexible session data storage
-- `session_data` (Text/JSON) - DEPRECATED, use attributes
-
-**Goal Types:**
-- UltimateGoal
-- LongTermGoal
-- MidTermGoal
-- ShortTermGoal
-- ImmediateGoal
-- MicroGoal
-- NanoGoal
-
-**Note:** PracticeSession is NO LONGER a goal type. Sessions are now stored in the separate `sessions` table.
-
-**Relationships:**
-- Self-referential parent-child via `parent_id`
-
-#### `sessions` (Separate Table)
-Stores practice session data independently from the goal hierarchy.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `name` (String)
-- `description` (String)
-- `root_id` (String, FK to goals.id) - Reference to fractal root
-- `completed` (Boolean)
-- `completed_at` (DateTime, nullable)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-- `deleted_at` (DateTime, nullable) - Soft delete
-- `duration_minutes` (Integer)
-- `session_start` (DateTime)
-- `session_end` (DateTime)
-- `total_duration_seconds` (Integer)
-- `template_id` (String)
-- `program_day_id` (String, FK to program_days.id)
-- `attributes` (Text/JSON) - Flexible session data storage
-
-**Relationships:**
-- Has many ActivityInstances
-- Has many-to-many with Goals via `session_goals`
-
-#### `session_goals` (Junction Table)
-Links Sessions to multiple Goals (many-to-many). Supports both ShortTermGoals and ImmediateGoals.
-
-**Fields:**
-- `session_id` (String, FK to sessions.id, PK)
-- `goal_id` (String, FK to goals.id, PK)
-- `goal_type` (String) - 'short_term' or 'immediate'
-- `created_at` (DateTime)
-
-#### `activity_groups`
-Organizes activities into families/categories.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `root_id` (String, FK to goals.id)
-- `name` (String)
-- `description` (String)
-- `created_at` (DateTime)
-- `sort_order` (Integer)
-
-#### `activity_definitions`
-Reusable activity templates.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `root_id` (String, FK to goals.id)
-- `name` (String)
-- `description` (String)
-- `created_at` (DateTime)
-- `has_sets` (Boolean)
-- `has_metrics` (Boolean)
-- `metrics_multiplicative` (Boolean)
-- `has_splits` (Boolean)
-- `group_id` (String, FK to activity_groups.id)
-
-**Relationships:**
-- Has many MetricDefinitions
-- Has many SplitDefinitions
-
-#### `metric_definitions`
-Defines metrics for activities (e.g., weight, reps, distance).
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `activity_id` (String, FK to activity_definitions.id)
-- `name` (String)
-- `unit` (String)
-- `created_at` (DateTime)
-- `deleted_at` (DateTime, nullable)
-- `is_active` (Boolean)
-- `is_top_set_metric` (Boolean) - Determines which metric defines "top set"
-- `is_multiplicative` (Boolean) - Include in product calculations
-
-#### `split_definitions`
-Defines splits for activities (e.g., left/right).
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `activity_id` (String, FK to activity_definitions.id)
-- `name` (String)
-- `order` (Integer)
-- `created_at` (DateTime)
-
-#### `activity_instances`
-Actual activity occurrences within sessions.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `session_id` (String, FK to sessions.id)
-- `activity_definition_id` (String, FK to activity_definitions.id)
-- `root_id` (String, FK to goals.id) - For performance
-- `created_at` (DateTime)
-- `time_start` (DateTime, nullable)
-- `time_stop` (DateTime, nullable)
-- `duration_seconds` (Integer, nullable)
-- `completed` (Boolean)
-- `notes` (Text)
-- `data` (Text/JSON) - Flexible data storage (sets, etc.)
-
-**Relationships:**
-- Belongs to Session
-- Belongs to ActivityDefinition
-- Has many MetricValues
-
-#### `metric_values`
-Recorded metric values for activity instances.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `activity_instance_id` (String, FK to activity_instances.id)
-- `metric_definition_id` (String, FK to metric_definitions.id)
-- `split_definition_id` (String, FK to split_definitions.id, nullable)
-- `value` (Float)
-
-#### `notes`
-Timestamped notes attached to sessions, activity instances, or sets.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `root_id` (String, FK to goals.id) - For fractal scoping
-- `context_type` (String) - 'session', 'activity_instance', or 'set'
-- `context_id` (String) - ID of the parent entity
-- `session_id` (String, FK to sessions.id, nullable)
-- `activity_instance_id` (String, FK to activity_instances.id, nullable)
-- `activity_definition_id` (String, FK to activity_definitions.id, nullable)
-- `set_index` (Integer, nullable) - For set-level notes
-- `content` (Text)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-- `deleted_at` (DateTime, nullable)
-
-**Relationships:**
-- Belongs to Session (optional)
-- Belongs to ActivityInstance (optional)
-- Belongs to ActivityDefinition (optional)
-
-#### `visualization_annotations`
-Stores annotations on data visualizations.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `root_id` (String, FK to goals.id)
-- `visualization_type` (String) - 'heatmap', 'scatter', 'line', etc.
-- `visualization_context` (Text/JSON) - Identifiers for context (e.g. activity_id)
-- `selected_points` (Text/JSON) - List of data points selected
-- `selection_bounds` (Text/JSON) - Coordinates of selection box
-- `content` (Text)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-#### `targets`
-Stores measurable targets attached to goals.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `goal_id` (String, FK to goals.id) - Parent goal
-- `root_id` (String, FK to goals.id) - Fractal root for scoping
-- `activity_id` (String, FK to activity_definitions.id, nullable) - Linked activity
-- `name` (String)
-- `type` (String) - 'threshold', 'sum', 'frequency'
-- `metrics` (JSON) - Array of metric criteria `[{metric_id, value, operator}]`
-- `time_scope` (String) - 'all_time', 'custom', 'program_block'
-- `start_date` (DateTime, nullable)
-- `end_date` (DateTime, nullable)
-- `linked_block_id` (String, FK to program_blocks.id, nullable)
-- `frequency_days` (Integer, nullable)
-- `frequency_count` (Integer, nullable)
-- `completed` (Boolean)
-- `completed_at` (DateTime, nullable)
-- `completed_session_id` (String, FK to sessions.id, nullable)
-- `completed_instance_id` (String, FK to activity_instances.id, nullable)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-- `deleted_at` (DateTime, nullable) - Soft delete
-
-**Relationships:**
-- Belongs to Goal
-- Belongs to ActivityDefinition (optional)
-- Belongs to completed Session (optional)
-- Belongs to completed ActivityInstance (optional)
-
-#### `session_templates`
-Reusable session templates.
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `name` (String)
-- `description` (String)
-- `root_id` (String, FK to goals.id)
-- `created_at` (DateTime)
-- `template_data` (String/JSON)
-
-#### `programs`
-Manages training programs (macro-cycles).
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `root_id` (String, FK to goals.id)
-- `name` (String)
-- `description` (String)
-- `start_date` (DateTime)
-- `end_date` (DateTime)
-- `is_active` (Boolean)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-#### `program_blocks`
-Training blocks within a program (meso-cycles).
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `program_id` (String, FK to programs.id)
-- `name` (String)
-- `start_date` (Date)
-- `end_date` (Date)
-- `color` (String)
-- `goal_ids` (Text/JSON) - Goals targeted by this block
-
-#### `program_days`
-Days within a block (micro-cycles).
-
-**Fields:**
-- `id` (String, UUID, PK)
-- `block_id` (String, FK to program_blocks.id)
-- `day_number` (Integer) - Order within block
-- `date` (Date)
-- `name` (String)
-- `notes` (Text)
-- `is_completed` (Boolean)
-
-#### `program_day_templates` (Junction Table)
-Links ProgramDays to multiple SessionTemplates (many-to-many).
-
-**Fields:**
-- `program_day_id` (String, FK to program_days.id, PK)
-- `session_template_id` (String, FK to session_templates.id, PK)
-- `order` (Integer)
-
----
-
-## Backend API Structure
-
-### Request Validation (`/validators.py`)
-Pydantic-based validation for all API endpoints.
-
-**Features:**
-- `@validate_request(SchemaClass)` decorator for automatic request validation
-- String sanitization (whitespace normalization, null byte removal)
-- Structured error responses with field-level details
-- Maximum length enforcement to prevent abuse
-
-**Key Schemas:**
-- `GoalCreateSchema`, `GoalUpdateSchema` - Goal CRUD validation
-- `FractalCreateSchema` - Root goal creation validation
-- `SessionCreateSchema`, `SessionUpdateSchema` - Session validation
-- `NoteCreateSchema`, `NoteUpdateSchema` - Note validation
-- `ProgramCreateSchema`, `ProgramBlockSchema` - Program validation
-
-### Blueprints (in `/blueprints/`)
-
-#### `goals_api.py`
-Manages goal hierarchy and CRUD operations.
-
-**Key Endpoints:**
-- `GET /api/fractals` - List all root goals (fractals)
-- `POST /api/fractals` - Create new fractal
-- `DELETE /api/fractals/<root_id>` - Delete fractal and all descendants
-- `GET /api/<root_id>/goals` - Get goal tree for fractal
-- `POST /api/goals` - Create new goal
-- `PUT /api/goals/<goal_id>` - Update goal
-- `DELETE /api/goals/<goal_id>` - Delete goal recursively
-- `PATCH /api/goals/<goal_id>/complete` - Toggle goal completion
-- `POST /api/goals/<goal_id>/targets` - Add target to goal
-- `DELETE /api/goals/<goal_id>/targets/<target_id>` - Remove target
-- `POST /api/<root_id>/goals/<goal_id>/evaluate-targets` - Evaluate and persist target completion for a session
-
-#### `sessions_api.py`
-Manages practice sessions.
-
-**Key Endpoints:**
-- `GET /api/<root_id>/sessions` - Get all sessions for fractal
-- `GET /api/<root_id>/sessions/<session_id>` - Get specific session
-- `POST /api/<root_id>/sessions` - Create new session
-- `PUT /api/<root_id>/sessions/<session_id>` - Update session
-- `DELETE /api/<root_id>/sessions/<session_id>` - Delete session
-- `POST /api/<root_id>/sessions/<session_id>/activities` - Add activity to session
-- `DELETE /api/<root_id>/sessions/<session_id>/activities/<instance_id>` - Remove activity
-- `PUT /api/<root_id>/sessions/<session_id>/activities/<instance_id>` - Update activity instance
-- `POST /api/<root_id>/sessions/<session_id>/activities/reorder` - Reorder activities
-
-#### `activities_api.py`
-Manages activity definitions, groups, metrics, and splits.
-
-**Key Endpoints:**
-- `GET /api/<root_id>/activities` - Get all activity definitions
-- `POST /api/<root_id>/activities` - Create activity definition
-- `PUT /api/<root_id>/activities/<activity_id>` - Update activity
-- `DELETE /api/<root_id>/activities/<activity_id>` - Delete activity
-- `GET /api/<root_id>/activity-groups` - Get all activity groups
-- `POST /api/<root_id>/activity-groups` - Create activity group
-- `PUT /api/<root_id>/activity-groups/<group_id>` - Update group
-- `DELETE /api/<root_id>/activity-groups/<group_id>` - Delete group
-- `POST /api/<root_id>/activities/<activity_id>/metrics` - Add metric definition
-- `PUT /api/<root_id>/activities/<activity_id>/metrics/<metric_id>` - Update metric
-- `DELETE /api/<root_id>/activities/<activity_id>/metrics/<metric_id>` - Delete metric
-- `POST /api/<root_id>/activities/<activity_id>/splits` - Add split definition
-- `DELETE /api/<root_id>/activities/<activity_id>/splits/<split_id>` - Delete split
-
-#### `timers_api.py`
-Manages activity timers and time tracking.
-
-**Key Endpoints:**
-- `POST /api/<root_id>/activity-instances` - Create activity instance (without starting timer)
-- `PUT /api/<root_id>/activity-instances/<instance_id>` - Update activity instance times
-- `POST /api/<root_id>/activity-instances/<instance_id>/start` - Start activity timer
-- `POST /api/<root_id>/activity-instances/<instance_id>/stop` - Stop activity timer
-
-#### `templates_api.py`
-Manages session templates.
-
-**Key Endpoints:**
-- `GET /api/<root_id>/session-templates` - Get all templates
-- `POST /api/<root_id>/session-templates` - Create template
-- `PUT /api/<root_id>/session-templates/<template_id>` - Update template
-- `DELETE /api/<root_id>/session-templates/<template_id>` - Delete template
-
-#### `programs_api.py`
-Manages training programs, blocks, and scheduled sessions.
-
-**Key Endpoints:**
-- `GET /api/<root_id>/programs` - Get all programs
-- `GET /api/<root_id>/programs/<program_id>` - Get specific program
-- `POST /api/<root_id>/programs` - Create program
-- `PUT /api/<root_id>/programs/<program_id>` - Update program
-- `DELETE /api/<root_id>/programs/<program_id>` - Delete program
-- `GET /api/<root_id>/programs/active-days` - Get active program days for current date
-- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days` - Add day to block
-- `PUT /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Update program day
-- `DELETE /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>` - Delete program day
-- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy` - Copy day to other blocks
-- `POST /api/<root_id>/programs/<program_id>/blocks/<block_id>/goals` - Attach goal to block
-
-**Note:** Logic refactored into `services/programs.py` (`ProgramService`). Use this service for all program-related operations.
-
-#### `notes_api.py`
-Manages timestamped notes for sessions, activities, and sets.
-
-**Key Endpoints:**
-- `GET /api/<root_id>/sessions/<session_id>/notes` - Get all notes for a session
-- `GET /api/<root_id>/sessions/<session_id>/previous-session-notes` - Get session-level notes from last 3 sessions (grouped by session)
-- `GET /api/<root_id>/activity-instances/<instance_id>/notes` - Get notes for activity instance
-- `GET /api/<root_id>/activities/<activity_id>/notes` - Get notes across sessions for activity
-- `GET /api/<root_id>/activities/<activity_id>/history` - Get previous activity instances (default limit: 3)
-- `POST /api/<root_id>/notes` - Create note
-- `PUT /api/<root_id>/notes/<note_id>` - Update note
-- `DELETE /api/<root_id>/notes/<note_id>` - Soft delete note
-
-#### `annotations_api.py`
-Manages visualization annotations.
-
-**Key Endpoints:**
-- `GET /api/roots/<root_id>/annotations` - Get annotations (can filter by type/context)
-- `POST /api/roots/<root_id>/annotations` - Create annotation
-- `PUT /api/roots/<root_id>/annotations/<annotation_id>` - Update annotation
-- `DELETE /api/roots/<root_id>/annotations/<annotation_id>` - Delete annotation
-
-#### `pages.py`
-Serves static pages (minimal usage, mostly SPA).
-
----
-
-## Frontend Component Structure
-
-### Main Application Files (in `/client/src/`)
-
-- **`main.jsx`** - Application entry point
-- **`AppRouter.jsx`** - Route configuration and navigation
-- **`FlowTree.jsx`** - ReactFlow-based goal tree visualization. Custom nodes with circular design, cosmic color coding, and 3-layer "bullseye" (outer ring, middle ring, core) for SMART goals.
-- **`App.css`** - Global styles
-- **`index.css`** - Base styles
-
-### Pages (in `/client/src/pages/`)
-
-#### `FractalGoals.jsx`
-Main fractal view page with goal tree visualization and sidebar.
-
-**Features:**
-- ReactFlow tree display
-- Goal creation/editing via modals
-- Goal completion toggling
-- Sidebar with goal details
-- Target management
-- Direct navigation to session creation from ShortTermGoal nodes
-
-#### `Sessions.jsx`
-Practice sessions list and management.
-
-**Features:**
-- Session list with filtering
-- Session creation from templates
-- Session deletion
-- Navigation to session detail
-- **Expandable Notes Accordion:** Each session card has a "📝 Notes" toggle that expands to show session-level notes, with note count badge
-
-#### `SessionDetail.jsx`
-Detailed view of a single practice session.
-
-**Features:**
-- Activity management (add, remove, reorder)
-- Activity timers (start, stop, manual entry)
-- Metric value recording
-- Session time editing
-- Activity instance creation and updates
-
-#### `ManageActivities.jsx`
-Activity definition management page.
-
-**Features:**
-- Activity list by group
-- Activity creation/editing via ActivityBuilder
-- Activity group management
-- Activity deletion
-
-#### `CreateSessionTemplate.jsx`
-Session template creation and management.
-
-**Features:**
-- Template creation from scratch
-- Template editing
-- Template loading
-- Custom modals for confirmations
-
-#### `Analytics.jsx`
-Analytics and reporting page.
-
-**Features:**
-- Activity performance tracking
-- Metric trends
-- Session statistics
-
-#### `Programming.jsx`
-Composable practice session template builder.
-
-**Features:**
-- Create session templates with multiple components
-- Component types with color coding (warmup, drill, practice, cooldown)
-- Reorder components within template
-- Duration tracking and calculation
-- Save and load templates
-- Export templates as JSON
-- Custom modals for alerts and confirmations
-
-#### `Programs.jsx`
-Programs list and management page.
-
-**Features:**
-- List all saved programs/templates
-- Create new programs
-- Edit existing programs
-- Delete programs with custom modal and session impact warning
-- Navigate to program detail view
-- Visual improvements:
-  - Block date ranges and active status indicators
-  - Correct grouping of attached goals
-
-#### `ProgramDetail.jsx`
-Detailed view of a single program/template.
-
-**Features:**
-- Calendar and blocks view modes
-- **Calendar View updates:**
-  - **Hierarchical Representation**: Session templates are now nested under their parent program days in the calendar view for better clarity.
-  - **Smart Completion Logic**: Program days are marked with a checkmark only when all associated session templates have been completed via linked sessions.
-  - **Template Level Tracking**: Individual templates in the calendar get checkmarks and session counts (e.g., "Practice Session ✓ 2") when multiple sessions are performed.
-  - **Visual indents**: Nested templates are indented and styled distinctly from parent program days.
-  - Toggle between "Select Dates to Add Block" mode and Day View mode
-  - Comprehensive Day View Modal showing schedule, templates, and goals due
-- **Block Interaction:**
-  - Create and edit training blocks with custom colors and date ranges
-  - User-controlled day creation (days not auto-populated)
-  - Edit existing blocks (name, dates, color)
-  - Active block indicators
-  - **Metrics Section:** Left sidebar displays simple text metrics strictly for the active block. Metrics are calculated by filtering sessions associated with the block's days (via `program_day_id` or `program_context`) and goals attached to the block (or program goals due within the block's timeframe as a fallback).
-  - **Block Goal Display:** All goals associated with a block (manually attached or falling within the block's date range) are displayed as interactive badges next to the block name in the blocks view.
-  - **Program Day Tracking:** Every program day card in the block panel shows a green-highlighted count of completed sessions for that day *within the current block*, with a trailing checkmark for full template completion.
-  - **Days Remaining:** Active blocks in the blocks view now display a "Days Remaining" metric highlighted in the block's specific color.
-  - **Smart Calendar Goals:** Completed goals on the calendar now move to their actual completion date (instead of the original deadline) for better historical tracking.
-- **Scheduling (New Architecture):**
-  - "Assigning" a Program Day to a calendar date creates a **Practice Session** (linked to the template) rather than duplicating the Program Day definition.
-  - Calendar displays these "Planned Sessions" unified with "Completed Sessions".
-- **Legacy Support:** view completed sessions linked to program days
-- Attach goals to blocks with deadline management
-- View completed sessions linked to program days
-
-#### `CreateSession.jsx`
-Session creation page (refactored into focused sub-components).
-
-**Features:**
-- Enhanced session creation flow with dual-source support
-- Option to create sessions from active program days
-- Option to create sessions from templates directly
-- Auto-detection of available sources (program days vs templates)
-- Program context tracking (links sessions to program/block/day)
-- Associate sessions with multiple short-term goals
-- Smart UI that adapts based on available options (all steps visible simultaneously)
-- Add/Attach Immediate Goals to new sessions (both new and existing immediate goals)
-
-**Sub-components (in `/client/src/components/createSession/`):**
-- `StepHeader.jsx` - Reusable step header with numbered badge
-- `ProgramSelector.jsx` - Step 0a: Choose program when multiple available
-- `SourceSelector.jsx` - Step 0b: Choose between program days vs templates
-- `ProgramDayPicker.jsx` - Step 1: Select program day and session
-- `TemplatePicker.jsx` - Step 1: Select template directly
-- `GoalAssociation.jsx` - Step 2: Associate with STGs and IGs
-- `ImmediateGoalSection.jsx` - Sub-component for IG display/management
-- `CreateSessionActions.jsx` - Step 3: Create button and summary
-- `SelectExistingGoalModal.jsx` - Modal for selecting existing IGs
-
-
-#### `Selection.jsx`
-Fractal selection/home page.
-
-**Features:**
-- List all fractals
-- Create new fractal
-- Delete fractal
-- Navigate to fractal view
-
-### Components (in `/client/src/components/`)
-
-#### Core Components
-
-- **`Sidebar.jsx`** - Sidebar for goal details; uses GoalDetailModal for goals, inline UI for sessions
-- **`GoalDetailModal.jsx`** - Unified goal viewing/editing/creating component with dual display modes (modal/panel):
-  - **Mode support:** 'view', 'edit', or 'create' mode via `mode` prop
-  - **Refactored Architecture:** Complex logic extracted into focused sub-components (`TargetManager`, `ActivityAssociator`, `GoalSessionList`).
-  - View/Edit goal name, description, deadline
-  - **Create mode:** Used for creating new child goals with consistent UI (replaces old GoalModal)
-  - **Associated/Targeting Programs display**
-  - **Associated Activities (SMART Achievable):** Managed via `ActivityAssociator`. Shows count of activities linked to goal.
-    - Activity Selector: Card-based group selection + individual activity selection.
-    - **Constraint:** Activities cannot be removed if used by existing targets.
-  - **Inline target builder:** Managed via `TargetManager`. Add/Edit targets with bubble-based activity selection interface. Auto-saves changes in View Mode.
-  - Completion confirmation flow with program/target summary
-  - **SMART Indicator:** Real-time feedback based on current editing state.
-  - **Goal Metadata:** Horizontal display of Created, Deadline, and Completed dates in the header.
-  - **Practice session relationships:** Managed via `GoalSessionList` (children for ShortTermGoals, parent for ImmediateGoals).
-  - **Action buttons layout:** 2x2 Grid layout (Complete, Add Child, Edit, Delete) for better ergonomics.
-  - **Contextual Styling:** 
-    - Goal Name, Date Labels, and Section Headers (Activities, Targets, Sessions) are colored with the goal's cosmic color.
-    - Parent goal references highlighted in parent goal color.
-  - **Completion Choices:** For higher-level goals, choose between tracking activities or delegating to child goals.
-  - **Associated Children:** View list of child goals directly in the modal.
-
-**Sub-components (in `/client/src/components/goalDetail/`):**
-- `TargetManager.jsx` - Manages target list, deletion, and inline target creation/editing.
-- `ActivityAssociator.jsx` - Manages activity associations and the activity selector UI.
-- `GoalSessionList.jsx` - Displays associated sessions contextually based on goal type.
-- **`SelectActivitiesModal.jsx`** - Modal for selecting activities to associate with a goal (for SMART "Achievable" criterion)
-- **`FractalView.jsx`** - Wrapper for fractal visualization
-- **`ActivityBuilder.jsx`** - Modal for creating/editing activity definitions
-- **`ActivitiesManager.jsx`** - Activity selection and management interface
-- **`ActivityCard.jsx`** - Card display for activities
-
-- **`AddTargetModal.jsx`** - Modal for adding targets to goals
-- **`TargetCard.jsx`** - Display card for targets
-- **`ConfirmationModal.jsx`** - Reusable confirmation dialog
-
-#### Modal Components (in `/client/src/components/modals/`)
-
-- **`AddChildModal.jsx`** - Modal for adding child goals
-- **`CreateFractalModal.jsx`** - Modal for creating new fractals
-- **`EditGoalModal.jsx`** - Modal for editing goal details
-- **`SessionCreationModal.jsx`** - Modal for creating sessions
-- **`TemplateSelectionModal.jsx`** - Modal for selecting templates
-- **`AlertModal.jsx`** - Reusable alert/notification modal
-- **`DeleteConfirmModal.jsx`** - Reusable delete confirmation modal. Supports `requireMatchingText` to enforce typing a specific string to enable the delete button.
-- **`ProgramBuilder.jsx`** - Modal for creating/editing programs
-- **`ProgramBlockModal.jsx`** - Modal for creating/editing program blocks
-- **`ProgramDayModal.jsx`** - Modal for creating/editing program days
-- **`AttachGoalModal.jsx`** - Modal for attaching goals to blocks
-- **DeleteProgramModal.jsx** - Modal for confirming program deletion with session count warning. Supports `requireMatchingText` to enforce typing a specific string.
-- **`DayViewModal.jsx`** - Detailed view of a calendar day (schedule + goal deadlines)
-- **`PracticeSessionModal.jsx`** - Modal for creating/editing practice sessions
-- **`GroupBuilderModal.jsx`** - Modal for creating/editing activity groups
-
-#### Analytics Components (in `/client/src/components/analytics/`)
-
-- **`AnnotatedHeatmap.jsx`** - GitHub-style heatmap with drag-to-select annotation support
-- **`AnnotatedChartWrapper.jsx`** - Wrapper for Chart.js charts adding annotation functionality
-- **`AnnotationModal.jsx`** - Modal for adding notes to selected data points
-- **`ProfileWindow.jsx`** - Main container for analytics visualizations
-- **`ActivityHeatmap.jsx`** - Core heatmap component
-- **`ScatterPlot.jsx`** - Scatter plot for metric correlations
-- **`LineGraph.jsx`** - Line graph for metric trends
-- **`WeeklyBarChart.jsx`** - Bar chart for weekly session counts
-- **`GoalCompletionTimeline.jsx`** - Stacked area chart for goal completions
-- **`GoalTimeDistribution.jsx`** - Stacked bar chart for time tracking
-- **`StreakTimeline.jsx`** - Visual timeline of activity streaks
-
-#### Session Detail Components (in `/client/src/components/sessionDetail/`)
-
-- **`SessionSidePane.jsx`** - Persistent side panel with Notes and History modes
-- **`SessionInfoPanel.jsx`** - Collapsible header panel showing session metadata and goals (used in Sidebar)
-- **`SessionSection.jsx`** - Renders a session section with its activities
-- **`SessionControls.jsx`** - Sticky footer controls for session actions (Delete, Cancel, Mark Complete, Done)
-- **`SessionActivityItem.jsx`** - Activity item in session with timer controls (moved from components root)
-- **`NotesPanel.jsx`** - Notes mode with quick-add, timeline, and previous session notes
-- **`NoteQuickAdd.jsx`** - Quick input for adding notes with Enter key submission
-- **`NoteTimeline.jsx`** - Chronological list of notes
-- **`NoteItem.jsx`** - Individual note with inline edit/delete
-- **`PreviousNotesSection.jsx`** - Collapsible section showing notes from previous sessions
-- **`HistoryPanel.jsx`** - Activity history mode showing previous instance metrics
-
-### Hooks (in `/client/src/hooks/`)
-
-- **`useSessionNotes.js`** - Session notes CRUD with `notes`, `previousNotes` (activity-specific), and `previousSessionNotes` (last 3 sessions)
-- **`useActivityHistory.js`** - Fetch previous activity instances for history panel
-- **`useAutoSave.js`** - Reusable debounced auto-save with status tracking
-- **`useTargetAchievements.js`** - Real-time target achievement detection during sessions (client-side only, no persistence until session completion)
-
-### Contexts (in `/client/src/contexts/`)
-
-- **`GoalContext.jsx`** - Global state for goals
-- **`SessionContext.jsx`** - Global state for sessions
-- **`ActivityContext.jsx`** - Global state for activities
-- **`TimezoneContext.jsx`** - Global timezone management
-- **`HeaderContext.jsx`** - Dynamic header actions for page-specific controls
-
-### Utilities (in `/client/src/utils/`)
-
-- **`api.js`** - Axios-based API client with all endpoint functions
-- **`dateUtils.js`** - Date formatting and timezone utilities:
-  - `getLocalISOString()` - Create timestamps in local time (use for session_start, etc.)
-  - `getTodayLocalDate()` - Get today's date as YYYY-MM-DD (local)
-  - `parseAnyDate()` - Safely parse any date string (handles date-only and datetime)
-  - `formatForInput()` - Format dates for input fields
-  - `formatDateInTimezone()` - Format dates for display
-- **`goalColors.js`** - Color schemes for goal types
-- **`goalHelpers.js`** - Goal hierarchy and validation helpers
-- **`metricsHelpers.js`** - Metric calculation utilities
-- **`targetUtils.js`** - Target validation and progress calculation
-- **`programUtils.jsx`** - Shared utilities for program block status (Active badges)
+The database is normalized and split into domain-specific tables. See `models/` directory for SQLAlchemy definitions.
+
+| Domain | Key Tables | Description |
+|--------|------------|-------------|
+| **Core** | `users` | User accounts and authentication. |
+| **Fractal** | `goals`, `targets` | The 7-level goal hierarchy and measurable targets. |
+| **Sessions** | `sessions`, `activity_instances` | Practice sessions and their tracked activities. |
+| **Activities** | `activity_definitions`, `activity_groups` | Reusable activity templates and metrics. |
+| **Programs** | `programs`, `program_blocks`, `program_days` | Training macro-cycles and schedules. |
+| **Data** | `notes`, `metric_values` | Polymorphic notes and discrete metric data points. |
+| **Logs** | `event_logs` | System-wide event audit trail. |
+
+## Frontend Architecture
+
+The frontend is a **React 19 + Vite** SPA using **ReactFlow** for the fractal visualization.
+
+### Key Directories (`client/src/`)
+- **`components/`**: Reusable UI components (Modals, Forms, etc.).
+- **`pages/`**: Top-level route views (`FractalGoals`, `Sessions`, `Analytics`).
+- **`hooks/`**: Custom hooks for business logic (`useSessionLogic`, `useGoalForm`).
+- **`contexts/`**: Global state (`AuthContext`, `GoalContext`, `SessionContext`).
+- **`utils/`**: Helpers for API calls, date formatting, and goal logic.
+
+### Core Pages
+- **Fractal View (`FractalGoals.jsx`)**: The interactive goal tree.
+- **Session Detail (`SessionDetail.jsx`)**: Active practice mode with timers and real-time tracking.
+- **Programs (`Programs.jsx`)**: Calendar and block-based training planner.
+- **Analytics (`Analytics.jsx`)**: Data visualization dashboard.
 
 ---
 
@@ -1487,68 +690,37 @@ When making changes, update these files as needed:
 
 ### Common Tasks
 
-- **Option A (Recommended)**: Use the provided script:
+- **Start All Services:**
   ```bash
   ./shell-scripts/start-all.sh
   ```
-  This starts:
-  - Local PostgreSQL (via Docker)
-  - Flask Backend (Student)
-  - React Frontend
+  (Starts Backend on port 8001 and Frontend on port 5173)
 
-**Access the app:**
-- Frontend: http://localhost:5173
-- Backend: http://localhost:8001
-- Health check: http://localhost:8001/health
+- **View Logs:**
+  ```bash
+  tail -f logs/development_backend.log
+  tail -f logs/development_frontend.log
+  ```
 
-**View logs:**
-```bash
-tail -f logs/development_backend.log
-tail -f logs/development_frontend.log
-```
+- **Run Database Migration:**
+  ```bash
+  source fractal-goals-venv/bin/activate
+  python python-scripts/migrate_<name>.py
+  ```
 
-**Stop all services:**
-```bash
-./shell-scripts/kill-all.sh
-```
+### Key Locations
 
-**Run database migration:**
-```bash
-source fractal-goals-venv/bin/activate
-python python-scripts/migrate_<name>.py
-```
-
-**Copy production database to dev/test:**
-```bash
-./shell-scripts/copy-db-to-envs.sh
-```
-
-### Important File Locations
-
-- **Database models:** `/models.py`
-- **Flask app:** `/app.py`
-- **API blueprints:** `/blueprints/`
-- **Frontend entry:** `/client/src/main.jsx`
-- **API client:** `/client/src/utils/api.js`
-- **Environment config:** `/.env.*` files
-- **Logs:** `/logs/`
-- **Database backups:** `/backups/` (gitignored)
-- **Documentation:** `/docs/` (organized by category)
-  - Architecture docs: `/docs/architecture/`
-  - Migration docs: `/docs/migrations/`
-  - Feature docs: `/docs/features/`
-  - Planning docs: `/docs/planning/`
-  - Guides: `/docs/guides/`
-- **Python Scripts:** `/python-scripts/` (organized by purpose)
-  - Migrations: `/python-scripts/migrations/`
-  - Debug tools: `/python-scripts/debug/`
-  - Demo data: `/python-scripts/demo-data/`
-  - Utilities: `/python-scripts/utilities/`
+- **Models:** `/models/` (Domain-specific modules)
+- **API Config:** `/app.py` & `/config.py`
+- **API Routes:** `/blueprints/`
+- **Frontend App:** `/client/src/`
+- **Documentation:** `/docs/`
+- **Scripts:** `/python-scripts/` & `/shell-scripts/`
 
 ---
 
-**Last Updated:** 2026-01-23  
-**Version:** 1.3.0  
+**Last Updated:** 2026-02-17
+**Version:** 2.0.0 (Refactored Architecture)
 **Maintained By:** Project AI Agents
 
 ---
