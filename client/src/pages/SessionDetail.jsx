@@ -13,6 +13,7 @@ import '../App.css';
 import { useGoals } from '../contexts/GoalsContext';
 import ActivityAssociationModal from '../components/sessionDetail/ActivityAssociationModal';
 import StatusState from '../components/common/StatusState';
+import useIsMobile from '../hooks/useIsMobile';
 
 // Context
 import { ActiveSessionProvider, useActiveSession } from '../contexts/ActiveSessionContext';
@@ -37,6 +38,7 @@ function SessionDetailContent() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
     const { useFractalTreeQuery } = useGoals();
+    const isMobile = useIsMobile();
 
 
 
@@ -77,6 +79,7 @@ function SessionDetailContent() {
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [showAssociationModal, setShowAssociationModal] = useState(false);
     const [associationContext, setAssociationContext] = useState(null);
+    const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
 
     // Pre-calculate full goal tree for association
     const { data: fullGoalTree } = useFractalTreeQuery(rootId);
@@ -109,6 +112,9 @@ function SessionDetailContent() {
         setSelectedActivity(instance);
         setSelectedSetIndex(null);
         setSidePaneMode('goals');
+        if (isMobile) {
+            setIsMobilePaneOpen(true);
+        }
     };
 
     const handleAssociateActivity = async (goalIds) => {
@@ -159,6 +165,19 @@ function SessionDetailContent() {
         refreshNotes
     } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
 
+    useEffect(() => {
+        if (!isMobile) {
+            setIsMobilePaneOpen(false);
+        }
+    }, [isMobile]);
+
+    const formatDuration = (seconds) => {
+        if (!seconds || Number.isNaN(seconds)) return '--:--';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${String(secs).padStart(2, '0')}`;
+    };
+
     if (loading) {
         return (
             <div className="page-container">
@@ -186,10 +205,34 @@ function SessionDetailContent() {
         );
     }
 
+    const totalDuration = calculateTotalDuration();
+    const isCompleted = Boolean(session?.attributes?.completed);
+    const selectedModeLabel = sidePaneMode.charAt(0).toUpperCase() + sidePaneMode.slice(1);
+
 
     return (
         <div className={styles.sessionDetailContainer}>
             <div className={styles.sessionMainContent}>
+                {isMobile && (
+                    <div className={styles.mobileSessionHeader}>
+                        <div className={styles.mobileSessionTitleRow}>
+                            <h1 className={styles.mobileSessionTitle}>{session?.name || 'Session'}</h1>
+                            <span className={`${styles.mobileSessionStatus} ${isCompleted ? styles.mobileSessionStatusDone : ''}`}>
+                                {isCompleted ? 'Complete' : 'In progress'}
+                            </span>
+                        </div>
+                        <div className={styles.mobileSessionMeta}>
+                            <span>Duration {formatDuration(totalDuration)}</span>
+                            <button
+                                type="button"
+                                className={styles.mobileOpenPaneButton}
+                                onClick={() => setIsMobilePaneOpen(true)}
+                            >
+                                Open {selectedModeLabel}
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className={styles.sessionSectionsList}>
                     {localSessionData.sections?.map((section, sectionIndex) => (
                         <SessionSection
@@ -210,7 +253,7 @@ function SessionDetailContent() {
                 </div>
             </div>
 
-            <div className={styles.sessionSidebarWrapper}>
+            <div className={`${styles.sessionSidebarWrapper} ${isMobile ? styles.sessionSidebarHidden : ''}`}>
                 <div className={styles.sessionSidebarSticky}>
                     <SessionSidePane
                         selectedActivity={selectedActivity}
@@ -230,9 +273,56 @@ function SessionDetailContent() {
                         onOpenGoals={handleOpenGoals}
                         mode={sidePaneMode}
                         onModeChange={setSidePaneMode}
+                        showModeTabs={!isMobile}
                     />
                 </div>
             </div>
+
+            {isMobile && isMobilePaneOpen && (
+                <div
+                    className={styles.mobilePaneOverlay}
+                    onClick={() => setIsMobilePaneOpen(false)}
+                    role="presentation"
+                >
+                    <div
+                        className={styles.mobilePaneSheet}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className={styles.mobilePaneHeader}>
+                            <div className={styles.mobilePaneTitle}>{selectedModeLabel}</div>
+                            <button
+                                type="button"
+                                className={styles.mobilePaneClose}
+                                onClick={() => setIsMobilePaneOpen(false)}
+                                aria-label="Close panel"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <SessionSidePane
+                            selectedActivity={selectedActivity}
+                            selectedSetIndex={selectedSetIndex}
+                            onNoteAdded={refreshNotes}
+                            onGoalClick={(goal) => setSelectedGoal(goal)}
+                            notes={sessionNotes}
+                            previousNotes={previousNotes}
+                            previousSessionNotes={previousSessionNotes}
+                            addNote={addNote}
+                            updateNote={updateNote}
+                            deleteNote={deleteNote}
+                            onDelete={handleDeleteSessionClick}
+                            onCancel={() => navigate(`/${rootId}/sessions`)}
+                            onGoalCreated={refreshSession}
+                            onSave={handleSaveSession}
+                            onOpenGoals={handleOpenGoals}
+                            mode={sidePaneMode}
+                            onModeChange={setSidePaneMode}
+                            showModeTabs={false}
+                            embedded
+                        />
+                    </div>
+                </div>
+            )}
 
             <ConfirmationModal
                 isOpen={showDeleteConfirm}
@@ -274,6 +364,24 @@ function SessionDetailContent() {
                     {autoSaveStatus === 'saving' && 'Saving changes...'}
                     {autoSaveStatus === 'saved' && 'Saved'}
                     {autoSaveStatus === 'error' && 'Save failed'}
+                </div>
+            )}
+
+            {isMobile && (
+                <div className={styles.mobileBottomDock}>
+                    {['details', 'goals', 'history'].map((modeOption) => (
+                        <button
+                            key={modeOption}
+                            type="button"
+                            className={`${styles.mobileDockTab} ${sidePaneMode === modeOption ? styles.mobileDockTabActive : ''}`}
+                            onClick={() => {
+                                setSidePaneMode(modeOption);
+                                setIsMobilePaneOpen(true);
+                            }}
+                        >
+                            {modeOption.charAt(0).toUpperCase() + modeOption.slice(1)}
+                        </button>
+                    ))}
                 </div>
             )}
         </div>

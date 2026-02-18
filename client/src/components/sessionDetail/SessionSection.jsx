@@ -3,6 +3,7 @@ import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import useIsMobile from '../../hooks/useIsMobile';
 
 /**
  * Calculate total duration in seconds for a section based on activity instances
@@ -49,6 +50,7 @@ const SessionSection = ({
     onDeleteNote,
     onOpenGoals,
 }) => {
+    const isMobile = useIsMobile();
     // Context
     const {
         rootId,
@@ -107,6 +109,104 @@ const SessionSection = ({
         }
         setDraggedItem(null);
     };
+
+    const isSelectorOpen = Boolean(showActivitySelector[sectionIndex]);
+    const closeSelector = () => {
+        setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
+        setViewGroupId(null);
+    };
+
+    const selectorContent = (
+        <div className={styles.activitySelector}>
+            <div className={styles.selectorHeader}>
+                <span className={styles.selectorTitle}>
+                    {viewGroupId === null ? 'Step 1: Select Activity Group' :
+                        viewGroupId === 'ungrouped' ? 'Step 2: Pick an Ungrouped Activity' :
+                            `Step 2: Pick a ${groupMap[viewGroupId]?.name || 'Group'} Activity`}
+                </span>
+                <div className={styles.selectorActions}>
+                    {viewGroupId !== null && (
+                        <button
+                            type="button"
+                            onClick={() => setViewGroupId(null)}
+                            className={styles.backButton}
+                        >
+                            ← Back
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={closeSelector}
+                        className={styles.closeButton}
+                        aria-label="Close activity selector"
+                    >
+                        ×
+                    </button>
+                </div>
+            </div>
+
+            {/* Hierarchical View */}
+            {viewGroupId === null ? (
+                <div className={styles.groupsGrid}>
+                    {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
+                        const group = groupMap[groupId];
+                        if (!groupActivities.length) return null;
+                        return (
+                            <button
+                                type="button"
+                                key={groupId}
+                                onClick={() => setViewGroupId(groupId)}
+                                className={styles.groupCard}
+                            >
+                                <div className={styles.groupCardName}>{group?.name || 'Unknown'}</div>
+                                <div className={styles.groupCardCount}>{groupActivities.length} activities</div>
+                            </button>
+                        );
+                    })}
+
+                    {ungroupedActivities.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setViewGroupId('ungrouped')}
+                            className={styles.ungroupedCard}
+                        >
+                            <div className={styles.ungroupedCardName}>Ungrouped</div>
+                            <div className={styles.groupCardCount}>{ungroupedActivities.length} activities</div>
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className={styles.activitiesList}>
+                    {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
+                        <button
+                            type="button"
+                            key={act.id}
+                            onClick={() => addActivity(sectionIndex, act.id)}
+                            className={styles.activityButton}
+                        >
+                            <span>+</span> {act.name}
+                        </button>
+                    ))}
+                    {(!groupedActivities[viewGroupId] && viewGroupId !== 'ungrouped' && (
+                        <div className={styles.noActivitiesMessage}>No activities found in this group.</div>
+                    ))}
+                </div>
+            )}
+
+            {viewGroupId === null && (
+                <>
+                    <div className={styles.selectorDivider}></div>
+                    <button
+                        type="button"
+                        onClick={() => onOpenActivityBuilder(sectionIndex)}
+                        className={styles.createActivityButton}
+                    >
+                        + Create New Activity Definition
+                    </button>
+                </>
+            )}
+        </div>
+    );
 
     return (
         <div
@@ -183,104 +283,20 @@ const SessionSection = ({
                 )}
 
                 {/* Add Activity Button / Selector */}
-                {showActivitySelector[sectionIndex] ? (
-                    <div className={styles.activitySelector}>
-                        <div className={styles.selectorHeader}>
-                            <span className={styles.selectorTitle}>
-                                {viewGroupId === null ? 'Select Activity Group' :
-                                    viewGroupId === 'ungrouped' ? 'Ungrouped Activities' :
-                                        groupMap[viewGroupId]?.name || 'Group Activities'}
-                            </span>
-                            <div className={styles.selectorActions}>
-                                {viewGroupId !== null && (
-                                <button
-                                    type="button"
-                                    onClick={() => setViewGroupId(null)}
-                                    className={styles.backButton}
-                                >
-                                    ← Back
-                                </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
-                                        setViewGroupId(null); // Reset on close
-                                    }}
-                                    className={styles.closeButton}
-                                    aria-label="Close activity selector"
-                                >
-                                    ×
-                                </button>
+                {isSelectorOpen ? (
+                    isMobile ? (
+                        <div
+                            className={styles.mobileSelectorOverlay}
+                            onClick={closeSelector}
+                            role="presentation"
+                        >
+                            <div className={styles.mobileSelectorSheet} onClick={(event) => event.stopPropagation()}>
+                                {selectorContent}
                             </div>
                         </div>
-
-                        {/* Hierarchical View */}
-                        {viewGroupId === null ? (
-                            /* LEVEL 1: GROUPS */
-                            <div className={styles.groupsGrid}>
-                                {/* Group Cards */}
-                                {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
-                                    const group = groupMap[groupId];
-                                    if (!groupActivities.length) return null;
-                                    return (
-                                        <button
-                                            type="button"
-                                            key={groupId}
-                                            onClick={() => setViewGroupId(groupId)}
-                                            className={styles.groupCard}
-                                        >
-                                            <div className={styles.groupCardName}>{group?.name || 'Unknown'}</div>
-                                            <div className={styles.groupCardCount}>{groupActivities.length} activities</div>
-                                        </button>
-                                    );
-                                })}
-
-                                {/* Ungrouped Card */}
-                                {ungroupedActivities.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewGroupId('ungrouped')}
-                                        className={styles.ungroupedCard}
-                                    >
-                                        <div className={styles.ungroupedCardName}>Ungrouped</div>
-                                        <div className={styles.groupCardCount}>{ungroupedActivities.length} activities</div>
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            /* LEVEL 2: ACTIVITIES */
-                            <div className={styles.activitiesList}>
-                                {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
-                                    <button
-                                        type="button"
-                                        key={act.id}
-                                        onClick={() => addActivity(sectionIndex, act.id)}
-                                        className={styles.activityButton}
-                                    >
-                                        <span>+</span> {act.name}
-                                    </button>
-                                ))}
-                                {(!groupedActivities[viewGroupId] && viewGroupId !== 'ungrouped' && (
-                                    <div className={styles.noActivitiesMessage}>No activities found in this group.</div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Actions Footer (only on root) */}
-                        {viewGroupId === null && (
-                            <>
-                                <div className={styles.selectorDivider}></div>
-                                <button
-                                    type="button"
-                                    onClick={() => onOpenActivityBuilder(sectionIndex)}
-                                    className={styles.createActivityButton}
-                                >
-                                    + Create New Activity Definition
-                                </button>
-                            </>
-                        )}
-                    </div>
+                    ) : (
+                        selectorContent
+                    )
                 ) : (
                     <button
                         type="button"

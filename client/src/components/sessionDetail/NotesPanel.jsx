@@ -9,11 +9,12 @@
  * Note: Activity-level previous notes are shown in HistoryPanel instead.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Linkify from '../atoms/Linkify';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './NotesPanel.module.css';
+import useIsMobile from '../../hooks/useIsMobile';
 
 function NotesPanel({
     rootId,
@@ -32,8 +33,18 @@ function NotesPanel({
     updateNote,
     deleteNote
 }) {
+    const isMobile = useIsMobile();
     const [showPreviousSessionNotes, setShowPreviousSessionNotes] = useState(false);
+    const [showSessionNotes, setShowSessionNotes] = useState(!isMobile);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
+
+    useEffect(() => {
+        if (isMobile) {
+            setShowSessionNotes(false);
+            return;
+        }
+        setShowSessionNotes(true);
+    }, [isMobile]);
 
     // Filter for Session-Level Notes (always show these)
     const sessionNotes = notes.filter(n => n.context_type === 'session');
@@ -63,22 +74,37 @@ function NotesPanel({
 
             {/* Current Session Notes */}
             <div className={styles.notesSection}>
-                <h4>
-                    Session Notes
-                    {sessionNotes.length > 0 && ` (${sessionNotes.length})`}
-                </h4>
-                {sessionNotes.length > 0 ? (
-                    <NoteTimeline
-                        notes={sessionNotes}
-                        onUpdate={updateNote}
-                        onDelete={deleteNote}
-                        compact={false}
-                        selectedNoteId={selectedNoteId}
-                        onNoteSelect={setSelectedNoteId}
-                    />
-                ) : (
+                <div
+                    className={styles.previousNotesHeader}
+                    onClick={() => setShowSessionNotes(prev => !prev)}
+                >
+                    <span className={styles.previousNotesToggle}>
+                        {showSessionNotes ? '▼' : '▶'}
+                    </span>
+                    <h4>
+                        Session Notes
+                        {sessionNotes.length > 0 && ` (${sessionNotes.length})`}
+                    </h4>
+                </div>
+                {showSessionNotes && (
+                    sessionNotes.length > 0 ? (
+                        <NoteTimeline
+                            notes={sessionNotes}
+                            onUpdate={updateNote}
+                            onDelete={deleteNote}
+                            compact={false}
+                            selectedNoteId={selectedNoteId}
+                            onNoteSelect={setSelectedNoteId}
+                        />
+                    ) : (
+                        <div className={styles.notesEmpty}>
+                            No session notes yet
+                        </div>
+                    )
+                )}
+                {!showSessionNotes && (
                     <div className={styles.notesEmpty}>
-                        No session notes yet
+                        Tap to expand notes
                     </div>
                 )}
             </div>

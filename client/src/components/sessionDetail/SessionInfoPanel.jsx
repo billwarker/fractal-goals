@@ -9,6 +9,7 @@ import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/da
 import styles from './SessionInfoPanel.module.css';
 import notify from '../../utils/notify';
 import { Heading } from '../atoms/Typography';
+import useIsMobile from '../../hooks/useIsMobile';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
 
@@ -28,11 +29,13 @@ function SessionInfoPanel({
     } = useActiveSession();
 
     const totalDuration = calculateTotalDuration();
+    const isMobile = useIsMobile();
     const { getGoalColor } = useTheme();
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
     const [editValue, setEditValue] = useState('');
     const [saving, setSaving] = useState(false);
+    const [showAllGoals, setShowAllGoals] = useState(false);
     const { timezone } = useTimezone();
 
     const formatDate = (dateString) => {
@@ -133,6 +136,7 @@ function SessionInfoPanel({
     // Determine values safely
     const startTime = session?.session_start || sessionData?.session_start;
     const endTime = session?.session_end || sessionData?.session_end;
+    const goalsToRender = isMobile && !showAllGoals ? allAssociatedGoals.slice(0, 6) : allAssociatedGoals;
 
     return (
         <div className={styles.sessionInfoPanel}>
@@ -256,9 +260,20 @@ function SessionInfoPanel({
                     {allAssociatedGoals.length > 0 && (
                         <div className={styles.sessionInfoGoals}>
                             <div className={styles.goalsGroup}>
-                                <span className={styles.goalsLabel}>Associated Goals:</span>
+                                <div className={styles.goalsHeaderRow}>
+                                    <span className={styles.goalsLabel}>Associated Goals:</span>
+                                    {isMobile && allAssociatedGoals.length > 6 && (
+                                        <button
+                                            type="button"
+                                            className={styles.goalsViewAllButton}
+                                            onClick={() => setShowAllGoals(prev => !prev)}
+                                        >
+                                            {showAllGoals ? 'Collapse' : 'View all'}
+                                        </button>
+                                    )}
+                                </div>
                                 <div className={styles.goalsBadges}>
-                                    {allAssociatedGoals.map(goal => {
+                                    {goalsToRender.map(goal => {
                                         const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
                                         return (
                                             <div

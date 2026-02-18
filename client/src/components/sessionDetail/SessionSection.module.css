@@ -82,6 +82,26 @@
     animation: fadeIn 0.2s ease-in-out;
 }
 
+.mobileSelectorOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    background: rgba(5, 10, 16, 0.6);
+    display: grid;
+    align-items: end;
+}
+
+.mobileSelectorSheet {
+    background: var(--color-bg-surface);
+    border-top-left-radius: var(--border-radius-xl);
+    border-top-right-radius: var(--border-radius-xl);
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    max-height: 82vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+
 .selectorHeader {
     margin-bottom: 12px;
     display: flex;
@@ -283,5 +303,20 @@
 
     .activityButton {
         width: 100%;
+    }
+
+    .mobileSelectorSheet .activitySelector {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding-bottom: calc(var(--spacing-2xl) + 24px);
+    }
+
+    .selectorHeader {
+        position: sticky;
+        top: 0;
+        background: var(--color-bg-surface);
+        padding-bottom: var(--spacing-sm);
+        z-index: 2;
     }
 }

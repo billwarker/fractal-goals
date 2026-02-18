@@ -17,8 +17,16 @@
     min-width: 0;
 }
 
+.mobileSessionHeader {
+    display: none;
+}
+
 .sessionSidebarWrapper {
     position: relative;
+}
+
+.sessionSidebarHidden {
+    display: none;
 }
 
 .sessionSidebarSticky {
@@ -79,6 +87,59 @@
 .autoSaveError {
     border-color: #f44336;
     color: #f44336;
+}
+
+.mobileBottomDock {
+    display: none;
+}
+
+.mobilePaneOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(7, 12, 18, 0.58);
+    display: grid;
+    align-items: end;
+}
+
+.mobilePaneSheet {
+    background: var(--color-bg-surface);
+    border-top-left-radius: var(--border-radius-xl);
+    border-top-right-radius: var(--border-radius-xl);
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    max-height: 82vh;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.mobilePaneHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(79, 156, 249, 0.14), transparent);
+}
+
+.mobilePaneTitle {
+    font-size: var(--font-size-base);
+    color: var(--color-text-primary);
+    font-weight: 700;
+}
+
+.mobilePaneClose {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
 }
 
 /* Drag and Drop Styles */
@@ -158,5 +219,112 @@
         padding-top: 76px;
         padding-left: var(--spacing-md);
         padding-right: var(--spacing-md);
+    }
+}
+
+@media (max-width: 768px) {
+    .sessionDetailContainer {
+        grid-template-columns: 1fr;
+        padding-bottom: 96px;
+    }
+
+    .mobileSessionHeader {
+        display: grid;
+        gap: var(--spacing-sm);
+        background: linear-gradient(160deg, var(--color-bg-card), var(--color-bg-card-alt));
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: var(--spacing-lg);
+    }
+
+    .mobileSessionTitleRow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--spacing-sm);
+    }
+
+    .mobileSessionTitle {
+        margin: 0;
+        font-size: var(--font-size-xl);
+        line-height: 1.2;
+    }
+
+    .mobileSessionStatus {
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        color: var(--color-text-muted);
+        border: 1px solid var(--color-border);
+        padding: 3px 8px;
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .mobileSessionStatusDone {
+        color: var(--color-brand-success);
+        border-color: var(--color-brand-success);
+        background: rgba(59, 197, 124, 0.1);
+    }
+
+    .mobileSessionMeta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--spacing-sm);
+        color: var(--color-text-secondary);
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-sm);
+    }
+
+    .mobileOpenPaneButton {
+        border: 1px solid var(--color-brand-primary);
+        background: rgba(79, 156, 249, 0.12);
+        color: var(--color-brand-primary);
+        border-radius: var(--border-radius-sm);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        padding: 6px 10px;
+        cursor: pointer;
+    }
+
+    .mobileBottomDock {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 10px;
+        z-index: 1100;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 8px;
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(8px);
+    }
+
+    .mobileDockTab {
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-card-alt);
+        color: var(--color-text-secondary);
+        border-radius: var(--border-radius-sm);
+        padding: 10px 8px;
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .mobileDockTabActive {
+        color: var(--color-text-inverse);
+        background: var(--color-brand-primary);
+        border-color: var(--color-brand-primary);
+    }
+
+    .autoSaveIndicator {
+        bottom: 84px;
     }
 }

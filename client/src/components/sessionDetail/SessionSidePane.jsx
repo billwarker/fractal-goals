@@ -39,7 +39,9 @@ function SessionSidePane({
     onModeChange,          // Callback for mode change
     createMicroTrigger,     // Trigger for auto-creation
     goalCreationContext,
-    onOpenGoals
+    onOpenGoals,
+    showModeTabs = true,
+    embedded = false
 }) {
     // Context
     const {
@@ -73,36 +75,38 @@ function SessionSidePane({
     }, [selectedActivity, activityDefinitions]);
 
     return (
-        <div className={styles.sessionSidepane}>
+        <div className={`${styles.sessionSidepane} ${embedded ? styles.sessionSidepaneEmbedded : ''}`}>
             {/* Mode Toggle Header */}
-            <div className={styles.sidepaneHeader}>
-                <div className={styles.sidepaneTabs}>
-                    <button
-                        type="button"
-                        className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
-                        onClick={() => onModeChange('details')}
-                        aria-pressed={mode === 'details'}
-                    >
-                        Details
-                    </button>
-                    <button
-                        type="button"
-                        className={`${styles.sidepaneTab} ${mode === 'goals' ? styles.sidepaneTabActive : ''}`}
-                        onClick={() => onModeChange('goals')}
-                        aria-pressed={mode === 'goals'}
-                    >
-                        Goals
-                    </button>
-                    <button
-                        type="button"
-                        className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
-                        onClick={() => onModeChange('history')}
-                        aria-pressed={mode === 'history'}
-                    >
-                        History
-                    </button>
+            {showModeTabs && (
+                <div className={styles.sidepaneHeader}>
+                    <div className={styles.sidepaneTabs}>
+                        <button
+                            type="button"
+                            className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
+                            onClick={() => onModeChange('details')}
+                            aria-pressed={mode === 'details'}
+                        >
+                            Details
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.sidepaneTab} ${mode === 'goals' ? styles.sidepaneTabActive : ''}`}
+                            onClick={() => onModeChange('goals')}
+                            aria-pressed={mode === 'goals'}
+                        >
+                            Goals
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
+                            onClick={() => onModeChange('history')}
+                            aria-pressed={mode === 'history'}
+                        >
+                            History
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Mode Content */}
             <div className={styles.sidepaneContent}>

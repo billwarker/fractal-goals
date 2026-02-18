@@ -79,6 +79,11 @@
   --font-size-xl: 18px;
   --font-size-2xl: 22px;
   --font-size-title: 30px;
+
+  /* Breakpoints */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
 }
 
 [data-theme="light"] {
