@@ -72,7 +72,7 @@ def get_immediate_goals_for_session(db_session, session_id):
     from .goal import Goal, session_goals
     stmt = select(Goal).join(session_goals).where(
         session_goals.c.session_id == session_id,
-        session_goals.c.goal_type == 'immediate'
+        Goal.type == 'ImmediateGoal'
     )
     return db_session.execute(stmt).scalars().all()
 

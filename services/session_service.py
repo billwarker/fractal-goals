@@ -29,6 +29,51 @@ class SessionService:
     def __init__(self, db_session):
         self.db_session = db_session
 
+    def _derive_session_goals_from_activities(self, session_obj):
+        """Derive display goals from session activities when persisted links are missing."""
+        activity_def_ids = set()
+
+        # Prefer persisted instances
+        for inst in (session_obj.activity_instances or []):
+            if inst.activity_definition_id:
+                activity_def_ids.add(inst.activity_definition_id)
+
+        # Fallback to session attributes
+        attrs = models._safe_load_json(getattr(session_obj, 'attributes', None), {})
+        for section in attrs.get('sections', []):
+            for exercise in section.get('exercises', []):
+                if exercise.get('activity_id'):
+                    activity_def_ids.add(exercise.get('activity_id'))
+
+        if not activity_def_ids:
+            return []
+
+        activities = self.db_session.query(ActivityDefinition).options(
+            joinedload(ActivityDefinition.associated_goals)
+        ).filter(
+            ActivityDefinition.id.in_(activity_def_ids),
+            ActivityDefinition.root_id == session_obj.root_id,
+            ActivityDefinition.deleted_at == None
+        ).all()
+
+        # Program scoping applies only when program has selected goals.
+        program_goal_ids = set()
+        if getattr(session_obj, 'program_day', None) and session_obj.program_day.block and session_obj.program_day.block.program:
+            program_goal_ids = set(models._safe_load_json(session_obj.program_day.block.program.goal_ids, []))
+
+        derived = {}
+        for act in activities:
+            for goal in act.associated_goals:
+                if goal.deleted_at or goal.completed:
+                    continue
+                if goal.root_id != session_obj.root_id:
+                    continue
+                if program_goal_ids and goal.id not in program_goal_ids:
+                    continue
+                derived[goal.id] = goal
+
+        return list(derived.values())
+
     def get_fractal_sessions(self, root_id, current_user_id, limit=10, offset=0):
         """Get sessions for a specific fractal."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -79,7 +124,13 @@ class SessionService:
         
         if not session:
             return None, "Session not found", 404
-            
+
+        # Backward-compatible fallback for sessions created without persisted links.
+        if not session.goals:
+            derived_goals = self._derive_session_goals_from_activities(session)
+            if derived_goals:
+                session._derived_goals = derived_goals
+
         return serialize_session(session, include_image_data=True), None, 200
 
     def create_session(self, root_id, current_user_id, data):
@@ -112,18 +163,39 @@ class SessionService:
         
         # Program Context
         program_day_id = None
+        program_goal_ids = set()
         if new_session.attributes:
             session_data_dict = models._safe_load_json(new_session.attributes, {})
             program_context = session_data_dict.get('program_context')
             if program_context and 'day_id' in program_context:
-                program_day_id = program_context['day_id']
-                new_session.program_day_id = program_day_id
+                requested_day_id = program_context['day_id']
+                p_day = self.db_session.query(models.ProgramDay).options(
+                    joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
+                ).filter(
+                    models.ProgramDay.id == requested_day_id
+                ).first()
+                if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
+                    program_day_id = requested_day_id
+                    new_session.program_day_id = program_day_id
+                    program_goal_ids = set(models._safe_load_json(p_day.block.program.goal_ids, []))
+                else:
+                    return None, "Invalid program day context for this fractal", 400
+
+        # Validate template ownership when provided
+        if new_session.template_id:
+            template = self.db_session.query(models.SessionTemplate).filter(
+                models.SessionTemplate.id == new_session.template_id,
+                models.SessionTemplate.root_id == root_id,
+                models.SessionTemplate.deleted_at == None
+            ).first()
+            if not template:
+                return None, "Template not found in this fractal", 404
         
         self.db_session.add(new_session)
         self.db_session.flush()
 
-        # Goal Inheritance Logic
-        inherited_goals = set()
+        # Goal Inheritance Logic (activities only)
+        inherited_goal_map = {}
         
         # A. From Activities
         activity_def_ids = set()
@@ -138,81 +210,91 @@ class SessionService:
         if activity_def_ids:
             activities = self.db_session.query(ActivityDefinition).options(
                 joinedload(ActivityDefinition.associated_goals)
-            ).filter(ActivityDefinition.id.in_(activity_def_ids)).all()
+            ).filter(
+                ActivityDefinition.id.in_(activity_def_ids),
+                ActivityDefinition.root_id == root_id,
+                ActivityDefinition.deleted_at == None
+            ).all()
+            found_activity_ids = {a.id for a in activities}
+            missing_activity_ids = activity_def_ids - found_activity_ids
+            if missing_activity_ids:
+                return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
             for act in activities:
                 for goal in act.associated_goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
+                    if (
+                        goal.root_id == root_id and
+                        not goal.completed and
+                        not goal.deleted_at
+                    ):
+                        inherited_goal_map[goal.id] = goal
 
-        # B. From Template
-        if new_session.template_id:
-            template = self.db_session.query(models.SessionTemplate).options(
-                joinedload(models.SessionTemplate.goals)
-            ).filter_by(id=new_session.template_id).first()
-            if template:
-                for goal in template.goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
-        
-        # C. From Program Day
-        program_block_goal_ids = set()
-        if program_day_id:
-            p_day = self.db_session.query(models.ProgramDay).options(
-                joinedload(models.ProgramDay.goals),
-                joinedload(models.ProgramDay.block)
-            ).filter_by(id=program_day_id).first()
-            if p_day:
-                for goal in p_day.goals:
-                    if not goal.completed and not goal.deleted_at:
-                        inherited_goals.add(goal)
-                if p_day.block and p_day.block.goal_ids:
-                    program_block_goal_ids = set(models._safe_load_json(p_day.block.goal_ids, []))
-
-        # Filtering
-        final_goals_to_link = []
-        if program_day_id and program_block_goal_ids:
-            for goal in inherited_goals:
-                if goal.id in program_block_goal_ids:
-                    final_goals_to_link.append(goal)
-        else:
-            final_goals_to_link = list(inherited_goals)
+        # Filter inherited goals by program-selected goals when in program context
+        if program_day_id and program_goal_ids:
+            inherited_goal_map = {gid: g for gid, g in inherited_goal_map.items() if gid in program_goal_ids}
 
         # Persist Associations
-        manual_ids = data.get('parent_ids', []) or data.get('goal_ids', [])
-        if data.get('parent_id'): manual_ids.append(data.get('parent_id'))
-        
-        all_goal_ids_to_link = set(g.id for g in final_goals_to_link)
-        all_goal_ids_to_link.update(manual_ids)
-        
-        for goal_id in all_goal_ids_to_link:
-            goal_obj = next((g for g in final_goals_to_link if g.id == goal_id), None)
-            if not goal_obj:
-                goal_obj = self.db_session.query(Goal).filter_by(id=goal_id).first()
-            
-            if goal_obj:
-                goal_type = 'short_term' if goal_obj.type == 'ShortTermGoal' else 'immediate'
-                self.db_session.execute(
-                    session_goals.insert().values(
-                        session_id=new_session.id,
-                        goal_id=goal_id,
-                        goal_type=goal_type
-                    )
+        manual_ids = set()
+        manual_ids.update(data.get('parent_ids', []) or [])
+        manual_ids.update(data.get('goal_ids', []) or [])
+        if data.get('parent_id'):
+            manual_ids.add(data.get('parent_id'))
+
+        # Provenance-aware linking
+        linked_goal_ids = set()
+
+        for goal_id, goal_obj in inherited_goal_map.items():
+            self.db_session.execute(
+                session_goals.insert().values(
+                    session_id=new_session.id,
+                    goal_id=goal_id,
+                    goal_type=goal_obj.type,
+                    association_source='activity'
                 )
+            )
+            linked_goal_ids.add(goal_id)
+
+        for goal_id in manual_ids:
+            goal_obj = self.db_session.query(Goal).filter(
+                Goal.id == goal_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).first()
+            if not goal_obj:
+                return None, f"Goal not found in this fractal: {goal_id}", 400
+            if goal_id in linked_goal_ids:
+                continue
+            self.db_session.execute(
+                session_goals.insert().values(
+                    session_id=new_session.id,
+                    goal_id=goal_id,
+                    goal_type=goal_obj.type,
+                    association_source='manual'
+                )
+            )
+            linked_goal_ids.add(goal_id)
 
         # Immediate Goals
         immediate_goal_ids = data.get('immediate_goal_ids', [])
         for ig_id in immediate_goal_ids:
-            goal = self.db_session.query(Goal).filter_by(id=ig_id).first()
-            if goal and goal.type == 'ImmediateGoal':
-                existing = self.db_session.query(session_goals).filter_by(session_id=new_session.id, goal_id=ig_id).first()
-                if not existing:
-                    self.db_session.execute(
-                        session_goals.insert().values(
-                            session_id=new_session.id,
-                            goal_id=ig_id,
-                            goal_type='immediate'
-                        )
+            goal = self.db_session.query(Goal).filter(
+                Goal.id == ig_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).first()
+            if not goal:
+                return None, f"Immediate goal not found in this fractal: {ig_id}", 400
+            if goal.type != 'ImmediateGoal':
+                return None, f"Goal is not an ImmediateGoal: {ig_id}", 400
+            if ig_id not in linked_goal_ids:
+                self.db_session.execute(
+                    session_goals.insert().values(
+                        session_id=new_session.id,
+                        goal_id=ig_id,
+                        goal_type=goal.type,
+                        association_source='manual'
                     )
+                )
+                linked_goal_ids.add(ig_id)
 
         if program_day_id:
             from models import ProgramDay

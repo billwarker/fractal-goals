@@ -730,22 +730,16 @@ def _check_parent_completion(db_session, parent: Goal):
 
 def _update_program_progress(db_session, goal: Goal):
     """Update program completion percentage when a goal is completed."""
-    from models import Program, ProgramBlock
+    from models import Program
     
     # Scope to the same fractal to avoid scanning unrelated blocks.
     goal_root_id = goal.root_id or goal.id
-    block_rows = (
-        db_session.query(ProgramBlock.program_id, ProgramBlock.goal_ids)
-        .join(Program, Program.id == ProgramBlock.program_id)
-        .filter(Program.root_id == goal_root_id)
-        .all()
-    )
-
-    program_ids = set()
-    for program_id, block_goal_ids_raw in block_rows:
-        block_goal_ids = models._safe_load_json(block_goal_ids_raw, [])
-        if goal.id in block_goal_ids:
-            program_ids.add(program_id)
+    programs_in_root = db_session.query(Program).filter(Program.root_id == goal_root_id).all()
+    program_ids = {
+        program.id
+        for program in programs_in_root
+        if goal.id in models._safe_load_json(program.goal_ids, [])
+    }
 
     if not program_ids:
         return
@@ -757,15 +751,7 @@ def _update_program_progress(db_session, goal: Goal):
 
 def _recalculate_program_progress(db_session, program):
     """Recalculate the completion percentage for a program."""
-    from models import ProgramBlock
-    
-    # Fetch only what we need from blocks to reduce object hydration overhead.
-    block_goal_rows = db_session.query(ProgramBlock.goal_ids).filter_by(program_id=program.id).all()
-    
-    all_goal_ids = set()
-    for (block_goal_ids_raw,) in block_goal_rows:
-        block_goal_ids = models._safe_load_json(block_goal_ids_raw, [])
-        all_goal_ids.update(block_goal_ids)
+    all_goal_ids = set(models._safe_load_json(program.goal_ids, []))
     
     if not all_goal_ids:
         if hasattr(program, 'goals_completed'):

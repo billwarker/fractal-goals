@@ -6,10 +6,11 @@ import logging
 logger = logging.getLogger(__name__)
 import models
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import select
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
-    ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate,
+    ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate, Program,
     validate_root_goal, get_session_by_id
 )
 from validators import (
@@ -231,6 +232,14 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
         
         if not activity_definition_id:
             return jsonify({"error": "activity_definition_id required"}), 400
+
+        activity_def = db_session.query(ActivityDefinition).filter(
+            ActivityDefinition.id == activity_definition_id,
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at == None
+        ).first()
+        if not activity_def:
+            return jsonify({"error": "Activity definition not found in this fractal"}), 404
         
         # Create the activity instance
         instance = ActivityInstance(
@@ -240,10 +249,43 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
             root_id=root_id  # Add root_id for performance
         )
         db_session.add(instance)
-        
-        # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(id=activity_definition_id).first()
+
+        # Get activity name directly from validated definition
         activity_name = activity_def.name if activity_def else 'Unknown'
+
+        # Inherit session-goal links from newly added activity.
+        associated_goals = [g for g in (activity_def.associated_goals or []) if not g.deleted_at]
+        program_goal_ids = set()
+        if session.program_day_id:
+            raw_program_goal_ids = db_session.execute(
+                select(Program.goal_ids)
+                .select_from(ProgramDay)
+                .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
+                .join(Program, Program.id == ProgramBlock.program_id)
+                .where(ProgramDay.id == session.program_day_id, Program.root_id == root_id)
+            ).scalar()
+            program_goal_ids = set(models._safe_load_json(raw_program_goal_ids, []))
+
+        for goal in associated_goals:
+            if goal.root_id != root_id:
+                continue
+            if program_goal_ids and goal.id not in program_goal_ids:
+                continue
+            existing = db_session.query(session_goals).filter_by(
+                session_id=session_id,
+                goal_id=goal.id
+            ).first()
+            if existing:
+                continue
+            db_session.execute(
+                session_goals.insert().values(
+                    session_id=session_id,
+                    goal_id=goal.id,
+                    goal_type=goal.type,
+                    association_source='activity'
+                )
+            )
+
         db_session.commit()
         db_session.refresh(instance)
         
@@ -282,12 +324,15 @@ def reorder_activities(current_user, root_id, session_id, validated_data):
         activity_ids = data.get('activity_ids', [])
         
         session = get_session_by_id(db_session, session_id)
-        if not session:
+        if not session or session.root_id != root_id:
             return jsonify({"error": "Session not found"}), 404
         
         # Update sort_order for each activity
         for idx, instance_id in enumerate(activity_ids):
-            instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+            instance = db_session.query(ActivityInstance).filter_by(
+                id=instance_id,
+                session_id=session_id
+            ).first()
             if instance:
                 instance.sort_order = idx
         
@@ -313,8 +358,20 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
         root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).first()
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
         data = validated_data
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
+        instance = db_session.query(ActivityInstance).options(
+            joinedload(ActivityInstance.definition)
+        ).filter_by(
+            id=instance_id,
+            session_id=session_id
+        ).first()
         if not instance:
             return jsonify({"error": "Instance not found"}), 404
         
@@ -358,6 +415,13 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
         root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).first()
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
         
         # Get the activity instance
         instance = db_session.query(ActivityInstance).filter_by(

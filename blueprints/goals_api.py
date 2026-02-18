@@ -226,7 +226,8 @@ def create_goal(validated_data):
             db_session.execute(session_goals.insert().values(
                 session_id=validated_data['session_id'],
                 goal_id=new_goal.id,
-                goal_type='micro'
+                goal_type='MicroGoal',
+                association_source='micro_goal'
             ))
         
         db_session.commit()
@@ -275,7 +276,7 @@ def get_session_micro_goals(current_user, root_id, session_id):
             select(Goal)
             .join(session_goals, Goal.id == session_goals.c.goal_id)
             .where(session_goals.c.session_id == session_id)
-            .where(session_goals.c.goal_type == 'micro')
+            .where(Goal.type == 'MicroGoal')
             .options(selectinload(Goal.children)) # Load NanoGoals
         )
         
@@ -881,7 +882,8 @@ def create_fractal_goal(current_user, root_id, validated_data):
             db_session.execute(session_goals.insert().values(
                 session_id=validated_data['session_id'],
                 goal_id=new_goal.id,
-                goal_type='micro'
+                goal_type='MicroGoal',
+                association_source='micro_goal'
             ))
         
         db_session.commit()

@@ -9,7 +9,8 @@ session_goals = Table(
     'session_goals', Base.metadata,
     Column('session_id', String, ForeignKey('sessions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('goal_type', String, nullable=False),  # 'short_term' or 'immediate'
+    Column('goal_type', String, nullable=False),  # canonical Goal.type value
+    Column('association_source', String, nullable=False, default='manual'),  # manual, activity, micro_goal
     Column('created_at', DateTime, default=utc_now)
 )
 
@@ -216,4 +217,3 @@ def delete_goal_recursive(db_session, goal_id):
         db_session.commit()
         return True
     return False
-

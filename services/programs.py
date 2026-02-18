@@ -1,5 +1,4 @@
 
-import json
 import uuid
 import logging
 from datetime import datetime, timedelta, date
@@ -11,7 +10,7 @@ from models import (
     validate_root_goal, _safe_load_json
 )
 from services import event_bus, Event, Events
-from services.serializers import serialize_program, serialize_program_block, serialize_goal
+from services.serializers import serialize_program, serialize_program_block
 
 logger = logging.getLogger(__name__)
 
@@ -468,8 +467,7 @@ class ProgramService:
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": _safe_load_json(template.template_data, {}),
-                                        "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
+                                        "template_data": _safe_load_json(template.template_data, {})
                                     })
                                 
                                 result.append({
@@ -478,12 +476,12 @@ class ProgramService:
                                     "block_id": block.id,
                                     "block_name": block.name,
                                     "block_color": block.color,
-                                    "block_goal_ids": _safe_load_json(block.goal_ids, []),
+                                    "program_goal_ids": _safe_load_json(program.goal_ids, []),
+                                    "block_goal_ids": _safe_load_json(program.goal_ids, []),  # compatibility alias
                                     "day_id": day.id,
                                     "day_name": day.name,
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
-                                    "goals": [serialize_goal(g, include_children=False) for g in day.goals] if hasattr(day, 'goals') else [],
                                     "is_completed": day.is_completed,
                                     "sessions": session_details,
                                     "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
@@ -492,31 +490,40 @@ class ProgramService:
 
     @staticmethod
     def attach_goal_to_block(session, root_id: str, program_id: str, block_id: str, data: Dict) -> Dict:
-        block = session.query(ProgramBlock).filter_by(id=block_id).first()
+        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
             raise ValueError("Block not found")
+        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        if not program:
+            raise ValueError("Program not found in this fractal")
         
         goal_id = data.get('goal_id')
         deadline_str = data.get('deadline')
         
         if not goal_id:
              raise ValueError("Goal ID required")
-        
-        current_ids = _safe_load_json(block.goal_ids, [])
+
+        goal = session.query(Goal).filter(
+            Goal.id == goal_id,
+            Goal.root_id == root_id,
+            Goal.deleted_at == None
+        ).first()
+        if not goal:
+            raise ValueError("Goal not found in this fractal")
+
+        current_ids = _safe_load_json(program.goal_ids, [])
         if goal_id not in current_ids:
             current_ids.append(goal_id)
-            block.goal_ids = json.dumps(current_ids)
-            session.add(block)
+            program.goal_ids = current_ids
+            session.add(program)
             
         if deadline_str:
-            goal = session.query(Goal).get(goal_id)
-            if goal:
-                try:
-                    if len(deadline_str) > 10: deadline_str = deadline_str[:10]
-                    goal.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-                    session.add(goal)
-                except ValueError:
-                     raise ValueError("Invalid date format")
+            try:
+                if len(deadline_str) > 10: deadline_str = deadline_str[:10]
+                goal.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
+                session.add(goal)
+            except ValueError:
+                raise ValueError("Invalid date format")
         
         event_bus.emit(Event(Events.GOAL_BLOCK_ASSOCIATED, {
             'block_id': block.id,

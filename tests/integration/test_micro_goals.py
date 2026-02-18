@@ -123,7 +123,7 @@ class TestMicroGoals:
         db_session.execute(session_goals.insert().values(
             session_id=session.id, 
             goal_id=micro.id,
-            goal_type='micro' 
+            goal_type='MicroGoal'
         ))
         db_session.commit()
         

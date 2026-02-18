@@ -227,7 +227,11 @@ def set_activity_group_goals(current_user, root_id, group_id):
         
         # Add new associations
         for goal_id in goal_ids:
-            goal = session.query(Goal).filter_by(id=goal_id).first()
+            goal = session.query(Goal).filter(
+                Goal.id == goal_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).first()
             if goal:
                 session.execute(
                     goal_activity_group_associations.insert().values(
@@ -368,7 +372,11 @@ def create_activity(current_user, root_id):
         if goal_ids:
             from models import Goal, activity_goal_associations
             for goal_id in goal_ids:
-                goal = session.query(Goal).filter_by(id=goal_id).first()
+                goal = session.query(Goal).filter(
+                    Goal.id == goal_id,
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None
+                ).first()
                 if goal:
                     session.execute(
                         activity_goal_associations.insert().values(
@@ -540,7 +548,11 @@ def update_activity(current_user, root_id, activity_id):
             
             # Add new associations
             for goal_id in goal_ids:
-                goal = session.query(Goal).filter_by(id=goal_id).first()
+                goal = session.query(Goal).filter(
+                    Goal.id == goal_id,
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None
+                ).first()
                 if goal:
                     session.execute(
                         activity_goal_associations.insert().values(
@@ -662,7 +674,11 @@ def set_activity_goals(current_user, root_id, activity_id):
         
         # Add new associations
         for goal_id in goal_ids:
-            goal = session.query(Goal).filter_by(id=goal_id).first()
+            goal = session.query(Goal).filter(
+                Goal.id == goal_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).first()
             if goal:
                 session.execute(
                     activity_goal_associations.insert().values(

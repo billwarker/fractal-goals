@@ -88,38 +88,9 @@ function SessionSummary({ selectedTemplate, selectedProgramDay, activityDefiniti
         const seenIds = new Set();
 
         // Helper to find a goal by ID in the hierarchical structure
-        const findGoalById = (id) => {
-            for (const stg of goals) {
-                if (stg.id === id) return stg;
-                if (stg.immediateGoals) {
-                    const ig = stg.immediateGoals.find(ig => ig.id === id);
-                    if (ig) return ig;
-                }
-            }
-            return null;
-        };
+        const findGoalById = (id) => goals.find(g => g.id === id) || null;
 
-        // 1. Goals from Template
-        if (selectedTemplate.goals) {
-            selectedTemplate.goals.forEach(g => {
-                if (!seenIds.has(g.id)) {
-                    seenIds.add(g.id);
-                    potentialGoals.push(g);
-                }
-            });
-        }
-
-        // 2. Goals from Program Day
-        if (selectedProgramDay?.goals) {
-            selectedProgramDay.goals.forEach(g => {
-                if (!seenIds.has(g.id)) {
-                    seenIds.add(g.id);
-                    potentialGoals.push(g);
-                }
-            });
-        }
-
-        // 3. Goals from Activities
+        // 1. Goals from Activities
         // Extract unique activity IDs from template sections
         const templateActivityIds = new Set();
         if (selectedTemplate.template_data?.sections) {
@@ -151,9 +122,10 @@ function SessionSummary({ selectedTemplate, selectedProgramDay, activityDefiniti
             }
         });
 
-        // 4. Filtering by Program Block
-        if (selectedProgramDay?.block_goal_ids && selectedProgramDay.block_goal_ids.length > 0) {
-            const allowedIds = new Set(selectedProgramDay.block_goal_ids);
+        // 2. Filtering by Program targets
+        const scopedProgramGoalIds = selectedProgramDay?.program_goal_ids || selectedProgramDay?.block_goal_ids || [];
+        if (scopedProgramGoalIds.length > 0) {
+            const allowedIds = new Set(scopedProgramGoalIds);
             potentialGoals = potentialGoals.filter(g => allowedIds.has(g.id));
         }
 

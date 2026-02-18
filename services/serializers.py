@@ -237,9 +237,13 @@ def serialize_session(session, include_image_data=False):
                 section["exercises"] = exercises
     
     # Hydrate goals based on type
-    if hasattr(session, 'goals') and session.goals:
-        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in session.goals if g.type == 'ShortTermGoal']
-        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in session.goals if g.type == 'ImmediateGoal']
+    goals_source = getattr(session, '_derived_goals', None)
+    if goals_source is None:
+        goals_source = session.goals if hasattr(session, 'goals') else []
+
+    if goals_source:
+        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if g.type == 'ShortTermGoal']
+        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if g.type == 'ImmediateGoal']
     else:
         result["short_term_goals"] = []
         result["immediate_goals"] = []
@@ -356,6 +360,7 @@ def serialize_program(program):
 
 def serialize_program_block(block):
     """Serialize a ProgramBlock object."""
+    program_goal_ids = _safe_load_json(block.program.goal_ids, []) if getattr(block, 'program', None) else _safe_load_json(block.goal_ids, [])
     return {
         "id": block.id,
         "program_id": block.program_id,
@@ -363,7 +368,7 @@ def serialize_program_block(block):
         "start_date": format_utc(block.start_date),
         "end_date": format_utc(block.end_date),
         "color": block.color,
-        "goal_ids": _safe_load_json(block.goal_ids, []),
+        "goal_ids": program_goal_ids,
         "days": [serialize_program_day(d) for d in block.days]
     }
 
@@ -378,7 +383,6 @@ def serialize_program_day(day):
         "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
-        "goals": [serialize_goal(g, include_children=False) for g in day.goals] if hasattr(day, 'goals') else [],
         "is_completed": day.is_completed,
         "sessions": [serialize_session(s) for s in day.completed_sessions if not s.deleted_at]
     }

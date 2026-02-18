@@ -414,7 +414,10 @@ class SessionUpdateSchema(BaseModel):
 class SessionGoalAssociationSchema(BaseModel):
     """Schema for associating a goal with a session."""
     goal_id: str = Field(..., min_length=1)
-    goal_type: Optional[str] = Field('short_term', pattern=r'^(short_term|immediate)$')
+    goal_type: Optional[str] = Field(
+        'ImmediateGoal',
+        pattern=r'^(UltimateGoal|LongTermGoal|MidTermGoal|ShortTermGoal|ImmediateGoal|MicroGoal|NanoGoal)$'
+    )
 
 
 # =============================================================================
