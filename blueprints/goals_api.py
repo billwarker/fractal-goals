@@ -486,11 +486,21 @@ def remove_goal_target(goal_id, target_id):
 
 
 @goals_bp.route('/goals/<goal_id>/metrics', methods=['GET'])
-def get_goal_metrics(goal_id: str):
+@token_required
+def get_goal_metrics(current_user, goal_id: str):
     """Get calculated metrics for a goal (direct and recursive)."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        goal = get_goal_by_id(db_session, goal_id, load_associations=False)
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+
+        authorized_root_id = goal.root_id or goal.id
+        root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         service = GoalMetricsService(db_session)
         metrics = service.get_metrics_for_goal(goal_id)
         
@@ -506,11 +516,21 @@ def get_goal_metrics(goal_id: str):
 
 
 @goals_bp.route('/goals/<goal_id>/metrics/daily-durations', methods=['GET'])
-def get_goal_daily_durations(goal_id: str):
+@token_required
+def get_goal_daily_durations(current_user, goal_id: str):
     """Get daily duration metrics for a goal (recursive)."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        goal = get_goal_by_id(db_session, goal_id, load_associations=False)
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+
+        authorized_root_id = goal.root_id or goal.id
+        root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         service = GoalMetricsService(db_session)
         metrics = service.get_goal_daily_durations(goal_id)
         
@@ -527,7 +547,8 @@ def get_goal_daily_durations(goal_id: str):
 
 @goals_bp.route('/goals/<goal_id>/complete', methods=['PATCH'])
 @goals_bp.route('/<root_id>/goals/<goal_id>/complete', methods=['PATCH'])
-def update_goal_completion_endpoint(goal_id: str, root_id=None):
+@token_required
+def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None):
     """Update goal completion status."""
     from datetime import datetime
     
@@ -537,41 +558,50 @@ def update_goal_completion_endpoint(goal_id: str, root_id=None):
     db_session = get_session(engine)
     try:
         goal = get_goal_by_id(db_session, goal_id)
-        if goal:
-            if 'completed' in data:
-                goal.completed = data['completed']
-            else:
-                goal.completed = not goal.completed
-            
-            # Set or clear completed_at based on completion status
-            if goal.completed:
-                goal.completed_at = datetime.now(timezone.utc)
-            else:
-                goal.completed_at = None
-                
-            db_session.commit()
-            db_session.refresh(goal)
-            
-            # Emit completion event
-            if goal.completed:
-                event_bus.emit(Event(Events.GOAL_COMPLETED, {
-                    'goal_id': goal.id,
-                    'goal_name': goal.name,
-                    'root_id': goal.root_id,
-                    'auto_completed': False,
-                    'reason': 'manual'
-                }, source='goals_api.update_completion'))
-            else:
-                event_bus.emit(Event(Events.GOAL_UNCOMPLETED, {
-                    'goal_id': goal.id,
-                    'goal_name': goal.name,
-                    'root_id': goal.root_id
-                }, source='goals_api.update_completion'))
-            
-            result = serialize_goal(goal)
-            return jsonify(result)
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+
+        # Authorize by owned root (works for both global and fractal-scoped routes)
+        authorized_root_id = root_id or goal.root_id or goal.id
+        root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        if goal.root_id and goal.root_id != authorized_root_id:
+            return jsonify({"error": "Goal not found in this fractal"}), 404
+
+        if 'completed' in data:
+            goal.completed = data['completed']
+        else:
+            goal.completed = not goal.completed
         
-        return jsonify({"error": "Goal not found"}), 404
+        # Set or clear completed_at based on completion status
+        if goal.completed:
+            goal.completed_at = datetime.now(timezone.utc)
+        else:
+            goal.completed_at = None
+            
+        db_session.commit()
+        db_session.refresh(goal)
+        
+        # Emit completion event
+        if goal.completed:
+            event_bus.emit(Event(Events.GOAL_COMPLETED, {
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'root_id': goal.root_id or goal.id,
+                'auto_completed': False,
+                'reason': 'manual'
+            }, source='goals_api.update_completion'))
+        else:
+            event_bus.emit(Event(Events.GOAL_UNCOMPLETED, {
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'root_id': goal.root_id or goal.id
+            }, source='goals_api.update_completion'))
+        
+        result = serialize_goal(goal)
+        return jsonify(result)
         
     except Exception as e:
         db_session.rollback()
@@ -719,9 +749,9 @@ def get_fractal_goals(current_user, root_id):
 
         if not root:
             # Fallback to simple validation if the complex query fails or returns nothing
-            root = validate_root_goal(db_session, root_id)
+            root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
             if not root:
-                return jsonify({"error": "Fractal not found"}), 404
+                return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Build complete tree for this fractal
         result = serialize_goal(root)
@@ -867,18 +897,19 @@ def create_fractal_goal(current_user, root_id, validated_data):
 
 
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['GET'])
-def get_fractal_goal(root_id, goal_id):
+@token_required
+def get_fractal_goal(current_user, root_id, goal_id):
     """Get a specific goal by ID within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
         # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the goal
-        goal = db_session.query(Goal).filter_by(id=goal_id).first()
+        goal = db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
         
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
@@ -892,19 +923,22 @@ def get_fractal_goal(root_id, goal_id):
 
 
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['DELETE'])
-def delete_fractal_goal(root_id, goal_id):
+@token_required
+def delete_fractal_goal(current_user, root_id, goal_id):
     """Delete a goal within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Find the goal
         goal = get_goal_by_id(db_session, goal_id)
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
+        if goal.root_id != root_id:
+            return jsonify({"error": "Goal not found in this fractal"}), 404
         
         # Capture data before delete for the event
         goal_id = goal.id
@@ -932,19 +966,22 @@ def delete_fractal_goal(root_id, goal_id):
 
 
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['PUT'])
-def update_fractal_goal(root_id, goal_id):
+@token_required
+def update_fractal_goal(current_user, root_id, goal_id):
     """Update a goal within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Find the goal
         goal = get_goal_by_id(db_session, goal_id)
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
+        if goal.root_id != root_id:
+            return jsonify({"error": "Goal not found in this fractal"}), 404
         
         data = request.get_json()
         
@@ -1006,7 +1043,8 @@ def update_fractal_goal(root_id, goal_id):
 
 
 @goals_bp.route('/<root_id>/goals/analytics', methods=['GET'])
-def get_goal_analytics(root_id):
+@token_required
+def get_goal_analytics(current_user, root_id):
     """
     Get goal analytics data for the fractal.
     
@@ -1023,9 +1061,9 @@ def get_goal_analytics(root_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # === BATCH QUERY 1: Get all goals for this fractal ===
         all_goals = db_session.query(Goal).filter(
@@ -1226,7 +1264,8 @@ def get_goal_analytics(root_id):
 # ============================================================================
 
 @goals_bp.route('/<root_id>/goals/<goal_id>/evaluate-targets', methods=['POST'])
-def evaluate_goal_targets(root_id, goal_id):
+@token_required
+def evaluate_goal_targets(current_user, root_id, goal_id):
     """
     Evaluate targets for a goal against a session's activity instances.
     
@@ -1256,14 +1295,16 @@ def evaluate_goal_targets(root_id, goal_id):
     db_session = get_session(engine)
     try:
         # Validate root goal exists
-        root = validate_root_goal(db_session, root_id)
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
         if not root:
-            return jsonify({"error": "Fractal not found"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the goal
         goal = get_goal_by_id(db_session, goal_id)
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
+        if goal.root_id != root_id:
+            return jsonify({"error": "Goal not found in this fractal"}), 404
         
         # Get request data
         data = request.get_json() or {}
@@ -1277,11 +1318,11 @@ def evaluate_goal_targets(root_id, goal_id):
         if not session:
             return jsonify({"error": "Session not found"}), 404
         
-        # Parse existing targets
-        targets = json.loads(goal.targets) if goal.targets else []
+        # Use relational targets (current source of truth)
+        targets = [t for t in goal.targets_rel if t.deleted_at is None]
         if not targets:
             return jsonify({
-                "goal": goal.to_dict(include_children=False),
+                "goal": serialize_goal(goal, include_children=False),
                 "targets_evaluated": 0,
                 "targets_completed": 0,
                 "newly_completed_targets": [],
@@ -1302,7 +1343,7 @@ def evaluate_goal_targets(root_id, goal_id):
                 instances_by_activity[activity_id] = []
             
             # Get metrics for this instance (both flat metrics and sets)
-            inst_dict = inst.to_dict()
+            inst_dict = serialize_activity_instance(inst)
             instances_by_activity[activity_id].append(inst_dict)
         
         # Evaluate each target
@@ -1311,11 +1352,11 @@ def evaluate_goal_targets(root_id, goal_id):
         
         for target in targets:
             # Skip already completed targets
-            if target.get('completed'):
+            if target.completed:
                 continue
             
-            activity_id = target.get('activity_id')
-            target_metrics = target.get('metrics', [])
+            activity_id = target.activity_id
+            target_metrics = target.metrics if isinstance(target.metrics, list) else []
             
             if not activity_id or not target_metrics:
                 continue
@@ -1343,17 +1384,14 @@ def evaluate_goal_targets(root_id, goal_id):
                     break
             
             if target_achieved:
-                target['completed'] = True
-                target['completed_at'] = format_utc(now)
-                target['completed_session_id'] = session_id
-                newly_completed_targets.append(target)
+                target.completed = True
+                target.completed_at = now
+                target.completed_session_id = session_id
+                newly_completed_targets.append(serialize_target(target))
         
         # Count completed targets
-        targets_completed = sum(1 for t in targets if t.get('completed'))
+        targets_completed = sum(1 for t in targets if t.completed)
         targets_total = len(targets)
-        
-        # Persist updated targets
-        goal.targets = json.dumps(targets)
         
         # Auto-complete the goal if ALL targets are met
         goal_was_completed = False
@@ -1368,7 +1406,7 @@ def evaluate_goal_targets(root_id, goal_id):
         db_session.refresh(goal)
         
         return jsonify({
-            "goal": goal.to_dict(include_children=False),
+            "goal": serialize_goal(goal, include_children=False),
             "targets_evaluated": targets_total,
             "targets_completed": targets_completed,
             "newly_completed_targets": newly_completed_targets,

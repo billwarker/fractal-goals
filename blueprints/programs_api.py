@@ -175,18 +175,22 @@ def add_block_day(current_user, root_id, program_id, block_id):
          return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
     except Exception as e:
         session.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error adding block day")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['PUT'])
-def update_block_day(root_id, program_id, block_id, day_id):
+@token_required
+def update_block_day(current_user, root_id, program_id, block_id, day_id):
     """Update a specific program day."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         data = request.get_json()
         ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, data)
         session.commit()
@@ -200,11 +204,16 @@ def update_block_day(root_id, program_id, block_id, day_id):
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['DELETE'])
-def delete_block_day(root_id, program_id, block_id, day_id):
+@token_required
+def delete_block_day(current_user, root_id, program_id, block_id, day_id):
     """Delete a program day."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id)
         session.commit()
         return jsonify({"message": "Day deleted"})
@@ -217,11 +226,16 @@ def delete_block_day(root_id, program_id, block_id, day_id):
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy', methods=['POST'])
-def copy_block_day(root_id, program_id, block_id, day_id):
+@token_required
+def copy_block_day(current_user, root_id, program_id, block_id, day_id):
     """Copy a day to other blocks."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         data = request.get_json()
         count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, data)
         session.commit()
@@ -248,18 +262,22 @@ def get_active_program_days(current_user, root_id):
         days = ProgramService.get_active_program_days(session, root_id)
         return jsonify(days or [])
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error getting active program days")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/goals', methods=['POST'])
-def attach_goal_to_block(root_id, program_id, block_id):
+@token_required
+def attach_goal_to_block(current_user, root_id, program_id, block_id):
     """Attach a goal to a block and update its deadline."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         data = request.get_json()
         block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, data)
         session.commit()
@@ -268,8 +286,7 @@ def attach_goal_to_block(root_id, program_id, block_id):
          return jsonify({"error": str(e)}), 400
     except Exception as e:
         session.rollback()
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error attaching goal to block")
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()

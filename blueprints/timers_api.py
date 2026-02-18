@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import uuid
+import logging
 import models
 from sqlalchemy.orm import joinedload
 from models import (
@@ -16,6 +17,7 @@ from services.serializers import serialize_activity_instance
 
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -48,9 +50,19 @@ def activity_instances(current_user, root_id):
             
             if not session_id or not activity_definition_id:
                 return jsonify({"error": "session_id and activity_definition_id required"}), 400
+
+            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            if not session_record:
+                return jsonify({"error": "Session not found in this fractal"}), 404
+
+            activity_def = db_session.query(ActivityDefinition).filter_by(
+                id=activity_definition_id, root_id=root_id, deleted_at=None
+            ).first()
+            if not activity_def:
+                return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
             # Check if instance already exists
-            existing = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+            existing = db_session.query(ActivityInstance).filter_by(id=instance_id, root_id=root_id).first()
             if existing:
                 return jsonify(serialize_activity_instance(existing))
             
@@ -65,7 +77,9 @@ def activity_instances(current_user, root_id):
             db_session.add(instance)
             
             # Get activity name directly from definition
-            activity_def = db_session.query(ActivityDefinition).filter_by(id=activity_definition_id).first()
+            activity_def = db_session.query(ActivityDefinition).filter_by(
+                id=activity_definition_id, root_id=root_id, deleted_at=None
+            ).first()
             activity_name = activity_def.name if activity_def else 'Unknown'
             db_session.commit()
             
@@ -84,6 +98,8 @@ def activity_instances(current_user, root_id):
             # Get all sessions for this fractal
             sessions = db_session.query(Session).filter(Session.root_id == root_id, Session.deleted_at == None).all()
             session_ids = [s.id for s in sessions]
+            if not session_ids:
+                return jsonify([])
             
             # Get all activity instances for these sessions
             instances = db_session.query(ActivityInstance).filter(
@@ -113,9 +129,12 @@ def start_activity_timer(current_user, root_id, instance_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
-        from sqlalchemy.orm import joinedload
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
-        print(f"[START TIMER] Instance found: {instance is not None}")
+        instance = (
+            db_session.query(ActivityInstance)
+            .options(joinedload(ActivityInstance.definition))
+            .filter_by(id=instance_id, root_id=root_id, deleted_at=None)
+            .first()
+        )
         
         if not instance:
             # Instance doesn't exist yet - create it
@@ -125,10 +144,18 @@ def start_activity_timer(current_user, root_id, instance_id):
 
             activity_definition_id = data.get('activity_definition_id')
             
-            print(f"[START TIMER] Creating new instance - session: {session_id}, activity: {activity_definition_id}")
-            
             if not session_id or not activity_definition_id:
                 return jsonify({"error": "session_id and activity_definition_id required"}), 400
+
+            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            if not session_record:
+                return jsonify({"error": "Session not found in this fractal"}), 404
+
+            activity_def = db_session.query(ActivityDefinition).filter_by(
+                id=activity_definition_id, root_id=root_id, deleted_at=None
+            ).first()
+            if not activity_def:
+                return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
             instance = ActivityInstance(
                 id=instance_id,
@@ -137,7 +164,6 @@ def start_activity_timer(current_user, root_id, instance_id):
                 root_id=root_id  # Add root_id for performance
             )
             db_session.add(instance)
-            print(f"[START TIMER] Instance added to session")
         
         # Set start time to now
         start_time = datetime.utcnow()
@@ -146,11 +172,10 @@ def start_activity_timer(current_user, root_id, instance_id):
         instance.time_stop = None
         instance.duration_seconds = None
         
-        print(f"[START TIMER] Set time_start to: {start_time}")
-        print(f"[START TIMER] Instance time_start before commit: {instance.time_start}")
-        
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_def = db_session.query(ActivityDefinition).filter_by(
+            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
+        ).first()
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
@@ -164,18 +189,10 @@ def start_activity_timer(current_user, root_id, instance_id):
             'updated_fields': ['time_start']
         }, source='timers_api.start_activity_timer'))
         
-        print(f"[START TIMER] Committed successfully")
-        print(f"[START TIMER] Instance time_start after commit: {instance.time_start}")
-        
-        result = serialize_activity_instance(instance)
-        print(f"[START TIMER] Returning: {result}")
-        
-        return jsonify(result)
+        return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
-        print(f"[START TIMER ERROR] {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error starting activity timer")
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
@@ -195,8 +212,11 @@ def complete_activity_instance(current_user, root_id, instance_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
-        from sqlalchemy.orm import joinedload
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter(ActivityInstance.id == instance_id, ActivityInstance.deleted_at == None).first()
+        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter(
+            ActivityInstance.id == instance_id,
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at == None
+        ).first()
         if not instance:
             return jsonify({
                 "error": "Activity instance not found."
@@ -217,7 +237,9 @@ def complete_activity_instance(current_user, root_id, instance_id):
             instance.completed = True
         
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_def = db_session.query(ActivityDefinition).filter_by(
+            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
+        ).first()
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
@@ -275,11 +297,11 @@ def parse_iso_datetime(iso_string):
         
         # Convert to timezone-naive UTC (to match database format from datetime.utcnow())
         if dt.tzinfo is not None:
-            dt = dt.replace(tzinfo=None)
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
         
         return dt
     except Exception as e:
-        print(f"[DATETIME PARSE ERROR] Failed to parse '{iso_string}': {str(e)}")
+        logger.warning("Failed to parse ISO datetime '%s': %s", iso_string, str(e))
         raise ValueError(f"Invalid datetime format: {iso_string}")
 
 
@@ -299,7 +321,12 @@ def update_activity_instance(current_user, root_id, instance_id):
         data = request.get_json() or {}
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter_by(id=instance_id).first()
+        instance = (
+            db_session.query(ActivityInstance)
+            .options(joinedload(ActivityInstance.definition))
+            .filter_by(id=instance_id, root_id=root_id, deleted_at=None)
+            .first()
+        )
         
         if not instance:
             # Create if missing, but we strictly need connection IDs
@@ -311,6 +338,16 @@ def update_activity_instance(current_user, root_id, instance_id):
             if not session_id or not activity_definition_id:
                 # If we lack info to create, and it doesn't exist, that's an issue for manual updates
                 return jsonify({"error": "Instance not found and missing creation details"}), 404
+
+            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            if not session_record:
+                return jsonify({"error": "Session not found in this fractal"}), 404
+
+            activity_def = db_session.query(ActivityDefinition).filter_by(
+                id=activity_definition_id, root_id=root_id, deleted_at=None
+            ).first()
+            if not activity_def:
+                return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
             instance = ActivityInstance(
                 id=instance_id,
@@ -323,22 +360,16 @@ def update_activity_instance(current_user, root_id, instance_id):
         # Update fields if present
         if 'time_start' in data:
             ts = data['time_start']
-            print(f"[UPDATE INSTANCE] Parsing time_start: {ts}")
             try:
                 instance.time_start = parse_iso_datetime(ts)
-                print(f"[UPDATE INSTANCE] Parsed time_start: {instance.time_start}")
             except ValueError as e:
-                print(f"[UPDATE INSTANCE ERROR] {str(e)}")
                 return jsonify({"error": str(e)}), 400
             
         if 'time_stop' in data:
             ts = data['time_stop']
-            print(f"[UPDATE INSTANCE] Parsing time_stop: {ts}")
             try:
                 instance.time_stop = parse_iso_datetime(ts)
-                print(f"[UPDATE INSTANCE] Parsed time_stop: {instance.time_stop}")
             except ValueError as e:
-                print(f"[UPDATE INSTANCE ERROR] {str(e)}")
                 return jsonify({"error": str(e)}), 400
 
         if 'completed' in data:
@@ -362,12 +393,13 @@ def update_activity_instance(current_user, root_id, instance_id):
         if instance.time_start and instance.time_stop:
             duration = (instance.time_stop - instance.time_start).total_seconds()
             instance.duration_seconds = int(duration)
-            print(f"[UPDATE INSTANCE] Calculated duration: {instance.duration_seconds}s")
         elif not instance.time_start or not instance.time_stop:
              instance.duration_seconds = None
         
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_def = db_session.query(ActivityDefinition).filter_by(
+            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
+        ).first()
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
@@ -381,14 +413,10 @@ def update_activity_instance(current_user, root_id, instance_id):
             'updated_fields': list(data.keys())
         }, source='timers_api.update_activity_instance'))
         
-        print(f"[UPDATE INSTANCE] Successfully updated instance")
-        
         return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
-        print(f"[UPDATE INSTANCE ERROR] Unexpected error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unexpected error updating activity instance")
         db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:

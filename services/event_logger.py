@@ -2,8 +2,10 @@ import logging
 import models
 from models import EventLog, get_session
 from services.events import event_bus, Event, Events
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
+_event_log_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="event-log")
 
 def _get_db_session():
     """Get a new database session."""
@@ -54,11 +56,12 @@ def setup_event_logging():
             except Exception as e:
                 logger.error(f"Error preparing log for {evt.name}: {e}")
 
-        # Start thread
-        import threading
-        t = threading.Thread(target=worker, args=(event,))
-        t.daemon = True # Don't block app exit
-        t.start()
+        # Offload to a bounded worker pool to avoid unbounded thread creation.
+        try:
+            _event_log_executor.submit(worker, event)
+        except RuntimeError:
+            # If executor is shutting down, execute inline as a safe fallback.
+            worker(event)
 
 def _get_entity_info(event: Event):
     """Extract entity type and ID from event name and data."""

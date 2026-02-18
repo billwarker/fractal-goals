@@ -11,7 +11,7 @@ Usage:
     # Register a handler
     @event_bus.on('goal.completed')
     def handle_goal_completed(event):
-        print(f"Goal {event.data['goal_id']} was completed!")
+        logger.info("Goal %s was completed", event.data['goal_id'])
     
     # Emit an event
     event_bus.emit(Event('goal.completed', {'goal_id': '123', 'goal_name': 'My Goal'}))

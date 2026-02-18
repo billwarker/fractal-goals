@@ -121,121 +121,6 @@ def _track_goal_completion(goal_data: dict):
     _achievement_context.completed_goals.append(goal_data)
 
 
-@event_bus.on(Events.ACTIVITY_INSTANCE_COMPLETED)
-def handle_activity_instance_completed(event: Event):
-    """
-    When an activity instance is completed, evaluate THRESHOLD targets for linked goals.
-    
-    Only evaluates threshold targets (single-session criteria).
-    Sum/frequency targets are evaluated on session completion.
-    
-    Expected event.data:
-        - instance_id: str
-        - session_id: str
-        - root_id: str
-        - activity_definition_id: str
-        - completed_at: str (ISO datetime)
-    """
-    instance_id = event.data.get('instance_id')
-    session_id = event.data.get('session_id')
-    root_id = event.data.get('root_id')
-    activity_id = event.data.get('activity_definition_id')
-    completed_at_str = event.data.get('completed_at')
-    
-    logger.info(f"[ACTIVITY_COMPLETED] Starting handler for instance {instance_id}")
-    logger.info(f"[ACTIVITY_COMPLETED] Event data: session={session_id}, activity={activity_id}")
-    
-    if not all([instance_id, session_id, root_id, activity_id]):
-        logger.warning(f"ACTIVITY_INSTANCE_COMPLETED missing required data: {event.data}")
-        return
-    
-    logger.info(f"Processing activity instance completion: {instance_id} for activity {activity_id}")
-    
-    # Clear achievement context at start
-    clear_achievement_context()
-    
-    db_session = _get_db_session()
-    try:
-        # Get the session
-        session = db_session.query(Session).filter_by(id=session_id).first()
-        if not session:
-            logger.warning(f"Session {session_id} not found")
-            return
-        
-        # Get the completed activity instance
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
-        if not instance:
-            logger.warning(f"Activity instance {instance_id} not found")
-            return
-        
-        # Find goals to evaluate in two ways:
-        # 1. Goals directly linked to the session (via session_goals)
-        # 2. Goals linked to the activity (via activity_goal_associations)
-        goals_to_check = set()
-        
-        # Session-linked goals
-        session_goals = session.goals or []
-        for g in session_goals:
-            goals_to_check.add(g.id)
-        logger.info(f"[ACTIVITY_COMPLETED] Session has {len(session_goals)} directly linked goals")
-        
-        # Activity-linked goals (via activity_goal_associations)
-        from sqlalchemy import text
-        activity_goal_result = db_session.execute(text('''
-            SELECT goal_id FROM activity_goal_associations 
-            WHERE activity_id = :activity_id
-        '''), {'activity_id': activity_id})
-        activity_goal_ids = [row[0] for row in activity_goal_result.fetchall()]
-        
-        for gid in activity_goal_ids:
-            goals_to_check.add(gid)
-        logger.info(f"[ACTIVITY_COMPLETED] Activity has {len(activity_goal_ids)} associated goals")
-        
-        if not goals_to_check:
-            logger.debug(f"No goals to evaluate for activity {activity_id}")
-            return
-        
-        # Fetch all unique goals
-        linked_goals = db_session.query(Goal).filter(Goal.id.in_(goals_to_check)).all()
-        logger.info(f"[ACTIVITY_COMPLETED] Total {len(linked_goals)} unique goals to evaluate")
-        
-        # Build instance data for target evaluation (single instance)
-        instance_data = serialize_activity_instance(instance)
-        instances_by_activity = {activity_id: [instance_data]}
-        logger.info(f"[ACTIVITY_COMPLETED] Instance metrics: {instance_data.get('metrics', [])}")
-        
-        # Parse completed_at time for target timestamp
-        completed_at = None
-        if completed_at_str:
-            try:
-                completed_at = datetime.fromisoformat(completed_at_str.replace('Z', '+00:00'))
-            except (ValueError, AttributeError):
-                completed_at = datetime.now(timezone.utc)
-        else:
-            completed_at = datetime.now(timezone.utc)
-        
-        # Evaluate THRESHOLD targets only for each linked goal
-        for goal in linked_goals:
-            logger.info(f"[ACTIVITY_COMPLETED] Evaluating goal: {goal.name} (id={goal.id})")
-            _evaluate_threshold_targets_for_activity(
-                db_session, goal, instances_by_activity, session_id, 
-                activity_id, completed_at
-            )
-        
-        db_session.commit()
-        logger.info(f"[ACTIVITY_COMPLETED] Committed changes")
-        
-        # Log achievement context
-        achievements = get_recent_achievements()
-        logger.info(f"[ACTIVITY_COMPLETED] Achievements: {achievements}")
-        
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(f"Error handling activity instance completion: {e}")
-    finally:
-        db_session.close()
-
-
 def _evaluate_threshold_targets_for_activity(
     db_session, goal: Goal, instances_by_activity: dict, 
     session_id: str, activity_id: str, completed_at: datetime
@@ -847,9 +732,15 @@ def _update_program_progress(db_session, goal: Goal):
     """Update program completion percentage when a goal is completed."""
     from models import Program, ProgramBlock
     
-    # Find programs that include this goal via block goal_ids JSON field
-    blocks = db_session.query(ProgramBlock).all()
-    
+    # Scope to the same fractal to avoid scanning unrelated blocks.
+    goal_root_id = goal.root_id or goal.id
+    blocks = (
+        db_session.query(ProgramBlock)
+        .join(Program, Program.id == ProgramBlock.program_id)
+        .filter(Program.root_id == goal_root_id)
+        .all()
+    )
+
     program_ids = set()
     for block in blocks:
         # Parse goal_ids from JSON
@@ -905,36 +796,6 @@ def _recalculate_program_progress(db_session, program):
         'goals_completed': completed_count,
         'goals_total': total_count
     }))
-
-
-def _check_metrics_meet_target(target_metrics: list, actual_metrics: list) -> bool:
-    """Check if actual metrics meet or exceed all target metrics."""
-    if not target_metrics:
-        return False
-    
-    # Build a map of actual metric values
-    actual_map = {}
-    for m in actual_metrics:
-        metric_id = m.get('metric_id') or m.get('metric_definition_id')
-        if metric_id and m.get('value') is not None:
-            actual_map[metric_id] = float(m['value'])
-    
-    # Check all target metrics are met
-    for tm in target_metrics:
-        metric_id = tm.get('metric_id')
-        target_value = tm.get('value')
-        
-        if not metric_id or target_value is None:
-            continue
-        
-        actual_value = actual_map.get(metric_id)
-        if actual_value is None:
-            return False
-        
-        if actual_value < float(target_value):
-            return False
-    
-    return True
 
 
 def _check_metric_value(target_value, actual_value, operator='>='):
