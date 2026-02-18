@@ -70,11 +70,60 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
         'ShortTermGoal',
         'ImmediateGoal',
         'MicroGoal',
-        'NanoGoal'
+        'NanoGoal',
+        'Target'
     ];
+
+    const { color: completedColor } = getDisplayData('Completed');
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Global Completion Styling */}
+            <div
+                style={{
+                    padding: '16px',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--color-bg-card-alt)',
+                    borderLeft: '4px solid ' + (completedColor?.primary || 'var(--color-brand-primary)')
+                }}
+            >
+                <div style={{
+                    marginBottom: '12px',
+                    fontWeight: 'bold',
+                    color: 'var(--color-text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: completedColor?.primary }} />
+                    Completion Styling
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px', marginTop: 0 }}>
+                    These colors apply to all goals and targets once they are completed.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Primary (Text & Icons)</label>
+                        <input
+                            type="color"
+                            value={completedColor?.primary || '#000000'}
+                            onChange={(e) => setGoalColor('Completed', 'primary', e.target.value, scope)}
+                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Secondary (Fills & Rings)</label>
+                        <input
+                            type="color"
+                            value={completedColor?.secondary || '#000000'}
+                            onChange={(e) => setGoalColor('Completed', 'secondary', e.target.value, scope)}
+                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                    </div>
+                </div>
+            </div>
+
             {scope !== 'default' && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
@@ -105,6 +154,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
             {GOAL_TYPE_ORDER.map((type) => {
                 const { char, color, isOverridden } = getDisplayData(type);
                 if (!char) return null;
+
                 return (
                     <div
                         key={type}
@@ -118,10 +168,7 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                         <div style={{
                             marginBottom: '16px',
                             fontWeight: 'bold',
-                            color: 'var(--color-text-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
+                            color: 'var(--color-text-primary)'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <GoalIcon
@@ -194,47 +241,70 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                 </div>
                             </div>
 
-                            {/* Relative Deadlines */}
-                            {type !== 'MicroGoal' && type !== 'NanoGoal' ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    {['min', 'max'].map(limitType => (
-                                        <div key={limitType}>
-                                            <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                                {limitType.charAt(0).toUpperCase() + limitType.slice(1)} Relative Deadline
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <input
-                                                    type="number"
-                                                    value={char.deadlines[limitType].value}
-                                                    onChange={(e) => handleDeadlineChange(type, limitType, 'value', e.target.value)}
-                                                    style={{
-                                                        width: '60px',
-                                                        padding: '6px',
-                                                        borderRadius: '4px',
-                                                        border: '1px solid var(--color-border)',
-                                                        backgroundColor: 'var(--color-bg-input)',
-                                                        color: 'var(--color-text-primary)'
-                                                    }}
-                                                />
-                                                <select
-                                                    value={char.deadlines[limitType].unit}
-                                                    onChange={(e) => handleDeadlineChange(type, limitType, 'unit', e.target.value)}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '6px',
-                                                        borderRadius: '4px',
-                                                        border: '1px solid var(--color-border)',
-                                                        backgroundColor: 'var(--color-bg-input)',
-                                                        color: 'var(--color-text-primary)'
-                                                    }}
-                                                >
-                                                    {DEADLINE_UNITS.map(u => (
-                                                        <option key={u.value} value={u.value}>{u.label}</option>
-                                                    ))}
-                                                </select>
+                            {/* Goal Deadlines and Methods */}
+                            {type !== 'MicroGoal' && type !== 'NanoGoal' && type !== 'Target' && type !== 'Completed' ? (
+                                <div className="characteristic-details" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {/* Relative Deadlines */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                        {['min', 'max'].map(limitType => (
+                                            <div key={limitType}>
+                                                <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                                    {limitType.charAt(0).toUpperCase() + limitType.slice(1)} Relative Deadline
+                                                </label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <input
+                                                        type="number"
+                                                        value={char.deadlines[limitType].value}
+                                                        onChange={(e) => handleDeadlineChange(type, limitType, 'value', e.target.value)}
+                                                        style={{
+                                                            width: '60px',
+                                                            padding: '6px',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid var(--color-border)',
+                                                            backgroundColor: 'var(--color-bg-input)',
+                                                            color: 'var(--color-text-primary)'
+                                                        }}
+                                                    />
+                                                    <select
+                                                        value={char.deadlines[limitType].unit}
+                                                        onChange={(e) => handleDeadlineChange(type, limitType, 'unit', e.target.value)}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '6px',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid var(--color-border)',
+                                                            backgroundColor: 'var(--color-bg-input)',
+                                                            color: 'var(--color-text-primary)'
+                                                        }}
+                                                    >
+                                                        {DEADLINE_UNITS.map(u => (
+                                                            <option key={u.value} value={u.value}>{u.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                             </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Completion Methods */}
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                            Valid Completion Methods
+                                        </label>
+                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                            {Object.entries(char.completion_methods).map(([method, enabled]) => (
+                                                <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={enabled}
+                                                        onChange={(e) => handleCompletionChange(type, method, e.target.checked)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    />
+                                                    {method.charAt(0).toUpperCase() + method.slice(1)}
+                                                </label>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{
@@ -246,40 +316,14 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                     color: 'var(--color-text-muted)',
                                     fontStyle: 'italic'
                                 }}>
-                                    Ephemeral Goal: Deadlines are not applicable to {formatGoalType(type)}s.
+                                    {type === 'Target' || type === 'Completed' ? `${formatGoalType(type)}s are completed by achieving their specified criteria.` : `Ephemeral Goal: Deadlines are not applicable to ${formatGoalType(type)}s.`}
                                 </div>
                             )}
-
-                            {/* Completion Methods */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                    Valid Completion Methods
-                                </label>
-                                <div style={{ display: 'flex', gap: '16px' }}>
-                                    {Object.entries(char.completion_methods)
-                                        .filter(([method]) => {
-                                            if (type === 'NanoGoal') return method === 'manual';
-                                            if (type === 'MicroGoal') return method !== 'children';
-                                            return true;
-                                        })
-                                        .map(([method, enabled]) => (
-                                            <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={enabled}
-                                                    onChange={(e) => handleCompletionChange(type, method, e.target.checked)}
-                                                    style={{ cursor: 'pointer' }}
-                                                />
-                                                {method.charAt(0).toUpperCase() + method.slice(1)}
-                                            </label>
-                                        ))}
-                                </div>
-                            </div>
                         </div>
                     </div>
-                )
+                );
             })}
-        </div>
+        </div >
     );
 };
 

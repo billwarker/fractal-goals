@@ -161,21 +161,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             >
                                 General
                             </div>
-                            {activeRootId && (
-                                <div
-                                    onClick={() => setActiveTab('fractal')}
-                                    style={{
-                                        padding: '12px 24px',
-                                        cursor: 'pointer',
-                                        backgroundColor: activeTab === 'fractal' ? 'var(--color-bg-card-alt)' : 'transparent',
-                                        color: activeTab === 'fractal' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                                        fontWeight: activeTab === 'fractal' ? 'bold' : 'normal',
-                                        borderLeft: activeTab === 'fractal' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
-                                    }}
-                                >
-                                    This Fractal
-                                </div>
-                            )}
+                            <div
+                                onClick={() => setActiveTab('styling')}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    backgroundColor: activeTab === 'styling' ? 'var(--color-bg-card-alt)' : 'transparent',
+                                    color: activeTab === 'styling' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                                    fontWeight: activeTab === 'styling' ? 'bold' : 'normal',
+                                    borderLeft: activeTab === 'styling' ? '3px solid var(--color-brand-primary, #3b82f6)' : '3px solid transparent'
+                                }}
+                            >
+                                Goal Styling
+                            </div>
                             <div
                                 onClick={() => setActiveTab('account')}
                                 style={{
@@ -276,13 +274,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             </div>
                         )}
 
-                        {activeTab === 'fractal' && activeRootId && (
+                        {activeTab === 'styling' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <section>
                                     <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                        Goal Characteristics
+                                        Goal Characteristics {activeRootId ? '(This Fractal)' : '(Global)'}
                                     </h3>
-                                    <GoalCharacteristicsSettings scope={activeRootId} />
+                                    <GoalCharacteristicsSettings scope={activeRootId || 'default'} />
                                 </section>
                             </div>
                         )}

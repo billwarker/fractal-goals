@@ -236,7 +236,8 @@ def serialize_session(session, include_image_data=False):
                         ex['type'] = 'activity'
                         ex['instance_id'] = inst.id
                         ex['activity_id'] = inst.activity_definition_id
-                        ex['has_sets'] = len(ex.get('sets', [])) > 0
+                        ex['has_sets'] = len(ex.get('sets', []) or []) > 0
+                        ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
                         exercises.append(ex)
                 section["exercises"] = exercises
     

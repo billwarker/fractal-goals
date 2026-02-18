@@ -355,7 +355,7 @@ function SessionDetail() {
 
     // Track previous states for reversion detection
     const prevAchievedTargetIdsRef = React.useRef(new Set());
-    const prevCompletedGoalIdsRef = React.useRef(new Set());
+    const prevCompletedIdsRef = React.useRef(new Set());
 
     // Detect new target achievements and reversions
     useEffect(() => {
@@ -418,18 +418,18 @@ function SessionDetail() {
     useEffect(() => {
         if (!goalAchievements) return;
 
-        const currentCompletedGoals = new Set();
+        const currentCompleteds = new Set();
         goalAchievements.forEach((status, goalId) => {
             if (status.allAchieved) {
-                currentCompletedGoals.add(goalId);
+                currentCompleteds.add(goalId);
             }
         });
 
-        const prevCompleted = prevCompletedGoalIdsRef.current;
+        const prevCompleted = prevCompletedIdsRef.current;
 
         // 1. Detect Newly Completed Goals
         const newlyCompleted = [];
-        for (const goalId of currentCompletedGoals) {
+        for (const goalId of currentCompleteds) {
             if (!prevCompleted.has(goalId)) {
                 const status = goalAchievements.get(goalId);
                 // Only notify if it wasn't already completed when the session started/loaded
@@ -447,7 +447,7 @@ function SessionDetail() {
         // 2. Detect Uncompleted Goals
         const newlyUncompleted = [];
         for (const goalId of prevCompleted) {
-            if (!currentCompletedGoals.has(goalId)) {
+            if (!currentCompleteds.has(goalId)) {
                 const status = goalAchievements.get(goalId);
                 newlyUncompleted.push(status);
             }
@@ -459,7 +459,7 @@ function SessionDetail() {
         }
 
         // Update ref
-        prevCompletedGoalIdsRef.current = currentCompletedGoals;
+        prevCompletedIdsRef.current = currentCompleteds;
     }, [goalAchievements]);
 
     useEffect(() => {

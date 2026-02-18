@@ -1,5 +1,6 @@
 import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
+import { useTheme } from '../../contexts/ThemeContext';
 import { parseTargets, formatTargetDescription } from '../../utils/goalUtils';
 import styles from './GoalsPanel.module.css';
 
@@ -7,15 +8,21 @@ function GoalRow({
     goal, icon, color, secondaryColor, completedColor, completedSecondaryColor,
     isExpanded, onToggle, onGoalClick, targetAchievements, achievedTargetIds,
 }) {
+    const { getScopedCharacteristics, getCompletionColor, getGoalSecondaryColor } = useTheme();
     const targets = parseTargets(goal);
+
+    const isCompleted = goal.completed || goal.attributes?.completed;
+    const effectiveIcon = icon || 'circle';
+    const effectiveColor = isCompleted ? getCompletionColor() : color;
+    const effectiveSecondaryColor = isCompleted ? getGoalSecondaryColor('Completed') : secondaryColor;
 
     return (
         <div className={styles.goalRow}>
             <div className={styles.goalHeader} onClick={onToggle}>
                 <GoalIcon
-                    shape={icon || 'circle'}
-                    color={goal.completed ? completedColor : color}
-                    secondaryColor={goal.completed ? completedSecondaryColor : secondaryColor}
+                    shape={effectiveIcon}
+                    color={effectiveColor}
+                    secondaryColor={effectiveSecondaryColor}
                     isSmart={goal.is_smart}
                     size={16}
                 />

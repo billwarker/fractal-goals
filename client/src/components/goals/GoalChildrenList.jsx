@@ -43,8 +43,8 @@ function GoalChildrenList({
 
     if (children.length === 0) return null;
 
-    const completedColor = getGoalColor('CompletedGoal');
-    const completedSecondaryColor = getGoalSecondaryColor('CompletedGoal');
+    const completedColor = getGoalColor('Completed');
+    const completedSecondaryColor = getGoalSecondaryColor('Completed');
 
     return (
         <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px' }}>

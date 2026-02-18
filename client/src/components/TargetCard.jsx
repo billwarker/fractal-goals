@@ -1,4 +1,6 @@
 import React from 'react';
+import GoalIcon from './atoms/GoalIcon';
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * TargetCard Component
@@ -7,6 +9,19 @@ import React from 'react';
 function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, isCompleted, isEditMode = false }) {
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
+
+    const { getScopedCharacteristics, getGoalColor, getGoalSecondaryColor } = useTheme();
+    const targetChar = getScopedCharacteristics('Target')?.icon || 'twelve-point-star';
+    const targetColor = getGoalColor('Target');
+    const targetSecondaryColor = getGoalSecondaryColor('Target');
+
+    const statusObj = isCompleted ? {
+        color: targetColor,
+        icon: <GoalIcon shape={targetChar} color={targetColor} secondaryColor={targetSecondaryColor} size={20} />
+    } : {
+        color: 'var(--color-text-muted)',
+        icon: <GoalIcon shape={targetChar} color="var(--color-text-muted)" size={20} />
+    };
 
     if (!activityDef) {
         // In view mode, don't show targets with missing activities
@@ -51,8 +66,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             style={{
                 padding: '12px',
                 background: 'var(--color-bg-card-alt)',
-                border: `1px solid ${isCompleted ? '#4caf50' : 'var(--color-border)'}`,
-                borderLeft: `4px solid ${isCompleted ? '#4caf50' : '#ff9800'}`,
+                border: `1px solid ${isCompleted ? targetColor : 'var(--color-border)'}`,
+                borderLeft: `4px solid ${isCompleted ? targetColor : 'var(--color-warning, #ff9800)'}`,
                 borderRadius: '6px',
                 marginBottom: '10px',
                 cursor: onClick ? 'pointer' : 'default',
@@ -81,15 +96,15 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 }}>
                     <span style={{
                         fontSize: '16px',
-                        color: isCompleted ? '#4caf50' : 'var(--color-text-muted)'
+                        color: statusObj.color
                     }}>
-                        {isCompleted ? '✓' : '○'}
+                        {statusObj.icon}
                     </span>
                     <div>
                         <div style={{
                             fontWeight: 600,
                             fontSize: '14px',
-                            color: isCompleted ? '#4caf50' : 'var(--color-text-primary)'
+                            color: statusObj.color
                         }}>
                             {target.name || activityDef.name}
                         </div>
@@ -182,7 +197,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         <div style={{
                             height: '100%',
                             width: `${Math.min(100, target.progress || 0)}%`,
-                            background: isCompleted ? '#4caf50' : 'var(--color-primary)',
+                            background: isCompleted ? targetColor : 'var(--color-primary)',
                             borderRadius: '3px',
                             transition: 'width 0.5s ease-out'
                         }} />
@@ -223,7 +238,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                             {' '}
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
                             {' '}
-                            <span style={{ fontWeight: 'bold', color: isCompleted ? '#4caf50' : 'var(--color-text-primary)' }}>
+                            <span style={{ fontWeight: 'bold', color: isCompleted ? targetColor : 'var(--color-text-primary)' }}>
                                 {metric.value} {metricDef.unit}
                             </span>
                         </div>

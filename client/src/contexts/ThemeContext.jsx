@@ -66,7 +66,11 @@ export const ThemeProvider = ({ children }) => {
                 if (parsed.UltimateGoal) {
                     return { ...initial, default: { ...defaults, ...parsed } };
                 }
-                return { ...initial, ...parsed };
+                return {
+                    ...initial,
+                    ...parsed,
+                    default: { ...defaults, ...(parsed.default || {}) }
+                };
             } catch (e) {
                 console.error("Failed to parse saved goal colors", e);
             }
@@ -89,7 +93,11 @@ export const ThemeProvider = ({ children }) => {
                 if (parsed.UltimateGoal) {
                     return { ...initial, default: { ...DEFAULT_GOAL_CHARACTERISTICS, ...parsed } };
                 }
-                return { ...initial, ...parsed };
+                return {
+                    ...initial,
+                    ...parsed,
+                    default: { ...DEFAULT_GOAL_CHARACTERISTICS, ...(parsed.default || {}) }
+                };
             } catch (e) {
                 console.error("Failed to parse saved goal characteristics", e);
             }
@@ -286,6 +294,14 @@ export const ThemeProvider = ({ children }) => {
         return brightness > 155 ? '#1a1a1a' : '#ffffff';
     };
 
+    const getCompletionColor = () => {
+        return getGoalColor('Completed');
+    };
+
+    const getCompletionIcon = () => {
+        return getScopedCharacteristics('Completed')?.icon || 'check';
+    };
+
     return (
         <ThemeContext.Provider value={{
             theme,
@@ -302,6 +318,8 @@ export const ThemeProvider = ({ children }) => {
             getGoalTextColor,
             getScopedCharacteristics,
             getScopedColors,
+            getCompletionColor,
+            getCompletionIcon,
             // Expose logic helpers if needed elsewhere
             adjustBrightness
         }}>

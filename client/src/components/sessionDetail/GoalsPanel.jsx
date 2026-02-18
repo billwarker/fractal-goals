@@ -420,8 +420,8 @@ function GoalsPanel({
     const nanoChars = getScopedCharacteristics('NanoGoal');
     const stChars = getScopedCharacteristics('ShortTermGoal');
     const immChars = getScopedCharacteristics('ImmediateGoal');
-    const completedColor = getGoalColor('CompletedGoal');
-    const completedSecondaryColor = getGoalSecondaryColor('CompletedGoal');
+    const completedColor = getGoalColor('Completed');
+    const completedSecondaryColor = getGoalSecondaryColor('Completed');
     const microTally = { done: microGoals.filter(g => g.completed).length, total: microGoals.length };
     const allNanoGoals = microGoals.flatMap(m => m.children || []);
     const nanoTally = { done: allNanoGoals.filter(g => g.completed).length, total: allNanoGoals.length };

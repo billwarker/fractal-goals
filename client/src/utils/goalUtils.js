@@ -42,7 +42,8 @@ export const buildFlattenedGoalTree = (node, targetGoalIds, filterCompleted = fa
     const nodeCompleted = node.completed || node.attributes?.completed;
 
     // If filtering completed, stop at this branch if the node is completed
-    if (filterCompleted && nodeCompleted) return [];
+    // UNLESS it's a direct target for the current activity/session
+    if (filterCompleted && nodeCompleted && !isTarget) return [];
 
     // Recursively check children
     let childrenNodes = [];

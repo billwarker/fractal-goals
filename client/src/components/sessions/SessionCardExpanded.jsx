@@ -11,78 +11,51 @@ import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import { formatDateInTimezone } from '../../utils/dateUtils';
+import GoalIcon from '../atoms/GoalIcon';
+import { useTheme } from '../../contexts/ThemeContext';
 import SessionSectionGrid from './SessionSectionGrid';
 import styles from './SessionCardExpanded.module.css';
 
-/**
- * Goals section - displays all associated goals
- */
-const GoalsSection = memo(function GoalsSection({
-    allGoals,
-    getGoalColor
+const AccomplishmentsSection = memo(function AccomplishmentsSection({
+    completedGoals,
+    getGoalColor,
+    getScopedCharacteristics
 }) {
-    if (allGoals.length === 0) {
+    if (completedGoals.length === 0) {
         return null;
     }
+
+    const completionColor = getGoalColor('Completed');
 
     return (
         <div className={styles.goalsSection}>
             <div className={styles.goalsColumn}>
-                <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '6px' }}>
-                    Associated Goals
+                <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '8px' }}>
+                    Completed Goals
                 </div>
-                <div className={styles.goalsList}>
-                    {allGoals.map(goal => {
-                        const goalColor = getGoalColor(goal.type || 'ShortTermGoal');
+                <div className={styles.goalsList} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {/* Completed Goals */}
+                    {completedGoals.map(goal => {
+                        const originalShape = getScopedCharacteristics(goal.type || goal.attributes?.type)?.icon || 'circle';
                         return (
                             <div
                                 key={goal.id}
-                                className={`${styles.goalTag} ${(goal.completed || goal.attributes?.completed) ? styles.goalTagCompleted : ''}`}
+                                className={`${styles.goalTag} ${styles.goalTagCompleted}`}
                                 style={{
-                                    border: `1px solid ${goalColor}`,
-                                    color: goalColor
+                                    border: `1px solid ${completionColor}`,
+                                    color: completionColor,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    paddingLeft: '6px'
                                 }}
                             >
-                                {goal.name}
-                                {(goal.completed || goal.attributes?.completed) && (
-                                    <span className={styles.checkMark}>✓</span>
-                                )}
+                                <GoalIcon shape={originalShape} color={completionColor} size={14} />
+                                <span style={{ fontWeight: 500 }}>{goal.name}</span>
                             </div>
                         );
                     })}
                 </div>
-            </div>
-        </div>
-    );
-});
-
-/**
- * Achieved targets section
- */
-const AchievedTargetsSection = memo(function AchievedTargetsSection({
-    session,
-    shortTermGoals
-}) {
-    const achievedTargets = useMemo(() =>
-        getAchievedTargetsForSession(session, shortTermGoals),
-        [session, shortTermGoals]
-    );
-
-    if (achievedTargets.length === 0) return null;
-
-    return (
-        <div className={styles.achievedSection}>
-            <div className={styles.achievedHeader}>
-                🎯 Targets Achieved ({achievedTargets.length}):
-            </div>
-            <div className={styles.goalsList}>
-                {achievedTargets.map((achieved, idx) => (
-                    <div key={idx} className={styles.achievedTag}>
-                        <span>✓</span>
-                        <span>{achieved.target.name || 'Target'}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>({achieved.goalName})</span>
-                    </div>
-                ))}
             </div>
         </div>
     );
@@ -101,6 +74,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     timezone,
     formatDate
 }) {
+    const { getScopedCharacteristics } = useTheme();
     const sessionData = session.attributes?.session_data;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
@@ -157,6 +131,40 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 
         return goals;
     }, [shortTermGoals, immediateGoals, sessionData?.sections, activities]);
+
+    const achievedTargets = useMemo(() => {
+        const allAchievables = [...shortTermGoals, ...immediateGoals];
+        const allAchieved = getAchievedTargetsForSession(session, allAchievables);
+        // Filter specifically for targets achieved in THIS session (relational check)
+        return allAchieved.filter(achieved => {
+            // Check if it's explicitly linked to this session
+            if (achieved.target.completed_session_id === session.id) return true;
+
+            // Or if it was calculated as achieved in this session by front-end logic 
+            // and is currently marked as completed.
+            return achieved.target.completed;
+        });
+    }, [session, shortTermGoals]);
+
+    const completedGoals = useMemo(() => {
+        // Goals are accomplishments if they are completed AND 
+        // they triggered because of a target or activity in this session
+        const sessionTargetGoalIds = new Set(achievedTargets.map(t => t.goalId));
+
+        return allGoals.filter(goal => {
+            const isCompleted = goal.completed || goal.attributes?.completed;
+            if (!isCompleted) return false;
+
+            // Relational check: Was this goal's target achieved in this session?
+            if (sessionTargetGoalIds.has(goal.id)) return true;
+
+            // Check children
+            const childAchieved = goal.children?.some(child => sessionTargetGoalIds.has(child.id));
+            if (childAchieved) return true;
+
+            return false;
+        });
+    }, [allGoals, achievedTargets]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -261,16 +269,11 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
             </div>
 
-            {/* Associated Goals Section */}
-            <GoalsSection
-                allGoals={allGoals}
+            {/* Session Accomplishments Section */}
+            <AccomplishmentsSection
+                completedGoals={completedGoals}
                 getGoalColor={getGoalColor}
-            />
-
-            {/* Achieved Targets Section */}
-            <AchievedTargetsSection
-                session={session}
-                shortTermGoals={shortTermGoals}
+                getScopedCharacteristics={getScopedCharacteristics}
             />
 
             {/* Bottom Level: Session data with horizontal sections */}

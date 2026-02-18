@@ -17,24 +17,21 @@ import GoalIcon from './components/atoms/GoalIcon';
 
 // Custom node component matching the tree style
 const CustomNode = ({ data }) => {
-    const { getGoalColor, getGoalSecondaryColor } = useTheme();
-
+    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics, getCompletionColor } = useTheme();
     const isCompleted = data.completed || false;
     const isSmartGoal = data.isSmart || false;
 
-    // Use cosmic color palette based on goal type
-    let fillColor = getGoalColor(data.type);
+    // Determination for Completed vs Level-based styling
+    const completionChar = getScopedCharacteristics('Completed') || { icon: 'check' };
+    const levelChar = getScopedCharacteristics(data.type) || { icon: 'circle' };
 
-    // Achievement Gold for completed goals
-    const completedGold = getGoalColor('CompletedGoal');
+    // Preserve level shape even when completed as per user feedback
+    const config = (isCompleted ? { ...completionChar, icon: levelChar.icon } : levelChar);
+
+    let fillColor = isCompleted ? getCompletionColor() : getGoalColor(data.type);
 
     // Check if it's an Ultimate Goal
     const isUltimate = data.type === 'UltimateGoal';
-
-    // Override with gold if completed
-    if (isCompleted) {
-        fillColor = completedGold;
-    }
 
     // Calculate age if created_at exists
     const getAge = () => {
@@ -85,11 +82,11 @@ const CustomNode = ({ data }) => {
     const timingLabel = age ? `Age: ${age}` : null;
 
     // Get the cosmic color for SMART ring (gold if completed, otherwise goal level color)
-    const smartRingColor = isCompleted ? completedGold : getGoalColor(data.type);
+    const smartRingColor = isCompleted ? getCompletionColor() : getGoalColor(data.type);
 
     // Get secondary color for SMART ring fill (the space between rings)
     const smartRingFillColor = isCompleted
-        ? getGoalSecondaryColor('CompletedGoal')
+        ? getGoalSecondaryColor('Completed')
         : getGoalSecondaryColor(data.type);
 
     // Simple hex to rgba helper
@@ -109,9 +106,7 @@ const CustomNode = ({ data }) => {
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
 
-    const glowColor = isCompleted ? hexToRgba(completedGold, 0.6) : null;
-    const { getScopedCharacteristics } = useTheme();
-    const config = getScopedCharacteristics(data.type);
+    const glowColor = isCompleted ? hexToRgba(fillColor, 0.6) : null;
 
     return (
         <div className={styles.nodeContainer}>
@@ -136,7 +131,7 @@ const CustomNode = ({ data }) => {
                     size={30}
                     className={isCompleted ? styles.nodeCircleCompleted : ''}
                     style={{
-                        filter: isCompleted ? `drop-shadow(0 0 5px ${glowColor})` : undefined
+                        filter: isCompleted ? `drop-shadow(0 0 3px ${glowColor})` : undefined
                     }}
                 />
 
@@ -160,7 +155,7 @@ const CustomNode = ({ data }) => {
                 <div
                     className={`${styles.nodeLabel} ${isUltimate ? styles.nodeLabelUltimate : ''} ${data.label.length > 30 ? styles.nodeLabelLongText : ''}`}
                     style={{
-                        color: isCompleted ? completedGold : 'var(--color-text-primary)',
+                        color: isCompleted ? fillColor : 'var(--color-text-primary)',
                     }}
                     onClick={data.onClick}
                 >
@@ -170,7 +165,7 @@ const CustomNode = ({ data }) => {
                     isCompleted ? (
                         <div
                             className={styles.completedDateLabel}
-                            style={{ color: completedGold }}
+                            style={{ color: fillColor }}
                         >
                             {getCompletedDateLabel()}
                         </div>
@@ -413,7 +408,7 @@ const FlowTree = React.forwardRef(({ treeData, onNodeClick, onAddChild, sidebarO
     const [isVisible, setIsVisible] = useState(false);
 
     const { getGoalColor } = useTheme();
-    const completedGoalColor = getGoalColor('CompletedGoal');
+    const completedGoalColor = getGoalColor('Completed');
 
     // Expose immediate fade-out function to parent
     React.useImperativeHandle(ref, () => ({

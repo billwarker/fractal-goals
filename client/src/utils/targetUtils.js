@@ -18,7 +18,8 @@ export const isTargetAchieved = (target, activityInstance) => {
     if (target.activity_id !== activityInstance.activity_id) return false;
 
     // For activities with sets, check if ANY set achieved all target metrics
-    if (activityInstance.has_sets && activityInstance.sets && activityInstance.sets.length > 0) {
+    const hasSets = activityInstance.has_sets || (activityInstance.sets && activityInstance.sets.length > 0);
+    if (hasSets) {
         return activityInstance.sets.some(set => {
             if (!set.metrics) return false;
 
@@ -42,7 +43,8 @@ export const isTargetAchieved = (target, activityInstance) => {
     }
 
     // For activities without sets, check if the single metrics achieve the target
-    if (activityInstance.has_metrics && activityInstance.metrics) {
+    const hasMetrics = activityInstance.has_metrics || (activityInstance.metrics && activityInstance.metrics.length > 0);
+    if (hasMetrics) {
         return target.metrics.every(targetMetric => {
             const instanceMetric = activityInstance.metrics.find(m => m.metric_id === targetMetric.metric_id);
             if (!instanceMetric || instanceMetric.value == null) return false;

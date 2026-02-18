@@ -57,12 +57,24 @@ export const DEFAULT_GOAL_CHARACTERISTICS = {
         completion_methods: { manual: true, children: true, targets: true }
     },
     NanoGoal: {
-        icon: 'circle',
+        icon: 'square',
+        deadline_min: { value: 0, unit: 'none' },
+        deadline_max: { value: 0, unit: 'none' }
+    },
+    Target: {
+        icon: 'twelve-point-star',
+        color: '#FFD700', // Gold default for targets
+        deadline_min: { value: 0, unit: 'none' },
+        deadline_max: { value: 0, unit: 'none' }
+    },
+    Completed: {
+        icon: 'check',
+        color: '#FFD700',
         deadlines: {
-            min: { value: 5, unit: 'minutes' },
-            max: { value: 4, unit: 'hours' }
+            min: { value: 0, unit: 'none' },
+            max: { value: 0, unit: 'none' }
         },
-        completion_methods: { manual: true, children: true, targets: true }
+        completion_methods: { manual: false, children: false, targets: false }
     }
 };
 
@@ -82,7 +94,8 @@ export const ICON_SHAPES = [
     { label: 'Triangle', value: 'triangle' },
     { label: 'Star', value: 'star' },
     { label: 'Hexagon', value: 'hexagon' },
-    { label: 'Diamond', value: 'diamond' }
+    { label: 'Diamond', value: 'diamond' },
+    { label: 'Twelve Point Star', value: 'twelve-point-star' }
 ];
 
 export const getDurationInDays = (value, unit) => {

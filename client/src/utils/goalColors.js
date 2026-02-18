@@ -77,7 +77,7 @@ export const GOAL_COLOR_SYSTEM = {
         contrastRatio: 7.1
     },
 
-    CompletedGoal: {
+    Completed: {
         primary: '#FFD700',
         primaryName: 'Achievement Gold',
         secondary: '#4C1D95',
