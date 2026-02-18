@@ -1,20 +1,16 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
-import json
 import uuid
 import logging
-import traceback
 
 logger = logging.getLogger(__name__)
 import models
-from sqlalchemy import text
-from sqlalchemy.orm import joinedload, subqueryload, selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
     ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate,
-    validate_root_goal, get_all_sessions, get_sessions_for_root,
-    get_immediate_goals_for_session, get_session_by_id
+    validate_root_goal, get_session_by_id
 )
 from validators import (
     validate_request,
@@ -24,6 +20,7 @@ from validators import (
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
 from blueprints.auth_api import token_required
+from blueprints.api_utils import parse_optional_pagination, etag_json_response, internal_error
 from services import event_bus, Event, Events
 from services.serializers import serialize_session, serialize_activity_instance, serialize_goal
 from services.session_service import SessionService
@@ -44,7 +41,7 @@ def get_all_sessions_endpoint(current_user):
     db_session = get_session(engine)
     try:
         # Join with Goal to check ownership of the root_id
-        sessions = db_session.query(Session).join(Goal, Goal.id == Session.root_id).options(
+        sessions_q = db_session.query(Session).join(Goal, Goal.id == Session.root_id).options(
             selectinload(Session.goals),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances)
@@ -52,10 +49,14 @@ def get_all_sessions_endpoint(current_user):
             Session.deleted_at == None,
             Goal.parent_id == None,
             Goal.owner_id == current_user.id
-        ).order_by(Session.created_at.desc()).all()
+        ).order_by(Session.created_at.desc())
+        limit, offset = parse_optional_pagination(request, max_limit=300)
+        if limit is not None:
+            sessions_q = sessions_q.offset(offset).limit(limit)
+        sessions = sessions_q.all()
         # Don't include image data in list view
         result = [serialize_session(s, include_image_data=False) for s in sessions]
-        return jsonify(result)
+        return etag_json_response(result)
     finally:
         db_session.close()
 
@@ -74,11 +75,9 @@ def get_fractal_sessions(current_user, root_id):
         result, error, status = service.get_fractal_sessions(root_id, current_user.id, limit, offset)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(result)
+        return etag_json_response(result)
     except Exception as e:
-        logger.error(f"Error in get_fractal_sessions: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+        return internal_error(logger, "Error in get_fractal_sessions")
     finally:
         db_session.close()
 
@@ -97,8 +96,7 @@ def create_fractal_session(current_user, root_id, validated_data):
             return jsonify({"error": error}), status
         return jsonify(result), status
     except Exception as e:
-        logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error creating session")
     finally:
         db_session.close()
 
@@ -117,8 +115,7 @@ def update_session(current_user, root_id, session_id, validated_data):
             return jsonify({"error": error}), status
         return jsonify(result), status
     except Exception as e:
-        logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error updating session")
     finally:
         db_session.close()
 
@@ -136,8 +133,7 @@ def get_session_endpoint(current_user, root_id, session_id):
             return jsonify({"error": error}), status
         return jsonify(result)
     except Exception as e:
-        logger.exception("Error getting session")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error getting session")
     finally:
         db_session.close()
 
@@ -155,8 +151,7 @@ def delete_session_endpoint(current_user, root_id, session_id):
             return jsonify({"error": error}), status
         return jsonify(result), status
     except Exception as e:
-        logger.exception("An error occurred")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Error deleting session")
     finally:
         db_session.close()
 

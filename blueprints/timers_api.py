@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 import uuid
 import logging
+import os
 import models
 from sqlalchemy.orm import joinedload
 from models import (
@@ -249,8 +250,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
         activity_name = activity_def.name if activity_def else 'Unknown'
         db_session.commit()
         
-        # Emit completion event - this triggers target evaluation synchronously
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_COMPLETED, {
+        completion_event = Event(Events.ACTIVITY_INSTANCE_COMPLETED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,
@@ -258,16 +258,30 @@ def complete_activity_instance(current_user, root_id, instance_id):
             'root_id': root_id,
             'duration_seconds': instance.duration_seconds,
             'completed_at': instance.time_stop.isoformat()
-        }, source='timers_api.complete_activity_instance'))
+        }, source='timers_api.complete_activity_instance')
+
+        async_completion = (
+            request.args.get("async_completion") == "1"
+            or os.getenv("ASYNC_ACTIVITY_COMPLETION", "false").lower() in ("1", "true", "yes")
+        )
+        if async_completion:
+            event_bus.emit_async(completion_event)
+        else:
+            event_bus.emit(completion_event)
         
         # Build response with achievement data
         result = serialize_activity_instance(instance)
         
         # Get any targets/goals that were achieved during this completion
-        from services.completion_handlers import get_recent_achievements
-        achievements = get_recent_achievements()
-        result['achieved_targets'] = achievements.get('achieved_targets', [])
-        result['completed_goals'] = achievements.get('completed_goals', [])
+        if async_completion:
+            result['achieved_targets'] = []
+            result['completed_goals'] = []
+            result['evaluation_queued'] = True
+        else:
+            from services.completion_handlers import get_recent_achievements
+            achievements = get_recent_achievements()
+            result['achieved_targets'] = achievements.get('achieved_targets', [])
+            result['completed_goals'] = achievements.get('completed_goals', [])
         
         return jsonify(result)
         

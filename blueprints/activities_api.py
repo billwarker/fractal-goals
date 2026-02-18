@@ -14,7 +14,7 @@ from validators import (
     ActivityGoalsSetSchema, GroupReorderSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, require_owned_root
+from blueprints.api_utils import parse_optional_pagination, require_owned_root, etag_json_response
 from services.events import event_bus, Event, Events
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition
@@ -280,7 +280,7 @@ def get_activities(current_user, root_id):
         if limit is not None:
             activities_q = activities_q.offset(offset).limit(limit)
         activities = activities_q.all()
-        return jsonify([serialize_activity_definition(a) for a in activities])
+        return etag_json_response([serialize_activity_definition(a) for a in activities])
     finally:
         session.close()
 
@@ -851,6 +851,75 @@ def get_goal_activity_groups(current_user, root_id, goal_id):
         
         groups = [{"id": g.id, "name": g.name} for g in goal.associated_activity_groups]
         return jsonify(groups)
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/goals/<goal_id>/associations/batch', methods=['PUT'])
+@token_required
+def set_goal_associations_batch(current_user, root_id, goal_id):
+    """Set both direct activity and activity-group associations for a goal in one request."""
+    from models import Goal, ActivityDefinition, ActivityGroup, activity_goal_associations, goal_activity_group_associations
+
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        root = require_owned_root(session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        goal = session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        if not goal:
+            return jsonify({"error": "Goal not found"}), 404
+
+        data = request.get_json() or {}
+        activity_ids = data.get("activity_ids", []) or []
+        group_ids = data.get("group_ids", []) or []
+        if not isinstance(activity_ids, list) or not isinstance(group_ids, list):
+            return jsonify({"error": "activity_ids and group_ids must be lists"}), 400
+
+        valid_activities = session.query(ActivityDefinition.id).filter(
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.id.in_(activity_ids),
+            ActivityDefinition.deleted_at.is_(None)
+        ).all()
+        valid_groups = session.query(ActivityGroup.id).filter(
+            ActivityGroup.root_id == root_id,
+            ActivityGroup.id.in_(group_ids),
+            ActivityGroup.deleted_at.is_(None)
+        ).all()
+        valid_activity_ids = {row[0] for row in valid_activities}
+        valid_group_ids = {row[0] for row in valid_groups}
+
+        # Replace direct activity associations.
+        session.execute(
+            activity_goal_associations.delete().where(activity_goal_associations.c.goal_id == goal_id)
+        )
+        if valid_activity_ids:
+            session.execute(
+                activity_goal_associations.insert(),
+                [{"goal_id": goal_id, "activity_id": aid} for aid in valid_activity_ids]
+            )
+
+        # Replace group associations.
+        session.execute(
+            goal_activity_group_associations.delete().where(goal_activity_group_associations.c.goal_id == goal_id)
+        )
+        if valid_group_ids:
+            session.execute(
+                goal_activity_group_associations.insert(),
+                [{"goal_id": goal_id, "activity_group_id": gid} for gid in valid_group_ids]
+            )
+
+        session.commit()
+        return jsonify({
+            "activity_ids": list(valid_activity_ids),
+            "group_ids": list(valid_group_ids),
+        }), 200
+    except Exception:
+        session.rollback()
+        logger.exception("Error setting goal associations in batch")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         session.close()
 

@@ -429,6 +429,15 @@ export const fractalApi = {
     unlinkGoalActivityGroup: (rootId, goalId, groupId) =>
         axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
 
+    /**
+     * Batch replace goal activity + group associations
+     * @param {string} rootId
+     * @param {string} goalId
+     * @param {Object} data - {activity_ids: string[], group_ids: string[]}
+     */
+    setGoalAssociationsBatch: (rootId, goalId, data) =>
+        axios.put(`${API_BASE}/${rootId}/goals/${goalId}/associations/batch`, data),
+
     // ========== Activity Instance Time Tracking ==========
 
     /**

@@ -1,4 +1,7 @@
-from flask import jsonify
+import hashlib
+import json
+
+from flask import jsonify, request, make_response
 
 from models import Goal, validate_root_goal
 
@@ -42,3 +45,16 @@ def parse_optional_pagination(req, *, max_limit: int = 200):
     limit_val = max(1, min(limit_val, max_limit))
     offset_val = max(0, offset_val)
     return limit_val, offset_val
+
+
+def etag_json_response(payload, status: int = 200):
+    """Return JSON response with a stable ETag and 304 support."""
+    raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
+    etag = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    if request.if_none_match and request.if_none_match.contains(etag):
+        resp = make_response("", 304)
+        resp.set_etag(etag)
+        return resp
+    resp = make_response(jsonify(payload), status)
+    resp.set_etag(etag)
+    return resp

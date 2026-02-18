@@ -8,7 +8,7 @@ from validators import (
 )
 from services.programs import ProgramService
 from blueprints.auth_api import token_required
-from blueprints.api_utils import internal_error
+from blueprints.api_utils import internal_error, parse_optional_pagination, etag_json_response
 from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,10 @@ def get_programs(current_user, root_id):
              return jsonify({"error": "Fractal not found or access denied"}), 404
              
         programs = ProgramService.get_programs(session, root_id)
-        return jsonify(programs)
+        limit, offset = parse_optional_pagination(request, max_limit=200)
+        if limit is not None:
+            programs = programs[offset: offset + limit]
+        return etag_json_response(programs)
     except Exception as e:
         logger.exception("Error getting programs")
         return internal_error(logger, "Program API request failed")

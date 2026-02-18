@@ -13,7 +13,7 @@ from validators import (
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root
+from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root, etag_json_response
 from services.events import event_bus, Event, Events
 from services.serializers import serialize_session_template
 
@@ -41,7 +41,7 @@ def get_session_templates(current_user, root_id):
             templates_q = templates_q.offset(offset).limit(limit)
         templates = templates_q.all()
         result = [serialize_session_template(template) for template in templates]
-        return jsonify(result)
+        return etag_json_response(result)
         
     finally:
         session.close()
@@ -62,7 +62,7 @@ def get_session_template(current_user, root_id, template_id):
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
-        return jsonify(serialize_session_template(template))
+        return etag_json_response(serialize_session_template(template))
         
     finally:
         session.close()

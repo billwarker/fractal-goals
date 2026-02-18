@@ -22,6 +22,7 @@ Usage:
 from services.events import event_bus, Event, Events, EventBus
 from services.completion_handlers import init_completion_handlers
 from services.event_logger import setup_event_logging
+from services.analytics_cache import setup_analytics_cache_invalidation
 
 
 def init_services():
@@ -31,6 +32,7 @@ def init_services():
     """
     init_completion_handlers()
     setup_event_logging()
+    setup_analytics_cache_invalidation()
     # Add future service initializations here
 
 

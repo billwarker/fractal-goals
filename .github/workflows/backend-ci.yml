@@ -49,3 +49,7 @@ jobs:
       - name: Run Integration Tests
         run: |
           python -m pytest tests/integration -q
+
+      - name: Run Query Budget Tests
+        run: |
+          python -m pytest tests/performance -q

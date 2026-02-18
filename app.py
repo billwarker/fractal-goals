@@ -3,9 +3,8 @@ Flask Application for Fractal Goals
 Main application file that integrates API and page routes.
 """
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
-from flask_compress import Compress
 from flask_compress import Compress
 from flask_talisman import Talisman
 import logging
@@ -54,6 +53,16 @@ except ValueError as e:
 app = Flask(__name__)
 app.config['ENV'] = config.ENV
 app.config['DEBUG'] = config.DEBUG
+app.config['COMPRESS_LEVEL'] = 6
+app.config['COMPRESS_MIN_SIZE'] = 512
+app.config['COMPRESS_MIMETYPES'] = [
+    'text/html',
+    'text/css',
+    'text/xml',
+    'application/json',
+    'application/javascript',
+    'image/svg+xml',
+]
 Compress(app)
 
 # Initialize Rate Limiter
@@ -145,6 +154,14 @@ logger.info("Database engine initialized with connection pooling")
 def shutdown_session(exception=None):
     """Clean up database session at the end of each request."""
     remove_session()
+
+
+@app.after_request
+def add_cache_headers(response):
+    # Allow short-lived private caching on ETagged GET API responses.
+    if request.method == 'GET' and response.headers.get('ETag') and response.status_code == 200:
+        response.headers.setdefault('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
+    return response
 
 
 

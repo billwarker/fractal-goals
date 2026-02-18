@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import notify from '../utils/notify';
 import Input from './atoms/Input';
 import TextArea from './atoms/TextArea';
@@ -11,9 +11,6 @@ import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoa
 import { formatDurationSeconds as formatDuration } from '../utils/formatters';
 import SMARTIndicator from './SMARTIndicator';
 import { fractalApi } from '../utils/api';
-import TargetManager from './goalDetail/TargetManager';
-import ActivityAssociator from './goalDetail/ActivityAssociator';
-import GoalSessionList from './goalDetail/GoalSessionList';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
@@ -21,8 +18,11 @@ import GoalSmartSection from './goals/GoalSmartSection';
 import GoalChildrenList from './goals/GoalChildrenList';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import { useGoalForm } from '../hooks/useGoalForm';
-import GenericGraphModal from './analytics/GenericGraphModal';
 import styles from './GoalDetailModal.module.css';
+
+const TargetManager = lazy(() => import('./goalDetail/TargetManager'));
+const ActivityAssociator = lazy(() => import('./goalDetail/ActivityAssociator'));
+const GenericGraphModal = lazy(() => import('./analytics/GenericGraphModal'));
 
 /**
  * GoalDetailModal Component
@@ -265,56 +265,11 @@ function GoalDetailModal({
 
         try {
             const currentActivityIds = activs.map(a => a.id);
-            const initialActivityIds = initialActivitiesRef.current;
-
-            // Find added and removed activities
-            const addedActivities = currentActivityIds.filter(id => !initialActivityIds.includes(id));
-            const removedActivities = initialActivityIds.filter(id => !currentActivityIds.includes(id));
-
-            // For each added activity, add this goal to its goal list
-            for (const activityId of addedActivities) {
-                try {
-                    const resp = await fractalApi.getActivityGoals(rootId, activityId);
-                    const existingGoalIds = (resp.data || []).map(g => g.id);
-                    if (!existingGoalIds.includes(goalId)) {
-                        await fractalApi.setActivityGoals(rootId, activityId, [...existingGoalIds, goalId]);
-                    }
-                } catch (err) {
-                    console.error(`Failed to add goal to activity ${activityId}:`, err);
-                }
-            }
-
-            // For each removed activity, remove this goal from its goal list
-            for (const activityId of removedActivities) {
-                try {
-                    await fractalApi.removeActivityGoal(rootId, activityId, goalId);
-                } catch (err) {
-                    console.error(`Failed to remove goal from activity ${activityId}:`, err);
-                }
-            }
-
-            // Persist group associations
             const currentGroupIds = groups.map(g => g.id);
-            const initialGroupIds = initialGroupsRef.current;
-
-            const addedGroups = currentGroupIds.filter(id => !initialGroupIds.includes(id));
-            const removedGroups = initialGroupIds.filter(id => !currentGroupIds.includes(id));
-
-            for (const groupId of addedGroups) {
-                try {
-                    await fractalApi.linkGoalActivityGroup(rootId, goalId, groupId);
-                } catch (err) {
-                    console.error(`Failed to link group ${groupId}:`, err);
-                }
-            }
-
-            for (const groupId of removedGroups) {
-                try {
-                    await fractalApi.unlinkGoalActivityGroup(rootId, goalId, groupId);
-                } catch (err) {
-                    console.error(`Failed to unlink group ${groupId}:`, err);
-                }
-            }
+            await fractalApi.setGoalAssociationsBatch(rootId, goalId, {
+                activity_ids: currentActivityIds,
+                group_ids: currentGroupIds
+            });
 
             // Update snapshots to reflect persisted state
             initialActivitiesRef.current = currentActivityIds;
@@ -454,15 +409,17 @@ function GoalDetailModal({
 
         return (
             <>
-                <GenericGraphModal
-                    isOpen={!!graphModalConfig}
-                    onClose={() => setGraphModalConfig(null)}
-                    title={graphModalConfig?.title}
-                    goalType={graphModalConfig?.goalType}
-                    goalColor={graphModalConfig?.goalColor}
-                    graphData={graphModalConfig?.graphData}
-                    options={graphModalConfig?.options}
-                />
+                <Suspense fallback={null}>
+                    <GenericGraphModal
+                        isOpen={!!graphModalConfig}
+                        onClose={() => setGraphModalConfig(null)}
+                        title={graphModalConfig?.title}
+                        goalType={graphModalConfig?.goalType}
+                        goalColor={graphModalConfig?.goalColor}
+                        graphData={graphModalConfig?.graphData}
+                        options={graphModalConfig?.options}
+                    />
+                </Suspense>
 
                 <GoalHeader
                     mode={mode}
@@ -593,44 +550,48 @@ function GoalDetailModal({
 
                         {/* Associated Activities Section - Edit/Create Mode */}
                         {trackActivities && (
-                            <ActivityAssociator
-                                associatedActivities={associatedActivities}
-                                setAssociatedActivities={setAssociatedActivities}
-                                associatedActivityGroups={associatedActivityGroups}
-                                setAssociatedActivityGroups={setAssociatedActivityGroups}
-                                activityDefinitions={activityDefinitions}
-                                activityGroups={activityGroups}
-                                setActivityGroups={setActivityGroups}
-                                rootId={rootId}
-                                goalId={goalId}
-                                isEditing={true}
-                                targets={targets}
-                                goalName={name}
-                                viewMode="list"
-                                onOpenSelector={() => setViewState('activity-associator')}
-                                completedViaChildren={completedViaChildren}
-                                isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
-                                headerColor={goalColor}
-                            />
+                            <Suspense fallback={null}>
+                                <ActivityAssociator
+                                    associatedActivities={associatedActivities}
+                                    setAssociatedActivities={setAssociatedActivities}
+                                    associatedActivityGroups={associatedActivityGroups}
+                                    setAssociatedActivityGroups={setAssociatedActivityGroups}
+                                    activityDefinitions={activityDefinitions}
+                                    activityGroups={activityGroups}
+                                    setActivityGroups={setActivityGroups}
+                                    rootId={rootId}
+                                    goalId={goalId}
+                                    isEditing={true}
+                                    targets={targets}
+                                    goalName={name}
+                                    viewMode="list"
+                                    onOpenSelector={() => setViewState('activity-associator')}
+                                    completedViaChildren={completedViaChildren}
+                                    isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
+                                    headerColor={goalColor}
+                                />
+                            </Suspense>
                         )}
 
                         {/* Targets Section - Edit/Create Mode */}
                         {trackActivities && (
-                            <TargetManager
-                                targets={targets}
-                                setTargets={setTargets}
-                                activityDefinitions={activityDefinitions}
-                                associatedActivities={associatedActivities}
-                                goalId={goalId}
-                                rootId={rootId}
-                                isEditing={true}
-                                viewMode="list"
-                                onOpenBuilder={(target) => {
-                                    setTargetToEdit(target || null);
-                                    setViewState('target-manager');
-                                }}
-                                headerColor={goalColor}
-                            />
+                            <Suspense fallback={null}>
+                                <TargetManager
+                                    targets={targets}
+                                    setTargets={setTargets}
+                                    activityDefinitions={activityDefinitions}
+                                    associatedActivities={associatedActivities}
+                                    goalId={goalId}
+                                    rootId={rootId}
+                                    isEditing={true}
+                                    viewMode="list"
+                                    onOpenBuilder={(target) => {
+                                        setTargetToEdit(target || null);
+                                        setViewState('target-manager');
+                                    }}
+                                    headerColor={goalColor}
+                                />
+                            </Suspense>
                         )}
 
                         {/* Edit Actions */}
@@ -873,17 +834,19 @@ function GoalDetailModal({
 
                         {/* Targets Section - View Mode (Read-only) */}
                         {trackActivities && goalCharacteristics[goalType]?.completion_methods?.targets !== false && (
-                            <TargetManager
-                                targets={targets}
-                                setTargets={setTargets}
-                                activityDefinitions={activityDefinitions}
-                                associatedActivities={associatedActivities}
-                                goalId={goalId}
-                                rootId={rootId}
-                                isEditing={false}
-                                viewMode="list"
-                                headerColor={goalColor}
-                            />
+                            <Suspense fallback={null}>
+                                <TargetManager
+                                    targets={targets}
+                                    setTargets={setTargets}
+                                    activityDefinitions={activityDefinitions}
+                                    associatedActivities={associatedActivities}
+                                    goalId={goalId}
+                                    rootId={rootId}
+                                    isEditing={false}
+                                    viewMode="list"
+                                    headerColor={goalColor}
+                                />
+                            </Suspense>
                         )}
 
                         {/* Associated Children Section */}
@@ -939,66 +902,70 @@ function GoalDetailModal({
         );
     } else if (viewState === 'target-manager') {
         content = (
-            <TargetManager
-                targets={targets}
-                setTargets={setTargets}
-                activityDefinitions={activityDefinitions}
-                associatedActivities={associatedActivities}
-                goalId={goalId}
-                rootId={rootId}
-                isEditing={true}
-                viewMode="builder"
-                headerColor="var(--color-text-muted)"
-                initialTarget={targetToEdit}
-                onCloseBuilder={() => {
-                    setTargetToEdit(null);
-                    setViewState('goal');
-                }}
-                onSave={(newTargets) => {
-                    if (onUpdate && goalId) {
-                        onUpdate(goalId, {
-                            name,
-                            description,
-                            deadline,
-                            relevance_statement: relevanceStatement,
-                            targets: newTargets
-                        });
-                    }
-                    setViewState('goal');
-                }}
-            />
+            <Suspense fallback={null}>
+                <TargetManager
+                    targets={targets}
+                    setTargets={setTargets}
+                    activityDefinitions={activityDefinitions}
+                    associatedActivities={associatedActivities}
+                    goalId={goalId}
+                    rootId={rootId}
+                    isEditing={true}
+                    viewMode="builder"
+                    headerColor="var(--color-text-muted)"
+                    initialTarget={targetToEdit}
+                    onCloseBuilder={() => {
+                        setTargetToEdit(null);
+                        setViewState('goal');
+                    }}
+                    onSave={(newTargets) => {
+                        if (onUpdate && goalId) {
+                            onUpdate(goalId, {
+                                name,
+                                description,
+                                deadline,
+                                relevance_statement: relevanceStatement,
+                                targets: newTargets
+                            });
+                        }
+                        setViewState('goal');
+                    }}
+                />
+            </Suspense>
         );
     } else if (viewState === 'activity-associator') {
         content = (
-            <ActivityAssociator
-                associatedActivities={associatedActivities}
-                setAssociatedActivities={setAssociatedActivities}
-                associatedActivityGroups={associatedActivityGroups}
-                setAssociatedActivityGroups={setAssociatedActivityGroups}
-                activityDefinitions={activityDefinitions}
-                activityGroups={activityGroups}
-                setActivityGroups={setActivityGroups}
-                rootId={rootId}
-                goalId={goalId}
-                goalName={name}
-                isEditing={true}
-                targets={targets}
-                viewMode="selector"
-                onCloseSelector={() => setViewState('goal')}
-                headerColor={goalColor}
-                onClose={onClose}
-                onSave={!isEditing ? persistAssociations : undefined}
-                onCreateActivity={() => {
-                    // Reset form state and switch to activity builder view
-                    setNewActivityName('');
-                    setNewActivityDescription('');
-                    setNewActivityHasMetrics(true);
-                    setNewActivityMetrics([{ name: '', unit: '' }]);
-                    setNewActivityHasSets(false);
-                    setNewActivityGroupId('');
-                    setViewState('activity-builder');
-                }}
-            />
+            <Suspense fallback={null}>
+                <ActivityAssociator
+                    associatedActivities={associatedActivities}
+                    setAssociatedActivities={setAssociatedActivities}
+                    associatedActivityGroups={associatedActivityGroups}
+                    setAssociatedActivityGroups={setAssociatedActivityGroups}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    setActivityGroups={setActivityGroups}
+                    rootId={rootId}
+                    goalId={goalId}
+                    goalName={name}
+                    isEditing={true}
+                    targets={targets}
+                    viewMode="selector"
+                    onCloseSelector={() => setViewState('goal')}
+                    headerColor={goalColor}
+                    onClose={onClose}
+                    onSave={!isEditing ? persistAssociations : undefined}
+                    onCreateActivity={() => {
+                        // Reset form state and switch to activity builder view
+                        setNewActivityName('');
+                        setNewActivityDescription('');
+                        setNewActivityHasMetrics(true);
+                        setNewActivityMetrics([{ name: '', unit: '' }]);
+                        setNewActivityHasSets(false);
+                        setNewActivityGroupId('');
+                        setViewState('activity-builder');
+                    }}
+                />
+            </Suspense>
         );
     } else if (viewState === 'activity-builder') {
         // Inline activity creation form

@@ -11,6 +11,7 @@ import os
 import sys
 import pytest
 import tempfile
+from sqlalchemy import event
 from datetime import datetime, timedelta, timezone
 import uuid
 import json
@@ -126,6 +127,22 @@ def db_session(app):
     session = get_session(engine)
     yield session
     session.close()
+
+
+@pytest.fixture(scope='function')
+def query_counter(app):
+    """Count SQL statements executed during a test block."""
+    engine = models.get_engine()
+    counts = {"total": 0}
+
+    def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        counts["total"] += 1
+
+    event.listen(engine, "before_cursor_execute", _before_cursor_execute)
+    try:
+        yield counts
+    finally:
+        event.remove(engine, "before_cursor_execute", _before_cursor_execute)
 
 
 @pytest.fixture(scope='function')

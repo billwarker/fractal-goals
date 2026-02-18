@@ -20,11 +20,18 @@ from validators import (
     parse_date_string
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import require_owned_root, get_goal_in_root, internal_error
+from blueprints.api_utils import (
+    require_owned_root,
+    get_goal_in_root,
+    internal_error,
+    parse_optional_pagination,
+    etag_json_response,
+)
 from services import event_bus, Event, Events
 from services.serializers import serialize_goal, serialize_target, calculate_smart_status, format_utc
 from extensions import limiter
 from services.metrics import GoalMetricsService
+from services.analytics_cache import get_analytics, set_analytics
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -151,10 +158,14 @@ def get_goals():
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        roots = get_all_root_goals(db_session)
+        roots_q = db_session.query(Goal).filter(Goal.parent_id == None, Goal.deleted_at == None).order_by(Goal.created_at.desc())
+        limit, offset = parse_optional_pagination(request, max_limit=200)
+        if limit is not None:
+            roots_q = roots_q.offset(offset).limit(limit)
+        roots = roots_q.all()
         # Build complete trees for each root
         result = [serialize_goal(root) for root in roots]
-        return jsonify(result)
+        return etag_json_response(result)
     finally:
         db_session.close()
 
@@ -755,7 +766,7 @@ def get_fractal_goals(current_user, root_id):
         
         # Build complete tree for this fractal
         result = serialize_goal(root)
-        return jsonify(result)
+        return etag_json_response(result)
         
     except Exception as e:
         logger.exception("Error fetching fractal tree")
@@ -813,7 +824,7 @@ def get_active_goals_for_selection(current_user, root_id):
             }
             result.append(stg_dict)
             
-        return jsonify(result)
+        return etag_json_response(result)
         
     except Exception as e:
         logger.exception("Error fetching selection goals")
@@ -1063,6 +1074,10 @@ def get_goal_analytics(current_user, root_id):
         root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        cached = get_analytics(root_id)
+        if cached is not None:
+            return etag_json_response(cached)
         
         # === BATCH QUERY 1: Get all goals for this fractal ===
         all_goals = db_session.query(Goal).filter(
@@ -1239,7 +1254,7 @@ def get_goal_analytics(current_user, root_id):
                 'activity_durations_by_date': activity_durations_by_date
             })
         
-        return jsonify({
+        payload = {
             'summary': {
                 'total_goals': len(all_goals),
                 'completed_goals': total_completed,
@@ -1249,7 +1264,9 @@ def get_goal_analytics(current_user, root_id):
                 'avg_duration_to_completion_seconds': round(avg_duration_to_completion, 0)
             },
             'goals': goals_data
-        })
+        }
+        set_analytics(root_id, payload)
+        return etag_json_response(payload)
         
     except Exception as e:
         return internal_error(logger, "Error fetching goal analytics")
