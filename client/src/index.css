@@ -1,14 +1,11 @@
 @import './design-tokens.css';
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family);
   line-height: 1.5;
   font-weight: 400;
-
-
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-app);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -23,58 +20,70 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--color-brand-primary);
   text-decoration: inherit;
 }
 
 a:hover {
-  color: #535bf2;
+  color: var(--color-brand-primary-hover);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  /* Centering here breaks scrolling on taller-than-viewport pages */
+  font-family: var(--font-family);
+  background:
+    radial-gradient(1200px 600px at 10% -20%, rgba(79, 156, 249, 0.14), transparent 55%),
+    radial-gradient(900px 540px at 95% 8%, rgba(60, 137, 232, 0.14), transparent 60%),
+    var(--color-bg-app);
+  color: var(--color-text-primary);
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: var(--font-size-title);
   line-height: 1.1;
 }
 
-/* button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+button,
+input,
+select,
+textarea {
   font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
 }
 
-button:hover {
-  border-color: #646cff;
+.mono {
+  font-family: var(--font-family-mono);
 }
 
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-} */
+[data-theme="dark"] .mono {
+  letter-spacing: 0.01em;
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+  border-radius: var(--border-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-app);
   }
 
   a:hover {
-    color: #747bff;
+    color: var(--color-brand-primary-hover);
   }
-
-  /* button {
-    background-color: #f9f9f9;
-  } */
 }

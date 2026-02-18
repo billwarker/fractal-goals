@@ -12,6 +12,7 @@ import notify from '../utils/notify';
 import '../App.css';
 import { useGoals } from '../contexts/GoalsContext';
 import ActivityAssociationModal from '../components/sessionDetail/ActivityAssociationModal';
+import StatusState from '../components/common/StatusState';
 
 // Context
 import { ActiveSessionProvider, useActiveSession } from '../contexts/ActiveSessionContext';
@@ -159,17 +160,27 @@ function SessionDetailContent() {
     } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
 
     if (loading) {
-        return <div className="page-container"><div className={styles.statusMessage}><p>Loading session...</p></div></div>;
+        return (
+            <div className="page-container">
+                <div className={styles.statusWrapper}>
+                    <StatusState
+                        title="Loading Session"
+                        description="Fetching your sections, activities, notes, and goals."
+                    />
+                </div>
+            </div>
+        );
     }
     if (!session || !localSessionData) {
         return (
             <div className="page-container">
-                <div className={styles.statusMessage}>
-                    <h2>Session Not Found</h2>
-                    <p>The session you're looking for doesn't exist or you don't have access.</p>
-                    <button onClick={() => navigate(`/${rootId}/sessions`)} className="btn btn-primary">
-                        Return to Sessions
-                    </button>
+                <div className={styles.statusWrapper}>
+                    <StatusState
+                        title="Session Not Found"
+                        description="The requested session does not exist or is no longer available."
+                        actionLabel="Return to Sessions"
+                        onAction={() => navigate(`/${rootId}/sessions`)}
+                    />
                 </div>
             </div>
         );
@@ -260,9 +271,9 @@ function SessionDetailContent() {
 
             {autoSaveStatus && (
                 <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
-                    {autoSaveStatus === 'saving' && '💾 Saving...'}
-                    {autoSaveStatus === 'saved' && '✓ Saved'}
-                    {autoSaveStatus === 'error' && '⚠ Error'}
+                    {autoSaveStatus === 'saving' && 'Saving changes...'}
+                    {autoSaveStatus === 'saved' && 'Saved'}
+                    {autoSaveStatus === 'error' && 'Save failed'}
                 </div>
             )}
         </div>

@@ -193,19 +193,22 @@ const SessionSection = ({
                             </span>
                             <div className={styles.selectorActions}>
                                 {viewGroupId !== null && (
-                                    <button
-                                        onClick={() => setViewGroupId(null)}
-                                        className={styles.backButton}
-                                    >
-                                        ← Back
-                                    </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewGroupId(null)}
+                                    className={styles.backButton}
+                                >
+                                    ← Back
+                                </button>
                                 )}
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
                                         setViewGroupId(null); // Reset on close
                                     }}
                                     className={styles.closeButton}
+                                    aria-label="Close activity selector"
                                 >
                                     ×
                                 </button>
@@ -222,6 +225,7 @@ const SessionSection = ({
                                     if (!groupActivities.length) return null;
                                     return (
                                         <button
+                                            type="button"
                                             key={groupId}
                                             onClick={() => setViewGroupId(groupId)}
                                             className={styles.groupCard}
@@ -235,6 +239,7 @@ const SessionSection = ({
                                 {/* Ungrouped Card */}
                                 {ungroupedActivities.length > 0 && (
                                     <button
+                                        type="button"
                                         onClick={() => setViewGroupId('ungrouped')}
                                         className={styles.ungroupedCard}
                                     >
@@ -248,6 +253,7 @@ const SessionSection = ({
                             <div className={styles.activitiesList}>
                                 {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
                                     <button
+                                        type="button"
                                         key={act.id}
                                         onClick={() => addActivity(sectionIndex, act.id)}
                                         className={styles.activityButton}
@@ -266,6 +272,7 @@ const SessionSection = ({
                             <>
                                 <div className={styles.selectorDivider}></div>
                                 <button
+                                    type="button"
                                     onClick={() => onOpenActivityBuilder(sectionIndex)}
                                     className={styles.createActivityButton}
                                 >
@@ -276,6 +283,7 @@ const SessionSection = ({
                     </div>
                 ) : (
                     <button
+                        type="button"
                         onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
                         className={styles.addActivityButton}
                     >

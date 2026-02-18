@@ -1,116 +1,126 @@
 /* Fractal Goals - Central Design Tokens */
-/* Created from a pixel-perfect visual audit to replace inline styles */
 
 :root {
   /* Core Colors (Dark Mode Default) */
   color-scheme: dark;
-  --color-bg-app: #121212;
-  --color-bg-card: rgb(42, 42, 42);
-  --color-bg-card-alt: rgb(30, 30, 30);
-  --color-bg-card-hover: rgb(50, 50, 50);
-  --color-bg-sidebar: rgb(26, 26, 26);
+  --color-bg-app: #121419;
+  --color-bg-elevated: #171d24;
+  --color-bg-card: #1c242e;
+  --color-bg-card-alt: #151c24;
+  --color-bg-card-hover: #24303d;
+  --color-bg-sidebar: #161d27;
   --color-bg-node: rgb(233, 240, 255);
-  --color-bg-header: #1a1a1a;
-  --color-bg-input: #333;
-  --color-border: #333;
-  --color-border-card: #333;
+  --color-bg-header: #151b23;
+  --color-bg-input: #101820;
+  --color-border: #304052;
+  --color-border-card: #304052;
   --color-border-btn: transparent;
-  --color-border-hover: #555;
-  --color-connection-line: #ffffff;
-  --color-grid: #333;
+  --color-border-hover: #46607a;
+  --color-connection-line: #a6b6c9;
+  --color-grid: rgba(166, 182, 201, 0.1);
   --color-overlay: rgba(0, 0, 0, 0.7);
-  --color-bg-surface: #1e1e1e;
-  --color-bg-secondary: #252525;
-  --color-bg-hover: rgba(255, 255, 255, 0.1);
-  --color-text-disabled: rgba(255, 255, 255, 0.38);
-  --color-bg-tooltip: rgba(30, 30, 30, 0.95);
+  --color-bg-surface: #151d26;
+  --color-bg-secondary: #111821;
+  --color-bg-hover: rgba(96, 169, 255, 0.12);
+  --color-text-disabled: rgba(223, 231, 240, 0.45);
+  --color-bg-tooltip: rgba(21, 29, 38, 0.96);
 
   /* Text Colors */
-  --color-text-primary: rgb(224, 224, 224);
-  --color-text-secondary: rgb(212, 212, 212);
-  --color-text-muted: #888;
-  --color-text-inverse: #121212;
+  --color-text-primary: #e6edf5;
+  --color-text-secondary: #bcc9d8;
+  --color-text-muted: #8ea0b7;
+  --color-text-inverse: #101820;
 
   /* Branding */
-  --color-brand-primary: #3b82f6;
-  /* Approximate blue used in app */
-  --color-brand-primary-hover: #2563eb;
-  --color-brand-success: #10b981;
-  --color-brand-success-hover: #059669;
-  --color-brand-danger: #ef4444;
-  --color-brand-danger-hover: #dc2626;
-  --color-brand-secondary: #9c27b0;
-  --color-brand-secondary-hover: #7b1fa2;
+  --color-brand-primary: #4f9cf9;
+  --color-brand-primary-hover: #3c89e8;
+  --color-brand-success: #3bc57c;
+  --color-brand-success-hover: #2baa68;
+  --color-brand-danger: #ef6a6a;
+  --color-brand-danger-hover: #dc5151;
+  --color-brand-secondary: #f59f4d;
+  --color-brand-secondary-hover: #e88d32;
 
   /* Aliases for semantic usage */
   --color-success: var(--color-brand-success);
   --color-error: var(--color-brand-danger);
+  --color-focus-ring: rgba(79, 156, 249, 0.45);
 
   /* Spacing */
+  --spacing-2xs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
 
-  /* Boarders & Shadows */
+  /* Borders & Shadows */
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
   --border-radius-full: 50%;
 
   --text-shadow-default: 0 1px 3px rgba(0, 0, 0, 0.8);
 
-  --shadow-sm: rgba(0, 0, 0, 0.3) 0px 2px 4px;
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 10px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.24);
+  --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.28);
 
   /* Typography */
-  --font-family: 'Inter', sans-serif;
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-mono: monospace;
   --font-size-xs: 12px;
-  --font-size-base: 14px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
   --font-size-lg: 16px;
   --font-size-xl: 18px;
-  --font-size-title: 24px;
+  --font-size-2xl: 22px;
+  --font-size-title: 30px;
 }
 
 [data-theme="light"] {
   color-scheme: light;
   /* Core Colors */
-  --color-bg-app: #f3f4f6;
+  --color-bg-app: #f4f7fb;
+  --color-bg-elevated: #ffffff;
   --color-bg-card: #ffffff;
-  --color-bg-card-alt: #f9fafb;
-  --color-bg-card-hover: #f3f4f6;
+  --color-bg-card-alt: #f8fafc;
+  --color-bg-card-hover: #eef4fb;
   --color-bg-sidebar: #ffffff;
   --color-bg-node: #bfdbfe;
   --color-bg-header: #ffffff;
-  --color-bg-input: #e5e7eb;
-  --color-border: #000000;
-  /* High contrast border for cards in light mode as per user request */
-  --color-border-card: #000000;
+  --color-bg-input: #f9fbfe;
+  --color-border: #ced8e5;
+  --color-border-card: #ced8e5;
   --color-border-btn: #111827;
-  --color-border-hover: #d1d5db;
-  --color-connection-line: #9ca3af;
-  --color-grid: #e5e7eb;
+  --color-border-hover: #9db2c8;
+  --color-connection-line: #7a8ea5;
+  --color-grid: rgba(82, 113, 145, 0.14);
   --color-overlay: rgba(0, 0, 0, 0.4);
   --color-bg-surface: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-bg-hover: rgba(0, 0, 0, 0.05);
+  --color-bg-secondary: #f8fbff;
+  --color-bg-hover: rgba(79, 156, 249, 0.08);
   --color-text-disabled: rgba(0, 0, 0, 0.38);
   --color-bg-tooltip: rgba(255, 255, 255, 0.95);
 
   /* Text Colors */
-  --color-text-primary: #111827;
-  --color-text-secondary: #4b5563;
-  --color-text-muted: #9ca3af;
+  --color-text-primary: #0f1f33;
+  --color-text-secondary: #334b66;
+  --color-text-muted: #6f87a0;
   --color-text-inverse: #ffffff;
 
   --text-shadow-default: none;
 
   /* Shadows */
-  --shadow-sm: rgba(0, 0, 0, 0.05) 0px 1px 2px;
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 4px 10px rgba(52, 73, 94, 0.08);
+  --shadow-md: 0 12px 26px rgba(52, 73, 94, 0.12);
+  --shadow-lg: 0 20px 42px rgba(52, 73, 94, 0.16);
 
   /* Aliases for semantic usage */
   --color-success: var(--color-brand-success);
   --color-error: var(--color-brand-danger);
+  --color-focus-ring: rgba(61, 130, 219, 0.32);
 }

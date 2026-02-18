@@ -2,63 +2,68 @@
 
 .sessionDetailContainer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 30%;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 30%);
+    gap: var(--spacing-2xl);
     width: 100%;
     position: relative;
-    padding: 24px;
+    padding: var(--spacing-xl);
     padding-bottom: 120px;
     color: var(--color-text-primary);
     box-sizing: border-box;
-    /* Added top padding to account for fixed header (60px) + gap */
     padding-top: 84px;
 }
 
-/* Sidebar Wrapper */
+.sessionMainContent {
+    min-width: 0;
+}
+
 .sessionSidebarWrapper {
     position: relative;
 }
 
 .sessionSidebarSticky {
     position: sticky;
-    /* Header (60px) + Gap (24px) */
     top: 84px;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 112px);
     overflow-y: auto;
-    /* Add scrollbar styling for dark mode */
 }
 
-/* Sections List */
 .sessionSectionsList {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--spacing-xl);
     min-width: 0;
 }
 
-/* Loading & Empty States */
 .statusMessage {
     text-align: center;
     padding: 40px;
     color: var(--color-text-muted);
 }
 
-/* Auto-save status indicator */
+.statusWrapper {
+    padding: 96px var(--spacing-xl) 0;
+    max-width: 680px;
+    margin: 0 auto;
+}
+
 .autoSaveIndicator {
     position: fixed;
-    bottom: 50px;
-    right: 20px;
+    bottom: 24px;
+    right: 24px;
     z-index: 999;
-    padding: 8px 12px;
-    background: var(--color-bg-card);
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 8px 14px;
+    background: var(--color-bg-elevated);
+    border-radius: 999px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 6px;
     border-width: 1px;
     border-style: solid;
-    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
 }
 
 .autoSaveDefault {
@@ -96,18 +101,18 @@
 }
 
 .sessionSectionDropZoneDragOver {
-    border: 2px dashed #4caf50;
-    background: rgba(76, 175, 80, 0.05);
+    border: 2px dashed var(--color-brand-success);
+    background: rgba(59, 197, 124, 0.08);
 }
 
 .dragHint {
     text-align: center;
     padding: 12px;
-    color: #4caf50;
+    color: var(--color-brand-success);
     font-size: 12px;
     font-style: italic;
-    background: rgba(76, 175, 80, 0.1);
-    border-radius: 4px;
+    background: rgba(59, 197, 124, 0.12);
+    border-radius: var(--border-radius-sm);
     margin-top: 8px;
 }
 
@@ -127,10 +132,31 @@
 @media (max-width: 1024px) {
     .sessionDetailContainer {
         grid-template-columns: 1fr;
+        padding: var(--spacing-lg);
+        padding-top: 84px;
     }
 
     .sessionSidebarSticky {
         height: auto;
         position: static;
+    }
+
+    .autoSaveIndicator {
+        right: 16px;
+        bottom: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    .sessionDetailContainer {
+        padding: var(--spacing-md);
+        padding-top: 76px;
+        gap: var(--spacing-lg);
+    }
+
+    .statusWrapper {
+        padding-top: 76px;
+        padding-left: var(--spacing-md);
+        padding-right: var(--spacing-md);
     }
 }

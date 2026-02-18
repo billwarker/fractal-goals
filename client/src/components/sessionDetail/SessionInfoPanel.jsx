@@ -145,7 +145,6 @@ function SessionInfoPanel({
                     className={styles.sessionInfoToggle}
                     onClick={() => setIsExpanded(!isExpanded)}
                     title={isExpanded ? 'Collapse' : 'Expand'}
-                    style={{ padding: '4px 8px', minHeight: 'auto', height: 'auto' }}
                 >
                     {isExpanded ? '▲' : '▼'}
                 </Button>
@@ -191,21 +190,22 @@ function SessionInfoPanel({
                                         className={styles.dateTimeInput}
                                         fullWidth
                                     />
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" style={{ padding: '0 8px' }}>✓</Button>
-                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" style={{ padding: '0 8px' }}>✗</Button>
+                                    <div className={styles.editActions}>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton}>✓</Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton}>✗</Button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className={styles.valueWithEdit}>
                                     <span>{formatDate(startTime)}</span>
-                                    <span
-                                        className={styles.editIcon}
+                                    <button
+                                        type="button"
+                                        className={styles.iconButton}
                                         onClick={() => handleStartEdit('start', startTime)}
                                         title="Edit start time"
                                     >
-                                        ✏️
-                                    </span>
+                                        ✎
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -222,21 +222,22 @@ function SessionInfoPanel({
                                         className={styles.dateTimeInput}
                                         fullWidth
                                     />
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" style={{ padding: '0 8px' }}>✓</Button>
-                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" style={{ padding: '0 8px' }}>✗</Button>
+                                    <div className={styles.editActions}>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton}>✓</Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton}>✗</Button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className={styles.valueWithEdit}>
                                     <span>{formatDate(endTime)}</span>
-                                    <span
-                                        className={styles.editIcon}
+                                    <button
+                                        type="button"
+                                        className={styles.iconButton}
                                         onClick={() => handleStartEdit('end', endTime)}
                                         title="Edit end time"
                                     >
-                                        ✏️
-                                    </span>
+                                        ✎
+                                    </button>
                                 </div>
                             )}
                         </div>

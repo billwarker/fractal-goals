@@ -34,7 +34,7 @@
 
 .input:focus {
     border-color: var(--color-brand-primary);
-    box-shadow: 0 0 0 1px var(--color-brand-primary);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .input:disabled {
@@ -48,7 +48,7 @@
 }
 
 .hasError:focus {
-    box-shadow: 0 0 0 1px var(--color-brand-danger, #ef4444);
+    box-shadow: 0 0 0 3px rgba(239, 106, 106, 0.3);
 }
 
 .errorMessage {

@@ -78,20 +78,26 @@ function SessionSidePane({
             <div className={styles.sidepaneHeader}>
                 <div className={styles.sidepaneTabs}>
                     <button
+                        type="button"
                         className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
                         onClick={() => onModeChange('details')}
+                        aria-pressed={mode === 'details'}
                     >
                         Details
                     </button>
                     <button
+                        type="button"
                         className={`${styles.sidepaneTab} ${mode === 'goals' ? styles.sidepaneTabActive : ''}`}
                         onClick={() => onModeChange('goals')}
+                        aria-pressed={mode === 'goals'}
                     >
                         Goals
                     </button>
                     <button
+                        type="button"
                         className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
                         onClick={() => onModeChange('history')}
+                        aria-pressed={mode === 'history'}
                     >
                         History
                     </button>
