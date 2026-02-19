@@ -85,6 +85,14 @@ function SessionActivityItem({
     const [setMetricDrafts, setSetMetricDrafts] = useState({});
     const [singleMetricDrafts, setSingleMetricDrafts] = useState({});
 
+    const resolveMetricId = useCallback((metric) => (
+        metric?.metric_id || metric?.metric_definition_id || null
+    ), []);
+
+    const resolveSplitId = useCallback((metric) => (
+        metric?.split_id || metric?.split_definition_id || null
+    ), []);
+
     useEffect(() => {
         setSetMetricDrafts({});
         setSingleMetricDrafts({});
@@ -112,10 +120,10 @@ function SessionActivityItem({
 
     const getMetricValue = useCallback((metricsList, metricId, splitId = null) => {
         const m = metricsList?.find(x =>
-            x.metric_id === metricId && (splitId ? x.split_id === splitId : !x.split_id)
+            resolveMetricId(x) === metricId && (splitId ? resolveSplitId(x) === splitId : !resolveSplitId(x))
         );
         return m ? m.value : '';
-    }, []);
+    }, [resolveMetricId, resolveSplitId]);
 
     const getSetMetricDisplayValue = useCallback((setIndex, metricsList, metricId, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
@@ -142,7 +150,7 @@ function SessionActivityItem({
         const set = { ...newSets[setIndex] };
         const metrics = Array.isArray(set.metrics) ? [...set.metrics] : [];
         const metricIdx = metrics.findIndex(m =>
-            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+            resolveMetricId(m) === metricId && (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
         );
         if (metricIdx >= 0) {
             metrics[metricIdx] = { ...metrics[metricIdx], value };
@@ -155,7 +163,7 @@ function SessionActivityItem({
         newSets[setIndex] = set;
         onUpdate('sets', newSets);
         clearSetMetricDraft(setIndex, metricId, splitId);
-    }, [exercise.sets, onUpdate, setMetricDraftKey, setMetricDrafts, clearSetMetricDraft]);
+    }, [exercise.sets, onUpdate, resolveMetricId, resolveSplitId, setMetricDraftKey, setMetricDrafts, clearSetMetricDraft]);
 
     const commitSingleMetricChange = useCallback((metricId, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
@@ -164,7 +172,7 @@ function SessionActivityItem({
 
         const currentMetrics = [...(exercise.metrics || [])];
         const metricIdx = currentMetrics.findIndex(m =>
-            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+            resolveMetricId(m) === metricId && (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
         );
         if (metricIdx >= 0) {
             currentMetrics[metricIdx] = { ...currentMetrics[metricIdx], value };
@@ -175,7 +183,7 @@ function SessionActivityItem({
         }
         onUpdate('metrics', currentMetrics);
         clearSingleMetricDraft(metricId, splitId);
-    }, [exercise.metrics, onUpdate, singleMetricDraftKey, singleMetricDrafts, clearSingleMetricDraft]);
+    }, [exercise.metrics, onUpdate, resolveMetricId, resolveSplitId, singleMetricDraftKey, singleMetricDrafts, clearSingleMetricDraft]);
 
     const handleSetMetricDraftChange = useCallback((setIndex, metricId, value, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);

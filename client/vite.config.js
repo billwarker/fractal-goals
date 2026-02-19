@@ -9,10 +9,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8001',
+          changeOrigin: true,
+        },
+      },
+    },
     define: {
       // Explicitly define environment variables
       'import.meta.env.VITE_ENV': JSON.stringify(env.VITE_ENV || mode),
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'http://localhost:8001/api'),
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || '/api'),
     },
   }
 })

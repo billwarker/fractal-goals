@@ -189,16 +189,50 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const updateInstanceMutation = useMutation({
         mutationFn: async ({ instanceId, updates }) => {
-            const instance = activityInstances.find(inst => inst.id === instanceId);
+            const cachedInstances = queryClient.getQueryData(['session-activities', rootId, sessionId]);
+            const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
+            const instance = instanceSource.find(inst => inst.id === instanceId);
             if (!instance) throw new Error('Instance not found');
 
             if (updates.metrics !== undefined) {
-                const metricsPayload = updates.metrics.map(m => ({
-                    metric_id: m.metric_id,
-                    split_id: m.split_id || null,
-                    value: m.value
-                }));
-                return fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, { metrics: metricsPayload });
+                const metricsPayload = (Array.isArray(updates.metrics) ? updates.metrics : [])
+                    .map((m) => {
+                        const metricId = m?.metric_id || m?.metric_definition_id || null;
+                        if (!metricId) return null;
+                        const rawValue = m?.value;
+                        let value = rawValue;
+                        if (rawValue === '' || rawValue === undefined) {
+                            value = null;
+                        } else if (typeof rawValue === 'string') {
+                            const trimmed = rawValue.trim();
+                            if (trimmed === '') {
+                                value = null;
+                            } else if (!Number.isNaN(Number(trimmed))) {
+                                value = Number(trimmed);
+                            } else {
+                                value = rawValue;
+                            }
+                        }
+                        return {
+                            metric_id: metricId,
+                            split_id: m?.split_id || m?.split_definition_id || null,
+                            value
+                        };
+                    })
+                    .filter(Boolean);
+                try {
+                    return await fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, { metrics: metricsPayload });
+                } catch (error) {
+                    // Some environments reject CORS preflight on the dedicated metrics endpoint.
+                    // Fall back to the broader instance update endpoint so metric edits still persist.
+                    const isNetworkLikeFailure = !error?.response || /network error/i.test(error?.message || '');
+                    if (!isNetworkLikeFailure) throw error;
+                    return fractalApi.updateActivityInstance(rootId, instanceId, {
+                        session_id: sessionId,
+                        activity_definition_id: instance.activity_definition_id,
+                        metrics: metricsPayload
+                    });
+                }
             }
 
             return fractalApi.updateActivityInstance(rootId, instanceId, {
@@ -227,7 +261,13 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             save: async (updates) => {
                 await updateInstanceMutation.mutateAsync({ instanceId, updates });
             },
-            onError: () => {
+            onError: (error) => {
+                console.error('[updateInstance] failed', {
+                    instanceId,
+                    message: error?.message,
+                    status: error?.response?.status,
+                    data: error?.response?.data
+                });
                 notify.error('Failed to save activity changes');
             }
         });
