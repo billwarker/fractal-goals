@@ -72,7 +72,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 marginBottom: '10px',
                 cursor: onClick ? 'pointer' : 'default',
                 transition: 'background-color 0.2s',
-                color: 'var(--color-text-primary)'
+                color: 'var(--color-text-primary)',
+                position: 'relative'
             }}
             onMouseEnter={(e) => {
                 if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-hover)';
@@ -81,6 +82,35 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-alt)';
             }}
         >
+            {onDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                    }}
+                    style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#f44336',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        padding: '0 4px',
+                        lineHeight: '1',
+                        opacity: 0.75,
+                        transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.opacity = '1'}
+                    onMouseLeave={(e) => e.target.style.opacity = '0.75'}
+                    title="Delete Target"
+                >
+                    ×
+                </button>
+            )}
+
             {/* Header with name and completion status */}
             <div style={{
                 display: 'flex',
@@ -120,68 +150,27 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {/* Action buttons - only show in edit mode */}
-                    {isEditMode && (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                                onClick={onEdit}
-                                style={{
-                                    padding: '4px 8px',
-                                    background: 'transparent',
-                                    border: '1px solid var(--color-border)',
-                                    borderRadius: '3px',
-                                    color: 'var(--color-text-secondary)',
-                                    cursor: 'pointer',
-                                    fontSize: '11px'
-                                }}
-                            >
-                                Edit
-                            </button>
-                            <button
-                                onClick={onDelete}
-                                style={{
-                                    padding: '4px 8px',
-                                    background: 'transparent',
-                                    border: '1px solid #f44336',
-                                    borderRadius: '3px',
-                                    color: '#f44336',
-                                    cursor: 'pointer',
-                                    fontSize: '11px'
-                                }}
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    )}
-
-                    {/* X Button for direct delete (if not in edit mode or supplemental) */}
-                    {onDelete && !isEditMode && (
+                {isEditMode && onEdit && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: onDelete ? '20px' : 0 }}>
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onDelete();
+                                onEdit();
                             }}
                             style={{
+                                padding: '4px 8px',
                                 background: 'transparent',
-                                border: 'none',
-                                color: '#f44336', // Red color for delete
-                                fontSize: '16px',
-                                fontWeight: 'bold',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '3px',
+                                color: 'var(--color-text-secondary)',
                                 cursor: 'pointer',
-                                padding: '0 4px',
-                                lineHeight: '1',
-                                opacity: 0.7,
-                                transition: 'opacity 0.2s'
+                                fontSize: '11px'
                             }}
-                            onMouseEnter={(e) => e.target.style.opacity = '1'}
-                            onMouseLeave={(e) => e.target.style.opacity = '0.7'}
-                            title="Delete Target"
                         >
-                            ×
+                            Edit
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             {/* Progress Bar for Accumulation/Frequency */}

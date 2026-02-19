@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
+import Modal from '../atoms/Modal';
+import Button from '../atoms/Button';
 import notify from '../../utils/notify';
 import styles from './ActivityAssociator.module.css';
 
@@ -24,6 +26,7 @@ const ActivityAssociator = ({
     activityGroups,
     setActivityGroups,
     targets,
+    setTargets,
     rootId,
     goalId,
     goalName,
@@ -51,6 +54,7 @@ const ActivityAssociator = ({
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
 
     // Reset selection when closing discovery; collapse all groups by default
     useEffect(() => {
@@ -158,7 +162,11 @@ const ActivityAssociator = ({
         if (parts.length > 0) notify.success(`Added ${parts.join(' and ')}`);
     };
 
-    const handleRemoveActivity = (activityId) => {
+    const executeRemoveActivity = (activityId, removedTargetsCount = 0) => {
+        const dependentTargets = Array.isArray(targets)
+            ? targets.filter(t => t.activity_id === activityId)
+            : [];
+
         const next = associatedActivities.filter(a => a.id !== activityId);
         setAssociatedActivities(next);
 
@@ -166,10 +174,46 @@ const ActivityAssociator = ({
             onSave(next, associatedActivityGroups);
         }
 
-        notify.success("Activity association removed");
+        const countForToast = removedTargetsCount || dependentTargets.length;
+        if (countForToast > 0) {
+            notify.success(`Activity association removed and ${countForToast} target${countForToast === 1 ? '' : 's'} deleted`);
+        } else {
+            notify.success("Activity association removed");
+        }
         window.dispatchEvent(new CustomEvent('activityAssociationsChanged', {
             detail: { activityId, goalId }
         }));
+    };
+
+    const handleRemoveActivity = (activityId) => {
+        const dependentTargets = Array.isArray(targets)
+            ? targets.filter(t => t.activity_id === activityId)
+            : [];
+
+        if (dependentTargets.length > 0) {
+            setPendingActivityRemoval({
+                activityId,
+                dependentTargetsCount: dependentTargets.length
+            });
+            return;
+        }
+
+        executeRemoveActivity(activityId);
+    };
+
+    const handleConfirmActivityRemoval = () => {
+        if (!pendingActivityRemoval?.activityId) return;
+
+        const { activityId, dependentTargetsCount } = pendingActivityRemoval;
+        if (setTargets) {
+            setTargets(prev => {
+                if (!Array.isArray(prev)) return prev;
+                return prev.filter(t => t.activity_id !== activityId);
+            });
+        }
+
+        executeRemoveActivity(activityId, dependentTargetsCount);
+        setPendingActivityRemoval(null);
     };
 
     const handleCreateGroup = async () => {
@@ -506,6 +550,26 @@ const ActivityAssociator = ({
 
     return (
         <div className={styles.container}>
+            <Modal
+                isOpen={!!pendingActivityRemoval}
+                onClose={() => setPendingActivityRemoval(null)}
+                title="Remove Activity?"
+                size="sm"
+                showCloseButton={true}
+            >
+                <p style={{ margin: '0 0 16px 0', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    This activity is used by {pendingActivityRemoval?.dependentTargetsCount || 0} target{(pendingActivityRemoval?.dependentTargetsCount || 0) === 1 ? '' : 's'}.
+                    Removing the activity will also delete those target{(pendingActivityRemoval?.dependentTargetsCount || 0) === 1 ? '' : 's'}.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+                    <Button variant="secondary" onClick={() => setPendingActivityRemoval(null)}>
+                        Cancel
+                    </Button>
+                    <Button variant="danger" onClick={handleConfirmActivityRemoval}>
+                        Remove Activity
+                    </Button>
+                </div>
+            </Modal>
 
             {/* ============ INLINE SECTION HEADER (list mode in edit form) ============ */}
             {!isSelectorMode && (

@@ -691,10 +691,7 @@ const TargetManager = ({
                                     isCompleted={target.completed}
                                     activityDefinitions={activityDefinitions}
                                     onEdit={undefined} // Handled by parent div click
-                                    onDelete={isEditing ? (e) => {
-                                        e.stopPropagation(); // Prevent opening edit mode
-                                        confirmAndDeleteTarget(target.id);
-                                    } : undefined}
+                                    onDelete={() => confirmAndDeleteTarget(target.id)}
                                 />
                             </div>
                         </div>

@@ -563,6 +563,7 @@ function GoalDetailModal({
                                     setActivityGroups={setActivityGroups}
                                     rootId={rootId}
                                     goalId={goalId}
+                                    setTargets={setTargets}
                                     isEditing={true}
                                     targets={targets}
                                     goalName={name}
@@ -846,6 +847,17 @@ function GoalDetailModal({
                                     rootId={rootId}
                                     isEditing={false}
                                     viewMode="list"
+                                    onSave={(newTargets) => {
+                                        if (onUpdate && goalId) {
+                                            onUpdate(goalId, {
+                                                name,
+                                                description,
+                                                deadline,
+                                                relevance_statement: relevanceStatement,
+                                                targets: newTargets
+                                            });
+                                        }
+                                    }}
                                     headerColor={goalColor}
                                 />
                             </Suspense>
@@ -949,6 +961,7 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     goalName={name}
+                    setTargets={setTargets}
                     isEditing={true}
                     targets={targets}
                     viewMode="selector"
