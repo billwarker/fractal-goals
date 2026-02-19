@@ -8,6 +8,7 @@
     padding: 16px;
     cursor: default;
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .activityCardSelected {
@@ -71,18 +72,26 @@
 
 .activityNameContainer {
     cursor: pointer;
+    min-width: 0;
 }
 
 .activityName {
     font-weight: bold;
     font-size: 16px;
     color: #4caf50;
+    overflow-wrap: anywhere;
 }
 
 .activityLabel {
     font-size: 11px;
     color: var(--color-text-muted);
     font-weight: normal;
+}
+
+.activityGroupLabel {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
 }
 
 .activityDescription {
@@ -94,12 +103,36 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    min-width: 0;
+}
+
+.timerControlsGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 128px;
+    gap: 10px;
+    width: 100%;
+}
+
+.timerMetaColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.timerActionColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    justify-content: flex-end;
 }
 
 .timerFieldContainer {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
 
 .timerLabel {
@@ -115,8 +148,9 @@
     border-radius: 3px;
     color: var(--color-text-primary);
     font-size: 11px;
-    width: 160px;
+    width: 100%;
     font-family: monospace;
+    min-width: 0;
 }
 
 .timerInputDisabled {
@@ -160,7 +194,9 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 14px;
+    margin-top: 0;
+    justify-content: center;
+    width: 100%;
 }
 
 .stopButton {
@@ -188,7 +224,9 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 14px;
+    margin-top: 0;
+    justify-content: center;
+    width: 100%;
 }
 
 .completedBadge {
@@ -201,9 +239,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 14px;
+    margin-top: 0;
     font-weight: bold;
     cursor: default;
+    justify-content: center;
+    width: 100%;
 }
 
 .resetButton {
@@ -217,7 +257,9 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 14px;
+    margin-top: 0;
+    justify-content: center;
+    width: 100%;
 }
 
 .microGoalActionButton {
@@ -251,8 +293,12 @@
     border: none;
     color: #f44336;
     cursor: pointer;
-    font-size: 18px;
-    margin-top: 14px;
+    font-size: 22px;
+    line-height: 1;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
 }
 
 .contentArea {
@@ -312,6 +358,8 @@
     align-items: center;
     gap: 8px;
     flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .metricLabel {
@@ -323,7 +371,7 @@
 .metricLabelLarge {
     font-size: 13px;
     color: var(--color-text-secondary);
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .metricInput {
@@ -335,6 +383,7 @@
     border-radius: 4px;
     font-size: 13px;
     transition: all 0.2s ease;
+    max-width: 100%;
 }
 
 .metricInput:focus {
@@ -370,6 +419,8 @@
 .metricUnitLarge {
     font-size: 12px;
     color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 .removeSetButton {
@@ -477,6 +528,7 @@
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
+        padding-right: 30px;
     }
 
     .activityHeaderLeft {
@@ -485,13 +537,13 @@
 
     .activityHeaderRight {
         width: 100%;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 6px;
     }
 
-    .timerFieldContainer {
-        flex: 1;
-        min-width: 120px;
+    .timerControlsGrid {
+        grid-template-columns: minmax(0, 1fr) 120px;
+        gap: 8px;
     }
 
     .timerInput {
@@ -506,6 +558,40 @@
     .resetButton {
         margin-top: 0;
         min-height: 36px;
+    }
+
+    .setRow {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .metricInputContainer {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .metricLabel,
+    .metricLabelLarge {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .metricInput {
+        min-width: 72px;
+        max-width: 120px;
+    }
+
+    .singleMetricGroupContent {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .splitContainer {
+        width: 100%;
+        flex-wrap: wrap;
     }
 
     .contentArea {

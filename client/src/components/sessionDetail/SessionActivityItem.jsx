@@ -426,8 +426,11 @@ function SessionActivityItem({
                         className={styles.activityNameContainer}
                     >
                         <div className={styles.activityName}>
-                            {def.name} <span className={styles.activityLabel}>{exercise.group_name ? `(${exercise.group_name})` : ''}</span>
+                            {def.name}
                         </div>
+                        {exercise.group_name && (
+                            <div className={styles.activityGroupLabel}>{exercise.group_name}</div>
+                        )}
                         {def.description && <div className={styles.activityDescription}><Linkify>{def.description}</Linkify></div>}
                     </div>
                 </div>
@@ -472,130 +475,141 @@ function SessionActivityItem({
 
                     {/* Timer Controls - New Design */}
                     {exercise.id && (
-                        <>
-                            {/* DateTime Start Field */}
-                            <div className={styles.timerFieldContainer}>
-                                <label className={styles.timerLabel}>Start</label>
-                                <input
-                                    type="text"
-                                    placeholder="YYYY-MM-DD HH:MM:SS"
-                                    value={localStartTime}
-                                    onChange={(e) => setLocalStartTime(e.target.value)}
-                                    onBlur={(e) => {
-                                        if (e.target.value) {
-                                            try {
-                                                const isoValue = localToISO(e.target.value, timezone);
-                                                onUpdate('time_start', isoValue);
-                                            } catch (err) {
-                                                console.error('Invalid date format:', err);
-                                                // Reset to previous value
-                                                setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+                        <div className={styles.timerControlsGrid}>
+                            <div className={styles.timerMetaColumn}>
+                                {/* DateTime Start Field */}
+                                <div className={styles.timerFieldContainer}>
+                                    <label className={styles.timerLabel}>Start</label>
+                                    <input
+                                        type="text"
+                                        placeholder="YYYY-MM-DD HH:MM:SS"
+                                        value={localStartTime}
+                                        onChange={(e) => setLocalStartTime(e.target.value)}
+                                        onBlur={(e) => {
+                                            if (e.target.value) {
+                                                try {
+                                                    const isoValue = localToISO(e.target.value, timezone);
+                                                    onUpdate('time_start', isoValue);
+                                                } catch (err) {
+                                                    console.error('Invalid date format:', err);
+                                                    // Reset to previous value
+                                                    setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+                                                }
+                                            } else {
+                                                onUpdate('time_start', null);
                                             }
-                                        } else {
-                                            onUpdate('time_start', null);
-                                        }
-                                    }}
-                                    className={styles.timerInput}
-                                />
-                            </div>
+                                        }}
+                                        className={styles.timerInput}
+                                    />
+                                </div>
 
-                            {/* DateTime Stop Field */}
-                            <div className={styles.timerFieldContainer}>
-                                <label className={styles.timerLabel}>Stop</label>
-                                <input
-                                    type="text"
-                                    placeholder="YYYY-MM-DD HH:MM:SS"
-                                    value={localStopTime}
-                                    onChange={(e) => setLocalStopTime(e.target.value)}
-                                    onBlur={(e) => {
-                                        if (e.target.value) {
-                                            try {
-                                                const isoValue = localToISO(e.target.value, timezone);
-                                                onUpdate('time_stop', isoValue);
-                                            } catch (err) {
-                                                console.error('Invalid date format:', err);
-                                                // Reset to previous value
-                                                setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
+                                {/* DateTime Stop Field */}
+                                <div className={styles.timerFieldContainer}>
+                                    <label className={styles.timerLabel}>Stop</label>
+                                    <input
+                                        type="text"
+                                        placeholder="YYYY-MM-DD HH:MM:SS"
+                                        value={localStopTime}
+                                        onChange={(e) => setLocalStopTime(e.target.value)}
+                                        onBlur={(e) => {
+                                            if (e.target.value) {
+                                                try {
+                                                    const isoValue = localToISO(e.target.value, timezone);
+                                                    onUpdate('time_stop', isoValue);
+                                                } catch (err) {
+                                                    console.error('Invalid date format:', err);
+                                                    // Reset to previous value
+                                                    setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
+                                                }
+                                            } else {
+                                                onUpdate('time_stop', null);
                                             }
-                                        } else {
-                                            onUpdate('time_stop', null);
-                                        }
-                                    }}
-                                    disabled={!exercise.time_start}
-                                    className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
-                                />
+                                        }}
+                                        disabled={!exercise.time_start}
+                                        className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
+                                    />
+                                </div>
+
+                                {/* Duration Display */}
+                                <div className={styles.timerFieldContainer}>
+                                    <label className={styles.timerLabel}>Duration</label>
+                                    <div className={`${styles.durationDisplay} ${(exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive}`}>
+                                        {formatDuration(realtimeDuration)}
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Duration Display */}
-                            <div className={styles.timerFieldContainer}>
-                                <label className={styles.timerLabel}>Duration</label>
-                                <div className={`${styles.durationDisplay} ${(exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive}`}>
-                                    {formatDuration(realtimeDuration)}
-                                </div>
+                            <div className={styles.timerActionColumn}>
+                                {!exercise.time_start ? (
+                                    <>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdate('timer_action', 'start');
+                                            }}
+                                            className={styles.startButton}
+                                            title="Start timer"
+                                        >
+                                            ▶ Start
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdate('timer_action', 'complete');
+                                            }}
+                                            className={styles.completeButton}
+                                            title="Instant complete (0s duration)"
+                                        >
+                                            ✓ Complete
+                                        </button>
+                                    </>
+                                ) : !exercise.time_stop ? (
+                                    <>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdate('timer_action', 'complete');
+                                            }}
+                                            className={styles.completeButton}
+                                            title="Complete activity"
+                                        >
+                                            ✓ Complete
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdate('timer_action', 'reset');
+                                            }}
+                                            className={styles.resetButton}
+                                            title="Reset timer"
+                                        >
+                                            ↺ Reset
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
+                                            Completed
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdate('timer_action', 'reset');
+                                            }}
+                                            className={styles.resetButton}
+                                            title="Reset timer"
+                                        >
+                                            ↺ Reset
+                                        </button>
+                                    </>
+                                )}
                             </div>
-
-                            {/* Start/Complete Button Flow */}
-                            {!exercise.time_start ? (
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onUpdate('timer_action', 'start');
-                                        }}
-                                        className={styles.startButton}
-                                        style={{ marginTop: 0 }}
-                                        title="Start timer"
-                                    >
-                                        ▶ Start
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onUpdate('timer_action', 'complete');
-                                        }}
-                                        className={styles.completeButton}
-                                        style={{ marginTop: 0 }}
-                                        title="Instant complete (0s duration)"
-                                    >
-                                        ✓ Complete
-                                    </button>
-                                </div>
-                            ) : !exercise.time_stop ? (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onUpdate('timer_action', 'complete');
-                                    }}
-                                    className={styles.completeButton}
-                                    title="Complete activity"
-                                >
-                                    ✓ Complete
-                                </button>
-                            ) : (
-                                <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
-                                    Completed
-                                </div>
-                            )}
-
-                            {/* Reset Button - Only show if started */}
-                            {exercise.time_start && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onUpdate('timer_action', 'reset');
-                                    }}
-                                    className={styles.resetButton}
-                                    title="Reset timer"
-                                >
-                                    ↺
-                                </button>
-                            )}
-                        </>
+                        </div>
                     )}
-
-                    {/* Delete Button */}
-                    <button onClick={onDelete} className={styles.deleteButton}>×</button>
                 </div>
+
+                {/* Delete Button */}
+                <button onClick={onDelete} className={styles.deleteButton}>×</button>
             </div>
 
             {/* Content Area */}
