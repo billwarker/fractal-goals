@@ -25,6 +25,66 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
 
+
+def _validate_activity_group_parent(session, root_id, group_id, parent_id):
+    """Validate parent assignment to avoid missing refs and cycles."""
+    if parent_id in (None, ''):
+        return None
+
+    parent = session.query(ActivityGroup).filter_by(id=parent_id, root_id=root_id).first()
+    if not parent:
+        return "Parent group not found in this fractal"
+
+    if group_id and parent_id == group_id:
+        return "A group cannot be its own parent"
+
+    if not group_id:
+        return None
+
+    seen = set()
+    cursor = parent
+    while cursor:
+        if cursor.id == group_id:
+            return "Invalid parent group: cycle detected"
+        if cursor.id in seen:
+            return "Invalid parent group: cycle detected"
+        seen.add(cursor.id)
+        if not cursor.parent_id:
+            break
+        cursor = session.query(ActivityGroup).filter_by(id=cursor.parent_id, root_id=root_id).first()
+    return None
+
+
+def _validate_activity_group_id(session, root_id, group_id):
+    """Ensure activity group belongs to the same fractal."""
+    if group_id in (None, ''):
+        return None
+    group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+    if not group:
+        return "Invalid group_id for this fractal"
+    return None
+
+
+def _validate_and_normalize_metrics(metrics_data):
+    """Require metrics to include both name and unit if provided."""
+    if metrics_data is None:
+        return [], None
+    if not isinstance(metrics_data, list):
+        return None, "Metrics must be an array"
+
+    normalized = []
+    for idx, metric in enumerate(metrics_data):
+        if not isinstance(metric, dict):
+            return None, f"Metric at index {idx} must be an object"
+        name = (metric.get('name') or '').strip()
+        unit = (metric.get('unit') or '').strip()
+        if not name and not unit:
+            continue
+        if not name or not unit:
+            return None, f"Metric at index {idx} must include both name and unit"
+        normalized.append({**metric, 'name': name, 'unit': unit})
+    return normalized, None
+
 # ============================================================================
 # ============================================================================
 # ACTIVITY GROUP ENDPOINTS
@@ -58,6 +118,11 @@ def create_activity_group(current_user, root_id, validated_data):
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
+        parent_id = validated_data.get('parent_id')
+        parent_err = _validate_activity_group_parent(session, root_id, None, parent_id)
+        if parent_err:
+            return jsonify({"error": parent_err}), 400
+
         # Calculate order
         max_order = session.query(func.max(ActivityGroup.sort_order)).filter_by(root_id=root_id).scalar()
         new_order = (max_order or 0) + 1
@@ -67,7 +132,7 @@ def create_activity_group(current_user, root_id, validated_data):
             name=validated_data['name'],  # Already sanitized
             description=validated_data.get('description', ''),
             sort_order=new_order,
-            parent_id=validated_data.get('parent_id')
+            parent_id=parent_id
         )
         session.add(new_group)
         session.commit()
@@ -103,6 +168,11 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
         if not group:
             return jsonify({"error": "Group not found"}), 404
         
+        if 'parent_id' in validated_data:
+            parent_err = _validate_activity_group_parent(session, root_id, group_id, validated_data.get('parent_id'))
+            if parent_err:
+                return jsonify({"error": parent_err}), 400
+
         if 'name' in validated_data:
             group.name = validated_data['name']
         if 'description' in validated_data:
@@ -215,7 +285,7 @@ def set_activity_group_goals(current_user, root_id, group_id):
         if not group:
             return jsonify({"error": "Activity group not found"}), 404
         
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         goal_ids = data.get('goal_ids', [])
         
         # Clear existing associations for this group
@@ -304,7 +374,14 @@ def create_activity(current_user, root_id):
         if not activity_name:
             return jsonify({"error": "Name is required"}), 400
 
-        metrics_data = data.get('metrics', [])
+        group_id = data.get('group_id') or None
+        group_err = _validate_activity_group_id(session, root_id, group_id)
+        if group_err:
+            return jsonify({"error": group_err}), 400
+
+        metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics', []))
+        if metrics_err:
+            return jsonify({"error": metrics_err}), 400
         if len(metrics_data) > 3:
              return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
 
@@ -321,7 +398,7 @@ def create_activity(current_user, root_id):
             has_metrics=data.get('has_metrics', True),
             metrics_multiplicative=data.get('metrics_multiplicative', False),
             has_splits=data.get('has_splits', False),
-            group_id=data.get('group_id')
+            group_id=group_id
         )
         session.add(new_activity)
         session.flush() # Get ID
@@ -405,10 +482,20 @@ def update_activity(current_user, root_id, activity_id):
             return jsonify({"error": "Activity not found"}), 404
         
         data = request.get_json(silent=True) or {}
+
+        if 'group_id' in data:
+            normalized_group_id = data.get('group_id') or None
+            group_err = _validate_activity_group_id(session, root_id, normalized_group_id)
+            if group_err:
+                return jsonify({"error": group_err}), 400
+            data['group_id'] = normalized_group_id
         
         # Update activity fields
         if 'name' in data:
-            activity.name = data['name']
+            next_name = (data['name'] or '').strip()
+            if not next_name:
+                return jsonify({"error": "Name is required"}), 400
+            activity.name = next_name
         if 'description' in data:
             activity.description = data['description']
         if 'has_sets' in data:
@@ -424,7 +511,9 @@ def update_activity(current_user, root_id, activity_id):
         
         # Update metrics if provided
         if 'metrics' in data:
-            metrics_data = data.get('metrics', [])
+            metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics'))
+            if metrics_err:
+                return jsonify({"error": metrics_err}), 400
             if len(metrics_data) > 3:
                 return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
             

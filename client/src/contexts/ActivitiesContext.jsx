@@ -61,7 +61,7 @@ export function ActivitiesProvider({ children }) {
     }, [queryClient, emitActivityEvent]);
 
     // Update an existing activity
-    const updateActivity = useCallback(async (rootId, activityId, updates) => {
+    const updateActivity = useCallback(async (rootId, activityId, updates, options = {}) => {
         try {
             setError(null);
             const res = await fractalApi.updateActivity(rootId, activityId, updates);
@@ -74,7 +74,12 @@ export function ActivitiesProvider({ children }) {
             });
             emitActivityEvent('activity.updated', { rootId, activityId, activity: updated });
             emitActivityEvent('activities.changed', { rootId, action: 'updated', activityId, activity: updated });
-            notify.success(`Updated activity "${updated?.name || 'Untitled'}"`);
+            if (options?.action === 'regroup') {
+                const targetGroupName = options?.groupName || 'Ungrouped';
+                notify.success(`Moved "${updated?.name || 'Untitled'}" to ${targetGroupName}`);
+            } else {
+                notify.success(`Updated activity "${updated?.name || 'Untitled'}"`);
+            }
             return updated;
         } catch (err) {
             console.error('Failed to update activity:', err);

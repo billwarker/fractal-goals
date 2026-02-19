@@ -97,6 +97,22 @@ class TestActivityGroups:
         assert relevant[0]['id'] == id2
         assert relevant[1]['id'] == id1
 
+    def test_activity_group_rejects_parent_cycle(self, authed_client, sample_ultimate_goal):
+        """A group cannot be assigned under its own descendant."""
+        root_id = sample_ultimate_goal.id
+        group_a = authed_client.post(f'/api/{root_id}/activity-groups', json={'name': 'A'}).get_json()
+        group_b = authed_client.post(
+            f'/api/{root_id}/activity-groups',
+            json={'name': 'B', 'parent_id': group_a['id']}
+        ).get_json()
+
+        response = authed_client.put(
+            f"/api/{root_id}/activity-groups/{group_a['id']}",
+            json={'parent_id': group_b['id']}
+        )
+        assert response.status_code == 400
+        assert 'cycle' in response.get_json().get('error', '').lower()
+
 
 @pytest.mark.integration
 class TestActivities:
@@ -165,6 +181,59 @@ class TestActivities:
         assert data_one['name'] == 'Scale Practice'
         assert data_two['name'] == 'Scale Practice'
         assert data_one['id'] != data_two['id']
+
+    def test_create_activity_rejects_invalid_group_id(self, authed_client, sample_ultimate_goal):
+        """group_id must belong to the current fractal."""
+        root_id = sample_ultimate_goal.id
+        payload = {
+            'name': 'Intervals',
+            'group_id': str(uuid.uuid4())
+        }
+        response = authed_client.post(f'/api/{root_id}/activities', json=payload)
+        assert response.status_code == 400
+        assert 'group_id' in response.get_json().get('error', '').lower()
+
+    def test_update_activity_rejects_invalid_group_id(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Updating group_id must validate group ownership."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}',
+            json={'group_id': str(uuid.uuid4())}
+        )
+        assert response.status_code == 400
+        assert 'group_id' in response.get_json().get('error', '').lower()
+
+    def test_create_activity_rejects_partial_metric_rows(self, authed_client, sample_ultimate_goal):
+        """Metric rows must include both name and unit."""
+        root_id = sample_ultimate_goal.id
+        payload = {
+            'name': 'Technique',
+            'metrics': [{'name': 'Speed'}]
+        }
+        response = authed_client.post(f'/api/{root_id}/activities', json=payload)
+        assert response.status_code == 400
+        assert 'both name and unit' in response.get_json().get('error', '').lower()
+
+    def test_update_activity_rejects_partial_metric_rows(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Partial metric payloads should fail fast instead of deleting existing metrics."""
+        root_id = sample_ultimate_goal.id
+        activity_id = sample_activity_definition.id
+
+        before_res = authed_client.get(f'/api/{root_id}/activities')
+        before_data = before_res.get_json()
+        before_activity = next(a for a in before_data if a['id'] == activity_id)
+        before_metric_count = len(before_activity.get('metric_definitions') or [])
+
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{activity_id}',
+            json={'metrics': [{'name': 'Only Name'}]}
+        )
+        assert response.status_code == 400
+
+        after_res = authed_client.get(f'/api/{root_id}/activities')
+        after_data = after_res.get_json()
+        after_activity = next(a for a in after_data if a['id'] == activity_id)
+        assert len(after_activity.get('metric_definitions') or []) == before_metric_count
 
     def test_update_activity_metrics(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Test updating activity metrics (add, remove, update)."""

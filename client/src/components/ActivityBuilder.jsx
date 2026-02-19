@@ -44,6 +44,21 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const [showAssociationModal, setShowAssociationModal] = useState(false);
     const [currentGoalPath, setCurrentGoalPath] = useState([]); // Stack of goal nodes for navigation
 
+    const normalizeMetricRows = (rows) => {
+        const normalized = [];
+        for (let i = 0; i < rows.length; i++) {
+            const metric = rows[i] || {};
+            const nameValue = (metric.name || '').trim();
+            const unitValue = (metric.unit || '').trim();
+            if (!nameValue && !unitValue) continue;
+            if (!nameValue || !unitValue) {
+                return { error: `Metric ${i + 1} must include both name and unit.`, metrics: null };
+            }
+            normalized.push({ ...metric, name: nameValue, unit: unitValue });
+        }
+        return { error: null, metrics: normalized };
+    };
+
     const parseGoalTargets = (node) => {
         const rawTargets = node?.attributes?.targets ?? node?.targets;
         if (!rawTargets) return [];
@@ -97,6 +112,12 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
     // Load activity data when editing
     useEffect(() => {
+        if (isOpen) {
+            setError(null);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
         if (editingActivity) {
             setName(editingActivity.name);
             setDescription(editingActivity.description || '');
@@ -137,6 +158,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     }, [editingActivity]);
 
     const resetForm = () => {
+        setError(null);
         setName('');
         setDescription('');
         setMetrics([{ name: '', unit: '', is_top_set_metric: false, is_multiplicative: true }]);
@@ -200,8 +222,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     };
 
     const processSubmission = async (overrideData = null) => {
+        if (creating) return;
         try {
             setCreating(true);
+            setError(null);
             const dataToSubmit = overrideData || buildActivityPayload({
                 name,
                 description,
@@ -230,15 +254,38 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
             onClose();
         } catch (err) {
             console.error(editingActivity ? "Failed to update activity" : "Failed to create activity", err);
-            setError(editingActivity ? "Failed to update activity" : "Failed to create activity");
+            setError(err?.response?.data?.error || (editingActivity ? "Failed to update activity" : "Failed to create activity"));
             setCreating(false);
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (creating) return;
+        setError(null);
 
-        const validMetrics = metrics.filter(m => m.name.trim() !== '');
+        let validMetrics = [];
+        if (hasMetrics) {
+            const { error: metricError, metrics: normalizedMetrics } = normalizeMetricRows(metrics);
+            if (metricError) {
+                setError(metricError);
+                return;
+            }
+            validMetrics = normalizedMetrics;
+        }
+
+        const payloadData = buildActivityPayload({
+            name,
+            description,
+            metrics: validMetrics,
+            splits,
+            hasSets,
+            hasMetrics,
+            metricsMultiplicative,
+            hasSplits,
+            groupId,
+            selectedGoalIds
+        });
 
         if (editingActivity) {
             if (editingActivity.metric_definitions) {
@@ -254,25 +301,14 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                         `You are removing ${removedMetrics.length} metric(s): ${metricNames}. ` +
                         `This may affect existing session data. Metrics from old sessions will no longer display.`
                     );
-                    setPendingSubmission(buildActivityPayload({
-                        name,
-                        description,
-                        metrics: validMetrics,
-                        splits,
-                        hasSets,
-                        hasMetrics,
-                        metricsMultiplicative,
-                        hasSplits,
-                        groupId,
-                        selectedGoalIds
-                    }));
+                    setPendingSubmission(payloadData);
                     setShowMetricWarning(true);
                     return;
                 }
             }
         }
 
-        processSubmission();
+        processSubmission(payloadData);
     };
 
     const handleCancel = () => {

@@ -55,6 +55,29 @@ function ManageActivities() {
         return buildLastInstantiatedMap(sessions);
     }, [sessions]);
 
+    const groupChildrenMap = useMemo(() => {
+        const map = new Map();
+        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
+            const key = group.parent_id || '__root__';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(group);
+        });
+        map.forEach((groups) => {
+            groups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        });
+        return map;
+    }, [activityGroups]);
+
+    const activitiesByGroupMap = useMemo(() => {
+        const map = new Map();
+        (Array.isArray(activities) ? activities : []).forEach((activity) => {
+            const key = activity.group_id || '__ungrouped__';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(activity);
+        });
+        return map;
+    }, [activities]);
+
     // Group Handlers
     const handleCreateGroup = () => {
         setEditingGroup(null);
@@ -209,7 +232,15 @@ function ManageActivities() {
         }
 
         try {
-            await updateActivity(rootId, activityId, { group_id: normalizedTargetGroupId });
+            const groupName = normalizedTargetGroupId
+                ? (activityGroups.find((g) => g.id === normalizedTargetGroupId)?.name || 'Selected Group')
+                : 'Ungrouped';
+            await updateActivity(
+                rootId,
+                activityId,
+                { group_id: normalizedTargetGroupId },
+                { action: 'regroup', groupName }
+            );
         } catch (err) {
             console.error('Failed to move activity:', err);
             console.error('Error response:', err.response?.data);
@@ -230,11 +261,10 @@ function ManageActivities() {
         const isDragOver = dragOverGroupId === group.id;
 
         // Find children groups
-        const childrenGroups = activityGroups.filter(g => g.parent_id === group.id)
-            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        const childrenGroups = groupChildrenMap.get(group.id) || [];
 
         // Find activities in this group
-        const groupActivities = Array.isArray(activities) ? activities.filter(a => a.group_id === group.id) : [];
+        const groupActivities = activitiesByGroupMap.get(group.id) || [];
 
         const isRoot = level === 0;
 
@@ -355,9 +385,7 @@ function ManageActivities() {
     };
 
     // Filter root groups
-    const rootGroups = activityGroups
-        .filter(g => !g.parent_id)
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    const rootGroups = groupChildrenMap.get('__root__') || [];
 
     return (
         <div className={`page-container ${styles.container}`}>
@@ -407,7 +435,7 @@ function ManageActivities() {
                         </h3>
                     )}
                     <div className={styles.grid} onDragEnd={handleDragEnd}>
-                        {(Array.isArray(activities) ? activities.filter(a => !a.group_id) : []).map(activity => (
+                        {(activitiesByGroupMap.get('__ungrouped__') || []).map(activity => (
                             <ActivityCard
                                 key={activity.id}
                                 activity={activity}
@@ -421,7 +449,7 @@ function ManageActivities() {
                             />
                         ))}
                     </div>
-                    {(Array.isArray(activities) ? activities.filter(a => !a.group_id) : []).length === 0 && rootGroups.length > 0 && (
+                    {(activitiesByGroupMap.get('__ungrouped__') || []).length === 0 && rootGroups.length > 0 && (
                         <div className={styles.emptyGroupState} style={{ padding: '15px', marginTop: '10px' }}>
                             {dragOverGroupId === 'ungrouped' ? 'Drop activity here to ungroup' : 'Drag activities here to ungroup'}
                         </div>
@@ -429,7 +457,7 @@ function ManageActivities() {
                 </div>
 
                 {/* Empty State (No activities and no groups) */}
-                {activities.length === 0 && rootGroups.length === 0 && (
+                {(Array.isArray(activities) ? activities.length : 0) === 0 && rootGroups.length === 0 && (
                     <div className={styles.emptyState}>
                         <p className={styles.emptyStateText}>
                             No activities defined yet

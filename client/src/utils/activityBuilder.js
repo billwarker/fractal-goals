@@ -13,7 +13,7 @@ export function buildActivityPayload({
     return {
         name,
         description,
-        metrics: hasMetrics ? (metrics || []).filter((m) => m.name.trim() !== '') : [],
+        metrics: hasMetrics ? (metrics || []).filter((m) => m.name?.trim() !== '' && m.unit?.trim() !== '') : [],
         splits: hasSplits ? (splits || []).filter((s) => s.name.trim() !== '') : [],
         has_sets: hasSets,
         has_metrics: hasMetrics,

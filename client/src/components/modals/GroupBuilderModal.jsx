@@ -3,6 +3,7 @@ import { useActivities } from '../../contexts/ActivitiesContext';
 import { useGoals } from '../../contexts/GoalsContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import useIsMobile from '../../hooks/useIsMobile';
+import notify from '../../utils/notify';
 
 export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
@@ -18,6 +19,7 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
     const [parentId, setParentId] = useState('');
     const [selectedGoalIds, setSelectedGoalIds] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     // UI State for Goal Selector
     const [showGoalSelector, setShowGoalSelector] = useState(false);
@@ -50,12 +52,15 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
             setParentId('');
             setSelectedGoalIds([]);
         }
+        setError(null);
         setShowGoalSelector(false);
     }, [editingGroup, isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (loading) return;
         setLoading(true);
+        setError(null);
         try {
             // Prepare payload
             const data = {
@@ -80,6 +85,9 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
             onClose();
         } catch (err) {
             console.error("Failed to save group", err);
+            const message = err?.response?.data?.error || "Failed to save group";
+            setError(message);
+            notify.error(message);
         } finally {
             setLoading(false);
         }
@@ -90,10 +98,24 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
         if (!activityGroups) return [];
         if (!editingGroup) return activityGroups;
 
-        // Simple cycle check: Can't pick self. 
-        // Checks deeper cycles is harder without full tree traversal but backend will block it (hopefully) or it's just a UI constraint.
-        // We'll just block self for now.
-        return activityGroups.filter(g => g.id !== editingGroup.id);
+        const childrenByParent = activityGroups.reduce((acc, group) => {
+            const key = group.parent_id || '__root__';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(group.id);
+            return acc;
+        }, {});
+
+        const blocked = new Set([editingGroup.id]);
+        const stack = [...(childrenByParent[editingGroup.id] || [])];
+        while (stack.length > 0) {
+            const current = stack.pop();
+            if (!current || blocked.has(current)) continue;
+            blocked.add(current);
+            const children = childrenByParent[current] || [];
+            children.forEach((childId) => stack.push(childId));
+        }
+
+        return activityGroups.filter(g => !blocked.has(g.id));
     }, [activityGroups, editingGroup]);
 
     if (!isOpen) return null;
@@ -117,6 +139,11 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
                 <h2 style={{ fontSize: '20px', fontWeight: 300, margin: 0 }}>
                     {editingGroup ? 'Edit Group' : 'Create Group'}
                 </h2>
+                {error && (
+                    <div style={{ fontSize: '13px', color: 'var(--color-brand-danger)', marginTop: '-8px' }}>
+                        {error}
+                    </div>
+                )}
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
 
                     {/* Name */}
