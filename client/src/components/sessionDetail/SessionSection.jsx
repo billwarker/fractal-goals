@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
@@ -26,6 +26,7 @@ const SessionSection = ({
         sessionId,
         activityInstances,
         activities,
+        activityGroups,
         groupMap,
         groupedActivities,
         showActivitySelector,
@@ -43,11 +44,41 @@ const SessionSection = ({
         session
     } = useActiveSession();
 
-    const [viewGroupId, setViewGroupId] = useState(null);
+    const [browseParentGroupId, setBrowseParentGroupId] = useState(null);
+    const [activeLeafGroupId, setActiveLeafGroupId] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
     // Filter ungrouped activities
     const ungroupedActivities = Array.isArray(activities) ? activities.filter(a => !a.group_id) : [];
+
+    const childGroupsByParent = useMemo(() => {
+        const map = {};
+        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
+            const parentId = group.parent_id || null;
+            if (!map[parentId]) map[parentId] = [];
+            map[parentId].push(group);
+        });
+        return map;
+    }, [activityGroups]);
+
+    const getRecursiveActivityCount = (groupId) => {
+        const direct = groupedActivities[groupId]?.length || 0;
+        const children = childGroupsByParent[groupId] || [];
+        return direct + children.reduce((sum, child) => sum + getRecursiveActivityCount(child.id), 0);
+    };
+
+    const currentGroupChoices = useMemo(() => {
+        const groups = childGroupsByParent[browseParentGroupId || null] || [];
+        return groups.filter((group) => getRecursiveActivityCount(group.id) > 0);
+    }, [browseParentGroupId, childGroupsByParent, groupedActivities]);
+
+    const currentParentGroup = browseParentGroupId ? groupMap[browseParentGroupId] : null;
+    const currentLevelActivities = browseParentGroupId
+        ? (groupedActivities[browseParentGroupId] || [])
+        : [];
+    const leafActivities = activeLeafGroupId === 'ungrouped'
+        ? ungroupedActivities
+        : (groupedActivities[activeLeafGroupId] || []);
 
     // Drag handlers for the section (drop target)
     const handleDragOver = (e) => {
@@ -82,27 +113,43 @@ const SessionSection = ({
     const isSelectorOpen = Boolean(showActivitySelector[sectionIndex]);
     const closeSelector = () => {
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
-        setViewGroupId(null);
+        setBrowseParentGroupId(null);
+        setActiveLeafGroupId(null);
+    };
+
+    const handleBack = () => {
+        if (activeLeafGroupId !== null) {
+            setActiveLeafGroupId(null);
+            return;
+        }
+        if (browseParentGroupId) {
+            setBrowseParentGroupId(groupMap[browseParentGroupId]?.parent_id || null);
+            return;
+        }
+        closeSelector();
     };
 
     const selectorContent = (
         <div className={styles.activitySelector}>
             <div className={styles.selectorHeader}>
                 <span className={styles.selectorTitle}>
-                    {viewGroupId === null ? 'Step 1: Select Activity Group' :
-                        viewGroupId === 'ungrouped' ? 'Step 2: Pick an Ungrouped Activity' :
-                            `Step 2: Pick a ${groupMap[viewGroupId]?.name || 'Group'} Activity`}
+                    {activeLeafGroupId === null
+                        ? (browseParentGroupId
+                            ? `Step 1: Select Sub-Group in ${currentParentGroup?.name || 'Group'}`
+                            : 'Step 1: Select Activity Group')
+                        : (activeLeafGroupId === 'ungrouped'
+                            ? 'Step 2: Pick an Ungrouped Activity'
+                            : `Step 2: Pick a ${groupMap[activeLeafGroupId]?.name || 'Group'} Activity`)
+                    }
                 </span>
                 <div className={styles.selectorActions}>
-                    {viewGroupId !== null && (
-                        <button
-                            type="button"
-                            onClick={() => setViewGroupId(null)}
-                            className={styles.backButton}
-                        >
-                            ← Back
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={handleBack}
+                        className={styles.backButton}
+                    >
+                        ← Back
+                    </button>
                     <button
                         type="button"
                         onClick={closeSelector}
@@ -115,38 +162,68 @@ const SessionSection = ({
             </div>
 
             {/* Hierarchical View */}
-            {viewGroupId === null ? (
-                <div className={styles.groupsGrid}>
-                    {Object.entries(groupedActivities).map(([groupId, groupActivities]) => {
-                        const group = groupMap[groupId];
-                        if (!groupActivities.length) return null;
-                        return (
+            {activeLeafGroupId === null ? (
+                <>
+                    <div className={styles.groupsGrid}>
+                        {currentGroupChoices.map((group) => {
+                            const childGroups = childGroupsByParent[group.id] || [];
+                            const hasChildren = childGroups.some((child) => getRecursiveActivityCount(child.id) > 0);
+                            const activityCount = getRecursiveActivityCount(group.id);
+                            return (
+                                <button
+                                    type="button"
+                                    key={group.id}
+                                    onClick={() => {
+                                        if (hasChildren) {
+                                            setBrowseParentGroupId(group.id);
+                                            setActiveLeafGroupId(null);
+                                        } else {
+                                            setActiveLeafGroupId(group.id);
+                                        }
+                                    }}
+                                    className={styles.groupCard}
+                                >
+                                    <div className={styles.groupCardName}>
+                                        {group?.name || 'Unknown'} {'›'}
+                                    </div>
+                                    <div className={styles.groupCardCount}>{activityCount} activities</div>
+                                </button>
+                            );
+                        })}
+
+                        {!browseParentGroupId && ungroupedActivities.length > 0 && (
                             <button
                                 type="button"
-                                key={groupId}
-                                onClick={() => setViewGroupId(groupId)}
-                                className={styles.groupCard}
+                                onClick={() => setActiveLeafGroupId('ungrouped')}
+                                className={styles.ungroupedCard}
                             >
-                                <div className={styles.groupCardName}>{group?.name || 'Unknown'}</div>
-                                <div className={styles.groupCardCount}>{groupActivities.length} activities</div>
+                                <div className={styles.ungroupedCardName}>Ungrouped</div>
+                                <div className={styles.groupCardCount}>{ungroupedActivities.length} activities</div>
                             </button>
-                        );
-                    })}
+                        )}
+                    </div>
 
-                    {ungroupedActivities.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => setViewGroupId('ungrouped')}
-                            className={styles.ungroupedCard}
-                        >
-                            <div className={styles.ungroupedCardName}>Ungrouped</div>
-                            <div className={styles.groupCardCount}>{ungroupedActivities.length} activities</div>
-                        </button>
+                    {currentLevelActivities.length > 0 && (
+                        <>
+                            <div className={styles.selectorDivider}></div>
+                            <div className={styles.activitiesList}>
+                                {currentLevelActivities.map((act) => (
+                                    <button
+                                        type="button"
+                                        key={act.id}
+                                        onClick={() => addActivity(sectionIndex, act.id)}
+                                        className={styles.activityButton}
+                                    >
+                                        <span>+</span> {act.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
                     )}
-                </div>
+                </>
             ) : (
                 <div className={styles.activitiesList}>
-                    {(viewGroupId === 'ungrouped' ? ungroupedActivities : groupedActivities[viewGroupId] || []).map(act => (
+                    {leafActivities.map(act => (
                         <button
                             type="button"
                             key={act.id}
@@ -156,13 +233,13 @@ const SessionSection = ({
                             <span>+</span> {act.name}
                         </button>
                     ))}
-                    {(!groupedActivities[viewGroupId] && viewGroupId !== 'ungrouped' && (
+                    {(leafActivities.length === 0 && (
                         <div className={styles.noActivitiesMessage}>No activities found in this group.</div>
                     ))}
                 </div>
             )}
 
-            {viewGroupId === null && (
+            {activeLeafGroupId === null && (
                 <>
                     <div className={styles.selectorDivider}></div>
                     <button
