@@ -20,6 +20,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const [notifiedTargetIds, setNotifiedTargetIds] = useState(new Set());
     const [localSessionData, setLocalSessionData] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
+    const [isDeletingSession, setIsDeletingSession] = useState(false);
     const initializedRef = useRef(false);
     const [justInitialized, setJustInitialized] = useState(false);
     const previousSessionKeyRef = useRef(null);
@@ -28,19 +29,30 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refreshSession } = useQuery({
         queryKey: ['session', rootId, sessionId],
         queryFn: async () => {
-            const res = await fractalApi.getSession(rootId, sessionId);
-            return res.data;
+            try {
+                const res = await fractalApi.getSession(rootId, sessionId);
+                return res.data;
+            } catch (err) {
+                // Session can legitimately disappear during delete navigation.
+                if (err?.response?.status === 404) return null;
+                throw err;
+            }
         },
-        enabled: !!rootId && !!sessionId
+        enabled: !!rootId && !!sessionId && !isDeletingSession
     });
 
     const { data: activityInstances = [], isLoading: instancesLoading, refetch: refreshInstances } = useQuery({
         queryKey: ['session-activities', rootId, sessionId],
         queryFn: async () => {
-            const res = await fractalApi.getSessionActivities(rootId, sessionId);
-            return res.data;
+            try {
+                const res = await fractalApi.getSessionActivities(rootId, sessionId);
+                return res.data;
+            } catch (err) {
+                if (err?.response?.status === 404) return [];
+                throw err;
+            }
         },
-        enabled: !!rootId && !!sessionId
+        enabled: !!rootId && !!sessionId && !isDeletingSession
     });
 
     const { data: activitiesRaw = [], isLoading: activitiesLoading } = useQuery({
@@ -121,12 +133,20 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const deleteSessionMutation = useMutation({
         mutationFn: () => fractalApi.deleteSession(rootId, sessionId),
+        onMutate: async () => {
+            setIsDeletingSession(true);
+            await queryClient.cancelQueries({ queryKey: ['session', rootId, sessionId] });
+            await queryClient.cancelQueries({ queryKey: ['session-activities', rootId, sessionId] });
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
             queryClient.removeQueries({ queryKey: ['session', rootId, sessionId] });
             queryClient.removeQueries({ queryKey: ['session-activities', rootId, sessionId] });
             notify.success('Session deleted successfully');
+        },
+        onError: () => {
+            setIsDeletingSession(false);
         }
     });
 
