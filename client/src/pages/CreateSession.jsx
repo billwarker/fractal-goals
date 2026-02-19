@@ -218,17 +218,41 @@ function CreateSession() {
         setCreating(true);
 
         try {
+            const extractActivityId = (item) => {
+                if (typeof item === 'string') return item;
+                if (!item || typeof item !== 'object') return null;
+                const direct =
+                    item.activity_id ||
+                    item.activity_definition_id ||
+                    item.activityId ||
+                    item.activityDefinitionId ||
+                    item.definition_id ||
+                    item.id;
+                if (direct) return direct;
+                if (item.activity && typeof item.activity === 'object') {
+                    return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
+                }
+                return null;
+            };
+
             // Convert template sections to session sections
             const sectionsWithExercises = (selectedTemplate.template_data?.sections || []).map(section => {
                 const templateItems = section.activities || section.exercises || [];
-                const exercises = templateItems.map(activity => ({
-                    type: 'activity',
-                    name: activity.name,
-                    activity_id: activity.activity_id || activity.activity_definition_id || activity.id,
-                    instance_id: crypto.randomUUID(),
-                    completed: false,
-                    notes: ''
-                }));
+                const exercises = templateItems
+                    .map((activity) => {
+                        const activityId = extractActivityId(activity);
+                        if (!activityId) return null;
+                        const name = typeof activity === 'object' ? activity.name : null;
+                        return {
+                            type: 'activity',
+                            name: name || 'Activity',
+                            activity_id: activityId,
+                            instance_id: crypto.randomUUID(),
+                            completed: false,
+                            notes: ''
+                        };
+                    })
+                    .filter(Boolean);
 
                 return {
                     ...section,

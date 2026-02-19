@@ -82,6 +82,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onMutate: () => setAutoSaveStatus('saving'),
         onSuccess: (res) => {
             queryClient.setQueryData(['session', rootId, sessionId], res.data);
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
             setAutoSaveStatus('saved');
             setTimeout(() => setAutoSaveStatus(''), 2000);
         },
@@ -305,16 +307,23 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         const newCompleted = !session.attributes.completed;
         const updatePayload = { completed: newCompleted };
 
-        if (newCompleted) {
-            updatePayload.session_end = new Date().toISOString();
-            for (const instance of activityInstances) {
-                if (instance.time_start && !instance.time_stop) {
-                    await handleUpdateTimer(instance.id, 'complete');
+        try {
+            if (newCompleted) {
+                updatePayload.session_end = new Date().toISOString();
+                for (const instance of activityInstances) {
+                    if (instance.time_start && !instance.time_stop) {
+                        await handleUpdateTimer(instance.id, 'complete');
+                    }
                 }
             }
+
+            await updateSessionMutation.mutateAsync(updatePayload);
+            notify.success(newCompleted ? 'Session completed!' : 'Session marked as incomplete');
+        } catch (err) {
+            console.error('Failed to toggle session completion', err);
+            notify.error(`Failed to update session completion: ${err?.response?.data?.error || err?.message || 'Unknown error'}`);
         }
-        updateSessionMutation.mutate(updatePayload);
-    }, [session, activityInstances, updateSessionMutation.mutate, handleUpdateTimer]);
+    }, [session, activityInstances, handleUpdateTimer, updateSessionMutation]);
 
     const calculateTotalDuration = useCallback(() => {
         return activityInstances.reduce((sum, inst) => sum + (inst.duration_seconds || 0), 0);
@@ -366,11 +375,94 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     useEffect(() => {
         if (!session) return;
         if (initializedRef.current && localSessionData) return;
-        setLocalSessionData(session.attributes?.session_data || { sections: [] });
+        const baseData = session.attributes?.session_data || { sections: [] };
+
+        const extractDefinitionId = (item) => {
+            if (typeof item === 'string') return item;
+            if (!item || typeof item !== 'object') return null;
+            const direct = item.activity_id || item.activity_definition_id || item.activityId || item.activityDefinitionId || item.definition_id || item.id;
+            if (direct) return direct;
+            if (item.activity && typeof item.activity === 'object') {
+                return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
+            }
+            return null;
+        };
+
+        const normalizeSectionActivityIds = (data, instances) => {
+            if (!data || typeof data !== 'object') return data;
+            const sections = Array.isArray(data.sections) ? data.sections : [];
+            if (sections.length === 0) return data;
+
+            const idsByDef = (instances || []).reduce((acc, inst) => {
+                const defId = inst?.activity_definition_id;
+                if (!defId || !inst?.id) return acc;
+                if (!acc[defId]) acc[defId] = [];
+                acc[defId].push(inst.id);
+                return acc;
+            }, {});
+
+            const allInstanceIds = (instances || []).map(inst => inst.id).filter(Boolean);
+            const used = new Set();
+
+            const normalizedSections = sections.map((section) => {
+                if (!section || typeof section !== 'object') return section;
+
+                const existing = Array.isArray(section.activity_ids)
+                    ? section.activity_ids.filter((id) => allInstanceIds.includes(id) && !used.has(id))
+                    : [];
+
+                let activityIds = [...existing];
+
+                if (activityIds.length === 0) {
+                    const rawItems = section.exercises || section.activities || [];
+
+                    // Prefer explicit instance IDs from legacy exercise payloads.
+                    for (const item of rawItems) {
+                        if (!item || typeof item !== 'object') continue;
+                        const iid = item.instance_id;
+                        if (iid && allInstanceIds.includes(iid) && !used.has(iid) && !activityIds.includes(iid)) {
+                            activityIds.push(iid);
+                        }
+                    }
+
+                    // Then map definition IDs to first unused instance.
+                    if (activityIds.length === 0) {
+                        for (const item of rawItems) {
+                            const defId = extractDefinitionId(item);
+                            if (!defId) continue;
+                            const candidates = idsByDef[defId] || [];
+                            const candidate = candidates.find((id) => !used.has(id) && !activityIds.includes(id));
+                            if (candidate) activityIds.push(candidate);
+                        }
+                    }
+                }
+
+                activityIds.forEach((id) => used.add(id));
+                return {
+                    ...section,
+                    activity_ids: activityIds
+                };
+            });
+
+            // Last resort: single section gets all remaining instances.
+            if (normalizedSections.length === 1 && (!normalizedSections[0].activity_ids || normalizedSections[0].activity_ids.length === 0)) {
+                normalizedSections[0] = {
+                    ...normalizedSections[0],
+                    activity_ids: allInstanceIds
+                };
+            }
+
+            return {
+                ...data,
+                sections: normalizedSections
+            };
+        };
+
+        setLocalSessionData(normalizeSectionActivityIds(baseData, activityInstances));
         initializedRef.current = true;
         setJustInitialized(true);
         setTimeout(() => setJustInitialized(false), 500); // Guard window
-    }, [session, sessionId, localSessionData]);
+    }, [session, sessionId, localSessionData, activityInstances]);
 
     useEffect(() => {
         console.log('[ActiveSessionProvider] Mounted');

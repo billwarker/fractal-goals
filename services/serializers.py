@@ -215,26 +215,85 @@ def serialize_session(session, include_image_data=False):
                 
     result["attributes"]["session_data"] = session_data
 
-    # Hydrate "exercises" from database ActivityInstances
-    if "sections" in attrs:
-        # We assume session.activity_instances is populated
+    # Hydrate section activity ordering + exercises from database ActivityInstances.
+    # SessionDetail renders from section.activity_ids, so normalize legacy shapes too.
+    session_sections = result["attributes"]["session_data"].get("sections")
+    if isinstance(session_sections, list):
         instance_map = {inst.id: inst for inst in session.activity_instances}
-        for section in attrs["sections"]:
-            if "activity_ids" in section:
-                activity_ids = section["activity_ids"]
-                exercises = []
-                for inst_id in activity_ids:
-                    if inst_id in instance_map:
-                        inst = instance_map[inst_id]
-                        # Use logic from serialize_activity_instance but modified for this structure
-                        ex = serialize_activity_instance(inst)
-                        ex['type'] = 'activity'
-                        ex['instance_id'] = inst.id
-                        ex['activity_id'] = inst.activity_definition_id
-                        ex['has_sets'] = len(ex.get('sets', []) or []) > 0
-                        ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
-                        exercises.append(ex)
-                section["exercises"] = exercises
+        remaining_ids = [inst.id for inst in session.activity_instances]
+        used_ids = set()
+
+        def _extract_def_id(item):
+            if isinstance(item, str):
+                return item
+            if not isinstance(item, dict):
+                return None
+            for key in ("activity_id", "activity_definition_id", "activityId", "activityDefinitionId", "definition_id", "id"):
+                val = item.get(key)
+                if isinstance(val, str) and val:
+                    return val
+            nested = item.get("activity")
+            if isinstance(nested, dict):
+                for key in ("id", "activity_id", "activity_definition_id"):
+                    val = nested.get(key)
+                    if isinstance(val, str) and val:
+                        return val
+            return None
+
+        # Build definition -> instance ids map in creation order.
+        ids_by_def = {}
+        for inst in session.activity_instances:
+            ids_by_def.setdefault(inst.activity_definition_id, []).append(inst.id)
+
+        for section in session_sections:
+            if not isinstance(section, dict):
+                continue
+
+            activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
+            normalized_ids = [iid for iid in activity_ids if iid in instance_map and iid not in used_ids]
+
+            if not normalized_ids:
+                raw_items = section.get("exercises") or section.get("activities") or []
+
+                # Prefer explicit instance ids when provided.
+                for item in raw_items:
+                    if not isinstance(item, dict):
+                        continue
+                    iid = item.get("instance_id")
+                    if iid in instance_map and iid not in used_ids and iid not in normalized_ids:
+                        normalized_ids.append(iid)
+
+                # Otherwise map template activity definitions to first unused instances.
+                if not normalized_ids:
+                    for item in raw_items:
+                        def_id = _extract_def_id(item)
+                        if not def_id:
+                            continue
+                        for iid in ids_by_def.get(def_id, []):
+                            if iid not in used_ids and iid not in normalized_ids:
+                                normalized_ids.append(iid)
+                                break
+
+                # Last-resort: if only one section, include all remaining instances.
+                if not normalized_ids and len(session_sections) == 1:
+                    normalized_ids = [iid for iid in remaining_ids if iid not in used_ids]
+
+            section["activity_ids"] = normalized_ids
+            for iid in normalized_ids:
+                used_ids.add(iid)
+
+            exercises = []
+            for inst_id in normalized_ids:
+                if inst_id in instance_map:
+                    inst = instance_map[inst_id]
+                    ex = serialize_activity_instance(inst)
+                    ex['type'] = 'activity'
+                    ex['instance_id'] = inst.id
+                    ex['activity_id'] = inst.activity_definition_id
+                    ex['has_sets'] = len(ex.get('sets', []) or []) > 0
+                    ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
+                    exercises.append(ex)
+            section["exercises"] = exercises
     
     # Hydrate goals based on type
     goals_source = getattr(session, '_derived_goals', None)

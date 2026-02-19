@@ -30,6 +30,35 @@ class SessionService:
         self.db_session = db_session
         self._session_goals_has_source = None
 
+    @staticmethod
+    def _extract_activity_definition_id(raw_item):
+        """Extract activity definition id from legacy/current template exercise shapes."""
+        if isinstance(raw_item, str):
+            return raw_item
+        if not isinstance(raw_item, dict):
+            return None
+
+        direct_keys = (
+            'activity_id',
+            'activity_definition_id',
+            'activityId',
+            'activityDefinitionId',
+            'definition_id',
+            'id',
+        )
+        for key in direct_keys:
+            value = raw_item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+
+        nested = raw_item.get('activity')
+        if isinstance(nested, dict):
+            for key in ('id', 'activity_id', 'activity_definition_id'):
+                value = nested.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value
+        return None
+
     def _session_goals_supports_source(self):
         if self._session_goals_has_source is None:
             cols = inspect(self.db_session.bind).get_columns('session_goals')
@@ -198,6 +227,7 @@ class SessionService:
                 else:
                     return None, "Invalid program day context for this fractal", 400
 
+        template = None
         # Validate template ownership when provided
         if new_session.template_id:
             template = self.db_session.query(models.SessionTemplate).filter(
@@ -207,6 +237,19 @@ class SessionService:
             ).first()
             if not template:
                 return None, "Template not found in this fractal", 404
+            # Fallback: if client payload omitted sections, hydrate from stored template.
+            if isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
+                template_payload = models._safe_load_json(template.template_data, {})
+                if isinstance(template_payload, dict) and template_payload.get('sections'):
+                    session_data_dict['sections'] = template_payload.get('sections', [])
+                    if not session_data_dict.get('template_name'):
+                        session_data_dict['template_name'] = template.name
+                    if (
+                        not session_data_dict.get('total_duration_minutes')
+                        and template_payload.get('total_duration_minutes') is not None
+                    ):
+                        session_data_dict['total_duration_minutes'] = template_payload.get('total_duration_minutes')
+                    new_session.attributes = session_data_dict
         
         self.db_session.add(new_session)
         self.db_session.flush()
@@ -215,27 +258,37 @@ class SessionService:
         inherited_goal_map = {}
         
         # A. Collect activities from session sections (supports legacy + current shapes)
+        def collect_section_exercises(input_sections):
+            local_activity_ids = set()
+            local_section_exercises = []
+            for section in input_sections or []:
+                if not isinstance(section, dict):
+                    continue
+                raw_exercises = section.get('exercises') or section.get('activities') or []
+                normalized = []
+                for exercise in raw_exercises:
+                    activity_id = self._extract_activity_definition_id(exercise)
+                    if not activity_id:
+                        continue
+                    local_activity_ids.add(activity_id)
+                    normalized.append((exercise, activity_id))
+                local_section_exercises.append((section, normalized))
+            return local_activity_ids, local_section_exercises
+
         sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
-        activity_def_ids = set()
-        section_exercises = []
-        for section in sections:
-            if not isinstance(section, dict):
-                continue
-            raw_exercises = section.get('exercises') or section.get('activities') or []
-            normalized = []
-            for exercise in raw_exercises:
-                if not isinstance(exercise, dict):
-                    continue
-                activity_id = (
-                    exercise.get('activity_id')
-                    or exercise.get('activity_definition_id')
-                    or exercise.get('id')
-                )
-                if not activity_id:
-                    continue
-                activity_def_ids.add(activity_id)
-                normalized.append((exercise, activity_id))
-            section_exercises.append((section, normalized))
+        activity_def_ids, section_exercises = collect_section_exercises(sections)
+
+        # If the incoming session payload had sections but no parseable activity ids,
+        # fall back to canonical template sections from DB.
+        if not activity_def_ids and template:
+            template_payload = models._safe_load_json(template.template_data, {})
+            template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
+            template_activity_ids, template_section_exercises = collect_section_exercises(template_sections)
+            if template_activity_ids:
+                session_data_dict['sections'] = template_sections
+                sections = session_data_dict.get('sections', [])
+                activity_def_ids = template_activity_ids
+                section_exercises = template_section_exercises
         
         if activity_def_ids:
             activities = self.db_session.query(ActivityDefinition).options(
@@ -281,6 +334,10 @@ class SessionService:
                         not goal.deleted_at
                     ):
                         inherited_goal_map[goal.id] = goal
+
+        # Reassign JSON attributes after in-place section normalization so SQLAlchemy
+        # reliably persists updates for non-mutable JSON columns.
+        new_session.attributes = models._safe_load_json(session_data_dict, {})
 
         # Filter inherited goals by program-selected goals when in program context
         if program_day_id and program_goal_ids:
