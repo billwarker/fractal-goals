@@ -179,8 +179,9 @@ const ActivityAssociator = ({
         }
         setIsCreatingGroup(true);
         try {
+            const trimmedName = newGroupName.trim();
             const data = {
-                name: newGroupName.trim(),
+                name: trimmedName,
                 parent_id: newGroupParentId || null
             };
             const result = await createActivityGroup(rootId, data);
@@ -188,18 +189,28 @@ const ActivityAssociator = ({
             // If we have the goalId, auto-associate this group with the current goal
             if (result && result.id && goalId) {
                 await setActivityGroupGoals(rootId, result.id, [goalId]);
+                if (setAssociatedActivityGroups) {
+                    setAssociatedActivityGroups(prev => {
+                        if (!Array.isArray(prev)) return [result];
+                        if (prev.some(g => g.id === result.id)) return prev;
+                        return [...prev, result];
+                    });
+                }
             }
 
-            // Refresh groups in parent
+            // Refresh groups and sync to parent-local state used by this modal
             if (fetchActivityGroups) {
-                await fetchActivityGroups(rootId);
+                const refreshedGroups = await fetchActivityGroups(rootId);
+                if (setActivityGroups && Array.isArray(refreshedGroups)) {
+                    setActivityGroups(refreshedGroups);
+                }
             }
 
-            notify.success(`Created group "${newGroupName.trim()}"`);
+            notify.success(`Created group "${trimmedName}"`);
             setNewGroupName('');
             setNewGroupParentId('');
             setShowGroupCreator(false);
-        } catch (err) {
+        } catch {
             notify.error('Failed to create group');
         } finally {
             setIsCreatingGroup(false);

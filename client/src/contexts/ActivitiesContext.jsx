@@ -95,8 +95,10 @@ export function ActivitiesProvider({ children }) {
             const res = await fractalApi.getActivityGroups(rootId);
             setActivityGroups(res.data);
             queryClient.setQueryData(['activity-groups', rootId], res.data);
+            return res.data;
         } catch (err) {
             console.error('Failed to fetch activity groups:', err);
+            return [];
         }
     }, [queryClient]);
 
