@@ -39,11 +39,13 @@ export function formatShortDuration(seconds) {
  */
 export function calculateSessionDuration(session) {
     const sessionData = session?.attributes?.session_data;
+    const startTime = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
+    const endTime = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
 
     // Priority 1: Calculate from session_start and session_end
-    if (sessionData?.session_start && sessionData?.session_end) {
-        const start = new Date(sessionData.session_start);
-        const end = new Date(sessionData.session_end);
+    if (startTime && endTime) {
+        const start = new Date(startTime);
+        const end = new Date(endTime);
 
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
             const diffSeconds = Math.floor((end - start) / 1000);
@@ -54,7 +56,7 @@ export function calculateSessionDuration(session) {
     }
 
     // Priority 2: Use total_duration_seconds if available
-    const totalDurationSeconds = session?.attributes?.total_duration_seconds;
+    const totalDurationSeconds = session?.attributes?.total_duration_seconds ?? session?.total_duration_seconds;
     if (totalDurationSeconds != null && totalDurationSeconds > 0) {
         return totalDurationSeconds;
     }

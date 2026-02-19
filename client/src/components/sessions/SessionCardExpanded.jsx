@@ -75,6 +75,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 }) {
     const { getScopedCharacteristics } = useTheme();
     const sessionData = session.attributes?.session_data;
+    const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
+    const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
 
@@ -216,8 +218,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 {/* Session Start */}
                 <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Session Start</div>
-                    {sessionData?.session_start ? (
-                        <div className={styles.fieldValue}>{formatDate(sessionData.session_start)}</div>
+                    {sessionStart ? (
+                        <div className={styles.fieldValue}>{formatDate(sessionStart)}</div>
                     ) : (
                         <div className={styles.fieldValueMuted}>-</div>
                     )}
@@ -226,8 +228,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 {/* Session End */}
                 <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Session End</div>
-                    {sessionData?.session_end ? (
-                        <div className={styles.fieldValue}>{formatDate(sessionData.session_end)}</div>
+                    {sessionEnd ? (
+                        <div className={styles.fieldValue}>{formatDate(sessionEnd)}</div>
                     ) : (
                         <div className={styles.fieldValueMuted}>-</div>
                     )}

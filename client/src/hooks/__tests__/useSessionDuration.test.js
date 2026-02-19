@@ -89,10 +89,32 @@ describe('calculateSessionDuration', () => {
         expect(calculateSessionDuration(session)).toBe(5400);
     });
 
+    it('calculates from top-level session_start/session_end when session_data is missing them', () => {
+        const session = {
+            session_start: '2024-01-01T10:00:00Z',
+            session_end: '2024-01-01T11:30:00Z',
+            attributes: {
+                session_data: {},
+                total_duration_seconds: 1000
+            }
+        };
+        expect(calculateSessionDuration(session)).toBe(5400);
+    });
+
     it('falls back to total_duration_seconds (priority 2)', () => {
         const session = {
             attributes: {
                 total_duration_seconds: 3600,
+                session_data: {}
+            }
+        };
+        expect(calculateSessionDuration(session)).toBe(3600);
+    });
+
+    it('falls back to top-level total_duration_seconds when attributes value is missing', () => {
+        const session = {
+            total_duration_seconds: 3600,
+            attributes: {
                 session_data: {}
             }
         };
