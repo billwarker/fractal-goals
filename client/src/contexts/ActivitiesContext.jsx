@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import notify from '../utils/notify';
 
 const ActivitiesContext = createContext();
 
@@ -10,6 +11,11 @@ export function ActivitiesProvider({ children }) {
     const [activityGroups, setActivityGroups] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const emitActivityEvent = useCallback((eventName, detail) => {
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    }, []);
 
     // Fetch all activities for a root goal
     const fetchActivities = useCallback(async (rootId) => {
@@ -34,46 +40,56 @@ export function ActivitiesProvider({ children }) {
         try {
             setError(null);
             const res = await fractalApi.createActivity(rootId, activityData);
+            const created = res.data;
             setActivities((prev) => {
                 const next = Array.isArray(prev) ? [...prev] : [];
-                const created = res.data;
                 if (!created?.id) return next;
                 if (next.some((item) => item.id === created.id)) return next;
                 next.push(created);
                 queryClient.setQueryData(['activities', rootId], next);
                 return next;
             });
-            return res.data;
+            emitActivityEvent('activity.created', { rootId, activity: created });
+            emitActivityEvent('activities.changed', { rootId, action: 'created', activity: created });
+            notify.success(`Created activity "${created?.name || 'Untitled'}"`);
+            return created;
         } catch (err) {
             console.error('Failed to create activity:', err);
-            setError('Failed to create activity');
+            setError(err?.response?.data?.error || 'Failed to create activity');
             throw err;
         }
-    }, [queryClient]);
+    }, [queryClient, emitActivityEvent]);
 
     // Update an existing activity
     const updateActivity = useCallback(async (rootId, activityId, updates) => {
         try {
             setError(null);
             const res = await fractalApi.updateActivity(rootId, activityId, updates);
+            const updated = res.data;
             setActivities((prev) => {
                 if (!Array.isArray(prev)) return prev;
-                const next = prev.map((item) => item.id === activityId ? { ...item, ...res.data } : item);
+                const next = prev.map((item) => item.id === activityId ? { ...item, ...updated } : item);
                 queryClient.setQueryData(['activities', rootId], next);
                 return next;
             });
-            return res.data;
+            emitActivityEvent('activity.updated', { rootId, activityId, activity: updated });
+            emitActivityEvent('activities.changed', { rootId, action: 'updated', activityId, activity: updated });
+            notify.success(`Updated activity "${updated?.name || 'Untitled'}"`);
+            return updated;
         } catch (err) {
             console.error('Failed to update activity:', err);
-            setError('Failed to update activity');
+            setError(err?.response?.data?.error || 'Failed to update activity');
             throw err;
         }
-    }, [queryClient]);
+    }, [queryClient, emitActivityEvent]);
 
     // Delete an activity
     const deleteActivity = useCallback(async (rootId, activityId) => {
         try {
             setError(null);
+            const deletedActivity = Array.isArray(activities)
+                ? activities.find((item) => item.id === activityId)
+                : null;
             await fractalApi.deleteActivity(rootId, activityId);
             setActivities((prev) => {
                 if (!Array.isArray(prev)) return prev;
@@ -81,12 +97,15 @@ export function ActivitiesProvider({ children }) {
                 queryClient.setQueryData(['activities', rootId], next);
                 return next;
             });
+            emitActivityEvent('activity.deleted', { rootId, activityId, activity: deletedActivity || null });
+            emitActivityEvent('activities.changed', { rootId, action: 'deleted', activityId, activity: deletedActivity || null });
+            notify.success(`Deleted activity "${deletedActivity?.name || 'Untitled'}"`);
         } catch (err) {
             console.error('Failed to delete activity:', err);
-            setError('Failed to delete activity');
+            setError(err?.response?.data?.error || 'Failed to delete activity');
             throw err;
         }
-    }, [queryClient]);
+    }, [queryClient, activities, emitActivityEvent]);
 
     // Fetch activity groups
     const fetchActivityGroups = useCallback(async (rootId) => {

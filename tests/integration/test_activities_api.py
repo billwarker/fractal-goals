@@ -134,6 +134,38 @@ class TestActivities:
         assert len(data['split_definitions']) == 2
         assert data['has_splits'] is True
 
+    def test_create_activity_allows_duplicate_names(self, authed_client, sample_ultimate_goal):
+        """Activities with the same name should be allowed (different IDs)."""
+        root_id = sample_ultimate_goal.id
+        payload_one = {
+            'name': 'Scale Practice',
+            'description': 'Warmup scales',
+        }
+        payload_two = {
+            'name': 'Scale Practice',
+            'description': 'Arpeggio-focused variant',
+        }
+
+        response_one = authed_client.post(
+            f'/api/{root_id}/activities',
+            data=json.dumps(payload_one),
+            content_type='application/json'
+        )
+        response_two = authed_client.post(
+            f'/api/{root_id}/activities',
+            data=json.dumps(payload_two),
+            content_type='application/json'
+        )
+
+        assert response_one.status_code == 201
+        assert response_two.status_code == 201
+
+        data_one = json.loads(response_one.data)
+        data_two = json.loads(response_two.data)
+        assert data_one['name'] == 'Scale Practice'
+        assert data_two['name'] == 'Scale Practice'
+        assert data_one['id'] != data_two['id']
+
     def test_update_activity_metrics(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Test updating activity metrics (add, remove, update)."""
         root_id = sample_ultimate_goal.id

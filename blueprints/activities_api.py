@@ -299,25 +299,23 @@ def create_activity(current_user, root_id):
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        data = request.get_json()
-        if not data.get('name'):
+        data = request.get_json(silent=True) or {}
+        activity_name = (data.get('name') or '').strip()
+        if not activity_name:
             return jsonify({"error": "Name is required"}), 400
-        
-        # Check for existing activity with same name (case-insensitive)
-        normalized_name = data['name'].strip()
-        existing_activity = session.query(ActivityDefinition).filter(
-            ActivityDefinition.root_id == root_id,
-            func.lower(ActivityDefinition.name) == normalized_name.lower()
-        ).first()
 
-        if existing_activity:
-            # If it exists, return it instead of creating a duplicate
-            return jsonify(serialize_activity_definition(existing_activity)), 200
+        metrics_data = data.get('metrics', [])
+        if len(metrics_data) > 3:
+             return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
+
+        splits_data = data.get('splits', [])
+        if len(splits_data) > 5:
+             return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
         
         # Create Activity
         new_activity = ActivityDefinition(
             root_id=root_id,
-            name=data['name'],
+            name=activity_name,
             description=data.get('description', ''),
             has_sets=data.get('has_sets', False),
             has_metrics=data.get('has_metrics', True),
@@ -327,18 +325,8 @@ def create_activity(current_user, root_id):
         )
         session.add(new_activity)
         session.flush() # Get ID
-        
-        # Emit activity created event
-        event_bus.emit(Event(Events.ACTIVITY_CREATED, {
-            'activity_id': new_activity.id,
-            'activity_name': new_activity.name,
-            'root_id': root_id
-        }, source='activities_api.create_activity'))
-        
+
         # Create Metrics
-        metrics_data = data.get('metrics', [])
-        if len(metrics_data) > 3:
-             return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
 
         for m in metrics_data:
             if m.get('name') and m.get('unit'):
@@ -353,9 +341,6 @@ def create_activity(current_user, root_id):
                 session.add(new_metric)
         
         # Create Splits
-        splits_data = data.get('splits', [])
-        if len(splits_data) > 5:
-             return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
 
         for idx, s in enumerate(splits_data):
             if s.get('name'):
@@ -419,7 +404,7 @@ def update_activity(current_user, root_id, activity_id):
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
         
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
         # Update activity fields
         if 'name' in data:
