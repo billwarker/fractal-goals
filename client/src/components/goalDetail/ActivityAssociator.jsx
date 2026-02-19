@@ -55,6 +55,10 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
+    const linkedGroupIds = useMemo(
+        () => new Set((associatedActivityGroups || []).map(g => g.id)),
+        [associatedActivityGroups]
+    );
 
     // Reset selection when closing discovery; collapse all groups by default
     useEffect(() => {
@@ -186,6 +190,16 @@ const ActivityAssociator = ({
     };
 
     const handleRemoveActivity = (activityId) => {
+        const activity = associatedActivities.find(a => a.id === activityId);
+        if (activity && isActivityProtectedByLinkedGroup(activity)) {
+            const groupName = resolveLinkedGroupNameForActivity(activity);
+            notify.error(
+                `Cannot remove "${activity.name}" directly because it is included via linked activity group` +
+                `${groupName ? ` "${groupName}"` : ''}. Unlink the group first.`
+            );
+            return;
+        }
+
         const dependentTargets = Array.isArray(targets)
             ? targets.filter(t => t.activity_id === activityId)
             : [];
@@ -283,6 +297,72 @@ const ActivityAssociator = ({
             g.children.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
         });
         return { roots, map };
+    };
+
+    const groupsById = useMemo(() => {
+        const map = new Map();
+        (activityGroups || []).forEach((group) => map.set(group.id, group));
+        return map;
+    }, [activityGroups]);
+
+    const resolveLinkedGroupNameForActivity = (activity) => {
+        let cursorId = activity?.group_id;
+        const seen = new Set();
+        while (cursorId && !seen.has(cursorId)) {
+            seen.add(cursorId);
+            const group = groupsById.get(cursorId);
+            if (!group) break;
+            if (linkedGroupIds.has(group.id)) return group.name;
+            cursorId = group.parent_id;
+        }
+        return null;
+    };
+
+    const isActivityProtectedByLinkedGroup = (activity) => {
+        if (!activity) return false;
+        if (activity.from_linked_group) return true;
+
+        let cursorId = activity.group_id;
+        const seen = new Set();
+        while (cursorId && !seen.has(cursorId)) {
+            seen.add(cursorId);
+            if (linkedGroupIds.has(cursorId)) return true;
+            const group = groupsById.get(cursorId);
+            if (!group) break;
+            cursorId = group.parent_id;
+        }
+        return false;
+    };
+
+    const handleUnlinkGroup = async (group) => {
+        if (!group?.id) return;
+
+        const descendantIds = new Set([group.id]);
+        const queue = [group.id];
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            (activityGroups || []).forEach((candidate) => {
+                if (candidate.parent_id === currentId && !descendantIds.has(candidate.id)) {
+                    descendantIds.add(candidate.id);
+                    queue.push(candidate.id);
+                }
+            });
+        }
+
+        const nextGroups = associatedActivityGroups.filter(g => g.id !== group.id);
+        const nextActivities = associatedActivities.filter((activity) => {
+            if (!activity?.from_linked_group) return true;
+            return !descendantIds.has(activity.group_id);
+        });
+
+        setAssociatedActivityGroups(nextGroups);
+        setAssociatedActivities(nextActivities);
+
+        if (onSave) {
+            await onSave(nextActivities, nextGroups);
+        }
+
+        notify.success(`Unlinked activity group "${group.name}"`);
     };
 
     // Build the tree of associated activities organized by group
@@ -425,6 +505,7 @@ const ActivityAssociator = ({
     const renderMiniCard = (activity, { isDiscovery = false } = {}) => {
         const isSelected = isDiscovery && tempSelectedActivities.includes(activity.id);
         const isInherited = activity.is_inherited;
+        const isProtectedByGroup = !isDiscovery && !isInherited && isActivityProtectedByLinkedGroup(activity);
 
         const cardClasses = [
             styles.miniCard,
@@ -457,7 +538,7 @@ const ActivityAssociator = ({
                         )}
                         {activity.name}
                     </h4>
-                    {!isDiscovery && !isInherited && (
+                    {!isDiscovery && !isInherited && !isProtectedByGroup && (
                         <button
                             className={styles.removeBtn}
                             onClick={(e) => {
@@ -470,6 +551,11 @@ const ActivityAssociator = ({
                         </button>
                     )}
                 </div>
+                {isProtectedByGroup && (
+                    <span className={styles.groupLinkedNote}>
+                        Included via linked group
+                    </span>
+                )}
 
                 {isInherited && (
                     <span className={styles.inheritedBadge}>
@@ -522,7 +608,20 @@ const ActivityAssociator = ({
                             </button>
                         )}
                         {isLinked && !isDiscovery && (
-                            <span className={styles.groupBadge}>Linked</span>
+                            <>
+                                <span className={styles.groupBadge}>Linked</span>
+                                <button
+                                    type="button"
+                                    className={styles.groupUnlinkBtn}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUnlinkGroup(group);
+                                    }}
+                                    title={`Unlink group "${group.name}"`}
+                                >
+                                    Unlink
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>

@@ -110,6 +110,7 @@ function GoalDetailModal({
     const [newActivityHasSets, setNewActivityHasSets] = useState(false);
     const [newActivityGroupId, setNewActivityGroupId] = useState('');
     const [isCreatingActivity, setIsCreatingActivity] = useState(false);
+    const [newActivityError, setNewActivityError] = useState('');
 
     // Metrics state
     const [metrics, setMetrics] = useState(null);
@@ -977,6 +978,7 @@ function GoalDetailModal({
                         setNewActivityMetrics([{ name: '', unit: '' }]);
                         setNewActivityHasSets(false);
                         setNewActivityGroupId('');
+                        setNewActivityError('');
                         setViewState('activity-builder');
                     }}
                 />
@@ -985,17 +987,35 @@ function GoalDetailModal({
     } else if (viewState === 'activity-builder') {
         // Inline activity creation form
         const handleCreateActivity = async () => {
+            setNewActivityError('');
             if (!newActivityName.trim()) {
                 notify.error('Please enter an activity name');
                 return;
             }
 
+            let validMetrics = [];
+            if (newActivityHasMetrics) {
+                for (let i = 0; i < newActivityMetrics.length; i++) {
+                    const metric = newActivityMetrics[i] || {};
+                    const metricName = (metric.name || '').trim();
+                    const metricUnit = (metric.unit || '').trim();
+
+                    if (!metricName && !metricUnit) continue;
+
+                    if (!metricName || !metricUnit) {
+                        setNewActivityError(
+                            `Malformed activity data: metric row ${i + 1} is incomplete. ` +
+                            'Each metric must include both a name and a unit.'
+                        );
+                        return;
+                    }
+
+                    validMetrics.push({ ...metric, name: metricName, unit: metricUnit });
+                }
+            }
+
             setIsCreatingActivity(true);
             try {
-                const validMetrics = newActivityHasMetrics
-                    ? newActivityMetrics.filter(m => m.name.trim() !== '')
-                    : [];
-
                 const activityData = {
                     name: newActivityName,
                     description: newActivityDescription,
@@ -1016,10 +1036,16 @@ function GoalDetailModal({
                 }
 
                 // Go back to activity-associator view
+                setNewActivityError('');
                 setViewState('activity-associator');
             } catch (error) {
                 console.error('Error creating activity:', error);
-                alert('Failed to create activity: ' + error.message);
+                const serverMessage = error?.response?.data?.error;
+                setNewActivityError(
+                    serverMessage
+                        ? `Malformed activity cannot be created: ${serverMessage}`
+                        : `Failed to create activity: ${error?.message || 'Unknown error'}`
+                );
             } finally {
                 setIsCreatingActivity(false);
             }
@@ -1039,6 +1065,11 @@ function GoalDetailModal({
                         Create New Activity
                     </h3>
                 </div>
+                {newActivityError && (
+                    <div className={styles.activityBuilderError}>
+                        {newActivityError}
+                    </div>
+                )}
 
                 {/* Activity Name */}
                 <Input
