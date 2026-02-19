@@ -96,6 +96,16 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+        },
+        onError: (err) => {
+            const status = err?.response?.status;
+            const endpoint = err?.config?.url;
+            console.error('[addActivityMutation] failed', {
+                status,
+                endpoint,
+                message: err?.message,
+                data: err?.response?.data
+            });
         }
     });
 
@@ -111,6 +121,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         mutationFn: () => fractalApi.deleteSession(rootId, sessionId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
+            queryClient.removeQueries({ queryKey: ['session', rootId, sessionId] });
+            queryClient.removeQueries({ queryKey: ['session-activities', rootId, sessionId] });
             notify.success('Session deleted successfully');
         }
     });
@@ -280,7 +293,10 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
         } catch (err) {
             console.error('Error adding activity:', err);
-            notify.error(`Failed to add activity: ${err.response?.data?.error || err.message}`);
+            const serverError = err?.response?.data?.error;
+            const status = err?.response?.status;
+            const message = serverError || (status ? `HTTP ${status}` : err?.message || 'Unknown error');
+            notify.error(`Failed to add activity: ${message}`);
         }
     }, [activities, addActivityMutation, localSessionData]);
 

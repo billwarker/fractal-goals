@@ -43,25 +43,49 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const [showAssociationModal, setShowAssociationModal] = useState(false);
     const [currentGoalPath, setCurrentGoalPath] = useState([]); // Stack of goal nodes for navigation
 
+    const parseGoalTargets = (node) => {
+        const rawTargets = node?.attributes?.targets ?? node?.targets;
+        if (!rawTargets) return [];
+        if (Array.isArray(rawTargets)) return rawTargets;
+        if (typeof rawTargets === 'string') {
+            try {
+                const parsed = JSON.parse(rawTargets);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    };
+
     // Flatten goal tree for selection
-    const flattenGoals = (node, goals = []) => {
+    const flattenGoals = (node, activityId, goals = []) => {
         if (!node) return goals;
 
         const childrenIds = node.children ? node.children.map(c => c.id || c.attributes?.id) : [];
+        const targets = parseGoalTargets(node);
+        const hasTargetForActivity = !!activityId && targets.some(target => {
+            const targetActivityId = target?.activity_id || target?.activity_definition_id;
+            return targetActivityId === activityId;
+        });
 
         goals.push({
             id: node.id || node.attributes?.id,
             name: node.name,
             type: node.attributes?.type || node.type,
-            childrenIds: childrenIds
+            childrenIds: childrenIds,
+            hasTargetForActivity
         });
         if (node.children && node.children.length > 0) {
-            node.children.forEach(child => flattenGoals(child, goals));
+            node.children.forEach(child => flattenGoals(child, activityId, goals));
         }
         return goals;
     };
 
-    const allGoals = React.useMemo(() => flattenGoals(currentFractal), [currentFractal]);
+    const allGoals = React.useMemo(
+        () => flattenGoals(currentFractal, editingActivity?.id),
+        [currentFractal, editingActivity?.id]
+    );
 
     // Fetch groups when opened
     useEffect(() => {

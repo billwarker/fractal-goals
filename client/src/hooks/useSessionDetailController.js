@@ -102,7 +102,9 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
 
     const handleConfirmDelete = async () => {
         await deleteSession();
-        navigate(`/${rootId}/sessions`);
+        navigate(`/${rootId}/sessions`, {
+            state: { deletedSessionId: sessionId, deletedAt: Date.now() }
+        });
     };
 
     const handleSaveSession = () => {

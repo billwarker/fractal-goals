@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -38,12 +38,17 @@ function Sessions() {
     const [sortBy, setSortBy] = useState('start_date');
     const [sortOrder, setSortOrder] = useState('desc');
     const [sessionInstancesById, setSessionInstancesById] = useState({});
+    const [hiddenSessionIds, setHiddenSessionIds] = useState(() => {
+        const deletedId = location.state?.deletedSessionId;
+        return deletedId ? new Set([deletedId]) : new Set();
+    });
 
     // Pagination state
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [totalSessions, setTotalSessions] = useState(0);
     const SESSIONS_PER_PAGE = 10;
+    const fetchRequestIdRef = useRef(0);
 
     useEffect(() => {
         if (!rootId) {
@@ -55,6 +60,17 @@ function Sessions() {
         fetchActivities();
         return () => setActiveRootId(null);
     }, [rootId, location.key, navigate, setActiveRootId]);
+
+    useEffect(() => {
+        const deletedId = location.state?.deletedSessionId;
+        if (!deletedId) return;
+        setHiddenSessionIds(prev => {
+            const next = new Set(prev);
+            next.add(deletedId);
+            return next;
+        });
+        setSelectedSessionId(prev => (prev === deletedId ? null : prev));
+    }, [location.state]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -113,10 +129,13 @@ function Sessions() {
     }, [sortBy]);
 
     const fetchSessions = async () => {
+        const requestId = ++fetchRequestIdRef.current;
         try {
             const res = await fractalApi.getSessions(rootId, { limit: SESSIONS_PER_PAGE, offset: 0 });
+            if (requestId !== fetchRequestIdRef.current) return;
             const { sessions: sessionsData, pagination } = res.data;
             const instancesMap = await fetchSessionInstances(sessionsData.map((session) => session.id));
+            if (requestId !== fetchRequestIdRef.current) return;
 
             setSessions(sessionsData);
             setSessionInstancesById(instancesMap);
@@ -124,6 +143,7 @@ function Sessions() {
             setTotalSessions(pagination.total);
             setLoading(false);
         } catch (err) {
+            if (requestId !== fetchRequestIdRef.current) return;
             console.error("Failed to fetch sessions", err);
             setLoading(false);
         }
@@ -133,20 +153,25 @@ function Sessions() {
         if (loadingMore || !hasMore) return;
 
         setLoadingMore(true);
+        const requestId = ++fetchRequestIdRef.current;
         try {
             const res = await fractalApi.getSessions(rootId, {
                 limit: SESSIONS_PER_PAGE,
                 offset: sessions.length
             });
+            if (requestId !== fetchRequestIdRef.current) return;
             const { sessions: newSessions, pagination } = res.data;
             const instancesMap = await fetchSessionInstances(newSessions.map((session) => session.id));
+            if (requestId !== fetchRequestIdRef.current) return;
 
             setSessions(prev => [...prev, ...newSessions]);
             setSessionInstancesById(prev => ({ ...prev, ...instancesMap }));
             setHasMore(pagination.has_more);
         } catch (err) {
+            if (requestId !== fetchRequestIdRef.current) return;
             console.error("Failed to load more sessions", err);
         } finally {
+            if (requestId !== fetchRequestIdRef.current) return;
             setLoadingMore(false);
         }
     };
@@ -154,6 +179,7 @@ function Sessions() {
     // Memoize filtered and sorted sessions
     const filteredSessions = useMemo(() => {
         return sessions.filter(session => {
+            if (hiddenSessionIds.has(session.id)) return false;
             if (filterCompleted === 'completed') return session.attributes?.completed;
             if (filterCompleted === 'incomplete') return !session.attributes?.completed;
             return true;
@@ -178,7 +204,7 @@ function Sessions() {
 
             return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
         });
-    }, [sessions, filterCompleted, sortBy, sortOrder]);
+    }, [sessions, hiddenSessionIds, filterCompleted, sortBy, sortOrder]);
 
     // Memoize date formatter
     const formatDate = useCallback((dateString, options = {}) => {

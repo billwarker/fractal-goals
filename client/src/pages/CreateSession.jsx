@@ -220,10 +220,11 @@ function CreateSession() {
         try {
             // Convert template sections to session sections
             const sectionsWithExercises = (selectedTemplate.template_data?.sections || []).map(section => {
-                const exercises = (section.activities || []).map(activity => ({
+                const templateItems = section.activities || section.exercises || [];
+                const exercises = templateItems.map(activity => ({
                     type: 'activity',
                     name: activity.name,
-                    activity_id: activity.activity_id,
+                    activity_id: activity.activity_id || activity.activity_definition_id || activity.id,
                     instance_id: crypto.randomUUID(),
                     completed: false,
                     notes: ''
@@ -232,7 +233,7 @@ function CreateSession() {
                 return {
                     ...section,
                     exercises,
-                    actual_duration_minutes: section.duration_minutes
+                    estimated_duration_minutes: section.estimated_duration_minutes || section.duration_minutes
                 };
             });
 
@@ -241,6 +242,7 @@ function CreateSession() {
             const sessionData = {
                 name: selectedTemplate.name,
                 description: selectedTemplate.description || '',
+                template_id: selectedTemplate.id,
                 duration_minutes: selectedTemplate.template_data?.total_duration_minutes || 0,
                 session_start: sessionStart,
                 session_data: {

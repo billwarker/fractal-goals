@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import notify from '../../utils/notify';
 import styles from './ActivityAssociationModal.module.css';
 import GoalIcon from '../atoms/GoalIcon';
 
@@ -20,10 +21,12 @@ const ActivityAssociationModal = ({
 
     // Multi-select state - initialize with passed IDs
     const [selectedGoalIds, setSelectedGoalIds] = useState(() => new Set(initialSelectedGoalIds));
+    const [initialGoalIds, setInitialGoalIds] = useState(() => new Set(initialSelectedGoalIds));
 
     useEffect(() => {
         if (isOpen) {
             setSelectedGoalIds(new Set(initialSelectedGoalIds));
+            setInitialGoalIds(new Set(initialSelectedGoalIds));
         }
     }, [isOpen, initialSelectedGoalIds]);
 
@@ -67,14 +70,42 @@ const ActivityAssociationModal = ({
         return groups;
     }, [filteredGoals]);
 
+    const hasSelectionChanged = useMemo(() => {
+        if (selectedGoalIds.size !== initialGoalIds.size) return true;
+        for (const goalId of selectedGoalIds) {
+            if (!initialGoalIds.has(goalId)) return true;
+        }
+        return false;
+    }, [selectedGoalIds, initialGoalIds]);
+
+    const blockedGoalRemovals = useMemo(() => {
+        const removedGoalIds = [];
+        for (const goalId of initialGoalIds) {
+            if (!selectedGoalIds.has(goalId)) removedGoalIds.push(goalId);
+        }
+
+        return goals.filter(goal =>
+            removedGoalIds.includes(goal.id) && goal.hasTargetForActivity
+        );
+    }, [goals, initialGoalIds, selectedGoalIds]);
+
+    const canConfirm = hasSelectionChanged && blockedGoalRemovals.length === 0;
+
     if (!isOpen) return null;
 
     const handleConfirm = () => {
-        if (selectedGoalIds.size > 0) {
+        if (blockedGoalRemovals.length > 0) {
+            const goalNames = blockedGoalRemovals.map(g => `"${g.name}"`).join(', ');
+            notify.error(`Cannot remove goals with targets on this activity: ${goalNames}`);
+            return;
+        }
+
+        if (hasSelectionChanged) {
             onAssociate(Array.from(selectedGoalIds));
             onClose();
             // Reset state
             setSelectedGoalIds(new Set());
+            setInitialGoalIds(new Set());
             setSearchTerm('');
         }
     };
@@ -241,13 +272,18 @@ const ActivityAssociationModal = ({
                     <button
                         className={styles.confirmButton}
                         onClick={handleConfirm}
-                        disabled={selectedGoalIds.size === 0}
+                        disabled={!canConfirm}
                     >
                         {selectedGoalIds.size > 0
                             ? `Associate ${selectedGoalIds.size} Goal${selectedGoalIds.size !== 1 ? 's' : ''}`
-                            : 'Associate Goal'}
+                            : 'Save Associations'}
                     </button>
                 </div>
+                {blockedGoalRemovals.length > 0 && (
+                    <div className={styles.blockedHint}>
+                        Remove targets first for: {blockedGoalRemovals.map(g => g.name).join(', ')}
+                    </div>
+                )}
             </div>
         </div>
     );

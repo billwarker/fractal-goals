@@ -96,7 +96,57 @@ class TestSessionCRUDEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['template_id'] == sample_session_template.id
-    
+
+    def test_create_session_persists_template_activities(
+        self, authed_client, sample_goal_hierarchy, sample_session_template, sample_activity_definition
+    ):
+        """Creating a session with template exercises should create ActivityInstances and section activity_ids."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        payload = {
+            'name': 'Session with Template Activities',
+            'parent_id': sample_goal_hierarchy['short_term'].id,
+            'template_id': sample_session_template.id,
+            'session_start': datetime.utcnow().isoformat(),
+            'session_data': {
+                'template_id': sample_session_template.id,
+                'sections': [
+                    {
+                        'name': 'Main',
+                        'duration_minutes': 20,
+                        'exercises': [
+                            {
+                                'type': 'activity',
+                                'name': sample_activity_definition.name,
+                                'activity_id': sample_activity_definition.id,
+                                'instance_id': 'test-instance-1'
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        create_response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert create_response.status_code == 201
+        session_data = json.loads(create_response.data)
+        session_id = session_data['id']
+
+        activities_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}/activities')
+        assert activities_response.status_code == 200
+        activities = json.loads(activities_response.data)
+        assert len(activities) == 1
+        assert activities[0]['activity_definition_id'] == sample_activity_definition.id
+
+        detail_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
+        assert detail_response.status_code == 200
+        detail = json.loads(detail_response.data)
+        sections = detail['attributes']['session_data']['sections']
+        assert len(sections[0]['activity_ids']) == 1
+        assert sections[0]['activity_ids'][0] == 'test-instance-1'
+
     def test_update_session(self, authed_client, sample_practice_session):
         """Test updating a session."""
         root_id = sample_practice_session.root_id

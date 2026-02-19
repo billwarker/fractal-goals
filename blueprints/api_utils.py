@@ -48,13 +48,14 @@ def parse_optional_pagination(req, *, max_limit: int = 200):
 
 
 def etag_json_response(payload, status: int = 200):
-    """Return JSON response with a stable ETag and 304 support."""
+    """Return JSON response with a stable ETag.
+
+    We intentionally avoid API-level 304 short-circuiting because several
+    frontend flows rely on always receiving a JSON payload (and can surface
+    stale UI state when a 304 empty response path is taken).
+    """
     raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
     etag = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    if request.if_none_match and request.if_none_match.contains(etag):
-        resp = make_response("", 304)
-        resp.set_etag(etag)
-        return resp
     resp = make_response(jsonify(payload), status)
     resp.set_etag(etag)
     return resp

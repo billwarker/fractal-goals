@@ -95,11 +95,11 @@ function SessionSummary({ selectedTemplate, selectedProgramDay, activityDefiniti
         const templateActivityIds = new Set();
         if (selectedTemplate.template_data?.sections) {
             selectedTemplate.template_data.sections.forEach(section => {
-                if (section.activities) {
-                    section.activities.forEach(a => {
-                        if (a.activity_id) templateActivityIds.add(a.activity_id);
-                    });
-                }
+                const templateItems = section.activities || section.exercises || [];
+                templateItems.forEach(a => {
+                    const activityId = a.activity_id || a.activity_definition_id || a.id;
+                    if (activityId) templateActivityIds.add(activityId);
+                });
             });
         }
 

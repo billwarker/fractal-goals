@@ -158,9 +158,9 @@ def shutdown_session(exception=None):
 
 @app.after_request
 def add_cache_headers(response):
-    # Allow short-lived private caching on ETagged GET API responses.
-    if request.method == 'GET' and response.headers.get('ETag') and response.status_code == 200:
-        response.headers.setdefault('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
+    # Favor correctness for authenticated API data over intermediary/browser caching.
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store'
     return response
 
 

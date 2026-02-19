@@ -176,13 +176,13 @@ class SessionService:
             template_id=data.get('template_id')
         )
         
-        new_session.attributes = models._safe_load_json(session_data, {})
+        session_data_dict = models._safe_load_json(session_data, {})
+        new_session.attributes = session_data_dict
         
         # Program Context
         program_day_id = None
         program_goal_ids = set()
         if new_session.attributes:
-            session_data_dict = models._safe_load_json(new_session.attributes, {})
             program_context = session_data_dict.get('program_context')
             if program_context and 'day_id' in program_context:
                 requested_day_id = program_context['day_id']
@@ -214,15 +214,28 @@ class SessionService:
         # Goal Inheritance Logic (activities only)
         inherited_goal_map = {}
         
-        # A. From Activities
+        # A. Collect activities from session sections (supports legacy + current shapes)
+        sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
         activity_def_ids = set()
-        if new_session.attributes:
-            session_dict = models._safe_load_json(new_session.attributes, {})
-            sections = session_dict.get('sections', [])
-            for section in sections:
-                for exercise in section.get('exercises', []):
-                    if exercise.get('activity_id'):
-                        activity_def_ids.add(exercise.get('activity_id'))
+        section_exercises = []
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            raw_exercises = section.get('exercises') or section.get('activities') or []
+            normalized = []
+            for exercise in raw_exercises:
+                if not isinstance(exercise, dict):
+                    continue
+                activity_id = (
+                    exercise.get('activity_id')
+                    or exercise.get('activity_definition_id')
+                    or exercise.get('id')
+                )
+                if not activity_id:
+                    continue
+                activity_def_ids.add(activity_id)
+                normalized.append((exercise, activity_id))
+            section_exercises.append((section, normalized))
         
         if activity_def_ids:
             activities = self.db_session.query(ActivityDefinition).options(
@@ -236,6 +249,30 @@ class SessionService:
             missing_activity_ids = activity_def_ids - found_activity_ids
             if missing_activity_ids:
                 return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
+            activity_map = {a.id: a for a in activities}
+
+            # Persist activity instances and canonical activity ordering for section rendering.
+            for section, normalized_exercises in section_exercises:
+                section_activity_ids = []
+                for exercise, activity_id in normalized_exercises:
+                    if activity_id not in activity_map:
+                        continue
+                    instance_id = exercise.get('instance_id') or str(uuid.uuid4())
+                    instance = ActivityInstance(
+                        id=instance_id,
+                        session_id=new_session.id,
+                        activity_definition_id=activity_id,
+                        root_id=root_id
+                    )
+                    self.db_session.add(instance)
+                    section_activity_ids.append(instance_id)
+
+                section['activity_ids'] = section_activity_ids
+                section.pop('exercises', None)
+                section.pop('activities', None)
+                if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
+                    section['estimated_duration_minutes'] = section.get('duration_minutes')
+
             for act in activities:
                 for goal in act.associated_goals:
                     if (
