@@ -33,6 +33,43 @@ export function findLastInstantiatedForActivity(sessions = [], activityId) {
     return mostRecent.session_start || mostRecent.attributes?.created_at || mostRecent.created_at || null;
 }
 
+export function buildLastInstantiatedMap(sessions = []) {
+    const latestByActivity = new Map();
+    if (!Array.isArray(sessions) || sessions.length === 0) return latestByActivity;
+
+    sessions.forEach((session) => {
+        const sessionTimestamp = session.session_start || session.attributes?.created_at || session.created_at || null;
+        if (!sessionTimestamp) return;
+
+        const instanceActivityIds = Array.isArray(session.activity_instances)
+            ? session.activity_instances
+                .map((instance) => instance.activity_definition_id)
+                .filter(Boolean)
+            : [];
+
+        const legacyActivityIds = (() => {
+            const attributes = session.attributes || session;
+            const sessionData = attributes.session_data;
+            if (!sessionData || !Array.isArray(sessionData.sections)) return [];
+            return sessionData.sections.flatMap((section) => (
+                Array.isArray(section.exercises)
+                    ? section.exercises.map((exercise) => exercise.activity_id).filter(Boolean)
+                    : []
+            ));
+        })();
+
+        const allActivityIds = [...instanceActivityIds, ...legacyActivityIds];
+        allActivityIds.forEach((activityId) => {
+            const prev = latestByActivity.get(activityId);
+            if (!prev || new Date(sessionTimestamp) > new Date(prev)) {
+                latestByActivity.set(activityId, sessionTimestamp);
+            }
+        });
+    });
+
+    return latestByActivity;
+}
+
 export function buildGroupReorderPayload(activityGroups = [], movingGroupId, direction) {
     if (!Array.isArray(activityGroups) || !movingGroupId || !direction) return null;
 

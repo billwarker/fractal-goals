@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getLocalISOString } from '../utils/dateUtils';
@@ -28,6 +29,7 @@ import '../App.css';
 function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
 
     // Data state
@@ -289,7 +291,50 @@ function CreateSession() {
             console.log('Session Payload:', sessionData);
 
             const response = await fractalApi.createSession(rootId, sessionData);
-            const createdSessionId = response.data.id;
+            const createdSession = response.data;
+            const createdSessionId = createdSession.id;
+
+            // Optimistically insert into sessions caches for immediate list visibility.
+            queryClient.setQueryData(['sessions', rootId, 'paginated'], (prev) => {
+                if (!prev || !Array.isArray(prev.pages) || prev.pages.length === 0) return prev;
+                const [firstPage, ...restPages] = prev.pages;
+                const existing = (firstPage.sessions || []).some((session) => session.id === createdSession.id);
+                if (existing) return prev;
+
+                const updatedFirstPage = {
+                    ...firstPage,
+                    sessions: [createdSession, ...(firstPage.sessions || [])],
+                    pagination: firstPage.pagination
+                        ? {
+                            ...firstPage.pagination,
+                            total: typeof firstPage.pagination.total === 'number'
+                                ? firstPage.pagination.total + 1
+                                : firstPage.pagination.total
+                        }
+                        : firstPage.pagination
+                };
+
+                return {
+                    ...prev,
+                    pages: [updatedFirstPage, ...restPages]
+                };
+            });
+
+            queryClient.setQueryData(['sessions', rootId], (prev) => {
+                if (!Array.isArray(prev)) return prev;
+                if (prev.some((session) => session.id === createdSession.id)) return prev;
+                return [createdSession, ...prev];
+            });
+
+            queryClient.setQueryData(['sessions', rootId, 'all'], (prev) => {
+                if (!Array.isArray(prev)) return prev;
+                if (prev.some((session) => session.id === createdSession.id)) return prev;
+                return [createdSession, ...prev];
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId], refetchType: 'inactive' });
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'], refetchType: 'inactive' });
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'paginated'], refetchType: 'inactive' });
 
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {

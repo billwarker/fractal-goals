@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
 const ActivitiesContext = createContext();
 
 export function ActivitiesProvider({ children }) {
+    const queryClient = useQueryClient();
     const [activities, setActivities] = useState([]);
     const [activityGroups, setActivityGroups] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -18,57 +20,73 @@ export function ActivitiesProvider({ children }) {
             setError(null);
             const res = await fractalApi.getActivities(rootId);
             setActivities(res.data);
+            queryClient.setQueryData(['activities', rootId], res.data);
         } catch (err) {
             console.error('Failed to fetch activities:', err);
             setError('Failed to load activities');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [queryClient]);
 
     // Create a new activity
     const createActivity = useCallback(async (rootId, activityData) => {
         try {
             setError(null);
             const res = await fractalApi.createActivity(rootId, activityData);
-            // Refresh activities list
-            await fetchActivities(rootId);
+            setActivities((prev) => {
+                const next = Array.isArray(prev) ? [...prev] : [];
+                const created = res.data;
+                if (!created?.id) return next;
+                if (next.some((item) => item.id === created.id)) return next;
+                next.push(created);
+                queryClient.setQueryData(['activities', rootId], next);
+                return next;
+            });
             return res.data;
         } catch (err) {
             console.error('Failed to create activity:', err);
             setError('Failed to create activity');
             throw err;
         }
-    }, [fetchActivities]);
+    }, [queryClient]);
 
     // Update an existing activity
     const updateActivity = useCallback(async (rootId, activityId, updates) => {
         try {
             setError(null);
             const res = await fractalApi.updateActivity(rootId, activityId, updates);
-            // Refresh activities list
-            await fetchActivities(rootId);
+            setActivities((prev) => {
+                if (!Array.isArray(prev)) return prev;
+                const next = prev.map((item) => item.id === activityId ? { ...item, ...res.data } : item);
+                queryClient.setQueryData(['activities', rootId], next);
+                return next;
+            });
             return res.data;
         } catch (err) {
             console.error('Failed to update activity:', err);
             setError('Failed to update activity');
             throw err;
         }
-    }, [fetchActivities]);
+    }, [queryClient]);
 
     // Delete an activity
     const deleteActivity = useCallback(async (rootId, activityId) => {
         try {
             setError(null);
             await fractalApi.deleteActivity(rootId, activityId);
-            // Refresh activities list
-            await fetchActivities(rootId);
+            setActivities((prev) => {
+                if (!Array.isArray(prev)) return prev;
+                const next = prev.filter((item) => item.id !== activityId);
+                queryClient.setQueryData(['activities', rootId], next);
+                return next;
+            });
         } catch (err) {
             console.error('Failed to delete activity:', err);
             setError('Failed to delete activity');
             throw err;
         }
-    }, [fetchActivities]);
+    }, [queryClient]);
 
     // Fetch activity groups
     const fetchActivityGroups = useCallback(async (rootId) => {
@@ -76,10 +94,11 @@ export function ActivitiesProvider({ children }) {
         try {
             const res = await fractalApi.getActivityGroups(rootId);
             setActivityGroups(res.data);
+            queryClient.setQueryData(['activity-groups', rootId], res.data);
         } catch (err) {
             console.error('Failed to fetch activity groups:', err);
         }
-    }, []);
+    }, [queryClient]);
 
     // Create activity group
     const createActivityGroup = useCallback(async (rootId, data) => {
@@ -160,7 +179,6 @@ export function ActivitiesProvider({ children }) {
         fetchActivityGroups,
         createActivityGroup,
         updateActivityGroup,
-        deleteActivityGroup,
         deleteActivityGroup,
         reorderActivityGroups,
         setActivityGroupGoals

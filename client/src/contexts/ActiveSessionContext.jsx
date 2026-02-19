@@ -7,7 +7,11 @@ import { useTimezone } from './TimezoneContext';
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 
-const ActiveSessionContext = createContext();
+const SessionDataContext = createContext(null);
+const SessionUiContext = createContext(null);
+const SessionActionsContext = createContext(null);
+
+const ActiveSessionContext = createContext(null);
 
 export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const queryClient = useQueryClient();
@@ -25,6 +29,17 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const initializedRef = useRef(false);
     const [justInitialized, setJustInitialized] = useState(false);
     const previousSessionKeyRef = useRef(null);
+    const statusTimeoutRef = useRef(null);
+    const initTimeoutRef = useRef(null);
+    const instanceQueuesRef = useRef(new Map());
+
+    const scheduleStatusClear = useCallback((delayMs) => {
+        if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+        statusTimeoutRef.current = setTimeout(() => {
+            setAutoSaveStatus('');
+            statusTimeoutRef.current = null;
+        }, delayMs);
+    }, []);
 
     // 1. Queries
     const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refreshSession } = useQuery({
@@ -98,11 +113,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
             setAutoSaveStatus('saved');
-            setTimeout(() => setAutoSaveStatus(''), 2000);
+            scheduleStatusClear(2000);
         },
         onError: () => {
             setAutoSaveStatus('error');
-            setTimeout(() => setAutoSaveStatus(''), 3000);
+            scheduleStatusClear(3000);
         }
     });
 
@@ -159,6 +174,19 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
     });
 
+    const applyInstanceOptimisticUpdate = useCallback((instanceId, updates) => {
+        queryClient.setQueryData(['session-activities', rootId, sessionId], (prev = []) => {
+            if (!Array.isArray(prev)) return prev;
+            return prev.map((inst) => {
+                if (inst.id !== instanceId) return inst;
+                return {
+                    ...inst,
+                    ...updates
+                };
+            });
+        });
+    }, [queryClient, rootId, sessionId]);
+
     const updateInstanceMutation = useMutation({
         mutationFn: async ({ instanceId, updates }) => {
             const instance = activityInstances.find(inst => inst.id === instanceId);
@@ -179,10 +207,40 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 ...updates
             });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+        onSuccess: (res, { instanceId }) => {
+            if (res?.data) {
+                queryClient.setQueryData(['session-activities', rootId, sessionId], (prev = []) =>
+                    prev.map(inst => inst.id === instanceId ? res.data : inst)
+                );
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            }
         }
     });
+
+    const getInstanceQueue = useCallback((instanceId) => {
+        if (!instanceId) return null;
+        const existing = instanceQueuesRef.current.get(instanceId);
+        if (existing) return existing;
+
+        const queue = createAutoSaveQueue({
+            save: async (updates) => {
+                await updateInstanceMutation.mutateAsync({ instanceId, updates });
+            },
+            onError: () => {
+                notify.error('Failed to save activity changes');
+            }
+        });
+        instanceQueuesRef.current.set(instanceId, queue);
+        return queue;
+    }, [updateInstanceMutation.mutateAsync]);
+
+    const enqueueInstanceUpdate = useCallback((instanceId, updates) => {
+        applyInstanceOptimisticUpdate(instanceId, updates);
+        const queue = getInstanceQueue(instanceId);
+        if (!queue) return Promise.resolve();
+        return queue.enqueue(updates);
+    }, [applyInstanceOptimisticUpdate, getInstanceQueue]);
 
     // 3. Derived Helpers
     const groupMap = useMemo(() => {
@@ -378,9 +436,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
         onError: () => {
             setAutoSaveStatus('error');
-            setTimeout(() => setAutoSaveStatus(''), 3000);
+            scheduleStatusClear(3000);
         }
-    }), [updateSessionMutation.mutateAsync]);
+    }), [updateSessionMutation.mutateAsync, scheduleStatusClear]);
 
     // 5. Effects
     useEffect(() => {
@@ -396,6 +454,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             initializedRef.current = false;
             setLocalSessionData(null);
             autoSaveQueue.reset();
+            instanceQueuesRef.current.forEach((queue) => queue.reset());
+            instanceQueuesRef.current.clear();
             setAutoSaveStatus('');
             setShowActivitySelector({});
             setDraggedItem(null);
@@ -495,7 +555,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         autoSaveQueue.seed(normalizedData);
         initializedRef.current = true;
         setJustInitialized(true);
-        setTimeout(() => setJustInitialized(false), 500); // Guard window
+        if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = setTimeout(() => {
+            setJustInitialized(false);
+            initTimeoutRef.current = null;
+        }, 500); // Guard window
     }, [session, sessionId, localSessionData, activityInstances, autoSaveQueue]);
 
     useEffect(() => {
@@ -579,7 +643,16 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         prevCompletedIdsRef.current = currentCompleteds;
     }, [goalAchievements]);
 
-    const value = useMemo(() => ({
+    useEffect(() => {
+        return () => {
+            if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
+            if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
+            instanceQueuesRef.current.forEach((queue) => queue.reset());
+            instanceQueuesRef.current.clear();
+        };
+    }, []);
+
+    const dataValue = useMemo(() => ({
         rootId,
         sessionId,
         session,
@@ -589,38 +662,17 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         parentGoals,
         immediateGoals,
         microGoals,
-        loading: sessionLoading || instancesLoading || activitiesLoading || (session && !localSessionData),
+        loading: sessionLoading || (session && !localSessionData),
+        instancesLoading,
+        activitiesLoading,
         sessionError,
         autoSaveStatus,
-        sidePaneMode,
-        setSidePaneMode,
-        showActivitySelector,
-        setShowActivitySelector,
         localSessionData,
-        setLocalSessionData,
-        draggedItem,
-        setDraggedItem,
         groupMap,
         groupedActivities,
         targetAchievements,
         achievedTargetIds,
         goalAchievements,
-        refreshSession,
-        refreshInstances,
-        // Handlers
-        updateSession: updateSessionMutation.mutateAsync,
-        addActivity: handleAddActivity,
-        removeActivity: removeActivityMutation.mutate,
-        updateInstance: updateInstanceMutation.mutate,
-        updateTimer: handleUpdateTimer,
-        createGoal,
-        updateGoal: updateGoalMutation.mutate,
-        toggleGoalCompletion,
-        reorderActivity: handleReorderActivity,
-        moveActivity: handleMoveActivity,
-        deleteSession: deleteSessionMutation.mutateAsync,
-        toggleSessionComplete: handleToggleSessionComplete,
-        calculateTotalDuration,
     }), [
         rootId,
         sessionId,
@@ -637,20 +689,51 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         localSessionData,
         sessionError,
         autoSaveStatus,
-        sidePaneMode,
-        showActivitySelector,
-        draggedItem,
         groupMap,
         groupedActivities,
         targetAchievements,
         achievedTargetIds,
         goalAchievements,
+    ]);
+
+    const uiValue = useMemo(() => ({
+        sidePaneMode,
+        setSidePaneMode,
+        showActivitySelector,
+        setShowActivitySelector,
+        draggedItem,
+        setDraggedItem
+    }), [
+        sidePaneMode,
+        showActivitySelector,
+        draggedItem
+    ]);
+
+    const actionsValue = useMemo(() => ({
+        setLocalSessionData,
+        refreshSession,
+        refreshInstances,
+        updateSession: updateSessionMutation.mutateAsync,
+        addActivity: handleAddActivity,
+        removeActivity: removeActivityMutation.mutate,
+        updateInstance: enqueueInstanceUpdate,
+        updateTimer: handleUpdateTimer,
+        createGoal,
+        updateGoal: updateGoalMutation.mutate,
+        toggleGoalCompletion,
+        reorderActivity: handleReorderActivity,
+        moveActivity: handleMoveActivity,
+        deleteSession: deleteSessionMutation.mutateAsync,
+        toggleSessionComplete: handleToggleSessionComplete,
+        calculateTotalDuration
+    }), [
+        setLocalSessionData,
         refreshSession,
         refreshInstances,
         updateSessionMutation.mutateAsync,
         handleAddActivity,
         removeActivityMutation.mutate,
-        updateInstanceMutation.mutate,
+        enqueueInstanceUpdate,
         handleUpdateTimer,
         createGoal,
         updateGoalMutation.mutate,
@@ -662,11 +745,51 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         calculateTotalDuration
     ]);
 
+    const value = useMemo(() => ({
+        ...dataValue,
+        ...uiValue,
+        ...actionsValue
+    }), [
+        dataValue,
+        uiValue,
+        actionsValue
+    ]);
+
     return (
-        <ActiveSessionContext.Provider value={value}>
-            {children}
-        </ActiveSessionContext.Provider>
+        <SessionDataContext.Provider value={dataValue}>
+            <SessionUiContext.Provider value={uiValue}>
+                <SessionActionsContext.Provider value={actionsValue}>
+                    <ActiveSessionContext.Provider value={value}>
+                        {children}
+                    </ActiveSessionContext.Provider>
+                </SessionActionsContext.Provider>
+            </SessionUiContext.Provider>
+        </SessionDataContext.Provider>
     );
+}
+
+export function useActiveSessionData() {
+    const context = useContext(SessionDataContext);
+    if (!context) {
+        throw new Error('useActiveSessionData must be used within an ActiveSessionProvider');
+    }
+    return context;
+}
+
+export function useActiveSessionUi() {
+    const context = useContext(SessionUiContext);
+    if (!context) {
+        throw new Error('useActiveSessionUi must be used within an ActiveSessionProvider');
+    }
+    return context;
+}
+
+export function useActiveSessionActions() {
+    const context = useContext(SessionActionsContext);
+    if (!context) {
+        throw new Error('useActiveSessionActions must be used within an ActiveSessionProvider');
+    }
+    return context;
 }
 
 export function useActiveSession() {

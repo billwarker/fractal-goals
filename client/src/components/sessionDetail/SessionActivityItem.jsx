@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import GoalIcon from '../atoms/GoalIcon';
 import { useTheme } from '../../contexts/ThemeContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
-import { fractalApi } from '../../utils/api';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
 
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -46,34 +45,147 @@ function SessionActivityItem({
 }) {
     // Context
     const {
-        rootId,
         sessionId,
         activities,
-        updateInstance,
-        updateTimer,
-        removeActivity,
-        createGoal,
         parentGoals,
         immediateGoals,
         microGoals,
         session,
-        refreshSession,
-    } = useActiveSession();
+    } = useActiveSessionData();
+
+    const {
+        updateInstance,
+        updateTimer,
+        removeActivity,
+        createGoal,
+    } = useActiveSessionActions();
 
     const activityDefinition = activityDefinitionProp
         || (Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null);
     const onDelete = () => removeActivity(exercise.id);
-    const onUpdate = (key, value) => {
+    const onUpdate = useCallback((key, value) => {
         if (key === 'timer_action') {
             updateTimer(exercise.id, value);
         } else {
-            updateInstance({ instanceId: exercise.id, updates: { [key]: value } });
+            updateInstance(exercise.id, { [key]: value });
         }
-    };
+    }, [exercise.id, updateInstance, updateTimer]);
 
     // Get timezone from context
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+
+    const setMetricDraftKey = useCallback((setIndex, metricId, splitId = null) => (
+        `${setIndex}:${metricId}:${splitId || ''}`
+    ), []);
+    const singleMetricDraftKey = useCallback((metricId, splitId = null) => (
+        `${metricId}:${splitId || ''}`
+    ), []);
+
+    const [setMetricDrafts, setSetMetricDrafts] = useState({});
+    const [singleMetricDrafts, setSingleMetricDrafts] = useState({});
+
+    useEffect(() => {
+        setSetMetricDrafts({});
+        setSingleMetricDrafts({});
+    }, [exercise.id]);
+
+    const clearSetMetricDraft = useCallback((setIndex, metricId, splitId = null) => {
+        const key = setMetricDraftKey(setIndex, metricId, splitId);
+        setSetMetricDrafts((prev) => {
+            if (!(key in prev)) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+    }, [setMetricDraftKey]);
+
+    const clearSingleMetricDraft = useCallback((metricId, splitId = null) => {
+        const key = singleMetricDraftKey(metricId, splitId);
+        setSingleMetricDrafts((prev) => {
+            if (!(key in prev)) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+    }, [singleMetricDraftKey]);
+
+    const getMetricValue = useCallback((metricsList, metricId, splitId = null) => {
+        const m = metricsList?.find(x =>
+            x.metric_id === metricId && (splitId ? x.split_id === splitId : !x.split_id)
+        );
+        return m ? m.value : '';
+    }, []);
+
+    const getSetMetricDisplayValue = useCallback((setIndex, metricsList, metricId, splitId = null) => {
+        const key = setMetricDraftKey(setIndex, metricId, splitId);
+        if (Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) {
+            return setMetricDrafts[key];
+        }
+        return getMetricValue(metricsList, metricId, splitId);
+    }, [getMetricValue, setMetricDraftKey, setMetricDrafts]);
+
+    const getSingleMetricDisplayValue = useCallback((metricsList, metricId, splitId = null) => {
+        const key = singleMetricDraftKey(metricId, splitId);
+        if (Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) {
+            return singleMetricDrafts[key];
+        }
+        return getMetricValue(metricsList, metricId, splitId);
+    }, [getMetricValue, singleMetricDraftKey, singleMetricDrafts]);
+
+    const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null) => {
+        const key = setMetricDraftKey(setIndex, metricId, splitId);
+        if (!Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) return;
+        const value = setMetricDrafts[key];
+
+        const newSets = [...(exercise.sets || [])];
+        const set = { ...newSets[setIndex] };
+        const metrics = Array.isArray(set.metrics) ? [...set.metrics] : [];
+        const metricIdx = metrics.findIndex(m =>
+            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+        );
+        if (metricIdx >= 0) {
+            metrics[metricIdx] = { ...metrics[metricIdx], value };
+        } else {
+            const newMetric = { metric_id: metricId, value };
+            if (splitId) newMetric.split_id = splitId;
+            metrics.push(newMetric);
+        }
+        set.metrics = metrics;
+        newSets[setIndex] = set;
+        onUpdate('sets', newSets);
+        clearSetMetricDraft(setIndex, metricId, splitId);
+    }, [exercise.sets, onUpdate, setMetricDraftKey, setMetricDrafts, clearSetMetricDraft]);
+
+    const commitSingleMetricChange = useCallback((metricId, splitId = null) => {
+        const key = singleMetricDraftKey(metricId, splitId);
+        if (!Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) return;
+        const value = singleMetricDrafts[key];
+
+        const currentMetrics = [...(exercise.metrics || [])];
+        const metricIdx = currentMetrics.findIndex(m =>
+            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+        );
+        if (metricIdx >= 0) {
+            currentMetrics[metricIdx] = { ...currentMetrics[metricIdx], value };
+        } else {
+            const newMetric = { metric_id: metricId, value };
+            if (splitId) newMetric.split_id = splitId;
+            currentMetrics.push(newMetric);
+        }
+        onUpdate('metrics', currentMetrics);
+        clearSingleMetricDraft(metricId, splitId);
+    }, [exercise.metrics, onUpdate, singleMetricDraftKey, singleMetricDrafts, clearSingleMetricDraft]);
+
+    const handleSetMetricDraftChange = useCallback((setIndex, metricId, value, splitId = null) => {
+        const key = setMetricDraftKey(setIndex, metricId, splitId);
+        setSetMetricDrafts((prev) => ({ ...prev, [key]: value }));
+    }, [setMetricDraftKey]);
+
+    const handleSingleMetricDraftChange = useCallback((metricId, value, splitId = null) => {
+        const key = singleMetricDraftKey(metricId, splitId);
+        setSingleMetricDrafts((prev) => ({ ...prev, [key]: value }));
+    }, [singleMetricDraftKey]);
 
     // Find active micro goal for this activity in the current session
     const activeMicroGoal = microGoals.find(mg =>
@@ -279,44 +391,6 @@ function SessionActivityItem({
         onUpdate('sets', newSets);
     };
 
-    const handleSetMetricChange = (setIndex, metricId, value, splitId = null) => {
-        const newSets = [...(exercise.sets || [])];
-        const set = { ...newSets[setIndex] };
-
-        // Find existing metric entry or add it
-        const metricIdx = set.metrics.findIndex(m =>
-            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
-        );
-
-        if (metricIdx >= 0) {
-            set.metrics[metricIdx] = { ...set.metrics[metricIdx], value };
-        } else {
-            const newMetric = { metric_id: metricId, value };
-            if (splitId) newMetric.split_id = splitId;
-            set.metrics.push(newMetric);
-        }
-
-        newSets[setIndex] = set;
-        onUpdate('sets', newSets);
-    };
-
-    const handleSingleMetricChange = (metricId, value, splitId = null) => {
-        const currentMetrics = [...(exercise.metrics || [])];
-        const metricIdx = currentMetrics.findIndex(m =>
-            m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
-        );
-
-        if (metricIdx >= 0) {
-            currentMetrics[metricIdx] = { ...currentMetrics[metricIdx], value };
-        } else {
-            const newMetric = { metric_id: metricId, value };
-            if (splitId) newMetric.split_id = splitId;
-            currentMetrics.push(newMetric);
-        }
-
-        onUpdate('metrics', currentMetrics);
-    };
-
     const handleCascade = (metricId, value, splitId = null, sourceIndex = 0) => {
         const newSets = [...(exercise.sets || [])];
         let hasChanges = false;
@@ -372,14 +446,6 @@ function SessionActivityItem({
             if (val === '' || val === null || val === undefined) return true;
         }
         return false;
-    };
-
-    // Helper to get value for input
-    const getMetricValue = (metricsList, metricId, splitId = null) => {
-        const m = metricsList?.find(x =>
-            x.metric_id === metricId && (splitId ? x.split_id === splitId : !x.split_id)
-        );
-        return m ? m.value : '';
     };
 
     // Handler for clicking on the activity panel (not a specific set)
@@ -649,8 +715,12 @@ function SessionActivityItem({
                                                             <input
                                                                 type="number"
                                                                 className={`${styles.metricInput} ${styles.metricInputSmall}`}
-                                                                value={getMetricValue(set.metrics, m.id, split.id)}
-                                                                onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value, split.id)}
+                                                                value={getSetMetricDisplayValue(setIdx, set.metrics, m.id, split.id)}
+                                                                onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value, split.id)}
+                                                                onBlur={() => commitSetMetricChange(setIdx, m.id, split.id)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                                                }}
                                                             />
                                                             <span className={styles.metricUnit}>{m.unit}</span>
                                                         </div>
@@ -665,8 +735,12 @@ function SessionActivityItem({
                                                     <input
                                                         type="number"
                                                         className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                                        value={getMetricValue(set.metrics, m.id)}
-                                                        onChange={(e) => handleSetMetricChange(setIdx, m.id, e.target.value)}
+                                                        value={getSetMetricDisplayValue(setIdx, set.metrics, m.id)}
+                                                        onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value)}
+                                                        onBlur={() => commitSetMetricChange(setIdx, m.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') e.currentTarget.blur();
+                                                        }}
                                                     />
                                                     <span className={styles.metricUnitLarge}>{m.unit}</span>
                                                 </div>
@@ -747,8 +821,12 @@ function SessionActivityItem({
                                                     <input
                                                         type="number"
                                                         className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                                        value={getMetricValue(exercise.metrics, m.id, split.id)}
-                                                        onChange={(e) => handleSingleMetricChange(m.id, e.target.value, split.id)}
+                                                        value={getSingleMetricDisplayValue(exercise.metrics, m.id, split.id)}
+                                                        onChange={(e) => handleSingleMetricDraftChange(m.id, e.target.value, split.id)}
+                                                        onBlur={() => commitSingleMetricChange(m.id, split.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') e.currentTarget.blur();
+                                                        }}
                                                     />
                                                     <span className={styles.metricUnitLarge}>{m.unit}</span>
                                                 </div>
@@ -766,8 +844,12 @@ function SessionActivityItem({
                                         <input
                                             type="number"
                                             className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                            value={getMetricValue(exercise.metrics, m.id)}
-                                            onChange={(e) => handleSingleMetricChange(m.id, e.target.value)}
+                                            value={getSingleMetricDisplayValue(exercise.metrics, m.id)}
+                                            onChange={(e) => handleSingleMetricDraftChange(m.id, e.target.value)}
+                                            onBlur={() => commitSingleMetricChange(m.id)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') e.currentTarget.blur();
+                                            }}
                                         />
                                         <span className={styles.metricUnitLarge}>{m.unit}</span>
                                     </div>

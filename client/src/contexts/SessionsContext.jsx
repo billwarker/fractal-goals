@@ -7,6 +7,20 @@ const SessionsContext = createContext();
 export function SessionsProvider({ children }) {
     const queryClient = useQueryClient();
 
+    const fetchAllSessions = useCallback(async (rootId, pageSize = 100) => {
+        if (!rootId) return [];
+        let offset = 0;
+        const all = [];
+        while (true) {
+            const res = await fractalApi.getSessions(rootId, { limit: pageSize, offset });
+            const pageSessions = res.data?.sessions || [];
+            all.push(...pageSessions);
+            if (!res.data?.pagination?.has_more) break;
+            offset = (res.data.pagination.offset || 0) + (res.data.pagination.limit || pageSize);
+        }
+        return all;
+    }, []);
+
     // 1. Queries
     const useSessionsQuery = (rootId) => useQuery({
         queryKey: ['sessions', rootId],
@@ -16,6 +30,13 @@ export function SessionsProvider({ children }) {
             return res.data.sessions || res.data;
         },
         enabled: !!rootId
+    });
+
+    const useAllSessionsQuery = (rootId) => useQuery({
+        queryKey: ['sessions', rootId, 'all'],
+        queryFn: () => fetchAllSessions(rootId),
+        enabled: !!rootId,
+        staleTime: 60_000
     });
 
     const useSessionDetailQuery = (rootId, sessionId) => useQuery({
@@ -68,12 +89,13 @@ export function SessionsProvider({ children }) {
         createSession: (rootId, sessionData) => createSessionMutation.mutateAsync({ rootId, sessionData }),
         updateSession: (rootId, sessionId, updates) => updateSessionMutation.mutateAsync({ rootId, sessionId, updates }),
         deleteSession: (rootId, sessionId) => deleteSessionMutation.mutateAsync({ rootId, sessionId }),
-        getSessionById: (rootId, sessionId) => {
+        getSessionById: (_rootId, _sessionId) => {
             // This is a bridge, might not work exactly as before
             return null;
         },
         // New Query-specific hooks
         useSessionsQuery,
+        useAllSessionsQuery,
         useSessionDetailQuery
     };
 

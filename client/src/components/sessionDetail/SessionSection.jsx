@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
@@ -23,27 +23,27 @@ const SessionSection = ({
     const isMobile = useIsMobile();
     // Context
     const {
-        rootId,
-        sessionId,
         activityInstances,
         activities,
         activityGroups,
         groupMap,
         groupedActivities,
+        instancesLoading
+    } = useActiveSessionData();
+
+    const {
         showActivitySelector,
         setShowActivitySelector,
         draggedItem,
         setDraggedItem,
+    } = useActiveSessionUi();
+
+    const {
         addActivity,
         removeActivity,
-        updateInstance,
         moveActivity,
         reorderActivity,
-        parentGoals,
-        immediateGoals,
-        microGoals,
-        session
-    } = useActiveSession();
+    } = useActiveSessionActions();
 
     const [browseParentGroupId, setBrowseParentGroupId] = useState(null);
     const [activeLeafGroupId, setActiveLeafGroupId] = useState(null);
@@ -62,16 +62,36 @@ const SessionSection = ({
         return map;
     }, [activityGroups]);
 
-    const getRecursiveActivityCount = (groupId) => {
-        const direct = groupedActivities[groupId]?.length || 0;
-        const children = childGroupsByParent[groupId] || [];
-        return direct + children.reduce((sum, child) => sum + getRecursiveActivityCount(child.id), 0);
-    };
+    const recursiveActivityCounts = useMemo(() => {
+        const counts = {};
+        const visiting = new Set();
+
+        const computeCount = (groupId) => {
+            if (!groupId) return 0;
+            if (counts[groupId] != null) return counts[groupId];
+            if (visiting.has(groupId)) return 0;
+            visiting.add(groupId);
+
+            const direct = groupedActivities[groupId]?.length || 0;
+            const children = childGroupsByParent[groupId] || [];
+            const nested = children.reduce((sum, child) => sum + computeCount(child.id), 0);
+            const total = direct + nested;
+            counts[groupId] = total;
+            visiting.delete(groupId);
+            return total;
+        };
+
+        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
+            computeCount(group.id);
+        });
+
+        return counts;
+    }, [activityGroups, childGroupsByParent, groupedActivities]);
 
     const currentGroupChoices = useMemo(() => {
         const groups = childGroupsByParent[browseParentGroupId || null] || [];
-        return groups.filter((group) => getRecursiveActivityCount(group.id) > 0);
-    }, [browseParentGroupId, childGroupsByParent, groupedActivities]);
+        return groups.filter((group) => (recursiveActivityCounts[group.id] || 0) > 0);
+    }, [browseParentGroupId, childGroupsByParent, recursiveActivityCounts]);
 
     const currentParentGroup = browseParentGroupId ? groupMap[browseParentGroupId] : null;
     const currentLevelActivities = browseParentGroupId
@@ -189,8 +209,8 @@ const SessionSection = ({
                     <div className={styles.groupsGrid}>
                         {currentGroupChoices.map((group) => {
                             const childGroups = childGroupsByParent[group.id] || [];
-                            const hasChildren = childGroups.some((child) => getRecursiveActivityCount(child.id) > 0);
-                            const activityCount = getRecursiveActivityCount(group.id);
+                            const hasChildren = childGroups.some((child) => (recursiveActivityCounts[child.id] || 0) > 0);
+                            const activityCount = recursiveActivityCounts[group.id] || 0;
                             return (
                                 <button
                                     type="button"
@@ -325,7 +345,6 @@ const SessionSection = ({
                             <SessionActivityItem
                                 exercise={instance}
                                 onDelete={() => removeActivity(instanceId)}
-                                onUpdate={(key, value) => updateInstance({ instanceId, updates: { [key]: value } })}
                                 onFocus={(instance, setIndex) => onFocusActivity(instance, setIndex)}
                                 isSelected={selectedActivityId === instanceId}
                                 onReorder={(direction) => reorderActivity(sectionIndex, position, direction)}
@@ -345,6 +364,12 @@ const SessionSection = ({
                         </div>
                     );
                 })}
+
+                {instancesLoading && (!section.activity_ids || section.activity_ids.length === 0) && (
+                    <div className={styles.dropZoneIndicator}>
+                        Loading activity items...
+                    </div>
+                )}
 
                 {/* Drop Zone Indicator */}
                 {isDragOver && draggedItem && (

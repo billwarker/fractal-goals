@@ -45,9 +45,6 @@ const ActivityAssociationModal = ({
 
     // Group goals by type for better organization
     const groupedGoals = useMemo(() => {
-        // Define explicit order
-        const order = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal', 'MicroGoal'];
-
         const groups = {
             'UltimateGoal': [],
             'LongTermGoal': [],
@@ -70,6 +67,14 @@ const ActivityAssociationModal = ({
         return groups;
     }, [filteredGoals]);
 
+    const goalById = useMemo(() => {
+        const map = new Map();
+        goals.forEach((goal) => {
+            map.set(goal.id, goal);
+        });
+        return map;
+    }, [goals]);
+
     const hasSelectionChanged = useMemo(() => {
         if (selectedGoalIds.size !== initialGoalIds.size) return true;
         for (const goalId of selectedGoalIds) {
@@ -90,8 +95,6 @@ const ActivityAssociationModal = ({
     }, [goals, initialGoalIds, selectedGoalIds]);
 
     const canConfirm = hasSelectionChanged && blockedGoalRemovals.length === 0;
-
-    if (!isOpen) return null;
 
     const handleConfirm = () => {
         if (blockedGoalRemovals.length > 0) {
@@ -146,17 +149,39 @@ const ActivityAssociationModal = ({
         }
     };
 
-    // Recursive check if any descendant is selected
-    const hasSelectedDescendant = (goal) => {
-        if (!goal.childrenIds || goal.childrenIds.length === 0) return false;
-        return goal.childrenIds.some(childId => {
-            if (selectedGoalIds.has(childId)) return true;
-            // Find child object to recurse
-            const childGoal = goals.find(g => g.id === childId);
-            if (childGoal) return hasSelectedDescendant(childGoal);
-            return false;
+    const selectedDescendantCache = useMemo(() => {
+        const cache = new Map();
+        const visiting = new Set();
+
+        const hasSelectedDescendant = (goalId) => {
+            if (!goalId) return false;
+            if (cache.has(goalId)) return cache.get(goalId);
+            if (visiting.has(goalId)) return false;
+            visiting.add(goalId);
+
+            const goal = goalById.get(goalId);
+            if (!goal || !Array.isArray(goal.childrenIds) || goal.childrenIds.length === 0) {
+                cache.set(goalId, false);
+                visiting.delete(goalId);
+                return false;
+            }
+
+            const result = goal.childrenIds.some((childId) => (
+                selectedGoalIds.has(childId) || hasSelectedDescendant(childId)
+            ));
+
+            cache.set(goalId, result);
+            visiting.delete(goalId);
+            return result;
+        };
+
+        goals.forEach((goal) => {
+            hasSelectedDescendant(goal.id);
         });
-    };
+        return cache;
+    }, [goals, goalById, selectedGoalIds]);
+
+    if (!isOpen) return null;
 
     // Helper to render section with icon
     const renderSection = (type, typeGoals) => {
@@ -188,7 +213,7 @@ const ActivityAssociationModal = ({
                     <div className={styles.groupContent}>
                         {typeGoals.map(goal => {
                             const isSelected = selectedGoalIds.has(goal.id);
-                            const isInherited = hasSelectedDescendant(goal);
+                            const isInherited = selectedDescendantCache.get(goal.id) || false;
 
                             // Determine styles based on state
                             // Direct selection takes precedence over inheritance visually

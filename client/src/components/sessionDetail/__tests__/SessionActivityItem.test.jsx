@@ -4,9 +4,12 @@ import SessionActivityItem from '../SessionActivityItem';
 
 const createGoal = vi.fn(() => Promise.resolve({ id: 'nano-1' }));
 const onAddNote = vi.fn(() => Promise.resolve());
+const updateInstance = vi.fn(() => Promise.resolve());
+const updateTimer = vi.fn();
+const removeActivity = vi.fn();
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
-    useActiveSession: () => ({
+    useActiveSessionData: () => ({
         rootId: 'root-1',
         sessionId: 'session-1',
         activities: [
@@ -20,10 +23,6 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
                 has_splits: false
             }
         ],
-        updateInstance: vi.fn(),
-        updateTimer: vi.fn(),
-        removeActivity: vi.fn(),
-        createGoal,
         parentGoals: [],
         immediateGoals: [{ id: 'ig-1', name: 'Immediate' }],
         microGoals: [
@@ -36,7 +35,12 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
             }
         ],
         session: { immediate_goals: [{ id: 'ig-1' }] },
-        refreshSession: vi.fn()
+    }),
+    useActiveSessionActions: () => ({
+        updateInstance,
+        updateTimer,
+        removeActivity,
+        createGoal
     })
 }));
 
@@ -56,6 +60,9 @@ describe('SessionActivityItem nano note flow', () => {
     beforeEach(() => {
         createGoal.mockClear();
         onAddNote.mockClear();
+        updateInstance.mockClear();
+        updateTimer.mockClear();
+        removeActivity.mockClear();
     });
 
     it('creates a nano goal note without runtime errors', async () => {
@@ -96,6 +103,57 @@ describe('SessionActivityItem nano note flow', () => {
         await waitFor(() => {
             expect(createGoal).toHaveBeenCalledTimes(1);
             expect(onAddNote).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('buffers single metric edits and commits on blur', async () => {
+        render(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-2',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [{ metric_id: 'm1', value: '5' }],
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={onAddNote}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />
+        );
+
+        const input = screen.getByDisplayValue('5');
+        fireEvent.change(input, { target: { value: '123' } });
+        expect(updateInstance).not.toHaveBeenCalled();
+        fireEvent.blur(input);
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledTimes(1);
+        });
+        expect(updateInstance).toHaveBeenCalledWith('instance-2', {
+            metrics: [{ metric_id: 'm1', value: '123' }]
         });
     });
 });

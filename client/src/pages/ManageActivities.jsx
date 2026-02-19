@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useSessions } from '../contexts/SessionsContext';
@@ -8,7 +8,7 @@ import ActivityCard from '../components/ActivityCard';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import Linkify from '../components/atoms/Linkify';
-import { buildGroupReorderPayload, findLastInstantiatedForActivity } from '../utils/manageActivities';
+import { buildGroupReorderPayload, buildLastInstantiatedMap } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 
 /**
@@ -17,15 +17,15 @@ import styles from './ManageActivities.module.css'; // Import CSS Module
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, createActivity, updateActivity, deleteActivity, loading, error: contextError,
+    const { activities, fetchActivities, updateActivity, deleteActivity, loading,
         activityGroups, fetchActivityGroups, deleteActivityGroup, reorderActivityGroups } = useActivities();
-    const { useSessionsQuery } = useSessions();
+    const { useAllSessionsQuery } = useSessions();
 
-    const { data: sessionsData } = useSessionsQuery(rootId);
+    const { data: sessionsData } = useAllSessionsQuery(rootId);
     const sessions = sessionsData || [];
 
     const [error, setError] = useState(null);
-    const [creating, setCreating] = useState(false);
+    const creating = false;
     const [activityToDelete, setActivityToDelete] = useState(null);
     const [showBuilder, setShowBuilder] = useState(false);
     const [editingActivity, setEditingActivity] = useState(null);
@@ -51,10 +51,9 @@ function ManageActivities() {
         fetchActivityGroups(rootId);
     }, [rootId, navigate, fetchActivities, fetchActivityGroups]);
 
-    // Calculate last instantiated time for each activity
-    const getLastInstantiated = (activityId) => {
-        return findLastInstantiatedForActivity(sessions, activityId);
-    };
+    const lastInstantiatedByActivity = useMemo(() => {
+        return buildLastInstantiatedMap(sessions);
+    }, [sessions]);
 
     // Group Handlers
     const handleCreateGroup = () => {
@@ -332,7 +331,7 @@ function ManageActivities() {
                                     <ActivityCard
                                         key={activity.id}
                                         activity={activity}
-                                        lastInstantiated={getLastInstantiated(activity.id)}
+                                        lastInstantiated={lastInstantiatedByActivity.get(activity.id)}
                                         onEdit={handleEditClick}
                                         onDuplicate={handleDuplicate}
                                         onDelete={handleDeleteClick}
@@ -412,7 +411,7 @@ function ManageActivities() {
                             <ActivityCard
                                 key={activity.id}
                                 activity={activity}
-                                lastInstantiated={getLastInstantiated(activity.id)}
+                                lastInstantiated={lastInstantiatedByActivity.get(activity.id)}
                                 onEdit={handleEditClick}
                                 onDuplicate={handleDuplicate}
                                 onDelete={handleDeleteClick}
