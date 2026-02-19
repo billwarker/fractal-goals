@@ -5,6 +5,7 @@ import { Heading } from '../atoms/Typography';
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
+import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
 
 const SessionSection = ({
     section,
@@ -79,6 +80,27 @@ const SessionSection = ({
     const leafActivities = activeLeafGroupId === 'ungrouped'
         ? ungroupedActivities
         : (groupedActivities[activeLeafGroupId] || []);
+    const instanceById = useMemo(() => {
+        return buildInstanceMap(activityInstances || []);
+    }, [activityInstances]);
+
+    const definitionById = useMemo(() => {
+        return buildDefinitionMap(activities || []);
+    }, [activities]);
+
+    const activityPositionById = useMemo(() => {
+        return buildPositionMap(section.activity_ids || []);
+    }, [section.activity_ids]);
+    const notesByInstanceId = useMemo(() => {
+        const map = new Map();
+        (allNotes || []).forEach((note) => {
+            const instanceId = note.activity_instance_id;
+            if (!instanceId) return;
+            if (!map.has(instanceId)) map.set(instanceId, []);
+            map.get(instanceId).push(note);
+        });
+        return map;
+    }, [allNotes]);
 
     // Drag handlers for the section (drop target)
     const handleDragOver = (e) => {
@@ -275,12 +297,13 @@ const SessionSection = ({
                 </div>
             </div>
 
-            <div className={styles.activitiesContainer}>
-                {section.activity_ids?.map((instanceId) => {
-                    const instance = activityInstances.find(i => i.id === instanceId);
+                <div className={styles.activitiesContainer}>
+                    {section.activity_ids?.map((instanceId) => {
+                    const instance = instanceById.get(instanceId);
                     if (!instance) return null;
-                    const definition = Array.isArray(activities) ? activities.find(a => a.id === instance.activity_definition_id) : null;
+                    const definition = definitionById.get(instance.activity_definition_id);
                     const isDragging = draggedItem?.instanceId === instanceId;
+                    const position = activityPositionById.get(instanceId) ?? -1;
 
                     return (
                         <div
@@ -305,9 +328,9 @@ const SessionSection = ({
                                 onUpdate={(key, value) => updateInstance({ instanceId, updates: { [key]: value } })}
                                 onFocus={(instance, setIndex) => onFocusActivity(instance, setIndex)}
                                 isSelected={selectedActivityId === instanceId}
-                                onReorder={(direction) => reorderActivity(sectionIndex, section.activity_ids.indexOf(instanceId), direction)}
-                                canMoveUp={section.activity_ids.indexOf(instanceId) > 0}
-                                canMoveDown={section.activity_ids.indexOf(instanceId) < section.activity_ids.length - 1}
+                                onReorder={(direction) => reorderActivity(sectionIndex, position, direction)}
+                                canMoveUp={position > 0}
+                                canMoveDown={position >= 0 && position < section.activity_ids.length - 1}
                                 showReorderButtons={true}
                                 onNoteCreated={onNoteCreated}
                                 allNotes={allNotes}
@@ -316,6 +339,8 @@ const SessionSection = ({
                                 onDeleteNote={onDeleteNote}
                                 onOpenGoals={onOpenGoals}
                                 isDragging={isDragging}
+                                activityDefinition={definition}
+                                activityNotes={notesByInstanceId.get(instanceId) || []}
                             />
                         </div>
                     );

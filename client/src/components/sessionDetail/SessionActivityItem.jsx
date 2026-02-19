@@ -41,6 +41,8 @@ function SessionActivityItem({
     onDeleteNote,
     onOpenGoals,
     isDragging,
+    activityDefinition: activityDefinitionProp = null,
+    activityNotes: activityNotesProp = null,
 }) {
     // Context
     const {
@@ -50,6 +52,7 @@ function SessionActivityItem({
         updateInstance,
         updateTimer,
         removeActivity,
+        createGoal,
         parentGoals,
         immediateGoals,
         microGoals,
@@ -57,7 +60,8 @@ function SessionActivityItem({
         refreshSession,
     } = useActiveSession();
 
-    const activityDefinition = Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null;
+    const activityDefinition = activityDefinitionProp
+        || (Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null);
     const onDelete = () => removeActivity(exercise.id);
     const onUpdate = (key, value) => {
         if (key === 'timer_action') {
@@ -91,6 +95,7 @@ function SessionActivityItem({
     const microChars = getScopedCharacteristics('MicroGoal');
     const nanoChars = getScopedCharacteristics('NanoGoal');
     const immediateChars = getScopedCharacteristics('ImmediateGoal');
+    const [nanoMode, setNanoMode] = useState(false);
 
     // Helper: Determine the next goal action based on activity's current associations
     const getNextGoalContext = () => {
@@ -137,9 +142,6 @@ function SessionActivityItem({
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
 
-    // Nano creation mode
-    const [nanoMode, setNanoMode] = useState(false);
-
     // Reset nano mode when active micro goal changes (e.g. completes or switch activity)
     useEffect(() => {
         if (!activeMicroGoal) setNanoMode(false);
@@ -176,7 +178,9 @@ function SessionActivityItem({
     }, [exercise.time_start, exercise.time_stop, exercise.duration_seconds]);
 
     // Filter notes for this activity
-    const activityNotes = allNotes?.filter(n => n.activity_instance_id === exercise.id) || [];
+    const activityNotes = Array.isArray(activityNotesProp)
+        ? activityNotesProp
+        : (allNotes?.filter(n => n.activity_instance_id === exercise.id) || []);
 
     const handleAddNote = async (content, imageData = null) => {
         // Either content or image is required

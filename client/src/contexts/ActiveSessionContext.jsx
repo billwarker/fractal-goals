@@ -5,6 +5,7 @@ import notify from '../utils/notify';
 import { useGoals } from './GoalsContext';
 import { useTimezone } from './TimezoneContext';
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
+import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 
 const ActiveSessionContext = createContext();
 
@@ -353,12 +354,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         try {
             const res = await fractalApi.createGoal(rootId, goalData);
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
             return res.data;
         } catch (err) {
             console.error("Failed to create goal", err);
             throw err;
         }
-    }, [rootId, queryClient]);
+    }, [rootId, sessionId, queryClient]);
 
     const toggleGoalCompletion = useCallback(async (goalId, completed) => {
         try {
@@ -370,6 +373,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             throw err;
         }
     }, [rootId, queryClient]);
+
+    const autoSaveQueue = useMemo(() => createAutoSaveQueue({
+        save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
+        onError: () => {
+            setAutoSaveStatus('error');
+            setTimeout(() => setAutoSaveStatus(''), 3000);
+        }
+    }), [updateSessionMutation.mutateAsync]);
 
     // 5. Effects
     useEffect(() => {
@@ -384,6 +395,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             previousSessionKeyRef.current = sessionKey;
             initializedRef.current = false;
             setLocalSessionData(null);
+            autoSaveQueue.reset();
             setAutoSaveStatus('');
             setShowActivitySelector({});
             setDraggedItem(null);
@@ -478,26 +490,21 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             };
         };
 
-        setLocalSessionData(normalizeSectionActivityIds(baseData, activityInstances));
+        const normalizedData = normalizeSectionActivityIds(baseData, activityInstances);
+        setLocalSessionData(normalizedData);
+        autoSaveQueue.seed(normalizedData);
         initializedRef.current = true;
         setJustInitialized(true);
         setTimeout(() => setJustInitialized(false), 500); // Guard window
-    }, [session, sessionId, localSessionData, activityInstances]);
-
-    useEffect(() => {
-        console.log('[ActiveSessionProvider] Mounted');
-        return () => {
-            console.log('[ActiveSessionProvider] Unmounting...');
-        };
-    }, []);
+    }, [session, sessionId, localSessionData, activityInstances, autoSaveQueue]);
 
     useEffect(() => {
         if (!localSessionData || !initializedRef.current || justInitialized) return;
         const timeoutId = setTimeout(() => {
-            updateSessionMutation.mutate({ session_data: localSessionData });
-        }, 2000);
+            autoSaveQueue.enqueue(localSessionData);
+        }, 800);
         return () => clearTimeout(timeoutId);
-    }, [localSessionData, justInitialized]);
+    }, [localSessionData, justInitialized, autoSaveQueue]);
 
     // Notification Effects
     const prevAchievedTargetIdsRef = useRef(new Set());
@@ -601,7 +608,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         refreshSession,
         refreshInstances,
         // Handlers
-        updateSession: updateSessionMutation.mutate,
+        updateSession: updateSessionMutation.mutateAsync,
         addActivity: handleAddActivity,
         removeActivity: removeActivityMutation.mutate,
         updateInstance: updateInstanceMutation.mutate,
@@ -640,7 +647,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         goalAchievements,
         refreshSession,
         refreshInstances,
-        updateSessionMutation.mutate,
+        updateSessionMutation.mutateAsync,
         handleAddActivity,
         removeActivityMutation.mutate,
         updateInstanceMutation.mutate,

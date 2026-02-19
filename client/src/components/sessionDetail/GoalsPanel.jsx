@@ -158,15 +158,6 @@ function GoalsPanel({
         setExpandedGoals(prev => ({ ...prev, [goalId]: !prev[goalId] }));
     };
 
-    const handleToggleCompletion = async (goal, completed) => {
-        try {
-            await toggleGoalCompletion(goal.id, completed);
-            if (onGoalCreated) onGoalCreated();
-        } catch (err) {
-            console.error("Failed to toggle goal completion", err);
-        }
-    };
-
     const handleCreateImmediateGoal = async () => {
         if (!igName.trim() || !igParentId) return;
         setIGCreating(true);
@@ -287,7 +278,7 @@ function GoalsPanel({
         setSubGoalName('');
     };
 
-    const handleConfirmSubGoalCreation = async () => {
+    const handleConfirmSubGoalCreation = useCallback(async () => {
         if (!creatingSubGoal || !subGoalName.trim()) return;
 
         const { parentId, type: parentType } = creatingSubGoal;
@@ -302,7 +293,6 @@ function GoalsPanel({
         const childType = typeMap[parentType];
         if (!childType) return;
 
-        setLoading(true);
         try {
             const payload = {
                 name: subGoalName.trim(),
@@ -313,8 +303,7 @@ function GoalsPanel({
                 payload.session_id = sessionId;
             }
 
-            const res = await fractalApi.createGoal(rootId, payload);
-            const newGoal = res.data;
+            const newGoal = await createGoal(payload);
 
             if (viewMode === 'activity' && activeActivityDef) {
                 try {
@@ -328,19 +317,13 @@ function GoalsPanel({
 
             fetchFractalTree(rootId);
 
-            if (childType === 'MicroGoal' || childType === 'NanoGoal') {
-                fetchMicroGoals();
-            }
-
             handleCancelSubGoalCreation();
             if (onGoalCreated) onGoalCreated(newGoal.name);
 
         } catch (err) {
             console.error("Failed to create sub-goal", err);
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [creatingSubGoal, subGoalName, sessionId, createGoal, viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated]);
 
     // --- Session Activities Derivation ---
     const sessionActivities = useMemo(() => {

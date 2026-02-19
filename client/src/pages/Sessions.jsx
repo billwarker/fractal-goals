@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -23,10 +24,7 @@ function Sessions() {
     const { setActiveRootId } = useGoals();
     const isMobile = useIsMobile();
 
-    const [sessions, setSessions] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filterCompleted, setFilterCompleted] = useState('all');
-    const [activities, setActivities] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const notesPaneStorageKey = `sessions-notes-pane-open:${rootId || 'default'}`;
@@ -37,18 +35,12 @@ function Sessions() {
     });
     const [sortBy, setSortBy] = useState('start_date');
     const [sortOrder, setSortOrder] = useState('desc');
-    const [sessionInstancesById, setSessionInstancesById] = useState({});
     const [hiddenSessionIds, setHiddenSessionIds] = useState(() => {
         const deletedId = location.state?.deletedSessionId;
         return deletedId ? new Set([deletedId]) : new Set();
     });
 
-    // Pagination state
-    const [hasMore, setHasMore] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [totalSessions, setTotalSessions] = useState(0);
     const SESSIONS_PER_PAGE = 10;
-    const fetchRequestIdRef = useRef(0);
 
     useEffect(() => {
         if (!rootId) {
@@ -56,10 +48,47 @@ function Sessions() {
             return;
         }
         setActiveRootId(rootId);
-        fetchSessions();
-        fetchActivities();
         return () => setActiveRootId(null);
-    }, [rootId, location.key, navigate, setActiveRootId]);
+    }, [rootId, navigate, setActiveRootId]);
+
+    const {
+        data: sessionsPages,
+        isLoading: sessionsLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteQuery({
+        queryKey: ['sessions', rootId, 'paginated'],
+        queryFn: async ({ pageParam = 0 }) => {
+            const res = await fractalApi.getSessions(rootId, {
+                limit: SESSIONS_PER_PAGE,
+                offset: pageParam
+            });
+            return res.data;
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => {
+            if (!lastPage?.pagination?.has_more) return undefined;
+            return (lastPage.pagination.offset || 0) + (lastPage.pagination.limit || SESSIONS_PER_PAGE);
+        },
+        enabled: !!rootId
+    });
+
+    const { data: activities = [], isLoading: activitiesLoading } = useQuery({
+        queryKey: ['activities', rootId],
+        queryFn: async () => {
+            const res = await fractalApi.getActivities(rootId);
+            return res.data || [];
+        },
+        enabled: !!rootId
+    });
+
+    const sessions = useMemo(() => {
+        const pages = sessionsPages?.pages || [];
+        return pages.flatMap((page) => page?.sessions || []);
+    }, [sessionsPages]);
+
+    const totalSessions = sessionsPages?.pages?.[0]?.pagination?.total || sessions.length;
 
     useEffect(() => {
         const deletedId = location.state?.deletedSessionId;
@@ -93,32 +122,6 @@ function Sessions() {
         }
     }, [selectedSessionId]);
 
-    const fetchActivities = async () => {
-        try {
-            const res = await fractalApi.getActivities(rootId);
-            setActivities(res.data);
-        } catch (err) {
-            console.error("Failed to fetch activities", err);
-        }
-    };
-
-    const fetchSessionInstances = useCallback(async (sessionIds) => {
-        if (!rootId || !Array.isArray(sessionIds) || sessionIds.length === 0) return {};
-        const uniqueIds = Array.from(new Set(sessionIds.filter(Boolean)));
-        const entries = await Promise.all(
-            uniqueIds.map(async (id) => {
-                try {
-                    const res = await fractalApi.getSessionActivities(rootId, id);
-                    return [id, res.data || []];
-                } catch (err) {
-                    console.error(`Failed to fetch activity instances for session ${id}`, err);
-                    return [id, []];
-                }
-            })
-        );
-        return Object.fromEntries(entries);
-    }, [rootId]);
-
     const handleSortChange = useCallback((criteria) => {
         if (sortBy === criteria) {
             setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
@@ -127,54 +130,6 @@ function Sessions() {
             setSortOrder('desc');
         }
     }, [sortBy]);
-
-    const fetchSessions = async () => {
-        const requestId = ++fetchRequestIdRef.current;
-        try {
-            const res = await fractalApi.getSessions(rootId, { limit: SESSIONS_PER_PAGE, offset: 0 });
-            if (requestId !== fetchRequestIdRef.current) return;
-            const { sessions: sessionsData, pagination } = res.data;
-            const instancesMap = await fetchSessionInstances(sessionsData.map((session) => session.id));
-            if (requestId !== fetchRequestIdRef.current) return;
-
-            setSessions(sessionsData);
-            setSessionInstancesById(instancesMap);
-            setHasMore(pagination.has_more);
-            setTotalSessions(pagination.total);
-            setLoading(false);
-        } catch (err) {
-            if (requestId !== fetchRequestIdRef.current) return;
-            console.error("Failed to fetch sessions", err);
-            setLoading(false);
-        }
-    };
-
-    const loadMoreSessions = async () => {
-        if (loadingMore || !hasMore) return;
-
-        setLoadingMore(true);
-        const requestId = ++fetchRequestIdRef.current;
-        try {
-            const res = await fractalApi.getSessions(rootId, {
-                limit: SESSIONS_PER_PAGE,
-                offset: sessions.length
-            });
-            if (requestId !== fetchRequestIdRef.current) return;
-            const { sessions: newSessions, pagination } = res.data;
-            const instancesMap = await fetchSessionInstances(newSessions.map((session) => session.id));
-            if (requestId !== fetchRequestIdRef.current) return;
-
-            setSessions(prev => [...prev, ...newSessions]);
-            setSessionInstancesById(prev => ({ ...prev, ...instancesMap }));
-            setHasMore(pagination.has_more);
-        } catch (err) {
-            if (requestId !== fetchRequestIdRef.current) return;
-            console.error("Failed to load more sessions", err);
-        } finally {
-            if (requestId !== fetchRequestIdRef.current) return;
-            setLoadingMore(false);
-        }
-    };
 
     // Memoize filtered and sorted sessions
     const filteredSessions = useMemo(() => {
@@ -236,7 +191,7 @@ function Sessions() {
         return sessions.reduce((count, session) => count + (session.notes?.length || 0), 0);
     }, [sessions]);
 
-    if (loading) {
+    if (sessionsLoading || activitiesLoading) {
         return <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>Loading sessions...</div>;
     }
 
@@ -332,12 +287,12 @@ function Sessions() {
                                     getGoalColor={getGoalColor}
                                     timezone={timezone}
                                     formatDate={formatDate}
-                                    sessionActivityInstances={sessionInstancesById[session.id] || []}
+                                    sessionActivityInstances={session.activity_instances || []}
                                 />
                             ))}
 
                             {/* Load More Button */}
-                            {hasMore && (
+                            {hasNextPage && (
                                 <div className={styles.loadMoreContainer}>
                                     <span className={styles.loadMoreText}>
                                         Showing {sessions.length} of {totalSessions} sessions
@@ -345,12 +300,12 @@ function Sessions() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            loadMoreSessions();
+                                            fetchNextPage();
                                         }}
-                                        disabled={loadingMore}
-                                        className={`${styles.loadMoreButton} ${loadingMore ? styles.loadMoreButtonDisabled : ''}`}
+                                        disabled={isFetchingNextPage}
+                                        className={`${styles.loadMoreButton} ${isFetchingNextPage ? styles.loadMoreButtonDisabled : ''}`}
                                     >
-                                        {loadingMore ? (
+                                        {isFetchingNextPage ? (
                                             <>
                                                 <span className={styles.loadingSpinner} />
                                                 Loading...

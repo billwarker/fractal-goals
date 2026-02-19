@@ -25,6 +25,7 @@
     display: flex;
     justify-content: space-between;
     align-items: start;
+    padding-right: 36px;
 }
 
 .activityHeaderLeft {
@@ -107,25 +108,29 @@
 }
 
 .timerControlsGrid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 128px;
+    display: flex;
+    align-items: flex-end;
     gap: 10px;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
 }
 
 .timerMetaColumn {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    gap: 8px;
     min-width: 0;
+    align-items: flex-end;
+    flex-wrap: wrap;
 }
 
 .timerActionColumn {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 6px;
-    align-items: stretch;
+    align-items: flex-end;
     justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 .timerFieldContainer {
@@ -148,7 +153,7 @@
     border-radius: 3px;
     color: var(--color-text-primary);
     font-size: 11px;
-    width: 100%;
+    width: 138px;
     font-family: monospace;
     min-width: 0;
 }
@@ -196,7 +201,7 @@
     gap: 4px;
     margin-top: 0;
     justify-content: center;
-    width: 100%;
+    width: auto;
 }
 
 .stopButton {
@@ -226,7 +231,7 @@
     gap: 4px;
     margin-top: 0;
     justify-content: center;
-    width: 100%;
+    width: auto;
 }
 
 .completedBadge {
@@ -243,7 +248,7 @@
     font-weight: bold;
     cursor: default;
     justify-content: center;
-    width: 100%;
+    width: auto;
 }
 
 .resetButton {
@@ -259,7 +264,7 @@
     gap: 4px;
     margin-top: 0;
     justify-content: center;
-    width: 100%;
+    width: auto;
 }
 
 .microGoalActionButton {
@@ -542,8 +547,21 @@
     }
 
     .timerControlsGrid {
+        display: grid;
         grid-template-columns: minmax(0, 1fr) 120px;
         gap: 8px;
+        width: 100%;
+    }
+
+    .timerMetaColumn {
+        flex-direction: column;
+        gap: 6px;
+        align-items: stretch;
+    }
+
+    .timerActionColumn {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .timerInput {
@@ -558,6 +576,7 @@
     .resetButton {
         margin-top: 0;
         min-height: 36px;
+        width: 100%;
     }
 
     .setRow {

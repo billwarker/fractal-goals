@@ -8,6 +8,7 @@ import ActivityCard from '../components/ActivityCard';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import Linkify from '../components/atoms/Linkify';
+import { buildGroupReorderPayload, findLastInstantiatedForActivity } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 
 /**
@@ -52,34 +53,7 @@ function ManageActivities() {
 
     // Calculate last instantiated time for each activity
     const getLastInstantiated = (activityId) => {
-        if (!sessions || sessions.length === 0) return null;
-
-        // Find all sessions that use this activity
-        const activitySessions = sessions.filter(session => {
-            // Handle both JSONAPI style (attributes) and flat structure
-            const attributes = session.attributes || session;
-            const sessionData = attributes.session_data;
-            if (!sessionData || !sessionData.sections) return false;
-
-            // Check all sections for exercises with this activity_id
-            return sessionData.sections.some(section =>
-                section.exercises?.some(exercise => exercise.activity_id === activityId)
-            );
-        });
-
-        if (activitySessions.length === 0) return null;
-
-        // Get the most recent session
-        const mostRecent = activitySessions.reduce((latest, current) => {
-            const currentAttrs = current.attributes || current;
-            const latestAttrs = latest.attributes || latest;
-            const currentStart = new Date(currentAttrs.session_start || currentAttrs.created_at);
-            const latestStart = new Date(latestAttrs.session_start || latestAttrs.created_at);
-            return currentStart > latestStart ? current : latest;
-        });
-
-        const recentAttrs = mostRecent.attributes || mostRecent;
-        return recentAttrs.session_start || recentAttrs.created_at;
+        return findLastInstantiatedForActivity(sessions, activityId);
     };
 
     // Group Handlers
@@ -89,7 +63,6 @@ function ManageActivities() {
     };
 
     const handleEditGroup = (group) => {
-        console.log("Editing group:", group); // Debugging
         setEditingGroup(group);
         setShowGroupBuilder(true);
     };
@@ -126,54 +99,15 @@ function ManageActivities() {
     };
 
     const handleMoveGroup = async (group, direction) => {
-        const siblings = getSiblings(group);
-        const index = siblings.findIndex(g => g.id === group.id);
+        const orderedIds = buildGroupReorderPayload(activityGroups, group?.id, direction);
+        if (!orderedIds) return;
 
-        if (index === -1) return;
-        if (direction === 'up' && index === 0) return;
-        if (direction === 'down' && index === siblings.length - 1) return;
-
-        const newSiblings = [...siblings];
-        const swapIndex = direction === 'up' ? index - 1 : index + 1;
-
-        // Swap
-        [newSiblings[index], newSiblings[swapIndex]] = [newSiblings[swapIndex], newSiblings[index]];
-
-        // We need to re-calculate sort_orders for ALL groups to be safe, or just these siblings?
-        // The API takes a list of IDs and sets sort_order = index in that list.
-        // If we send only siblings, their sort_orders become 0, 1, 2... which might conflict or be weird if "sort_order" is global.
-        // Assuming sort_order is global, we should probably construct the entire list in correct order.
-        // However, for now, let's try sending just the siblings. If backend overwrites sort_order to 0..N, it might be scoped?
-        // No, backend doesn't scope.
-
-        // Safer approach: Get ALL groups, find the segment corresponding to these siblings, swap them in the big list, then send big list.
-        // But we don't have the "big list" sorted perfectly if we have hierarchy.
-
-        // Let's rely on the frontend structure.
-        // 1. Build tree.
-        // 2. Perform swap in proper children array.
-        // 3. Flatten tree to get full ID list.
-        // 4. Send full ID list.
-
-        // Simplified for today (MVP): Just swap sort_orders of the two items and update them individually? 
-        // No, `reorderActivityGroups` is bulk.
-
-        // Let's blindly send swapped siblings and hope the integer values (0, 1..) don't break things if they heavily overlap with others.
-        // The sort works by "order by sort_order". Duplicates in sort_order are resolved by created_at.
-        // If we overwrite sort_order to 0, 1 for these two, they will float to the top of the GLOBAL list if we are not careful.
-
-        // Fix: Don't implement reorder for nested groups yet, or hide buttons if it's too risky without backend support for scoped reordering.
-        // I'll leave the buttons but maybe only for root groups for now? 
-        // Or just implement it "locally" in UI logic and don't persist? No.
-
-        // I will temporarily disable reordering for this refactor to avoid bugs, as requested "Make activity cards clickable...". Reordering wasn't explicitly requested to be fixed/changed, but I should preserve it if possible.
-        // I'll leave the handler but maybe simplify or implement the Full Tree Flatten approach.
-
-        // approach: Flatten everything by current sort_order, then swap.
-        // But hierarchy matters.
-        // OK, I'll Skip robust reordering for nested items in this step to ensure I deliver the requested features first.
-
-        // Wait, I see `handleMoveGroupUp` was already there. I'll just use the old logic for ROOT groups only for now.
+        try {
+            await reorderActivityGroups(rootId, orderedIds);
+        } catch (err) {
+            console.error('Failed to reorder activity groups', err);
+            setError('Failed to reorder activity groups');
+        }
     };
 
     const handleCreateClick = () => {
@@ -259,32 +193,24 @@ function ManageActivities() {
         e.stopPropagation(); // Prevent bubbling to parent groups
 
         const activityId = e.dataTransfer.getData('activityId');
-        console.log('Drop event:', { activityId, targetGroupId });
-
         if (!activityId) {
-            console.log('No activity ID in dataTransfer');
             return;
         }
 
         // Find the activity to check current group
         const activity = Array.isArray(activities) ? activities.find(a => a.id === activityId) : null;
-        console.log('Found activity:', activity);
-
         // Check if already in the target group (handle null for ungrouped)
         const currentGroupId = activity?.group_id || null;
         const normalizedTargetGroupId = targetGroupId || null;
 
         if (!activity || currentGroupId === normalizedTargetGroupId) {
-            console.log('Activity not found or already in target group');
             setDraggingActivityId(null);
             setDragOverGroupId(null);
             return;
         }
 
         try {
-            console.log('Calling updateActivity:', { rootId, activityId, group_id: normalizedTargetGroupId });
             await updateActivity(rootId, activityId, { group_id: normalizedTargetGroupId });
-            console.log('Activity moved successfully');
         } catch (err) {
             console.error('Failed to move activity:', err);
             console.error('Error response:', err.response?.data);
@@ -355,7 +281,24 @@ function ManageActivities() {
                         {/* Only show reorder for root groups for now to avoid complexity */}
                         {isRoot && (
                             <div className={styles.moveButtons}>
-                                {/* ... existing move logic if needed ... */}
+                                <button
+                                    type="button"
+                                    className={styles.moveBtn}
+                                    onClick={() => handleMoveGroup(group, 'up')}
+                                    disabled={getSiblings(group).findIndex(g => g.id === group.id) === 0}
+                                    title="Move group up"
+                                >
+                                    ↑
+                                </button>
+                                <button
+                                    type="button"
+                                    className={styles.moveBtn}
+                                    onClick={() => handleMoveGroup(group, 'down')}
+                                    disabled={getSiblings(group).findIndex(g => g.id === group.id) === getSiblings(group).length - 1}
+                                    title="Move group down"
+                                >
+                                    ↓
+                                </button>
                             </div>
                         )}
                         <button
@@ -544,4 +487,3 @@ function ManageActivities() {
 }
 
 export default ManageActivities;
-

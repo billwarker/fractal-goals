@@ -10,6 +10,7 @@ import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
 import ActivityAssociationModal from './sessionDetail/ActivityAssociationModal';
+import { buildActivityPayload } from '../utils/activityBuilder';
 import styles from './ActivityBuilder.module.css';
 
 /**
@@ -201,18 +202,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const processSubmission = async (overrideData = null) => {
         try {
             setCreating(true);
-            const dataToSubmit = overrideData || {
+            const dataToSubmit = overrideData || buildActivityPayload({
                 name,
                 description,
-                metrics: hasMetrics ? metrics.filter(m => m.name.trim() !== '') : [],
-                splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
-                has_sets: hasSets,
-                has_metrics: hasMetrics,
-                metrics_multiplicative: metricsMultiplicative,
-                has_splits: hasSplits,
-                group_id: groupId || null,
-                goal_ids: selectedGoalIds
-            };
+                metrics,
+                splits,
+                hasSets,
+                hasMetrics,
+                metricsMultiplicative,
+                hasSplits,
+                groupId,
+                selectedGoalIds
+            });
 
             let result;
             if (editingActivity && editingActivity.id) {
@@ -253,17 +254,18 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                         `You are removing ${removedMetrics.length} metric(s): ${metricNames}. ` +
                         `This may affect existing session data. Metrics from old sessions will no longer display.`
                     );
-                    setPendingSubmission({
+                    setPendingSubmission(buildActivityPayload({
                         name,
                         description,
-                        metrics: hasMetrics ? validMetrics : [],
-                        splits: hasSplits ? splits.filter(s => s.name.trim() !== '') : [],
-                        has_sets: hasSets,
-                        has_metrics: hasMetrics,
-                        metrics_multiplicative: metricsMultiplicative,
-                        has_splits: hasSplits,
-                        group_id: groupId || null
-                    });
+                        metrics: validMetrics,
+                        splits,
+                        hasSets,
+                        hasMetrics,
+                        metricsMultiplicative,
+                        hasSplits,
+                        groupId,
+                        selectedGoalIds
+                    }));
                     setShowMetricWarning(true);
                     return;
                 }
