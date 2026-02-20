@@ -61,7 +61,7 @@ export const globalApi = {
     /**
      * Get all configured goal levels for the current user
      */
-    getGoalLevels: () => axios.get(`${API_BASE}/goal-levels`),
+    getGoalLevels: (rootId) => axios.get(`${API_BASE}/goal-levels`, { params: rootId ? { root_id: rootId } : {} }),
 
     /**
      * Update a goal level's configuration

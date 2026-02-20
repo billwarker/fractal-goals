@@ -33,30 +33,42 @@ def serialize_goal_level(level):
 @token_required
 def get_goal_levels(current_user):
     """
-    Fetch all goal levels applicable to the user.
-    Returns System Defaults (owner_id is null) AND user-specific overrides.
+    Fetch all goal levels applicable to the user, optionally scoped to a fractal.
+    3-layer merge: System Defaults → User Global Overrides → Fractal-Scoped Overrides.
     """
+    root_id = request.args.get('root_id')
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Get system defaults
+        # Layer 1: System defaults (owner_id is null)
         system_levels = db_session.query(GoalLevel).filter_by(owner_id=None, deleted_at=None).all()
-        # Get user overrides
-        user_levels = db_session.query(GoalLevel).filter_by(owner_id=current_user.id, deleted_at=None).all()
         
-        # Merge them: user overrides replace system defaults of the same name and rank
+        # Layer 2: User-global overrides (owner_id=user, root_id=null)
+        user_global_levels = db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == current_user.id,
+            GoalLevel.root_id == None,
+            GoalLevel.deleted_at == None
+        ).all()
+        
+        # Layer 3: Fractal-scoped overrides (owner_id=user, root_id=X)
+        root_levels = []
+        if root_id:
+            root_levels = db_session.query(GoalLevel).filter(
+                GoalLevel.owner_id == current_user.id,
+                GoalLevel.root_id == root_id,
+                GoalLevel.deleted_at == None
+            ).all()
+        
+        # Merge: each layer overrides the previous by name
         level_map = {}
         for level in system_levels:
-            # key by name (e.g. "Long Term Goal") to easily replace with user overrides
             level_map[level.name] = level
-            
-        for level in user_levels:
-            # We assume users only override existing canonical levels for now
-            # If they create entirely new ones, they just get added
+        for level in user_global_levels:
+            level_map[level.name] = level
+        for level in root_levels:
             level_map[level.name] = level
             
         merged_levels = list(level_map.values())
-        # Sort by rank
         merged_levels.sort(key=lambda x: x.rank)
         
         return jsonify([serialize_goal_level(l) for l in merged_levels])
@@ -86,15 +98,36 @@ def update_goal_level(current_user, level_id):
             return jsonify({"error": "Permission denied"}), 403
             
         data = request.json
+        req_root_id = data.get('root_id')  # Fractal scope from request
         
-        # If it's a system default, we must duplicate it instead of editing in place
+        # If it's a system default OR a user-global level and we want a root-scoped override,
+        # we must duplicate it instead of editing in place
+        needs_clone = False
         if level.owner_id is None:
-            # Check if user ALREADY cloned this system level
-            existing_user_clone = db_session.query(GoalLevel).filter_by(
-                owner_id=current_user.id, 
-                name=level.name, 
-                deleted_at=None
-            ).first()
+            # System default → always clone
+            needs_clone = True
+        elif level.owner_id == current_user.id and req_root_id and level.root_id != req_root_id:
+            # User-global level but we want a root-scoped version → clone
+            needs_clone = True
+            
+        if needs_clone:
+            # Check if user ALREADY has a clone for this root_id + name
+            clone_filters = {
+                'owner_id': current_user.id,
+                'name': level.name,
+                'deleted_at': None
+            }
+            if req_root_id:
+                clone_filters['root_id'] = req_root_id
+            else:
+                # User-global clone (no root_id)
+                pass
+                
+            existing_user_clone = db_session.query(GoalLevel).filter_by(**clone_filters)
+            if req_root_id:
+                existing_user_clone = existing_user_clone.first()
+            else:
+                existing_user_clone = existing_user_clone.filter(GoalLevel.root_id == None).first()
             
             if existing_user_clone:
                 level = existing_user_clone
@@ -106,20 +139,13 @@ def update_goal_level(current_user, level_id):
                     secondary_color=getattr(level, 'secondary_color', None),
                     icon=level.icon,
                     owner_id=current_user.id,
+                    root_id=req_root_id,
                     allow_manual_completion=level.allow_manual_completion,
                     track_activities=level.track_activities,
                     requires_smart=getattr(level, 'requires_smart', False)
                 )
                 db_session.add(new_level)
-                db_session.flush() # get ID
-                
-                # IMPORTANT: Since they now have a custom level, we should ideally migrate
-                # any existing Goals they have of the system-default level to point to this new one.
-                from models.goal import Goal
-                user_goals = db_session.query(Goal).filter_by(owner_id=current_user.id, level_id=level.id).all()
-                for g in user_goals:
-                    g.level_id = new_level.id
-                    
+                db_session.flush()
                 level = new_level
                 
         # Now we have a user-owned level we can safely edit

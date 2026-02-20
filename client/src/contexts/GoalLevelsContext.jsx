@@ -24,14 +24,39 @@ export function GoalLevelsProvider({ children }) {
     const { isAuthenticated } = useAuth();
     const queryClient = useQueryClient();
 
+    // Extract rootId from URL path (pattern: /:rootId/...)
+    // UUID pattern: 8-4-4-4-12 hex characters
+    const getRootIdFromUrl = () => {
+        const match = window.location.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+        return match ? match[1] : null;
+    };
+
+    const [currentRootId, setCurrentRootId] = React.useState(getRootIdFromUrl);
+
+    // Keep rootId in sync with URL changes
+    React.useEffect(() => {
+        const handleLocationChange = () => {
+            const newRootId = getRootIdFromUrl();
+            setCurrentRootId(prev => prev !== newRootId ? newRootId : prev);
+        };
+        // Listen for popstate (back/forward) and custom navigation events
+        window.addEventListener('popstate', handleLocationChange);
+        // Also poll briefly to catch pushState navigations from React Router
+        const interval = setInterval(handleLocationChange, 500);
+        return () => {
+            window.removeEventListener('popstate', handleLocationChange);
+            clearInterval(interval);
+        };
+    }, []);
+
     const {
         data: goalLevels = [],
         isLoading,
         error
     } = useQuery({
-        queryKey: ['goalLevels'],
+        queryKey: ['goalLevels', currentRootId],
         queryFn: async () => {
-            const res = await globalApi.getGoalLevels();
+            const res = await globalApi.getGoalLevels(currentRootId);
             return res.data;
         },
         enabled: isAuthenticated
@@ -39,12 +64,13 @@ export function GoalLevelsProvider({ children }) {
 
     const updateGoalLevelMutation = useMutation({
         mutationFn: async ({ id, updates }) => {
-            const res = await globalApi.updateGoalLevel(id, updates);
+            // Always include root_id in updates so backend creates fractal-scoped clone
+            const res = await globalApi.updateGoalLevel(id, { ...updates, root_id: currentRootId });
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['goalLevels'] });
-            queryClient.invalidateQueries({ queryKey: ['fractals'] }); // In case tree renders need refresh
+            queryClient.invalidateQueries({ queryKey: ['goalLevels', currentRootId] });
+            queryClient.invalidateQueries({ queryKey: ['fractals'] });
         }
     });
 
@@ -54,7 +80,7 @@ export function GoalLevelsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['goalLevels'] });
+            queryClient.invalidateQueries({ queryKey: ['goalLevels', currentRootId] });
             queryClient.invalidateQueries({ queryKey: ['fractals'] });
         }
     });
