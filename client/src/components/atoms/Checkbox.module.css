@@ -49,6 +49,12 @@
     border-color: var(--color-brand-primary, #3b82f6);
 }
 
+/* Keep checked state visually stable during hover */
+.container:hover .input:checked~.checkmark {
+    background-color: var(--color-brand-primary, #3b82f6);
+    border-color: var(--color-brand-primary, #3b82f6);
+}
+
 /* Create the checkmark/indicator (hidden when not checked) */
 .checkmark:after {
     content: "";
