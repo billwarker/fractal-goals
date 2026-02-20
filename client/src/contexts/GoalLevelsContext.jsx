@@ -126,8 +126,20 @@ export function GoalLevelsProvider({ children }) {
 
     // Helpers relying on getGoalColor:
     const getGoalSecondaryColor = (goal) => {
+        // Check if database has a custom secondary_color for this level
+        if (goal && typeof goal === 'string') {
+            const normalizedName = goal.replace(/([A-Z])/g, ' $1').trim();
+            const lvl = getLevelByName(normalizedName) || getLevelByName(goal);
+            if (lvl?.secondary_color) return lvl.secondary_color;
+        } else if (goal?.level?.secondary_color) {
+            return goal.level.secondary_color;
+        } else if (goal?.level_id) {
+            const lvl = getLevelById(goal.level_id);
+            if (lvl?.secondary_color) return lvl.secondary_color;
+        }
+        // Fallback: auto-derive from primary
         const primary = getGoalColor(goal);
-        return adjustBrightness(primary, -0.6); // Simulate a dark secondary background
+        return adjustBrightness(primary, -0.6);
     };
 
     const getGoalTextColor = (goal) => {

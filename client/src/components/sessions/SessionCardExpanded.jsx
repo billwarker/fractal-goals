@@ -19,7 +19,7 @@ import styles from './SessionCardExpanded.module.css';
 const AccomplishmentsSection = memo(function AccomplishmentsSection({
     completedGoals,
     getGoalColor,
-    getLevelByName
+    getGoalIcon
 }) {
     if (completedGoals.length === 0) {
         return null;
@@ -36,7 +36,7 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                 <div className={styles.goalsList} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {/* Completed Goals */}
                     {completedGoals.map(goal => {
-                        const originalShape = getLevelByName(goal.type || goal.attributes?.type)?.icon || 'circle';
+                        const originalShape = getGoalIcon(goal.type || goal.attributes?.type);
                         return (
                             <div
                                 key={goal.id}
@@ -74,7 +74,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     getGoalColor,
     formatDate
 }) {
-    const { getLevelByName } = useGoalLevels();;
+    const { getLevelByName, getGoalIcon } = useGoalLevels();;
     const sessionData = session.attributes?.session_data;
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
@@ -265,7 +265,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             <AccomplishmentsSection
                 completedGoals={completedGoals}
                 getGoalColor={getGoalColor}
-                getLevelByName={getLevelByName}
+                getGoalIcon={getGoalIcon}
             />
 
             {/* Bottom Level: Session data with horizontal sections */}

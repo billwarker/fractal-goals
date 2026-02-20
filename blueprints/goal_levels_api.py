@@ -18,6 +18,7 @@ def serialize_goal_level(level):
         "name": level.name,
         "rank": level.rank,
         "color": level.color,
+        "secondary_color": getattr(level, 'secondary_color', None),
         "icon": level.icon,
         "owner_id": level.owner_id,
         "root_id": level.root_id,
@@ -102,6 +103,7 @@ def update_goal_level(current_user, level_id):
                     name=level.name,
                     rank=level.rank,
                     color=level.color,
+                    secondary_color=getattr(level, 'secondary_color', None),
                     icon=level.icon,
                     owner_id=current_user.id,
                     allow_manual_completion=level.allow_manual_completion,
@@ -123,6 +125,8 @@ def update_goal_level(current_user, level_id):
         # Now we have a user-owned level we can safely edit
         if 'color' in data:
             level.color = data['color']
+        if 'secondary_color' in data:
+            level.secondary_color = data['secondary_color']
         if 'icon' in data:
             level.icon = data['icon']
         if 'allow_manual_completion' in data:

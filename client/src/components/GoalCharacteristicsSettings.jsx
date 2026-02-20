@@ -97,6 +97,8 @@ const GoalCharacteristicsSettings = () => {
                                 <GoalIcon
                                     shape={current.icon || 'circle'}
                                     color={current.color || 'var(--color-brand-primary)'}
+                                    secondaryColor={current.secondary_color || undefined}
+                                    isSmart={true}
                                     size={24}
                                 />
                                 {current.name}
@@ -183,16 +185,29 @@ const GoalCharacteristicsSettings = () => {
                             </div>
 
                             {/* Color Selection */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                    Primary Color
-                                </label>
-                                <input
-                                    type="color"
-                                    value={current.color || '#000000'}
-                                    onChange={(e) => handleChange(level.id, 'color', e.target.value)}
-                                    style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                                />
+                            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                        Primary Color
+                                    </label>
+                                    <input
+                                        type="color"
+                                        value={current.color || '#000000'}
+                                        onChange={(e) => handleChange(level.id, 'color', e.target.value)}
+                                        style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                        Secondary Color <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(SMART ring fill)</span>
+                                    </label>
+                                    <input
+                                        type="color"
+                                        value={current.secondary_color || current.color || '#000000'}
+                                        onChange={(e) => handleChange(level.id, 'secondary_color', e.target.value)}
+                                        style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                                    />
+                                </div>
                             </div>
 
                             {/* Behavior Toggles */}

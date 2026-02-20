@@ -58,6 +58,7 @@ class GoalLevel(Base):
     name = Column(String, nullable=False) # e.g. "Long Term Goal", "Nano Goal"
     rank = Column(Integer, nullable=False, default=0) # 0 is highest level
     color = Column(String, nullable=True)
+    secondary_color = Column(String, nullable=True)
     icon = Column(String, nullable=True)
     
     # Customization Fields
