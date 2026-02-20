@@ -1,8 +1,8 @@
-"""add secondary_color to goal_levels and seed system defaults
+"""seed system default goal levels
 
-Revision ID: 3973b9211a5b
-Revises: bd71cb89beb8
-Create Date: 2026-02-20 12:56:34.041855
+Revision ID: 6cd6d0e3f98b
+Revises: 3973b9211a5b
+Create Date: 2026-02-20 13:10:00.000000
 
 """
 from typing import Sequence, Union
@@ -13,12 +13,13 @@ import uuid
 
 
 # revision identifiers, used by Alembic.
-revision: str = '3973b9211a5b'
-down_revision: Union[str, Sequence[str], None] = 'bd71cb89beb8'
+revision: str = '6cd6d0e3f98b'
+down_revision: Union[str, Sequence[str], None] = '3973b9211a5b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-# System default goal levels
+# System default goal levels - these serve as the base layer that all users inherit from.
+# Users can create personal overrides (owner_id != NULL) or fractal-scoped overrides (root_id != NULL).
 DEFAULT_LEVELS = [
     {"name": "Ultimate Goal",    "rank": 0, "color": "#1a1a2e", "icon": "circle"},
     {"name": "Long Term Goal",   "rank": 1, "color": "#16213e", "icon": "circle"},
@@ -32,17 +33,8 @@ DEFAULT_LEVELS = [
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    # Add the secondary_color column (IF NOT EXISTS for idempotency)
+    """Seed system default goal levels if they don't already exist."""
     conn = op.get_bind()
-    result = conn.execute(sa.text(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_name='goal_levels' AND column_name='secondary_color'"
-    ))
-    if result.fetchone() is None:
-        op.add_column('goal_levels', sa.Column('secondary_color', sa.String(), nullable=True))
-
-    # Seed system default goal levels if they don't exist
     existing = conn.execute(sa.text("SELECT COUNT(*) FROM goal_levels WHERE owner_id IS NULL")).scalar()
     if existing == 0:
         for level in DEFAULT_LEVELS:
@@ -53,5 +45,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    op.drop_column('goal_levels', 'secondary_color')
+    """Remove system default goal levels."""
+    conn = op.get_bind()
+    conn.execute(sa.text("DELETE FROM goal_levels WHERE owner_id IS NULL"))
