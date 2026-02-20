@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
@@ -73,7 +74,7 @@ function SessionActivityItem({
 
     // Get timezone from context
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();;
 
     const setMetricDraftKey = useCallback((setIndex, metricId, splitId = null) => (
         `${setIndex}:${metricId}:${splitId || ''}`
@@ -212,9 +213,9 @@ function SessionActivityItem({
     };
 
     // Characteristics for goal icons
-    const microChars = getScopedCharacteristics('MicroGoal');
-    const nanoChars = getScopedCharacteristics('NanoGoal');
-    const immediateChars = getScopedCharacteristics('ImmediateGoal');
+    const microChars = getLevelByName('MicroGoal');
+    const nanoChars = getLevelByName('NanoGoal');
+    const immediateChars = getLevelByName('ImmediateGoal');
     const [nanoMode, setNanoMode] = useState(false);
 
     // Helper: Determine the next goal action based on activity's current associations

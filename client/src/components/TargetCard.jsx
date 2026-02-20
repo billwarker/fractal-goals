@@ -1,6 +1,7 @@
 import React from 'react';
 import GoalIcon from './atoms/GoalIcon';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 
 /**
  * TargetCard Component
@@ -10,8 +11,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
-    const { getScopedCharacteristics, getGoalColor, getGoalSecondaryColor } = useTheme();
-    const targetChar = getScopedCharacteristics('Target')?.icon || 'twelve-point-star';
+    const { getLevelByName, getGoalColor, getGoalSecondaryColor } = useGoalLevels();;
+    const targetChar = getLevelByName('Target')?.icon || 'twelve-point-star';
     const targetColor = getGoalColor('Target');
     const targetSecondaryColor = getGoalSecondaryColor('Target');
 

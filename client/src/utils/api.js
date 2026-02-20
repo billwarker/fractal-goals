@@ -55,6 +55,26 @@ export const globalApi = {
      * @param {string} rootId - ID of the fractal to delete
      */
     deleteFractal: (rootId) => axios.delete(`${API_BASE}/fractals/${rootId}`),
+
+    // ========== Goal Levels ==========
+
+    /**
+     * Get all configured goal levels for the current user
+     */
+    getGoalLevels: () => axios.get(`${API_BASE}/goal-levels`),
+
+    /**
+     * Update a goal level's configuration
+     * @param {string} levelId - ID of the level
+     * @param {Object} data - fields to update
+     */
+    updateGoalLevel: (levelId, data) => axios.put(`${API_BASE}/goal-levels/${levelId}`, data),
+
+    /**
+     * Reset a goal level back to system defaults
+     * @param {string} levelId - ID of the level
+     */
+    resetGoalLevel: (levelId) => axios.delete(`${API_BASE}/goal-levels/${levelId}`),
 };
 
 /**

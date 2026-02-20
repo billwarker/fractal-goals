@@ -1,5 +1,6 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import StepHeader from './StepHeader';
 
 /**
@@ -80,7 +81,7 @@ function CreateSessionActions({
 }
 
 function SessionSummary({ selectedTemplate, selectedProgramDay, activityDefinitions, goals }) {
-    const { getGoalColor, getGoalSecondaryColor } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor } = useGoalLevels();;
 
     // Combine goals from template, program day, and activities
     const calculateGoals = () => {

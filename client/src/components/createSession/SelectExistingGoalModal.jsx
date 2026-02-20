@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 
 /**
  * Modal for selecting existing immediate goals to attach to session
@@ -11,7 +12,7 @@ function SelectExistingGoalModal({
     onClose,
     onConfirm
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const [tempSelectedGoals, setTempSelectedGoals] = useState([]);
 
     if (!isOpen) return null;
@@ -102,7 +103,7 @@ function SelectExistingGoalModal({
 }
 
 function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     return (
         <div
             onClick={onToggle}

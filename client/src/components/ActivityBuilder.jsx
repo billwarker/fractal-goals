@@ -7,7 +7,8 @@ import Checkbox from './atoms/Checkbox';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { fractalApi } from '../utils/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
 import ActivityAssociationModal from './sessionDetail/ActivityAssociationModal';
 import { buildActivityPayload } from '../utils/activityBuilder';
@@ -19,7 +20,7 @@ import styles from './ActivityBuilder.module.css';
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
     const { useFractalTreeQuery } = useGoals();
-    const { getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor } = useGoalLevels();;
 
     // Use the query hook to get the fractal tree
     const { data: currentFractal, isLoading: isLoadingGoals } = useFractalTreeQuery(rootId);

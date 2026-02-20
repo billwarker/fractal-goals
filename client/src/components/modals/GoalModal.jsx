@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
 import { validateDeadline } from '../../utils/goalCharacteristics';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import AddTargetModal from '../AddTargetModal';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
@@ -10,7 +11,7 @@ import toast from 'react-hot-toast';
 import styles from './GoalModal.module.css';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
-    const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
+    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon } = useGoalLevels();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
@@ -48,7 +49,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
 
         // Validate deadline against configured characteristics
         if (deadline) {
-            const validation = validateDeadline(deadline, goalCharacteristics[goalType]);
+            const validation = validateDeadline(deadline, getLevelByName(goalType));
             if (!validation.isValid) {
                 toast.error(validation.message);
                 return;
@@ -119,7 +120,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                         style={{ background: themeColor, color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
                                         <GoalIcon
-                                            shape={goalCharacteristics[goalType]?.icon || 'circle'}
+                                            shape={getGoalIcon(goalType)}
                                             color={textColor}
                                             size={18}
                                         />

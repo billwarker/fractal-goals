@@ -7,7 +7,8 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Selection.module.css'; // Import CSS Module
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import useIsMobile from '../hooks/useIsMobile';
 
 /**
@@ -25,7 +26,7 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated } = useAuth();
-    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor } = useTheme();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor } = useGoalLevels();;
     const isMobile = useIsMobile();
 
     useEffect(() => {

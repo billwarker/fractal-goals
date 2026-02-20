@@ -1,6 +1,7 @@
 import React from 'react';
 import { calculateSMARTStatus, SMART_CRITERIA, getSMARTTooltip } from '../utils/smartHelpers';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 
 /**
  * SMARTIndicator Component
@@ -9,7 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
  * Letters are colored with the goal's cosmic color when met, gray when not.
  */
 function SMARTIndicator({ goal, goalType }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const status = calculateSMARTStatus(goal);
     const goalColor = getGoalColor(goalType);
     const inactiveColor = '#555';

@@ -9,7 +9,8 @@ import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
 import { Bar, Line } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import Button from '../atoms/Button';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
@@ -51,7 +52,7 @@ function ProfileWindow({
     onSelect,
     hasAnnotationsWindow = false
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);

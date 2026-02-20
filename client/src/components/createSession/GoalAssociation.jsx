@@ -1,5 +1,6 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import StepHeader from './StepHeader';
 import ImmediateGoalSection from './ImmediateGoalSection';
 
@@ -17,7 +18,7 @@ function GoalAssociation({
     onRemoveImmediateGoal,
     onCreateImmediateGoal
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     return (
         <div style={{
             background: 'var(--color-bg-card)',
@@ -83,7 +84,7 @@ function GoalAssociation({
 }
 
 function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediateGoals, onClick }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     return (
         <div
             onClick={onClick}

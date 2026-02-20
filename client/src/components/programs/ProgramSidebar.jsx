@@ -1,5 +1,6 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { formatDurationSeconds } from '../../utils/formatters';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import styles from './ProgramSidebar.module.css';
@@ -14,7 +15,7 @@ function ProgramSidebar({
     getGoalDetails, // Function to get full goal details by ID (needed for children)
     compact = false
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
 
     // Recursive renderer
     const renderGoalItem = (goal, parentColors = []) => {

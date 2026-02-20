@@ -11,14 +11,15 @@ import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import SessionSectionGrid from './SessionSectionGrid';
 import styles from './SessionCardExpanded.module.css';
 
 const AccomplishmentsSection = memo(function AccomplishmentsSection({
     completedGoals,
     getGoalColor,
-    getScopedCharacteristics
+    getLevelByName
 }) {
     if (completedGoals.length === 0) {
         return null;
@@ -35,7 +36,7 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                 <div className={styles.goalsList} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {/* Completed Goals */}
                     {completedGoals.map(goal => {
-                        const originalShape = getScopedCharacteristics(goal.type || goal.attributes?.type)?.icon || 'circle';
+                        const originalShape = getLevelByName(goal.type || goal.attributes?.type)?.icon || 'circle';
                         return (
                             <div
                                 key={goal.id}
@@ -73,7 +74,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     getGoalColor,
     formatDate
 }) {
-    const { getScopedCharacteristics } = useTheme();
+    const { getLevelByName } = useGoalLevels();;
     const sessionData = session.attributes?.session_data;
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
@@ -264,7 +265,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             <AccomplishmentsSection
                 completedGoals={completedGoals}
                 getGoalColor={getGoalColor}
-                getScopedCharacteristics={getScopedCharacteristics}
+                getLevelByName={getLevelByName}
             />
 
             {/* Bottom Level: Session data with horizontal sections */}

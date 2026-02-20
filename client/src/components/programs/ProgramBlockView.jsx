@@ -1,6 +1,7 @@
 import React from 'react';
 import moment from 'moment';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
 import Card from '../atoms/Card';
 import Button from '../atoms/Button';
@@ -24,7 +25,7 @@ function ProgramBlockView({
     onAddDay,
     onGoalClick
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const { timezone } = useTimezone();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [blockToDelete, setBlockToDelete] = useState(null);

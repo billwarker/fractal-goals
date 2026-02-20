@@ -59,6 +59,16 @@ class GoalLevel(Base):
     rank = Column(Integer, nullable=False, default=0) # 0 is highest level
     color = Column(String, nullable=True)
     icon = Column(String, nullable=True)
+    
+    # Customization Fields
+    owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
+    root_id = Column(String, nullable=True, index=True) # If tied to a specific fractal project
+    
+    # Characteristics Overrides
+    allow_manual_completion = Column(Boolean, default=True)
+    track_activities = Column(Boolean, default=True)
+    requires_smart = Column(Boolean, default=False)
+    
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)

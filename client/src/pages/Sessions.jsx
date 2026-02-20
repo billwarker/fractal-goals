@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar, SessionCardExpanded } from '../components/sessions';
@@ -16,7 +17,7 @@ import { useGoals } from '../contexts/GoalsContext';
  * Displays all practice sessions for the current fractal in card format with horizontal sections
  */
 function Sessions() {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const { rootId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();

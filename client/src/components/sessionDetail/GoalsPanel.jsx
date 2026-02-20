@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { fractalApi } from '../../utils/api';
 import {
     buildFlattenedGoalTree,
@@ -40,7 +41,7 @@ function GoalsPanel({
         refreshSession,
         microGoals,
     } = useActiveSession();
-    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();;
     const { useFractalTreeQuery, fetchFractalTree } = useGoals();
     const [expandedGoals, setExpandedGoals] = useState({});
 
@@ -418,10 +419,10 @@ function GoalsPanel({
         return getHierarchy(resolvedActivityGoalIds, 'activity', activeActivityDef.id);
     }, [activeActivityDef, resolvedActivityGoalIds, getHierarchy]);
 
-    const microChars = getScopedCharacteristics('MicroGoal');
-    const nanoChars = getScopedCharacteristics('NanoGoal');
-    const stChars = getScopedCharacteristics('ShortTermGoal');
-    const immChars = getScopedCharacteristics('ImmediateGoal');
+    const microChars = getLevelByName('MicroGoal');
+    const nanoChars = getLevelByName('NanoGoal');
+    const stChars = getLevelByName('ShortTermGoal');
+    const immChars = getLevelByName('ImmediateGoal');
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
     const microTally = { done: microGoals.filter(g => g.completed).length, total: microGoals.length };
@@ -457,9 +458,10 @@ function GoalsPanel({
                             flattenedHierarchy={activeActivityHierarchy}
                             viewMode={viewMode}
                             onGoalClick={onGoalClick}
-                            getScopedCharacteristics={getScopedCharacteristics}
+                            getLevelByName={getLevelByName}
                             getGoalColor={getGoalColor}
                             getGoalSecondaryColor={getGoalSecondaryColor}
+                            getGoalIcon={getGoalIcon}
                             completedColor={completedColor}
                             completedSecondaryColor={completedSecondaryColor}
                             achievedTargetIds={achievedTargetIds}
@@ -504,9 +506,10 @@ function GoalsPanel({
                             flattenedHierarchy={sessionHierarchy}
                             viewMode="session"
                             onGoalClick={onGoalClick}
-                            getScopedCharacteristics={getScopedCharacteristics}
+                            getLevelByName={getLevelByName}
                             getGoalColor={getGoalColor}
                             getGoalSecondaryColor={getGoalSecondaryColor}
+                            getGoalIcon={getGoalIcon}
                             completedColor={completedColor}
                             completedSecondaryColor={completedSecondaryColor}
                             achievedTargetIds={achievedTargetIds}

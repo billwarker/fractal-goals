@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { chartDefaults } from './ChartJSWrapper'; // Import chartDefaults for consistent coloring
 
 /**
@@ -14,7 +15,7 @@ import { chartDefaults } from './ChartJSWrapper'; // Import chartDefaults for co
  * - Option to measure by activity duration vs session duration
  */
 function GoalTimeDistribution({ goals, chartRef }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     // Roll-up toggle: when true, child goal time is aggregated to parents
     const [rollUpEnabled, setRollUpEnabled] = useState(false);
     // Duration mode: 'activity' = activity instance duration, 'session' = full session duration

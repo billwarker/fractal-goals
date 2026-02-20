@@ -1,5 +1,6 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 
 /**
  * Immediate Goals Section within a Short-Term Goal card
@@ -14,7 +15,7 @@ function ImmediateGoalSection({
     onRemoveNewGoal,
     onCreateNewGoal
 }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const hasExistingGoals = existingImmediateGoals.length > 0;
     const hasNewGoals = newImmediateGoals.length > 0;
 
@@ -89,7 +90,7 @@ function ImmediateGoalSection({
 }
 
 function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     return (
         <div
             onClick={(e) => {
@@ -142,7 +143,7 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
 }
 
 function NewGoalCard({ goal, onRemove }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     return (
         <div
             style={{

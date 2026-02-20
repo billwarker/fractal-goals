@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import { useGoals } from '../../contexts/GoalsContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
 
 export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
     const { useFractalTreeQuery } = useGoals();
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
 
     // Use the query hook to get the fractal tree for goal selection
     const { data: currentFractal } = useFractalTreeQuery(rootId);

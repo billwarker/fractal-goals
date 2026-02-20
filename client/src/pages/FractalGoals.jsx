@@ -11,7 +11,8 @@ import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useDebug } from '../contexts/DebugContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import { getChildType } from '../utils/goalHelpers';
 import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
@@ -63,7 +64,7 @@ function FractalGoals() {
     } = useActivities();
 
     const { debugMode } = useDebug();
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const isMobile = useIsMobile();
 
     // Programs State

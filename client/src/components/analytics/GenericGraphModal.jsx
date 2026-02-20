@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Line, Bar } from 'react-chartjs-2';
 import { useChartOptions } from './ChartJSWrapper'; // Import hook
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import styles from '../GoalDetailModal.module.css'; // Reusing modal styles for consistency
 import flowStyles from '../../FlowTree.module.css'; // Reusing node styles for goal icon
 import '../../App.css'; // For global modal styles if needed
@@ -22,7 +23,7 @@ const GenericGraphModal = ({
     options = {},
     type = 'line'
 }) => {
-    const { getGoalColor, getGoalSecondaryColor } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor } = useGoalLevels();;
 
     // Theme-aware options
     const baseOptions = useChartOptions({

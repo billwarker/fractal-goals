@@ -1,157 +1,82 @@
-import React from 'react';
-import { useTheme } from '../contexts/ThemeContext';
+import React, { useState } from 'react';
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import GoalIcon from './atoms/GoalIcon';
-import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
+import { ICON_SHAPES } from '../utils/goalCharacteristics';
 import useIsMobile from '../hooks/useIsMobile';
+import toast from 'react-hot-toast';
 
-const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
-    const {
-        goalColors,
-        setGoalColor,
-        resetGoalColors,
-        goalCharacteristics,
-        setGoalCharacteristic,
-        resetGoalCharacteristics
-    } = useTheme();
-
+const GoalCharacteristicsSettings = () => {
+    const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
     const isMobile = useIsMobile();
 
-    // Helper to get data for current scope with fallback to default
-    const getDisplayData = (goalType) => {
-        const defaultChar = goalCharacteristics.default[goalType];
-        const defaultColor = goalColors.default[goalType];
+    // We maintain local state for active edits before saving to DB
+    const [edits, setEdits] = useState({});
 
-        if (scope === 'default') {
-            return { char: defaultChar, color: defaultColor, isOverridden: false };
+    if (!goalLevels || goalLevels.length === 0) {
+        return <div>Loading Goal Configuration...</div>;
+    }
+
+    const handleChange = (levelId, field, value) => {
+        setEdits(prev => ({
+            ...prev,
+            [levelId]: {
+                ...(prev[levelId] || {}),
+                [field]: value
+            }
+        }));
+    };
+
+    const handleSave = async (levelId) => {
+        const changes = edits[levelId];
+        if (!changes) return;
+
+        try {
+            await updateGoalLevel({ id: levelId, updates: changes });
+            toast.success("Settings saved.");
+
+            // Clear local edits for this level since they are now persisted
+            setEdits(prev => {
+                const next = { ...prev };
+                delete next[levelId];
+                return next;
+            });
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save settings.");
         }
-
-        const scopedChar = goalCharacteristics.fractals[scope]?.[goalType];
-        const scopedColor = goalColors.fractals[scope]?.[goalType];
-
-        return {
-            char: scopedChar ? { ...defaultChar, ...scopedChar } : defaultChar,
-            color: scopedColor ? { ...defaultColor, ...scopedColor } : defaultColor,
-            isOverridden: !!(scopedChar || scopedColor)
-        };
     };
 
-    const formatGoalType = (type) => {
-        return type.replace(/([A-Z])/g, ' $1').trim();
+    const handleReset = async (levelId) => {
+        if (!window.confirm("Restore this level to the system default characteristics?")) return;
+        try {
+            await resetGoalLevel(levelId);
+            toast.success("Reset to defaults.");
+            setEdits(prev => {
+                const next = { ...prev };
+                delete next[levelId];
+                return next;
+            });
+        } catch (error) {
+            toast.error("Failed to reset level.");
+        }
     };
-
-    const handleDeadlineChange = (goalType, type, field, value) => {
-        // type: 'min' or 'max', field: 'value' or 'unit'
-        const baseChar = goalCharacteristics.fractals[scope]?.[goalType] || goalCharacteristics.default[goalType];
-        const currentDeadlines = { ...baseChar.deadlines };
-        currentDeadlines[type] = {
-            ...currentDeadlines[type],
-            [field]: field === 'value' ? parseInt(value) || 0 : value
-        };
-        setGoalCharacteristic(goalType, 'deadlines', currentDeadlines, scope);
-    };
-
-    const handleCompletionChange = (goalType, method, checked) => {
-        const baseChar = goalCharacteristics.fractals[scope]?.[goalType] || goalCharacteristics.default[goalType];
-        const currentMethods = { ...baseChar.completion_methods };
-        currentMethods[method] = checked;
-        setGoalCharacteristic(goalType, 'completion_methods', currentMethods, scope);
-    };
-
-    const GOAL_TYPE_ORDER = [
-        'UltimateGoal',
-        'LongTermGoal',
-        'MidTermGoal',
-        'ShortTermGoal',
-        'ImmediateGoal',
-        'MicroGoal',
-        'NanoGoal',
-        'Target'
-    ];
-
-    const { color: completedColor } = getDisplayData('Completed');
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Global Completion Styling */}
-            <div
-                style={{
-                    padding: '16px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--color-bg-card-alt)',
-                    borderLeft: '4px solid ' + (completedColor?.primary || 'var(--color-brand-primary)')
-                }}
-            >
-                <div style={{
-                    marginBottom: '12px',
-                    fontWeight: 'bold',
-                    color: 'var(--color-text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: completedColor?.primary }} />
-                    Completion Styling
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px', marginTop: 0 }}>
-                    These colors apply to all goals and targets once they are completed.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Primary (Text & Icons)</label>
-                        <input
-                            type="color"
-                            value={completedColor?.primary || '#000000'}
-                            onChange={(e) => setGoalColor('Completed', 'primary', e.target.value, scope)}
-                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Secondary (Fills & Rings)</label>
-                        <input
-                            type="color"
-                            value={completedColor?.secondary || '#000000'}
-                            onChange={(e) => setGoalColor('Completed', 'secondary', e.target.value, scope)}
-                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                        />
-                    </div>
-                </div>
-            </div>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                Customize the shape, colors, and behaviors of your goal hierarchy.
+                Any modifications you make here will be saved as personal overrides specifically for your account.
+            </p>
 
-            {scope !== 'default' && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                        onClick={() => {
-                            if (window.confirm(`Reset overrides for this fractal and inherit from Global Defaults?`)) {
-                                resetGoalColors(scope);
-                                resetGoalCharacteristics(scope);
-                            }
-                        }}
-                        style={{
-                            fontSize: '12px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            color: 'var(--color-text-primary)',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <span style={{ color: 'var(--color-brand-danger)' }}>↺</span> Reset to Defaults
-                    </button>
-                </div>
-            )}
-
-            {GOAL_TYPE_ORDER.map((type) => {
-                const { char, color } = getDisplayData(type);
-                if (!char) return null;
+            {goalLevels.map((level) => {
+                // Merge DB state with local unsaved edits
+                const current = { ...level, ...(edits[level.id] || {}) };
+                const hasUnsavedChanges = !!edits[level.id] && Object.keys(edits[level.id]).length > 0;
+                const isCustomized = level.owner_id !== null;
 
                 return (
                     <div
-                        key={type}
+                        key={level.id}
                         style={{
                             padding: '16px',
                             border: '1px solid var(--color-border)',
@@ -159,18 +84,64 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                             backgroundColor: 'var(--color-bg-card-alt)'
                         }}
                     >
+                        {/* Header Row */}
                         <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
                             marginBottom: '16px',
-                            fontWeight: 'bold',
-                            color: 'var(--color-text-primary)'
+                            flexWrap: 'wrap',
+                            gap: '12px'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                                 <GoalIcon
-                                    shape={char.icon}
-                                    color={color?.primary || 'var(--color-primary)'}
+                                    shape={current.icon || 'circle'}
+                                    color={current.color || 'var(--color-brand-primary)'}
                                     size={24}
                                 />
-                                {formatGoalType(type)}
+                                {current.name}
+
+                                {isCustomized && (
+                                    <span style={{ fontSize: '10px', background: 'var(--color-bg-primary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                                        Customized
+                                    </span>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {isCustomized && (
+                                    <button
+                                        onClick={() => handleReset(level.id)}
+                                        style={{
+                                            fontSize: '12px',
+                                            background: 'transparent',
+                                            border: '1px solid var(--color-border)',
+                                            color: 'var(--color-text-secondary)',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Restore Default
+                                    </button>
+                                )}
+                                {hasUnsavedChanges && (
+                                    <button
+                                        onClick={() => handleSave(level.id)}
+                                        style={{
+                                            fontSize: '12px',
+                                            background: 'var(--color-brand-primary)',
+                                            border: 'none',
+                                            color: '#fff',
+                                            padding: '4px 12px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        Save Changes
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -181,143 +152,86 @@ const GoalCharacteristicsSettings = ({ scope = 'default' }) => {
                                     Shape
                                 </label>
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {ICON_SHAPES.map(s => (
-                                        <button
-                                            key={s.value}
-                                            onClick={() => setGoalCharacteristic(type, 'icon', s.value, scope)}
-                                            style={{
-                                                padding: '8px',
-                                                borderRadius: '4px',
-                                                border: '1px solid',
-                                                borderColor: char.icon === s.value ? (color?.primary || 'var(--color-brand-primary)') : 'var(--color-border)',
-                                                backgroundColor: char.icon === s.value ? 'rgba(0,0,0,0.1)' : 'transparent',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}
-                                            title={s.label}
-                                        >
-                                            <GoalIcon
-                                                shape={s.value}
-                                                color={char.icon === s.value ? (color?.primary || 'var(--color-brand-primary)') : 'var(--color-text-muted)'}
-                                                size={20}
-                                            />
-                                        </button>
-                                    ))}
+                                    {ICON_SHAPES.map(s => {
+                                        const isSelected = current.icon === s.value;
+                                        return (
+                                            <button
+                                                key={s.value}
+                                                onClick={() => handleChange(level.id, 'icon', s.value)}
+                                                style={{
+                                                    padding: '8px',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid',
+                                                    borderColor: isSelected ? (current.color || 'var(--color-brand-primary)') : 'var(--color-border)',
+                                                    backgroundColor: isSelected ? 'rgba(0,0,0,0.1)' : 'transparent',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                                title={s.label}
+                                            >
+                                                <GoalIcon
+                                                    shape={s.value}
+                                                    color={isSelected ? (current.color || 'var(--color-brand-primary)') : 'var(--color-text-muted)'}
+                                                    size={20}
+                                                />
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            {/* Colors */}
+                            {/* Color Selection */}
                             <div>
                                 <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                    Colors
+                                    Primary Color
                                 </label>
-                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Primary</label>
-                                        <input
-                                            type="color"
-                                            value={color?.primary || '#000000'}
-                                            onChange={(e) => setGoalColor(type, 'primary', e.target.value, scope)}
-                                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '11px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>Secondary</label>
-                                        <input
-                                            type="color"
-                                            value={color?.secondary || '#000000'}
-                                            onChange={(e) => setGoalColor(type, 'secondary', e.target.value, scope)}
-                                            style={{ width: '100%', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                                        />
-                                    </div>
-                                </div>
+                                <input
+                                    type="color"
+                                    value={current.color || '#000000'}
+                                    onChange={(e) => handleChange(level.id, 'color', e.target.value)}
+                                    style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                                />
                             </div>
 
-                            {/* Goal Deadlines and Methods */}
-                            {type !== 'MicroGoal' && type !== 'NanoGoal' && type !== 'Target' && type !== 'Completed' ? (
-                                <div className="characteristic-details" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    {/* Relative Deadlines */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
-                                        {['min', 'max'].map(limitType => (
-                                            <div key={limitType}>
-                                                <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                                    {limitType.charAt(0).toUpperCase() + limitType.slice(1)} Relative Deadline
-                                                </label>
-                                                <div style={{ display: 'flex', gap: '8px', flexDirection: isMobile ? 'column' : 'row' }}>
-                                                    <input
-                                                        type="number"
-                                                        value={char.deadlines[limitType].value}
-                                                        onChange={(e) => handleDeadlineChange(type, limitType, 'value', e.target.value)}
-                                                        style={{
-                                                            width: isMobile ? '100%' : '60px',
-                                                            padding: '6px',
-                                                            borderRadius: '4px',
-                                                            border: '1px solid var(--color-border)',
-                                                            backgroundColor: 'var(--color-bg-input)',
-                                                            color: 'var(--color-text-primary)'
-                                                        }}
-                                                    />
-                                                    <select
-                                                        value={char.deadlines[limitType].unit}
-                                                        onChange={(e) => handleDeadlineChange(type, limitType, 'unit', e.target.value)}
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '6px',
-                                                            borderRadius: '4px',
-                                                            border: '1px solid var(--color-border)',
-                                                            backgroundColor: 'var(--color-bg-input)',
-                                                            color: 'var(--color-text-primary)'
-                                                        }}
-                                                    >
-                                                        {DEADLINE_UNITS.map(u => (
-                                                            <option key={u.value} value={u.value}>{u.label}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                            {/* Behavior Toggles */}
+                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.allow_manual_completion ?? true}
+                                        onChange={(e) => handleChange(level.id, 'allow_manual_completion', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Allow Manual Completion
+                                </label>
 
-                                    {/* Completion Methods */}
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                            Valid Completion Methods
-                                        </label>
-                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
-                                            {Object.entries(char.completion_methods).map(([method, enabled]) => (
-                                                <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={enabled}
-                                                        onChange={(e) => handleCompletionChange(type, method, e.target.checked)}
-                                                        style={{ cursor: 'pointer' }}
-                                                    />
-                                                    {method.charAt(0).toUpperCase() + method.slice(1)}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    padding: '8px 12px',
-                                    backgroundColor: 'var(--color-bg-primary)',
-                                    border: '1px dashed var(--color-border)',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    color: 'var(--color-text-muted)',
-                                    fontStyle: 'italic'
-                                }}>
-                                    {type === 'Target' || type === 'Completed' ? `${formatGoalType(type)}s are completed by achieving their specified criteria.` : `Ephemeral Goal: Deadlines are not applicable to ${formatGoalType(type)}s.`}
-                                </div>
-                            )}
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.track_activities ?? true}
+                                        onChange={(e) => handleChange(level.id, 'track_activities', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Support Activity Tracking
+                                </label>
+
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.requires_smart ?? false}
+                                        onChange={(e) => handleChange(level.id, 'requires_smart', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Requires SMART Metrics
+                                </label>
+                            </div>
                         </div>
                     </div>
                 );
             })}
-        </div >
+        </div>
     );
 };
 

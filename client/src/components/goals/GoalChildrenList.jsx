@@ -1,7 +1,8 @@
 import React from 'react';
 import { findGoalById, getTypeDisplayName } from '../../utils/goalHelpers';
 import { isSMART } from '../../utils/smartHelpers';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import GoalIcon from '../atoms/GoalIcon';
 
 /**
@@ -37,7 +38,7 @@ function GoalChildrenList({
     childType,
     onGoalSelect
 }) {
-    const { getGoalColor, getGoalSecondaryColor, goalCharacteristics } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const node = findGoalById(treeData, goalId);
     const children = node?.children || [];
 
@@ -83,7 +84,7 @@ function GoalChildrenList({
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <GoalIcon
-                                    shape={goalCharacteristics[childType]?.icon || 'circle'}
+                                    shape={getGoalIcon(childType)}
                                     color={iconColor}
                                     secondaryColor={iconSecondaryColor}
                                     isSmart={childIsSmart}

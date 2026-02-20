@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import { getISOYMDInTimezone, formatDateInTimezone, getDatePart, formatLiteralDate } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
@@ -26,7 +27,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
 
 const ProgramDetail = () => {
-    const { getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor } = useGoalLevels();;
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();

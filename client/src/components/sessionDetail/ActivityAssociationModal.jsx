@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import notify from '../../utils/notify';
 import styles from './ActivityAssociationModal.module.css';
 import GoalIcon from '../atoms/GoalIcon';
@@ -16,7 +17,7 @@ const ActivityAssociationModal = ({
     initialActivityName = '',
     initialSelectedGoalIds = []
 }) => {
-    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();;
     const [searchTerm, setSearchTerm] = useState('');
 
     // Multi-select state - initialize with passed IDs
@@ -187,7 +188,7 @@ const ActivityAssociationModal = ({
     const renderSection = (type, typeGoals) => {
         if (!typeGoals || typeGoals.length === 0) return null;
 
-        const characteristics = getScopedCharacteristics(type);
+        const characteristics = getLevelByName(type);
         const shape = characteristics?.icon || 'circle';
         const isCollapsed = collapsedSections.has(type);
 

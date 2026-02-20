@@ -10,6 +10,7 @@ function HierarchySection({
     getScopedCharacteristics,
     getGoalColor,
     getGoalSecondaryColor,
+    getGoalIcon,
     completedColor,
     completedSecondaryColor,
     creatingSubGoal,
@@ -53,7 +54,7 @@ function HierarchySection({
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', height: '16px', minWidth: '16px' }}>
                                     <GoalIcon
-                                        shape={getScopedCharacteristics(node.type)?.icon || 'circle'}
+                                        shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
                                         color={node.completed ? completedColor : getGoalColor(node.type)}
                                         secondaryColor={node.completed ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
                                         isSmart={node.is_smart}

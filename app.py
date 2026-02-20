@@ -29,6 +29,7 @@ from config import config
 from blueprints.activities_api import activities_bp
 from blueprints.sessions_api import sessions_bp
 from blueprints.goals_api import goals_bp
+from blueprints.goal_levels_api import goal_levels_bp
 from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
@@ -132,6 +133,7 @@ CORS(app, resources={
 app.register_blueprint(activities_bp)
 app.register_blueprint(sessions_bp)
 app.register_blueprint(goals_bp)
+app.register_blueprint(goal_levels_bp)
 app.register_blueprint(templates_bp)
 app.register_blueprint(timers_bp)
 app.register_blueprint(programs_bp)

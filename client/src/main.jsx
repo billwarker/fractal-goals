@@ -23,6 +23,7 @@ import { ActivitiesProvider } from './contexts/ActivitiesContext.jsx'
 import { SessionsProvider } from './contexts/SessionsContext.jsx'
 
 import { GoalsProvider } from './contexts/GoalsContext.jsx'
+import { GoalLevelsProvider } from './contexts/GoalLevelsContext.jsx'
 
 import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
@@ -88,15 +89,17 @@ createRoot(document.getElementById('root')).render(
             />
             <TimezoneProvider>
               <AuthProvider>
-                <GoalsProvider>
-                  <ThemeProvider>
-                    <ActivitiesProvider>
-                      <SessionsProvider>
-                        <AppRouter />
-                      </SessionsProvider>
-                    </ActivitiesProvider>
-                  </ThemeProvider>
-                </GoalsProvider>
+                <GoalLevelsProvider>
+                  <GoalsProvider>
+                    <ThemeProvider>
+                      <ActivitiesProvider>
+                        <SessionsProvider>
+                          <AppRouter />
+                        </SessionsProvider>
+                      </ActivitiesProvider>
+                    </ThemeProvider>
+                  </GoalsProvider>
+                </GoalLevelsProvider>
               </AuthProvider>
             </TimezoneProvider>
           </DebugProvider>

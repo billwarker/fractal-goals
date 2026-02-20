@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 
 /**
  * GoalCompletionTimeline - Stacked area chart showing cumulative goal completions over time
@@ -10,7 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext';
  * The x-axis shows the timeline based on completion dates.
  */
 function GoalCompletionTimeline({ goals, chartRef }) {
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     // Goal types in hierarchy order from PARENT (bottom of stack) to CHILD (top of stack)
     // This ensures parent goals form the base of the stacked area chart
     const goalTypesHierarchy = [

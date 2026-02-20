@@ -6,7 +6,8 @@ import Select from './atoms/Select';
 import Checkbox from './atoms/Checkbox';
 import Button from './atoms/Button';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext'
+import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
 import { formatDurationSeconds as formatDuration } from '../utils/formatters';
 import SMARTIndicator from './SMARTIndicator';
@@ -59,7 +60,7 @@ function GoalDetailModal({
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse
 }) {
-    const { getGoalColor, getGoalTextColor, goalCharacteristics } = useTheme();
+    const { getGoalColor, getGoalTextColor, getLevelByName } = useGoalLevels();
     const navigate = useNavigate();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
@@ -86,6 +87,7 @@ function GoalDetailModal({
     // Local completion state for optimistic UI
     const [localCompleted, setLocalCompleted] = useState(false);
     const [localCompletedAt, setLocalCompletedAt] = useState(null);
+    const isCompleted = localCompleted || goal?.completed || false;
 
     // Target editing state
     const [targetToEdit, setTargetToEdit] = useState(null);
@@ -345,8 +347,8 @@ function GoalDetailModal({
 
     const goalColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
-    const isCompleted = localCompleted;  // Use local state for optimistic UI
     const childType = getChildType(goalType);
+    const levelConfig = getLevelByName(goalType) || {};
 
     // Session relationships
     const isShortTermGoal = goalType === 'ShortTermGoal';
@@ -625,10 +627,10 @@ function GoalDetailModal({
                         {/* Action Buttons - 2x2 Grid */}
                         <div className={styles.actionGrid}>
                             {onToggleCompletion && (() => {
-                                const isManualAllowed = goalCharacteristics[goalType]?.completion_methods?.manual !== false;
+                                const isManualAllowed = levelConfig.allow_manual_completion !== false;
                                 const canShowManual = allowManualCompletion && isManualAllowed;
-                                const isTargetsAllowed = goalCharacteristics[goalType]?.completion_methods?.targets !== false && goalType !== 'NanoGoal';
-                                const isChildrenAllowed = goalCharacteristics[goalType]?.completion_methods?.children !== false && goalType !== 'MicroGoal' && goalType !== 'NanoGoal';
+                                const isTargetsAllowed = levelConfig.track_activities !== false && goalType !== 'NanoGoal';
+                                const isChildrenAllowed = goalType !== 'MicroGoal' && goalType !== 'NanoGoal';
 
                                 return (
                                     <button
@@ -837,7 +839,7 @@ function GoalDetailModal({
                         )}
 
                         {/* Targets Section - View Mode (Read-only) */}
-                        {trackActivities && goalCharacteristics[goalType]?.completion_methods?.targets !== false && (
+                        {trackActivities && levelConfig.track_activities !== false && (
                             <Suspense fallback={null}>
                                 <TargetManager
                                     targets={targets}

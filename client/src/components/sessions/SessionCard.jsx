@@ -7,7 +7,8 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext'
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import './SessionCard.css';
@@ -22,7 +23,7 @@ function SessionCard({
 }) {
     const navigate = useNavigate();
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalTextColor } = useTheme();
+    const { getGoalColor, getGoalTextColor } = useGoalLevels();;
 
     const sessionData = session.session_data || {};
 

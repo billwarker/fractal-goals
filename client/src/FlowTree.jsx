@@ -11,7 +11,8 @@ import styles from './FlowTree.module.css';
 import dagre from 'dagre';
 import { isSMART } from './utils/smartHelpers';
 
-import { useTheme } from './contexts/ThemeContext';
+import { useTheme } from './contexts/ThemeContext'
+import { useGoalLevels } from './contexts/GoalLevelsContext';;
 import GoalIcon from './components/atoms/GoalIcon';
 import useIsMobile from './hooks/useIsMobile';
 
@@ -24,12 +25,12 @@ const DEFAULT_VIEW_SETTINGS = {
 const toId = (value) => (value == null ? null : String(value));
 
 const CustomNode = ({ data }) => {
-    const { getGoalColor, getGoalSecondaryColor, getScopedCharacteristics, getCompletionColor } = useTheme();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getCompletionColor, getGoalIcon } = useGoalLevels();;
     const isCompleted = data.completed || false;
     const isSmartGoal = data.isSmart || false;
 
-    const completionChar = getScopedCharacteristics('Completed') || { icon: 'check' };
-    const levelChar = getScopedCharacteristics(data.type) || { icon: 'circle' };
+    const completionChar = getLevelByName('Completed') || { icon: 'check' };
+    const levelChar = { icon: getGoalIcon(data.type) };
     const config = (isCompleted ? { ...completionChar, icon: levelChar.icon } : levelChar);
 
     const fillColor = isCompleted ? getCompletionColor() : getGoalColor(data.type);
@@ -946,7 +947,7 @@ const FlowTree = React.forwardRef(({
     const [isVisible, setIsVisible] = useState(false);
     const isMobile = useIsMobile();
 
-    const { getGoalColor } = useTheme();
+    const { getGoalColor } = useGoalLevels();;
     const completedGoalColor = getGoalColor('Completed');
 
     React.useImperativeHandle(ref, () => ({
