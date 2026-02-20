@@ -9,9 +9,10 @@ session_goals = Table(
     'session_goals', Base.metadata,
     Column('session_id', String, ForeignKey('sessions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('goal_type', String, nullable=False),  # canonical Goal.type value
+    Column('goal_type', String, nullable=False),  # legacy type mapping or level
     Column('association_source', String, nullable=False, default='manual'),  # manual, activity, micro_goal
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    Column('deleted_at', DateTime, nullable=True)
 )
 
 # Junction table for linking Activities to Goals
@@ -19,7 +20,8 @@ activity_goal_associations = Table(
     'activity_goal_associations', Base.metadata,
     Column('activity_id', String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    Column('deleted_at', DateTime, nullable=True)
 )
 
 # Junction table for linking Activity GROUPS to Goals
@@ -27,7 +29,8 @@ goal_activity_group_associations = Table(
     'goal_activity_group_associations', Base.metadata,
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('activity_group_id', String, ForeignKey('activity_groups.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    Column('deleted_at', DateTime, nullable=True)
 )
 
 # Junction table for linking Session Templates to Goals
@@ -35,7 +38,8 @@ session_template_goals = Table(
     'session_template_goals', Base.metadata,
     Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    Column('deleted_at', DateTime, nullable=True)
 )
 
 # Junction table for linking Program Days to Goals
@@ -43,8 +47,21 @@ program_day_goals = Table(
     'program_day_goals', Base.metadata,
     Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    Column('deleted_at', DateTime, nullable=True)
 )
+
+class GoalLevel(Base):
+    __tablename__ = 'goal_levels'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False) # e.g. "Long Term Goal", "Nano Goal"
+    rank = Column(Integer, nullable=False, default=0) # 0 is highest level
+    color = Column(String, nullable=True)
+    icon = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
 
 class Goal(Base):
     """
@@ -53,7 +70,7 @@ class Goal(Base):
     __tablename__ = 'goals'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    type = Column(String, nullable=False)
+    level_id = Column(String, ForeignKey('goal_levels.id'), nullable=True, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
     deadline = Column(DateTime, nullable=True)
@@ -75,22 +92,11 @@ class Goal(Base):
     targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
     
     __table_args__ = (
-        CheckConstraint(
-            type.in_([
-                'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-                'ImmediateGoal', 'MicroGoal', 'NanoGoal'
-            ]),
-            name='valid_goal_type'
-        ),
-        sa.Index('ix_goals_root_deleted_type', 'root_id', 'deleted_at', 'type'),
+        sa.Index('ix_goals_root_deleted_level', 'root_id', 'deleted_at', 'level_id'),
         sa.Index('ix_goals_root_parent_deleted', 'root_id', 'parent_id', 'deleted_at'),
     )
-    
-    __mapper_args__ = {
-        'polymorphic_on': type,
-        'polymorphic_identity': 'Goal'
-    }
 
+    level = relationship("GoalLevel")
     owner = relationship("User", back_populates="goals")
     children = relationship(
         "Goal",
@@ -123,32 +129,35 @@ class Goal(Base):
     )
 
     def __repr__(self):
-        return f"<{self.type}(id={self.id}, name={self.name})>"
+        return f"<Goal(id={self.id}, name={self.name})>"
 
-class UltimateGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'UltimateGoal'}
-class LongTermGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'LongTermGoal'}
-class MidTermGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'MidTermGoal'}
-class ShortTermGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'ShortTermGoal'}
-class ImmediateGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'ImmediateGoal'}
-class MicroGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'MicroGoal'}
-class NanoGoal(Goal):
-    __mapper_args__ = {'polymorphic_identity': 'NanoGoal'}
+class TargetTemplate(Base):
+    __tablename__ = 'target_templates'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(String, default='')
+    type = Column(String, default='threshold')
+    time_scope = Column(String, default='all_time')
+    frequency_days = Column(Integer, nullable=True)
+    frequency_count = Column(Integer, nullable=True)
+    
+    default_metrics = Column(JSON_TYPE, nullable=True) # JSON snapshot for default config conditions
+    
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
 
 class Target(Base):
     __tablename__ = 'targets'
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    template_id = Column(String, ForeignKey('target_templates.id', ondelete='SET NULL'), nullable=True)
     goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     activity_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
+    activity_group_id = Column(String, ForeignKey('activity_groups.id', ondelete='SET NULL'), nullable=True, index=True)
     name = Column(String, nullable=False)
     type = Column(String, default='threshold')
-    metrics = Column(JSON_TYPE, nullable=True)
     time_scope = Column(String, default='all_time')
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
@@ -168,10 +177,48 @@ class Target(Base):
         sa.Index('ix_targets_root_deleted', 'root_id', 'deleted_at'),
     )
     
+    template = relationship("TargetTemplate")
     goal = relationship("Goal", back_populates="targets_rel", foreign_keys=[goal_id])
     activity = relationship("ActivityDefinition")
+    activity_group = relationship("ActivityGroup")
+    metric_conditions = relationship("TargetMetricCondition", back_populates="target", cascade="all, delete-orphan")
+    ledger_entries = relationship("TargetContributionLedger", back_populates="target", cascade="all, delete-orphan")
     completed_session = relationship("Session", foreign_keys=[completed_session_id])
     completed_instance = relationship("ActivityInstance", foreign_keys=[completed_instance_id])
+
+class TargetMetricCondition(Base):
+    """
+    Explicit relational conditions that must be met to fulfill a Target.
+    """
+    __tablename__ = 'target_metric_conditions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    target_id = Column(String, ForeignKey('targets.id', ondelete='CASCADE'), nullable=False, index=True)
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    operator = Column(String, nullable=False) # e.g. ">=", "<", "=="
+    target_value = Column(Integer, nullable=False) # stored as int/float
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    target = relationship("Target", back_populates="metric_conditions")
+    metric = relationship("MetricDefinition")
+
+class TargetContributionLedger(Base):
+    """
+    Explicit log mapping an ActivityInstance's metric production to a Target's cumulative tracking.
+    """
+    __tablename__ = 'target_contribution_ledgers'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    target_id = Column(String, ForeignKey('targets.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, index=True)
+    metric_condition_id = Column(String, ForeignKey('target_metric_conditions.id', ondelete='CASCADE'), nullable=False)
+    contributed_value = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+
+    target = relationship("Target", back_populates="ledger_entries")
+    instance = relationship("ActivityInstance")
+    condition = relationship("TargetMetricCondition")
 
 def get_all_root_goals(db_session):
     from sqlalchemy.orm import selectinload

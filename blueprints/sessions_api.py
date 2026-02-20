@@ -10,6 +10,7 @@ from sqlalchemy import select, inspect, text
 from models import (
     get_session,
     Session, Goal, ActivityInstance, MetricValue, session_goals,
+    program_goals,
     ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate, Program,
     validate_root_goal, get_session_by_id
 )
@@ -25,6 +26,7 @@ from blueprints.api_utils import parse_optional_pagination, etag_json_response, 
 from services import event_bus, Event, Events
 from services.serializers import serialize_session, serialize_activity_instance, serialize_goal
 from services.session_service import SessionService
+from services.goal_type_utils import get_canonical_goal_type
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
@@ -279,14 +281,15 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
         associated_goals = [g for g in (activity_def.associated_goals or []) if not g.deleted_at]
         program_goal_ids = set()
         if session.program_day_id:
-            raw_program_goal_ids = db_session.execute(
-                select(Program.goal_ids)
+            raw_program_goals = db_session.execute(
+                select(program_goals.c.goal_id)
                 .select_from(ProgramDay)
                 .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
                 .join(Program, Program.id == ProgramBlock.program_id)
+                .join(program_goals, program_goals.c.program_id == Program.id)
                 .where(ProgramDay.id == session.program_day_id, Program.root_id == root_id)
-            ).scalar()
-            program_goal_ids = set(models._safe_load_json(raw_program_goal_ids, []))
+            ).scalars().all()
+            program_goal_ids = set(raw_program_goals)
 
         for goal in associated_goals:
             if goal.root_id != root_id:
@@ -302,7 +305,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
             db_session.execute(
                 session_goals.insert().values(
                     **_session_goal_insert_values(
-                        db_session, session_id, goal.id, goal.type, 'activity'
+                        db_session, session_id, goal.id, get_canonical_goal_type(goal), 'activity'
                     )
                 )
             )

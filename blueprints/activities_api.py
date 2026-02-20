@@ -19,6 +19,7 @@ from services.events import event_bus, Event, Events
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition
 )
+from services.goal_type_utils import get_canonical_goal_type
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,15 @@ def create_activity_group(current_user, root_id, validated_data):
             parent_id=parent_id
         )
         session.add(new_group)
+        session.flush() # Get ID for goal associations
+
+        goal_ids = validated_data.get('goal_ids', [])
+        if goal_ids:
+            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
+            for goal in goals:
+                if goal not in new_group.associated_goals:
+                    new_group.associated_goals.append(goal)
+        
         session.commit()
         
         # Emit activity group created event
@@ -179,6 +189,19 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
             group.description = validated_data['description']
         if 'parent_id' in validated_data:
             group.parent_id = validated_data['parent_id']
+        
+        # Update goal associations if provided
+        if 'goal_ids' in validated_data:
+            goal_ids = validated_data.get('goal_ids', [])
+            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
+            
+            # Remove old ones not in the new list
+            group.associated_goals = [g for g in group.associated_goals if g.id in goal_ids]
+            
+            # Add new ones
+            for goal in goals:
+                if goal not in group.associated_goals:
+                    group.associated_goals.append(goal)
             
         session.commit()
         
@@ -272,7 +295,7 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 @token_required
 def set_activity_group_goals(current_user, root_id, group_id):
     """Set goals associated with an activity group (replaces existing associations)."""
-    from models import Goal, goal_activity_group_associations
+    # from models import Goal, goal_activity_group_associations # No longer needed
     
     engine = models.get_engine()
     session = get_session(engine)
@@ -289,26 +312,32 @@ def set_activity_group_goals(current_user, root_id, group_id):
         goal_ids = data.get('goal_ids', [])
         
         # Clear existing associations for this group
-        session.execute(
-            goal_activity_group_associations.delete().where(
-                goal_activity_group_associations.c.activity_group_id == group_id
-            )
-        )
+        # session.execute( # No longer needed with explicit relationship
+        #     goal_activity_group_associations.delete().where(
+        #         goal_activity_group_associations.c.activity_group_id == group_id
+        #     )
+        # )
+        group.associated_goals.clear() # Clear all existing associations
         
         # Add new associations
-        for goal_id in goal_ids:
-            goal = session.query(Goal).filter(
-                Goal.id == goal_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).first()
-            if goal:
-                session.execute(
-                    goal_activity_group_associations.insert().values(
-                        activity_group_id=group_id,
-                        goal_id=goal_id
-                    )
-                )
+        if goal_ids:
+            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
+            for goal in goals:
+                if goal not in group.associated_goals:
+                    group.associated_goals.append(goal)
+        # for goal_id in goal_ids: # No longer needed with explicit relationship
+        #     goal = session.query(Goal).filter(
+        #         Goal.id == goal_id,
+        #         Goal.root_id == root_id,
+        #         Goal.deleted_at == None
+        #     ).first()
+        #     if goal:
+        #         session.execute(
+        #             goal_activity_group_associations.insert().values(
+        #                 activity_group_id=group_id,
+        #                 goal_id=goal_id
+        #             )
+        #         )
         
         session.commit()
         
@@ -432,20 +461,24 @@ def create_activity(current_user, root_id):
         # Handle Goal Associations
         goal_ids = data.get('goal_ids', [])
         if goal_ids:
-            from models import Goal, activity_goal_associations
-            for goal_id in goal_ids:
-                goal = session.query(Goal).filter(
-                    Goal.id == goal_id,
-                    Goal.root_id == root_id,
-                    Goal.deleted_at == None
-                ).first()
-                if goal:
-                    session.execute(
-                        activity_goal_associations.insert().values(
-                            activity_id=new_activity.id,
-                            goal_id=goal_id
-                        )
-                    )
+            # from models import Goal, activity_goal_associations # No longer needed
+            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
+            new_activity.associated_goals.extend(
+                [g for g in goals if g not in new_activity.associated_goals]
+            )
+            # for goal_id in goal_ids: # No longer needed with explicit relationship
+            #     goal = session.query(Goal).filter(
+            #         Goal.id == goal_id,
+            #         Goal.root_id == root_id,
+            #         Goal.deleted_at == None
+            #     ).first()
+            #     if goal:
+            #         session.execute(
+            #             activity_goal_associations.insert().values(
+            #                 activity_id=new_activity.id,
+            #                 goal_id=goal_id
+            #             )
+            #         )
 
         session.commit()
         session.refresh(new_activity) # refresh to load metrics, splits, AND goals
@@ -610,30 +643,22 @@ def update_activity(current_user, root_id, activity_id):
 
         # Update goal associations if provided
         if 'goal_ids' in data:
-            from models import Goal, activity_goal_associations
+            # from models import Goal, activity_goal_associations # No longer needed
             goal_ids = data.get('goal_ids', [])
+            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
             
             # Clear existing associations
-            session.execute(
-                activity_goal_associations.delete().where(
-                    activity_goal_associations.c.activity_id == activity_id
-                )
-            )
+            # session.execute( # No longer needed with explicit relationship
+            #     activity_goal_associations.delete().where(
+            #         activity_goal_associations.c.activity_id == activity_id
+            #     )
+            # )
+            activity.associated_goals.clear() # Clear all existing associations
             
             # Add new associations
-            for goal_id in goal_ids:
-                goal = session.query(Goal).filter(
-                    Goal.id == goal_id,
-                    Goal.root_id == root_id,
-                    Goal.deleted_at == None
-                ).first()
-                if goal:
-                    session.execute(
-                        activity_goal_associations.insert().values(
-                            activity_id=activity_id,
-                            goal_id=goal_id
-                        )
-                    )
+            for goal in goals:
+                if goal not in activity.associated_goals:
+                    activity.associated_goals.append(goal)
         
         session.commit()
         session.refresh(activity)  # Refresh to load updated metrics and goals
@@ -713,7 +738,7 @@ def get_activity_goals(current_user, root_id, activity_id):
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
         
-        goals = [{"id": g.id, "name": g.name, "type": g.type} for g in activity.associated_goals]
+        goals = [{"id": g.id, "name": g.name, "type": get_canonical_goal_type(g)} for g in activity.associated_goals]
         return jsonify(goals)
     finally:
         session.close()

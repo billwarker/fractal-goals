@@ -11,8 +11,18 @@ from models import (
 import models
 from services import event_bus, Event, Events
 from services.serializers import serialize_session
-
+from services.goal_type_utils import get_canonical_goal_type
 logger = logging.getLogger(__name__)
+
+def _program_goal_ids(db_session, program_id):
+    if not program_id:
+        return set()
+    return set(
+        db_session.execute(
+            text("SELECT goal_id FROM program_goals WHERE program_id = :program_id"),
+            {'program_id': program_id}
+        ).scalars().all()
+    )
 
 
 def _parse_iso_datetime_strict(value):
@@ -105,7 +115,7 @@ class SessionService:
         # Program scoping applies only when program has selected goals.
         program_goal_ids = set()
         if getattr(session_obj, 'program_day', None) and session_obj.program_day.block and session_obj.program_day.block.program:
-            program_goal_ids = set(models._safe_load_json(session_obj.program_day.block.program.goal_ids, []))
+            program_goal_ids = _program_goal_ids(self.db_session, session_obj.program_day.block.program.id)
 
         derived = {}
         for act in activities:
@@ -223,7 +233,7 @@ class SessionService:
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
                     program_day_id = requested_day_id
                     new_session.program_day_id = program_day_id
-                    program_goal_ids = set(models._safe_load_json(p_day.block.program.goal_ids, []))
+                    program_goal_ids = _program_goal_ids(self.db_session, p_day.block.program.id)
                 else:
                     return None, "Invalid program day context for this fractal", 400
 
@@ -357,7 +367,7 @@ class SessionService:
             self.db_session.execute(
                 session_goals.insert().values(
                     **self._session_goal_insert_values(
-                        new_session.id, goal_id, goal_obj.type, 'activity'
+                        new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'activity'
                     )
                 )
             )
@@ -376,7 +386,7 @@ class SessionService:
             self.db_session.execute(
                 session_goals.insert().values(
                     **self._session_goal_insert_values(
-                        new_session.id, goal_id, goal_obj.type, 'manual'
+                        new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'manual'
                     )
                 )
             )
@@ -392,13 +402,13 @@ class SessionService:
             ).first()
             if not goal:
                 return None, f"Immediate goal not found in this fractal: {ig_id}", 400
-            if goal.type != 'ImmediateGoal':
+            if get_canonical_goal_type(goal) != 'ImmediateGoal':
                 return None, f"Goal is not an ImmediateGoal: {ig_id}", 400
             if ig_id not in linked_goal_ids:
                 self.db_session.execute(
                     session_goals.insert().values(
                         **self._session_goal_insert_values(
-                            new_session.id, ig_id, goal.type, 'manual'
+                            new_session.id, ig_id, get_canonical_goal_type(goal), 'manual'
                         )
                     )
                 )

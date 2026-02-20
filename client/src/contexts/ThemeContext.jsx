@@ -8,6 +8,18 @@ import { useGoals } from './GoalsContext';
 
 const ThemeContext = createContext();
 
+const normalizeGoalType = (goalType) => {
+    if (!goalType || typeof goalType !== 'string') return goalType;
+    if (GOAL_COLOR_SYSTEM[goalType]) return goalType;
+
+    // In rare cases where a legacy string slips through despite the backend mapper, 
+    // try removing spaces.
+    const compact = goalType.replace(/\s+/g, '');
+    if (GOAL_COLOR_SYSTEM[compact]) return compact;
+
+    return goalType;
+};
+
 export const useTheme = () => {
     const context = useContext(ThemeContext);
     if (!context) {
@@ -254,27 +266,31 @@ export const ThemeProvider = ({ children }) => {
 
     // --- Helpers (Context Aware) ---
     const getScopedColors = (goalType) => {
-        if (activeRootId && goalColors.fractals[activeRootId]?.[goalType]) {
-            return { ...goalColors.default[goalType], ...goalColors.fractals[activeRootId][goalType] };
+        const normalizedType = normalizeGoalType(goalType);
+        if (activeRootId && goalColors.fractals[activeRootId]?.[normalizedType]) {
+            return { ...goalColors.default[normalizedType], ...goalColors.fractals[activeRootId][normalizedType] };
         }
-        return goalColors.default[goalType];
+        return goalColors.default[normalizedType];
     };
 
     const getScopedCharacteristics = (goalType) => {
-        if (activeRootId && goalCharacteristics.fractals[activeRootId]?.[goalType]) {
-            return { ...goalCharacteristics.default[goalType], ...goalCharacteristics.fractals[activeRootId][goalType] };
+        const normalizedType = normalizeGoalType(goalType);
+        if (activeRootId && goalCharacteristics.fractals[activeRootId]?.[normalizedType]) {
+            return { ...goalCharacteristics.default[normalizedType], ...goalCharacteristics.fractals[activeRootId][normalizedType] };
         }
-        return goalCharacteristics.default[goalType];
+        return goalCharacteristics.default[normalizedType];
     };
 
     const getGoalColor = (goalType) => {
-        const colors = getScopedColors(goalType);
-        return colors?.primary || GOAL_COLOR_SYSTEM[goalType]?.primary || '#4caf50';
+        const normalizedType = normalizeGoalType(goalType);
+        const colors = getScopedColors(normalizedType);
+        return colors?.primary || GOAL_COLOR_SYSTEM[normalizedType]?.primary || '#4caf50';
     };
 
     const getGoalSecondaryColor = (goalType) => {
-        const colors = getScopedColors(goalType);
-        return colors?.secondary || GOAL_COLOR_SYSTEM[goalType]?.secondary || '#1a1a1a';
+        const normalizedType = normalizeGoalType(goalType);
+        const colors = getScopedColors(normalizedType);
+        return colors?.secondary || GOAL_COLOR_SYSTEM[normalizedType]?.secondary || '#1a1a1a';
     };
 
     // Helper to get dark variant of the *current* goal color

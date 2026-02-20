@@ -10,7 +10,7 @@ from sqlalchemy import inspect
 logger = logging.getLogger(__name__)
 from models import (
     get_session,
-    Goal, Session, Target,
+    Goal, Session, Target, GoalLevel, TargetMetricCondition,
     get_all_root_goals, get_goal_by_id, get_session_by_id,
     validate_root_goal, session_goals
 )
@@ -38,6 +38,22 @@ from services.analytics_cache import get_analytics, set_analytics
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
 
 _SESSION_GOALS_HAS_SOURCE = None
+_TYPE_TO_LEVEL_NAME = {
+    'UltimateGoal': 'Ultimate Goal',
+    'LongTermGoal': 'Long Term Goal',
+    'MidTermGoal': 'Mid Term Goal',
+    'ShortTermGoal': 'Short Term Goal',
+    'ImmediateGoal': 'Immediate Goal',
+    'MicroGoal': 'Micro Goal',
+    'NanoGoal': 'Nano Goal',
+}
+
+def _resolve_level_id(db_session, type_value):
+    level_name = _TYPE_TO_LEVEL_NAME.get(type_value, type_value.replace('Goal', ' Goal') if isinstance(type_value, str) else None)
+    if not level_name:
+        return None
+    level = db_session.query(GoalLevel).filter_by(name=level_name).first()
+    return level.id if level else None
 
 
 def _session_goals_supports_source(db_session):
@@ -91,7 +107,10 @@ def _sync_targets(db_session, goal, incoming_targets: list):
         if not isinstance(val, list): return []
         cleaned = []
         for m in val:
-            v_raw = m.get('value', 0)
+            metric_id = m.get('metric_id') or m.get('metric_definition_id')
+            if not metric_id:
+                continue
+            v_raw = m.get('value', m.get('target_value', 0))
             try:
                 v = float(v_raw)
                 import math
@@ -99,8 +118,8 @@ def _sync_targets(db_session, goal, incoming_targets: list):
             except: v = 0.0
             
             cleaned.append({
-                'metric_id': m.get('metric_id'),
-                'value': v,
+                'metric_definition_id': metric_id,
+                'target_value': v,
                 'operator': m.get('operator', '>=')
             })
         return cleaned
@@ -135,13 +154,29 @@ def _sync_targets(db_session, goal, incoming_targets: list):
                 target.name = target_data.get('name', target.name)
                 target.activity_id = activity_id
                 target.type = target_data.get('type', target.type)
-                target.metrics = metrics
                 target.time_scope = target_data.get('time_scope', target.time_scope)
                 target.start_date = start_date
                 target.end_date = end_date
                 target.linked_block_id = linked_block_id
                 target.frequency_days = freq_days
                 target.frequency_count = freq_count
+                existing_conditions = {c.metric_definition_id: c for c in (target.metric_conditions or [])}
+                incoming_metric_ids = {m['metric_definition_id'] for m in metrics}
+                for condition in list(target.metric_conditions or []):
+                    if condition.metric_definition_id not in incoming_metric_ids:
+                        db_session.delete(condition)
+                for metric in metrics:
+                    condition = existing_conditions.get(metric['metric_definition_id'])
+                    if condition:
+                        condition.operator = metric['operator']
+                        condition.target_value = metric['target_value']
+                    else:
+                        db_session.add(TargetMetricCondition(
+                            target_id=target.id,
+                            metric_definition_id=metric['metric_definition_id'],
+                            operator=metric['operator'],
+                            target_value=metric['target_value']
+                        ))
                 logger.debug(f"Updated target {target_id}")
             else:
                 # Create new target
@@ -152,7 +187,6 @@ def _sync_targets(db_session, goal, incoming_targets: list):
                     activity_id=activity_id,
                     name=target_data.get('name', 'Measure'),
                     type=target_data.get('type', 'threshold'),
-                    metrics=metrics,
                     time_scope=target_data.get('time_scope', 'all_time'),
                     start_date=start_date,
                     end_date=end_date,
@@ -162,6 +196,14 @@ def _sync_targets(db_session, goal, incoming_targets: list):
                     completed=target_data.get('completed', False)
                 )
                 db_session.add(new_target)
+                db_session.flush()
+                for metric in metrics:
+                    db_session.add(TargetMetricCondition(
+                        target_id=new_target.id,
+                        metric_definition_id=metric['metric_definition_id'],
+                        operator=metric['operator'],
+                        target_value=metric['target_value']
+                    ))
                 logger.debug(f"Created new target {new_target.id} with activity_id={activity_id}")
                 
     except Exception as e:
@@ -191,6 +233,122 @@ def get_goals():
     finally:
         db_session.close()
 
+@goals_bp.route('/goal-levels', methods=['GET'])
+@token_required
+def get_goal_levels(current_user):
+    """List goal levels used by goal type configuration."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        levels = db_session.query(GoalLevel).filter(GoalLevel.deleted_at == None).order_by(GoalLevel.rank.asc(), GoalLevel.created_at.asc()).all()
+        return jsonify([{
+            "id": level.id,
+            "name": level.name,
+            "rank": level.rank,
+            "color": level.color,
+            "icon": level.icon,
+            "created_at": format_utc(level.created_at),
+            "updated_at": format_utc(level.updated_at),
+        } for level in levels])
+    finally:
+        db_session.close()
+
+@goals_bp.route('/goal-levels', methods=['POST'])
+@token_required
+def create_goal_level(current_user):
+    """Create a goal level."""
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        exists = db_session.query(GoalLevel).filter(GoalLevel.name == name, GoalLevel.deleted_at == None).first()
+        if exists:
+            return jsonify({"error": "Goal level already exists"}), 409
+        level = GoalLevel(
+            name=name,
+            rank=int(data.get('rank', 0)),
+            color=data.get('color'),
+            icon=data.get('icon'),
+        )
+        db_session.add(level)
+        db_session.commit()
+        return jsonify({
+            "id": level.id,
+            "name": level.name,
+            "rank": level.rank,
+            "color": level.color,
+            "icon": level.icon,
+            "created_at": format_utc(level.created_at),
+            "updated_at": format_utc(level.updated_at),
+        }), 201
+    finally:
+        db_session.close()
+
+@goals_bp.route('/goal-levels/<level_id>', methods=['PUT'])
+@token_required
+def update_goal_level(current_user, level_id):
+    """Update a goal level."""
+    data = request.get_json() or {}
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        level = db_session.query(GoalLevel).filter(GoalLevel.id == level_id, GoalLevel.deleted_at == None).first()
+        if not level:
+            return jsonify({"error": "Goal level not found"}), 404
+        if 'name' in data:
+            name = (data.get('name') or '').strip()
+            if not name:
+                return jsonify({"error": "name cannot be empty"}), 400
+            dup = db_session.query(GoalLevel).filter(
+                GoalLevel.id != level_id,
+                GoalLevel.name == name,
+                GoalLevel.deleted_at == None
+            ).first()
+            if dup:
+                return jsonify({"error": "Goal level already exists"}), 409
+            level.name = name
+        if 'rank' in data:
+            level.rank = int(data.get('rank', 0))
+        if 'color' in data:
+            level.color = data.get('color')
+        if 'icon' in data:
+            level.icon = data.get('icon')
+        db_session.commit()
+        return jsonify({
+            "id": level.id,
+            "name": level.name,
+            "rank": level.rank,
+            "color": level.color,
+            "icon": level.icon,
+            "created_at": format_utc(level.created_at),
+            "updated_at": format_utc(level.updated_at),
+        })
+    finally:
+        db_session.close()
+
+@goals_bp.route('/goal-levels/<level_id>', methods=['DELETE'])
+@token_required
+def delete_goal_level(current_user, level_id):
+    """Soft-delete a goal level when not referenced."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        level = db_session.query(GoalLevel).filter(GoalLevel.id == level_id, GoalLevel.deleted_at == None).first()
+        if not level:
+            return jsonify({"error": "Goal level not found"}), 404
+        in_use = db_session.query(Goal.id).filter(Goal.level_id == level_id, Goal.deleted_at == None).first()
+        if in_use:
+            return jsonify({"error": "Cannot delete a level currently used by goals"}), 409
+        level.deleted_at = datetime.now(timezone.utc)
+        db_session.commit()
+        return jsonify({"message": "Goal level deleted"})
+    finally:
+        db_session.close()
+
 
 @goals_bp.route('/goals', methods=['POST'])
 @validate_request(GoalCreateSchema)
@@ -213,10 +371,12 @@ def create_goal(validated_data):
         deadline = None
         if validated_data.get('deadline'):
             deadline = parse_date_string(validated_data['deadline'])
+
+        level_id = _resolve_level_id(db_session, validated_data.get('type'))
         
         # Create the goal (type already validated by schema)
         new_goal = Goal(
-            type=validated_data['type'],
+            level_id=level_id,
             name=validated_data['name'],  # Already sanitized
             description=validated_data.get('description', ''),
             deadline=deadline,
@@ -243,14 +403,19 @@ def create_goal(validated_data):
             _sync_targets(db_session, new_goal, validated_data['targets'])
             new_goal.targets = None
         
-        # Link to session if session_id provided and it's a MicroGoal
-        if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
+        # Link to session if session_id provided and it's a Micro Goal
+        # We need to check the level name
+        is_micro = False
+        if getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal':
+            is_micro = True
+            
+        if validated_data.get('session_id') and (validated_data.get('type') == 'MicroGoal' or is_micro):
             db_session.execute(session_goals.insert().values(
                 **_session_goal_insert_values(
                     db_session,
                     validated_data['session_id'],
                     new_goal.id,
-                    'MicroGoal',
+                    'MicroGoal', # Legacy string for the junction table if it still expects it
                     'micro_goal'
                 )
             ))
@@ -263,8 +428,7 @@ def create_goal(validated_data):
         # Emit goal created event
         event_bus.emit(Event(Events.GOAL_CREATED, {
             'goal_id': new_goal.id,
-            'goal_name': new_goal.name,
-            'goal_type': new_goal.type,
+            'goal_type': validated_data.get('type', 'Goal'),
             'parent_id': new_goal.parent_id,
             'root_id': new_goal.root_id
         }, source='goals_api.create_goal'))
@@ -300,8 +464,9 @@ def get_session_micro_goals(current_user, root_id, session_id):
         stmt = (
             select(Goal)
             .join(session_goals, Goal.id == session_goals.c.goal_id)
+            .join(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
             .where(session_goals.c.session_id == session_id)
-            .where(Goal.type == 'MicroGoal')
+            .where(models.GoalLevel.name == 'Micro Goal')
             .options(selectinload(Goal.children)) # Load NanoGoals
         )
         
@@ -447,7 +612,6 @@ def add_goal_target(goal_id):
             activity_id=data.get('activity_id'),
             name=data.get('name', 'Measure'),
             type=data.get('type', 'threshold'),
-            metrics=data.get('metrics', []),
             time_scope=data.get('time_scope', 'all_time'),
             start_date=data.get('start_date'),
             end_date=data.get('end_date'),
@@ -458,6 +622,22 @@ def add_goal_target(goal_id):
         )
         
         db_session.add(new_target)
+        db_session.flush()
+        for metric in (data.get('metrics') or []):
+            metric_id = metric.get('metric_id') or metric.get('metric_definition_id')
+            if not metric_id:
+                continue
+            target_value = metric.get('value', metric.get('target_value', 0))
+            try:
+                target_value = float(target_value)
+            except (TypeError, ValueError):
+                target_value = 0
+            db_session.add(TargetMetricCondition(
+                target_id=new_target.id,
+                metric_definition_id=metric_id,
+                operator=metric.get('operator', '>='),
+                target_value=target_value
+            ))
         db_session.commit()
         db_session.refresh(new_target)
         
@@ -685,11 +865,12 @@ def get_all_fractals(current_user):
             
             last_activity = find_max_updated(root, max_updated)
             
+            level_name = root.level.name if getattr(root, 'level', None) else "Ultimate Goal"
             result.append({
                 "id": root.id,
                 "name": root.name,
                 "description": root.description,
-                "type": root.type,
+                "type": level_name.replace(" ", ""),
                 "created_at": format_utc(root.created_at),
                 "updated_at": format_utc(last_activity),
                 "is_smart": all(calculate_smart_status(root).values())
@@ -709,9 +890,16 @@ def create_fractal(current_user, validated_data):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
+        # For now we'll lookup or create the Ultimate Goal level
+        level = db_session.query(models.GoalLevel).filter_by(name="Ultimate Goal").first()
+        if not level:
+            level = models.GoalLevel(name="Ultimate Goal", rank=0)
+            db_session.add(level)
+            db_session.flush()
+
         # Create root goal
         new_fractal = Goal(
-            type=validated_data.get('type', 'UltimateGoal'),
+            level_id=level.id,
             name=validated_data['name'],
             description=validated_data.get('description', ''),
             relevance_statement=validated_data.get('relevance_statement'),
@@ -820,13 +1008,13 @@ def get_active_goals_for_selection(current_user, root_id):
         # Filter for active (not completed) goals only
         # Eagerly load children and associations for SMART status checks
         from sqlalchemy.orm import selectinload
-        st_goals = db_session.query(Goal).options(
+        st_goals = db_session.query(Goal).join(models.GoalLevel, Goal.level_id == models.GoalLevel.id).options(
             selectinload(Goal.children),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups)
         ).filter(
             Goal.root_id == root_id,
-            Goal.type == 'ShortTermGoal',
+            models.GoalLevel.name == 'Short Term Goal',
             Goal.completed == False,
             Goal.deleted_at == None
         ).all()
@@ -834,11 +1022,13 @@ def get_active_goals_for_selection(current_user, root_id):
         result = []
         for stg in st_goals:
             # Manually find active children to avoid loading entire tree or deleted items
-            active_children = [
-                serialize_goal(child, include_children=False) 
-                for child in stg.children 
-                if child.type == 'ImmediateGoal' and not child.completed and not child.deleted_at
-            ]
+            active_children = []
+            for child in stg.children:
+                is_imm = False
+                if getattr(child, 'level', None) and child.level.name == 'Immediate Goal':
+                    is_imm = True
+                if is_imm and not child.completed and not child.deleted_at:
+                    active_children.append(serialize_goal(child, include_children=False))
             
             stg_dict = {
                 "id": stg.id,
@@ -876,13 +1066,15 @@ def create_fractal_goal(current_user, root_id, validated_data):
         deadline = None
         if validated_data.get('deadline'):
             deadline = parse_date_string(validated_data['deadline'])
+            
+        level_id = _resolve_level_id(db_session, validated_data.get('type'))
         
-        # Create new goal (type already validated by schema)
+        # Create new goal
         new_goal = Goal(
             id=str(uuid.uuid4()),
             name=validated_data['name'],  # Already sanitized
             description=validated_data.get('description', ''),
-            type=validated_data['type'],
+            level_id=level_id,
             parent_id=validated_data.get('parent_id'),
             deadline=deadline,
             completed=False,
@@ -903,7 +1095,8 @@ def create_fractal_goal(current_user, root_id, validated_data):
             new_goal.targets = None
         
         # Link to session if session_id provided and it's a MicroGoal
-        if validated_data.get('session_id') and new_goal.type == 'MicroGoal':
+        is_micro = getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal'
+        if validated_data.get('session_id') and is_micro:
             db_session.execute(session_goals.insert().values(
                 **_session_goal_insert_values(
                     db_session,
@@ -921,7 +1114,7 @@ def create_fractal_goal(current_user, root_id, validated_data):
         event_bus.emit(Event(Events.GOAL_CREATED, {
             'goal_id': new_goal.id,
             'goal_name': new_goal.name,
-            'goal_type': new_goal.type,
+            'goal_type': validated_data.get('type', 'Goal'),
             'parent_id': new_goal.parent_id,
             'root_id': new_goal.root_id
         }, source='goals_api.create_fractal_goal'))
@@ -1269,7 +1462,7 @@ def get_goal_analytics(current_user, root_id):
             goals_data.append({
                 'id': goal.id,
                 'name': goal.name,
-                'type': goal.type,
+                'type': goal.level.name.replace(" ", "") if getattr(goal, 'level', None) else "Goal",
                 'description': goal.description,
                 'completed': goal.completed,
                 'completed_at': format_utc(goal.completed_at),
@@ -1401,7 +1594,16 @@ def evaluate_goal_targets(current_user, root_id, goal_id):
                 continue
             
             activity_id = target.activity_id
-            target_metrics = target.metrics if isinstance(target.metrics, list) else []
+            target_metrics = [
+                {
+                    'metric_id': c.metric_definition_id,
+                    'metric_definition_id': c.metric_definition_id,
+                    'value': c.target_value,
+                    'target_value': c.target_value,
+                    'operator': c.operator,
+                }
+                for c in (target.metric_conditions or [])
+            ]
             
             if not activity_id or not target_metrics:
                 continue
@@ -1489,8 +1691,9 @@ def _check_metrics_meet_target(target_metrics, actual_metrics):
     
     # Check all target metrics are met
     for tm in target_metrics:
-        metric_id = tm.get('metric_id')
-        target_value = tm.get('value')
+        metric_id = tm.get('metric_id') or tm.get('metric_definition_id')
+        target_value = tm.get('value', tm.get('target_value'))
+        operator = tm.get('operator', '>=')
         
         if not metric_id or target_value is None:
             continue
@@ -1499,7 +1702,16 @@ def _check_metrics_meet_target(target_metrics, actual_metrics):
         if actual_value is None:
             return False  # Missing metric
         
-        if actual_value < float(target_value):
+        target_float = float(target_value)
+        if operator == '>=' and not (actual_value >= target_float):
+            return False
+        if operator == '>' and not (actual_value > target_float):
+            return False
+        if operator == '<=' and not (actual_value <= target_float):
+            return False
+        if operator == '<' and not (actual_value < target_float):
+            return False
+        if operator in ('==', '=') and not (abs(actual_value - target_float) < 0.001):
             return False  # Below target
-    
+
     return True

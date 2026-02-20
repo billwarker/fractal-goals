@@ -69,10 +69,11 @@ def get_sessions_for_root(db_session, root_id):
 def get_immediate_goals_for_session(db_session, session_id):
     """Get ImmediateGoals associated with a session via the junction table."""
     from sqlalchemy import select
-    from .goal import Goal, session_goals
+    from .goal import Goal, GoalLevel, session_goals
     stmt = select(Goal).join(session_goals).where(
         session_goals.c.session_id == session_id,
-        Goal.type == 'ImmediateGoal'
+        Goal.level_id == GoalLevel.id,
+        GoalLevel.name == 'Immediate Goal'
     )
     return db_session.execute(stmt).scalars().all()
 

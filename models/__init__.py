@@ -4,8 +4,7 @@ from .base import (
 )
 from .user import User
 from .goal import (
-    Goal, UltimateGoal, LongTermGoal, MidTermGoal, ShortTermGoal, 
-    ImmediateGoal, MicroGoal, NanoGoal, Target,
+    GoalLevel, Goal, TargetTemplate, Target, TargetMetricCondition, TargetContributionLedger,
     session_goals, activity_goal_associations, goal_activity_group_associations,
     session_template_goals, program_day_goals,
     get_all_root_goals, get_goal_by_id, get_root_id_for_goal, 
@@ -19,7 +18,10 @@ from .session import (
     Session, SessionTemplate, get_session_by_id, get_all_sessions,
     get_sessions_for_root, get_immediate_goals_for_session, delete_session
 )
-from .program import Program, ProgramBlock, ProgramDay, program_day_templates
+from .program import (
+    Program, ProgramBlock, ProgramDay, ProgramDaySession,
+    program_day_templates, program_goals, program_block_goals
+)
 from .common import Note, VisualizationAnnotation, EventLog
 
 # Legacy ALIASES for backward compatibility (Optional)

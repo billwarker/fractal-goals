@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from services.serializers import format_utc
 from models import (
     Program, ProgramBlock, ProgramDay, Goal, SessionTemplate, Session,
-    validate_root_goal, _safe_load_json
+    validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
 from services.serializers import serialize_program, serialize_program_block
@@ -18,6 +18,56 @@ class ProgramService:
     """
     Service for managing training programs, blocks, and days.
     """
+
+    @staticmethod
+    def _replace_program_goals(session, program_id: str, goal_ids: List[str], root_id: str) -> List[Goal]:
+        goal_ids = list(dict.fromkeys(goal_ids or []))
+        goals = []
+        if goal_ids:
+            goals = session.query(Goal).filter(
+                Goal.id.in_(goal_ids),
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).all()
+            found_ids = {g.id for g in goals}
+            missing_ids = [gid for gid in goal_ids if gid not in found_ids]
+            if missing_ids:
+                raise ValueError(f"Goals not found in this fractal: {', '.join(missing_ids)}")
+
+        session.execute(
+            program_goals.delete().where(program_goals.c.program_id == program_id)
+        )
+        if goals:
+            session.execute(
+                program_goals.insert(),
+                [{'program_id': program_id, 'goal_id': g.id} for g in goals]
+            )
+        return goals
+
+    @staticmethod
+    def _replace_block_goals(session, block_id: str, goal_ids: List[str], root_id: str):
+        goal_ids = list(dict.fromkeys(goal_ids or []))
+        goals = []
+        if goal_ids:
+            goals = session.query(Goal).filter(
+                Goal.id.in_(goal_ids),
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).all()
+            found_ids = {g.id for g in goals}
+            missing_ids = [gid for gid in goal_ids if gid not in found_ids]
+            if missing_ids:
+                raise ValueError(f"Goals not found in this fractal: {', '.join(missing_ids)}")
+
+        session.execute(
+            program_block_goals.delete().where(program_block_goals.c.program_block_id == block_id)
+        )
+        if goals:
+            session.execute(
+                program_block_goals.insert(),
+                [{'program_block_id': block_id, 'goal_id': g.id} for g in goals]
+            )
+        return goals
 
     @staticmethod
     def _sync_program_structure(session, program: Program, schedule_list: List[Dict]):
@@ -142,10 +192,11 @@ class ProgramService:
             description=validated_data.get('description', ''),
             start_date=start_date,
             end_date=end_date,
-            goal_ids=validated_data.get('selectedGoals', []),
             weekly_schedule=schedule_list,
             is_active=validated_data.get('is_active', True)
         )
+        
+        goal_ids = validated_data.get('selectedGoals', [])
         
         # Enforce single active program constraint
         if new_program.is_active:
@@ -156,6 +207,8 @@ class ProgramService:
             # But if we create it with is_active=True, we should ensure it stays True.
         
         session.add(new_program)
+        session.flush()
+        ProgramService._replace_program_goals(session, new_program.id, goal_ids, root_id)
         
         # Sync to new tables
         ProgramService._sync_program_structure(session, new_program, schedule_list)
@@ -185,7 +238,8 @@ class ProgramService:
         if 'end_date' in validated_data:
             program.end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
         if 'selectedGoals' in validated_data:
-            program.goal_ids = validated_data['selectedGoals']
+            goal_ids = validated_data['selectedGoals']
+            ProgramService._replace_program_goals(session, program.id, goal_ids, root_id)
         
         if 'weeklySchedule' in validated_data:
             schedule_list = validated_data['weeklySchedule']
@@ -476,8 +530,8 @@ class ProgramService:
                                     "block_id": block.id,
                                     "block_name": block.name,
                                     "block_color": block.color,
-                                    "program_goal_ids": _safe_load_json(program.goal_ids, []),
-                                    "block_goal_ids": _safe_load_json(program.goal_ids, []),  # compatibility alias
+                                    "program_goal_ids": [g.id for g in program.goals],
+                                    "block_goal_ids": [g.id for g in block.goals] or [g.id for g in program.goals],  # compatibility alias
                                     "day_id": day.id,
                                     "day_name": day.name,
                                     "day_number": day.day_number,
@@ -511,11 +565,17 @@ class ProgramService:
         if not goal:
             raise ValueError("Goal not found in this fractal")
 
-        current_ids = _safe_load_json(program.goal_ids, [])
-        if goal_id not in current_ids:
-            current_ids.append(goal_id)
-            program.goal_ids = current_ids
-            session.add(program)
+        current_program_goal_ids = [g.id for g in (program.goals or [])]
+        if goal.id not in current_program_goal_ids:
+            ProgramService._replace_program_goals(
+                session, program.id, current_program_goal_ids + [goal.id], root_id
+            )
+
+        current_block_goal_ids = [g.id for g in (block.goals or [])]
+        if goal.id not in current_block_goal_ids:
+            ProgramService._replace_block_goals(
+                session, block.id, current_block_goal_ids + [goal.id], root_id
+            )
             
         if deadline_str:
             try:

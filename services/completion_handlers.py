@@ -15,10 +15,54 @@ import json
 
 from services.events import event_bus, Event, Events
 import models
-from models import get_session, Goal, Session, ActivityInstance, Target
+from models import (
+    get_session, Goal, Session, ActivityInstance, Target,
+    TargetContributionLedger
+)
 from services.serializers import serialize_activity_instance, format_utc
 
 logger = logging.getLogger(__name__)
+
+def _target_metrics_from_conditions(target: Target):
+    metrics = []
+    for condition in (target.metric_conditions or []):
+        metrics.append({
+            'metric_id': condition.metric_definition_id,
+            'operator': condition.operator,
+            'value': condition.target_value,
+        })
+    return metrics
+
+def _collect_actual_metric_values_from_instance_dict(instance_dict: dict):
+    actual_map = {}
+    for m in (instance_dict.get('metrics') or []):
+        metric_id = m.get('metric_id') or m.get('metric_definition_id')
+        if metric_id and m.get('value') is not None:
+            actual_map[metric_id] = float(m.get('value'))
+    for s in (instance_dict.get('sets') or []):
+        for m in (s.get('metrics') or []):
+            metric_id = m.get('metric_id') or m.get('metric_definition_id')
+            if metric_id and m.get('value') is not None:
+                actual_map[metric_id] = max(actual_map.get(metric_id, 0.0), float(m.get('value')))
+    return actual_map
+
+def _record_target_contributions(db_session, target: Target, instance_id: str, actual_metric_map: dict):
+    if not instance_id:
+        return
+    db_session.query(TargetContributionLedger).filter(
+        TargetContributionLedger.target_id == target.id,
+        TargetContributionLedger.activity_instance_id == instance_id
+    ).delete(synchronize_session=False)
+    for condition in (target.metric_conditions or []):
+        actual_value = actual_metric_map.get(condition.metric_definition_id)
+        if actual_value is None:
+            continue
+        db_session.add(TargetContributionLedger(
+            target_id=target.id,
+            activity_instance_id=instance_id,
+            metric_condition_id=condition.id,
+            contributed_value=int(round(actual_value))
+        ))
 
 
 def _get_db_session():
@@ -172,7 +216,7 @@ def _evaluate_threshold_targets_for_activity(
             'name': target.name,
             'type': target.type,
             'activity_id': target.activity_id,
-            'metrics': target.metrics if isinstance(target.metrics, list) else [],
+            'metrics': _target_metrics_from_conditions(target),
         }
         
         logger.info(f"[TARGET_EVAL] Evaluating '{target_name}' against instances...")
@@ -185,6 +229,9 @@ def _evaluate_threshold_targets_for_activity(
             target.completed_session_id = session_id
             instance_list = instances_by_activity.get(activity_id, [])
             target.completed_instance_id = instance_list[0].get('id') if instance_list else None
+            if instance_list:
+                metric_map = _collect_actual_metric_values_from_instance_dict(instance_list[0])
+                _record_target_contributions(db_session, target, target.completed_instance_id, metric_map)
             
             newly_completed.append(target)
             
@@ -268,7 +315,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             'name': target.name,
             'type': target.type,
             'activity_id': target.activity_id,
-            'metrics': target.metrics if isinstance(target.metrics, list) else [],
+            'metrics': _target_metrics_from_conditions(target),
             'time_scope': target.time_scope,
             'start_date': target.start_date,
             'end_date': target.end_date,
@@ -738,7 +785,7 @@ def _update_program_progress(db_session, goal: Goal):
     program_ids = {
         program.id
         for program in programs_in_root
-        if goal.id in models._safe_load_json(program.goal_ids, [])
+        if goal.id in {g.id for g in (program.goals or [])}
     }
 
     if not program_ids:
@@ -751,7 +798,7 @@ def _update_program_progress(db_session, goal: Goal):
 
 def _recalculate_program_progress(db_session, program):
     """Recalculate the completion percentage for a program."""
-    all_goal_ids = set(models._safe_load_json(program.goal_ids, []))
+    all_goal_ids = {g.id for g in (program.goals or [])}
     
     if not all_goal_ids:
         if hasattr(program, 'goals_completed'):

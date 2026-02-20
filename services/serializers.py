@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, date
 import json
 from models import _safe_load_json
+from .goal_type_utils import get_canonical_goal_type
 
 def format_utc(dt):
     """Format a datetime or date object to ISO string with UTC indicator."""
@@ -34,19 +35,32 @@ def calculate_smart_status(goal):
         "measurable": is_measurable,
         "achievable": is_achievable,
         "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
-        "time_bound": goal.deadline is not None or goal.type in ['MicroGoal', 'NanoGoal']
+        "time_bound": goal.deadline is not None or get_canonical_goal_type(goal) in ['MicroGoal', 'NanoGoal']
     }
 
 def serialize_target(target):
     """Serialize a Target object."""
+    metrics_json = []
+    if getattr(target, 'metric_conditions', None):
+        for condition in target.metric_conditions:
+            metrics_json.append({
+                "metric_id": condition.metric_definition_id,
+                "metric_definition_id": condition.metric_definition_id,
+                "operator": condition.operator,
+                "value": condition.target_value,
+                "target_value": condition.target_value
+            })
+            
     return {
         "id": target.id,
         "goal_id": target.goal_id,
         "root_id": target.root_id,
         "activity_id": target.activity_id,
+        "activity_group_id": getattr(target, 'activity_group_id', None),
+        "template_id": getattr(target, 'template_id', None),
         "name": target.name,
         "type": target.type or "threshold",
-        "metrics": _safe_load_json(target.metrics, []),
+        "metrics": metrics_json,
         "time_scope": target.time_scope or "all_time",
         "start_date": format_utc(target.start_date),
         "end_date": format_utc(target.end_date),
@@ -55,8 +69,8 @@ def serialize_target(target):
         "frequency_count": target.frequency_count,
         "completed": target.completed or False,
         "completed_at": format_utc(target.completed_at),
-        "completed_session_id": target.completed_session_id,
-        "completed_instance_id": target.completed_instance_id,
+        "completed_session_id": getattr(target, 'completed_session_id', None),
+        "completed_instance_id": getattr(target, 'completed_instance_id', None),
         "created_at": format_utc(target.created_at),
         "updated_at": format_utc(target.updated_at)
     }
@@ -113,10 +127,14 @@ def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""
     smart_status = calculate_smart_status(goal)
     
+    goal_type = get_canonical_goal_type(goal)
+    goal_level_name = getattr(goal.level, 'name', None) if getattr(goal, 'level', None) else None
+    
     result = {
         "name": goal.name,
         "id": goal.id,
-        "type": goal.type,  # Hoist type to top level for frontend convenience
+        "type": goal_type,  # Hoist type to top level for frontend convenience
+        "level_name": goal_level_name,
         "completed": goal.completed,
         "completed_at": format_utc(goal.completed_at),
         "is_smart": all(smart_status.values()),
@@ -125,10 +143,10 @@ def serialize_goal(goal, include_children=True):
         "deadline": format_utc(goal.deadline),
         "attributes": {
             "id": goal.id,
-            "type": goal.type,
+            "type": goal_type,
             "parent_id": goal.parent_id,
             "root_id": goal.root_id,
-            "owner_id": goal.owner_id,
+            "owner_id": getattr(goal, 'owner_id', None),
             "description": goal.description,
             "deadline": format_utc(goal.deadline),
             "completed": goal.completed,
@@ -301,8 +319,11 @@ def serialize_session(session, include_image_data=False):
         goals_source = session.goals if hasattr(session, 'goals') else []
 
     if goals_source:
-        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if g.type == 'ShortTermGoal']
-        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if g.type == 'ImmediateGoal']
+        def get_type(g):
+            return get_canonical_goal_type(g)
+            
+        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ShortTermGoal']
+        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ImmediateGoal']
     else:
         result["short_term_goals"] = []
         result["immediate_goals"] = []
@@ -364,7 +385,7 @@ def serialize_activity_definition(activity):
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions],
         "associated_goal_ids": [g.id for g in activity.associated_goals] if activity.associated_goals else [],
-        "associated_goals": [{"id": g.id, "name": g.name, "type": g.type} for g in activity.associated_goals] if activity.associated_goals else []
+        "associated_goals": [{"id": g.id, "name": g.name, "type": get_canonical_goal_type(g)} for g in activity.associated_goals] if activity.associated_goals else []
     }
 
 def serialize_metric_definition(metric):
@@ -411,15 +432,16 @@ def serialize_program(program):
         "end_date": format_utc(program.end_date),
         "weekly_schedule": schedule_from_db or _safe_load_json(program.weekly_schedule, []),
         "blocks": schedule_from_db,
-        "goal_ids": _safe_load_json(program.goal_ids, []),
-        "selected_goals": _safe_load_json(program.goal_ids, []),  # Keep both for safety
+        "goal_ids": [g.id for g in (program.goals or [])],
+        "selected_goals": [g.id for g in (program.goals or [])],  # Keep both for safety
         "created_at": format_utc(program.created_at),
         "updated_at": format_utc(program.updated_at)
     }
 
 def serialize_program_block(block):
     """Serialize a ProgramBlock object."""
-    program_goal_ids = _safe_load_json(block.program.goal_ids, []) if getattr(block, 'program', None) else _safe_load_json(block.goal_ids, [])
+    block_goal_ids = [g.id for g in (block.goals or [])]
+    program_goal_ids = [g.id for g in (block.program.goals or [])] if getattr(block, 'program', None) else []
     return {
         "id": block.id,
         "program_id": block.program_id,
@@ -427,7 +449,7 @@ def serialize_program_block(block):
         "start_date": format_utc(block.start_date),
         "end_date": format_utc(block.end_date),
         "color": block.color,
-        "goal_ids": program_goal_ids,
+        "goal_ids": block_goal_ids or program_goal_ids,
         "days": [serialize_program_day(d) for d in block.days]
     }
 

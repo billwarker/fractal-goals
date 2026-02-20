@@ -401,6 +401,7 @@ Recent focus has been on:
 - **CRITICAL FIX: Missing onAddChild Prop**: Added `onAddChild` to `GoalDetailModal` props destructuring. This missing prop caused a `ReferenceError` that crashed the entire sidebar when clicking any goal. Also added `ErrorBoundary` component to `FractalGoals.jsx` to catch and display future errors gracefully.
 - **FlowTree Evidence Resolution**: Expanded `deriveEvidenceGoalIds` in `FlowTree.jsx` so highlights and fades accurately reflect work logged against Activity Groups (not just direct activities). Added strict fallback logic to map evidence to session-level goals dynamically if specific activities cannot be cleanly matched.
 - **FlowTree Metrics Overlay**: Implemented a comprehensive dynamic metrics overlay in `FlowTree.jsx` that computes statistics exactly on the currently visible goal lineage, displaying key insights across Goals, Work Evidence, Pathways, Momentum (Last 7 Days), and Program Alignment.
+- **Goal Mapping Centralization**: Replaced duplicate, fallback `_goal_type_from_level` logic across the backend with a single `get_canonical_goal_type` and `get_canonical_goal_level_name` utility in `services/goal_type_utils.py`. Enforced strict foreign-keys and visual characteristics by backfilling `level_id` values for all existing goals, resolving a major bug where unmapped goals rendered incorrectly as a generic `"Goal"` in the UI.
 
 ---
 
@@ -723,7 +724,7 @@ When making changes, update these files as needed:
 
 ---
 
-**Last Updated:** 2026-02-18
+**Last Updated:** 2026-02-20
 **Version:** 2.0.0 (Refactored Architecture)
 **Maintained By:** Project AI Agents
 

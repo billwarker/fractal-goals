@@ -7,20 +7,33 @@ sys.path.append(current_dir)
 
 try:
     from app import app
-    from models import get_engine, ActivityInstance, Session
-    from services.db_queries import get_session
+    from models import get_engine, Goal, GoalLevel, get_session
+    from sqlalchemy import func
     
     engine = get_engine()
     db = get_session(engine)
     
-    # Let's get the 5 most recent sessions and their instances
-    sessions = db.query(Session).order_by(Session.created_at.desc()).limit(5).all()
-    print("--- RECENT SESSIONS ---")
-    for s in sessions:
-        print(f"Session {s.id} completed={s.completed} total_duration={s.total_duration_seconds}")
-        for inst in s.activity_instances:
-            print(f"  -> Instance {inst.id} completed={inst.completed} def_id={inst.activity_definition_id} start={inst.time_start} stop={inst.time_stop} duration={inst.duration_seconds}")
+    with app.app_context():
+        # 1. Count goals with level_id is null
+        null_level_count = db.query(Goal).filter(Goal.level_id == None).count()
+        print(f"[{null_level_count}] goals with level_id is NULL")
+        
+        # 2. List distinct goal_levels.name
+        levels = db.query(GoalLevel.name, GoalLevel.id).distinct().all()
+        print(f"Distinct Goal Levels count: {len(levels)}")
+        for name, lid in levels:
+            print(f"  - {name} ({lid})")
             
+        # Check if there are distinct level names present from join
+        goal_stats = db.query(
+            GoalLevel.name, 
+            func.count(Goal.id)
+        ).outerjoin(Goal.level).group_by(GoalLevel.name).all()
+        
+        print("\nGoals by Level Name:")
+        for name, cnt in goal_stats:
+            print(f"  - {name or 'NULL'}: {cnt} goals")
+
 except Exception as e:
     import traceback
     traceback.print_exc()
