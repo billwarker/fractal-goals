@@ -11,6 +11,19 @@
     stroke-width: 2.5px !important;
 }
 
+.active-branch-edge .react-flow__edge-path {
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 70%, transparent));
+}
+
+.faded-edge .react-flow__edge-path {
+    opacity: 0.16;
+}
+
+.journey-edge .react-flow__edge-path {
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-brand-primary, #38bdf8) 70%, transparent));
+}
+
 .react-flow__edge {
     pointer-events: all !important;
 }

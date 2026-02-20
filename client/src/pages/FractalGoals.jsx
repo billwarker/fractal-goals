@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -6,6 +6,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import AlertModal from '../components/modals/AlertModal';
+import Checkbox from '../components/atoms/Checkbox';
 import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
@@ -23,6 +24,8 @@ import './FractalGoals.css';
  * They are managed separately via the /sessions page.
  */
 function FractalGoals() {
+    const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
+
     const { rootId } = useParams();
     const navigate = useNavigate();
 
@@ -43,13 +46,12 @@ function FractalGoals() {
     } = useFractalTreeQuery(rootId);
 
     const {
-        fetchSessions,
-        useSessionsQuery
+        useAllSessionsQuery
     } = useSessions();
 
     const {
         data: sessions = [],
-    } = useSessionsQuery(rootId);
+    } = useAllSessionsQuery(rootId);
 
     const {
         activities,
@@ -65,7 +67,7 @@ function FractalGoals() {
     // Programs State
     const [programs, setPrograms] = useState([]);
 
-    const fetchPrograms = async (id) => {
+    const fetchPrograms = useCallback(async (id) => {
         try {
             const { fractalApi } = await import('../utils/api');
             const res = await fractalApi.getPrograms(id);
@@ -73,7 +75,7 @@ function FractalGoals() {
         } catch (err) {
             console.error("Failed to fetch programs:", err);
         }
-    };
+    }, []);
 
     const loading = goalsLoading;
 
@@ -89,6 +91,11 @@ function FractalGoals() {
 
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
+    const [viewSettings, setViewSettings] = useState({
+        highlightActiveBranches: false,
+        fadeInactiveBranches: false,
+        showCompletionJourney: false
+    });
 
     // Initial Data Fetch (Only for non-Query managed data)
     useEffect(() => {
@@ -97,13 +104,36 @@ function FractalGoals() {
             return;
         }
         setActiveRootId(rootId);
-        fetchSessions(rootId);
         fetchActivities(rootId);
         fetchActivityGroups(rootId);
         fetchPrograms(rootId);
 
         return () => setActiveRootId(null);
-    }, [rootId, navigate, setActiveRootId]);
+    }, [rootId, navigate, setActiveRootId, fetchActivities, fetchActivityGroups, fetchPrograms]);
+
+    useEffect(() => {
+        if (!rootId) return;
+        try {
+            const raw = localStorage.getItem(`${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}`);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            setViewSettings((prev) => ({
+                ...prev,
+                ...parsed
+            }));
+        } catch (err) {
+            console.error('Failed to load FlowTree settings:', err);
+        }
+    }, [rootId]);
+
+    useEffect(() => {
+        if (!rootId) return;
+        try {
+            localStorage.setItem(`${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}`, JSON.stringify(viewSettings));
+        } catch (err) {
+            console.error('Failed to persist FlowTree settings:', err);
+        }
+    }, [rootId, viewSettings]);
 
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {
@@ -220,6 +250,12 @@ function FractalGoals() {
         ? getChildType(selectedParent?.attributes?.type || selectedParent?.type)
         : (viewingGoal?.attributes?.type || viewingGoal?.type);
     const sheetTitleColor = activeGoalType ? getGoalColor(activeGoalType) : 'var(--color-text-primary)';
+    const handleToggleViewSetting = (settingKey) => (event) => {
+        setViewSettings((prev) => ({
+            ...prev,
+            [settingKey]: event.target.checked
+        }));
+    };
 
     return (
         <div className="fractal-page-container" style={{
@@ -252,8 +288,29 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
+                    <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''}`}>
+                        <div className="flowtree-options-title">Graph View</div>
+                        <Checkbox
+                            label="Highlight active branches"
+                            checked={viewSettings.highlightActiveBranches}
+                            onChange={handleToggleViewSetting('highlightActiveBranches')}
+                        />
+                        <Checkbox
+                            label="Fade inactive branches"
+                            checked={viewSettings.fadeInactiveBranches}
+                            onChange={handleToggleViewSetting('fadeInactiveBranches')}
+                        />
+                        <Checkbox
+                            label="Show completion journey"
+                            checked={viewSettings.showCompletionJourney}
+                            onChange={handleToggleViewSetting('showCompletionJourney')}
+                        />
+                    </div>
                     <FractalView
                         treeData={fractalData}
+                        sessions={sessions}
+                        activities={activities}
+                        viewSettings={viewSettings}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
                         onAddChild={handleAddChildClick}

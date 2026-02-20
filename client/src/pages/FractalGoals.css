@@ -43,6 +43,32 @@
     min-width: 0;
 }
 
+.flowtree-options-pane {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 250px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--color-bg-sidebar) 90%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-md);
+}
+
+.flowtree-options-title {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
 /* 
    We keep .docked for flex behavior, but we use inline styles 
    in FractalGoals.jsx to achieve the "floating" look.
@@ -63,6 +89,20 @@
 
     .fractal-view-wrapper {
         min-height: 0;
+    }
+
+    .flowtree-options-pane {
+        top: 10px;
+        left: 10px;
+        min-width: 210px;
+        max-width: calc(100% - 20px);
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    .flowtree-options-pane-mobile {
+        transform: scale(0.94);
+        transform-origin: top left;
     }
 
     .mobile-sheet-collapsed-bar {
