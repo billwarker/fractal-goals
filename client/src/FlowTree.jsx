@@ -415,12 +415,16 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
 };
 
 const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = []) => {
+    const safeSessions = Array.isArray(sessions) ? sessions : [];
+    const safeActivities = Array.isArray(activities) ? activities : [];
+    const safeActivityGroups = Array.isArray(activityGroups) ? activityGroups : [];
+
     // 1. Map Activity ID -> Goal IDs
     const goalsByActivityId = new Map();
     // Also track which group an activity belongs to
     const groupIdByActivityId = new Map();
 
-    activities.forEach((activity) => {
+    safeActivities.forEach((activity) => {
         const activityId = toId(activity?.id);
         if (!activityId) return;
 
@@ -436,7 +440,7 @@ const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = 
 
     // 2. Map Activity Group ID -> Goal IDs
     const goalsByGroupId = new Map();
-    activityGroups.forEach((group) => {
+    safeActivityGroups.forEach((group) => {
         const groupId = toId(group?.id);
         if (!groupId) return;
 
@@ -450,7 +454,7 @@ const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = 
     let hasInstanceEvidence = false;
 
     // 3. Process completed sessions & instances
-    sessions.forEach((session) => {
+    safeSessions.forEach((session) => {
         if (!session?.completed) return;
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
 
@@ -482,7 +486,7 @@ const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = 
     // This prevents highlighting the entire tree if direct mapping fails, but handles
     // cases where old data doesn't map to activities well.
     if (!hasInstanceEvidence) {
-        sessions.forEach((session) => {
+        safeSessions.forEach((session) => {
             if (!session?.completed) return;
 
             const shortTermGoals = Array.isArray(session.short_term_goals) ? session.short_term_goals : [];
@@ -587,6 +591,11 @@ const deriveGraphMetrics = (
     activityGroups,
     programs
 ) => {
+    const safeSessions = Array.isArray(sessions) ? sessions : [];
+    const safeActivities = Array.isArray(activities) ? activities : [];
+    const safeActivityGroups = Array.isArray(activityGroups) ? activityGroups : [];
+    const safePrograms = Array.isArray(programs) ? programs : [];
+
     // ROW 1: Goals
     const totalGoals = rawNodes.length;
     const completedGoals = rawNodes.filter((n) => n.data.completed).length;
@@ -596,14 +605,14 @@ const deriveGraphMetrics = (
 
     const goalsByActivityId = new Map();
     const groupIdByActivityId = new Map();
-    activities.forEach((a) => {
+    safeActivities.forEach((a) => {
         const id = toId(a.id);
         goalsByActivityId.set(id, Array.isArray(a.associated_goal_ids) ? a.associated_goal_ids.map(toId) : []);
         if (a.group_id) groupIdByActivityId.set(id, toId(a.group_id));
     });
 
     const goalsByGroupId = new Map();
-    activityGroups.forEach((g) => {
+    safeActivityGroups.forEach((g) => {
         goalsByGroupId.set(toId(g.id), Array.isArray(g.associated_goal_ids) ? g.associated_goal_ids.map(toId) : []);
     });
 
@@ -638,7 +647,7 @@ const deriveGraphMetrics = (
     };
 
     let associatedActivitiesCount = 0;
-    activities.forEach((a) => {
+    safeActivities.forEach((a) => {
         const id = toId(a.id);
         const directGoals = goalsByActivityId.get(id) || [];
         if (directGoals.some((gId) => visibleNodeIds.has(gId))) {
@@ -669,7 +678,7 @@ const deriveGraphMetrics = (
     let programSessionsCount = 0;
     let recentProgramSessionsCount = 0;
 
-    sessions.forEach((session) => {
+    safeSessions.forEach((session) => {
         // Evaluate activity instances independently of session completion
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
         instances.forEach((inst) => {
@@ -715,7 +724,7 @@ const deriveGraphMetrics = (
     }).length;
 
     const activeProgramGoalIds = new Set();
-    programs.forEach((prog) => {
+    safePrograms.forEach((prog) => {
         if (!prog.is_active) return;
         const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
         blocks.forEach((b) => {

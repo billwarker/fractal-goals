@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -50,8 +50,10 @@ function FractalGoals() {
     } = useSessions();
 
     const {
-        data: sessions = [],
+        data: sessionsData,
     } = useAllSessionsQuery(rootId);
+
+    const sessions = useMemo(() => (Array.isArray(sessionsData) ? sessionsData : []), [sessionsData]);
 
     const {
         activities,
