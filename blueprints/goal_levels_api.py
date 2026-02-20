@@ -25,6 +25,18 @@ def serialize_goal_level(level):
         "allow_manual_completion": level.allow_manual_completion,
         "track_activities": level.track_activities,
         "requires_smart": getattr(level, 'requires_smart', False),
+        "deadline_min_value": level.deadline_min_value,
+        "deadline_min_unit": level.deadline_min_unit,
+        "deadline_max_value": level.deadline_max_value,
+        "deadline_max_unit": level.deadline_max_unit,
+        "max_children": level.max_children,
+        "auto_complete_when_children_done": level.auto_complete_when_children_done,
+        "can_have_targets": level.can_have_targets,
+
+        "description_required": level.description_required,
+        "default_deadline_offset_value": level.default_deadline_offset_value,
+        "default_deadline_offset_unit": level.default_deadline_offset_unit,
+        "sort_children_by": level.sort_children_by,
         "created_at": format_utc(level.created_at),
         "updated_at": format_utc(level.updated_at)
     }
@@ -142,7 +154,19 @@ def update_goal_level(current_user, level_id):
                     root_id=req_root_id,
                     allow_manual_completion=level.allow_manual_completion,
                     track_activities=level.track_activities,
-                    requires_smart=getattr(level, 'requires_smart', False)
+                    requires_smart=getattr(level, 'requires_smart', False),
+                    deadline_min_value=level.deadline_min_value,
+                    deadline_min_unit=level.deadline_min_unit,
+                    deadline_max_value=level.deadline_max_value,
+                    deadline_max_unit=level.deadline_max_unit,
+                    max_children=level.max_children,
+                    auto_complete_when_children_done=level.auto_complete_when_children_done,
+                    can_have_targets=level.can_have_targets,
+
+                    description_required=level.description_required,
+                    default_deadline_offset_value=level.default_deadline_offset_value,
+                    default_deadline_offset_unit=level.default_deadline_offset_unit,
+                    sort_children_by=level.sort_children_by
                 )
                 db_session.add(new_level)
                 db_session.flush()
@@ -161,6 +185,29 @@ def update_goal_level(current_user, level_id):
             level.track_activities = bool(data['track_activities'])
         if 'requires_smart' in data:
             level.requires_smart = bool(data['requires_smart'])
+        if 'deadline_min_value' in data:
+            level.deadline_min_value = int(data['deadline_min_value']) if data['deadline_min_value'] is not None else None
+        if 'deadline_min_unit' in data:
+            level.deadline_min_unit = data['deadline_min_unit']
+        if 'deadline_max_value' in data:
+            level.deadline_max_value = int(data['deadline_max_value']) if data['deadline_max_value'] is not None else None
+        if 'deadline_max_unit' in data:
+            level.deadline_max_unit = data['deadline_max_unit']
+        if 'max_children' in data:
+            level.max_children = int(data['max_children']) if data['max_children'] is not None else None
+        if 'auto_complete_when_children_done' in data:
+            level.auto_complete_when_children_done = bool(data['auto_complete_when_children_done'])
+        if 'can_have_targets' in data:
+            level.can_have_targets = bool(data['can_have_targets'])
+
+        if 'description_required' in data:
+            level.description_required = bool(data['description_required'])
+        if 'default_deadline_offset_value' in data:
+            level.default_deadline_offset_value = int(data['default_deadline_offset_value']) if data['default_deadline_offset_value'] is not None else None
+        if 'default_deadline_offset_unit' in data:
+            level.default_deadline_offset_unit = data['default_deadline_offset_unit']
+        if 'sort_children_by' in data:
+            level.sort_children_by = data['sort_children_by']
             
         db_session.commit()
         return jsonify(serialize_goal_level(level))

@@ -728,11 +728,15 @@ def handle_goal_completed(event: Event):
         if not goal:
             return
         
-        # Check if parent goal has completed_via_children enabled
+        # Check if parent goal has completed_via_children enabled (per-goal or level default)
         if goal.parent_id:
             parent = db_session.query(Goal).filter_by(id=goal.parent_id).first()
-            if parent and parent.completed_via_children:
-                _check_parent_completion(db_session, parent)
+            if parent:
+                auto_complete = parent.completed_via_children
+                if not auto_complete and getattr(parent, 'level', None):
+                    auto_complete = getattr(parent.level, 'auto_complete_when_children_done', False)
+                if auto_complete:
+                    _check_parent_completion(db_session, parent)
         
         # Update any programs this goal is part of
         _update_program_progress(db_session, goal)

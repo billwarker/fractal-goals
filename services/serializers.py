@@ -134,6 +134,7 @@ def serialize_goal(goal, include_children=True):
         "name": goal.name,
         "id": goal.id,
         "type": goal_type,  # Hoist type to top level for frontend convenience
+        "level_id": goal.level_id,
         "level_name": goal_level_name,
         "completed": goal.completed,
         "completed_at": format_utc(goal.completed_at),
@@ -144,6 +145,7 @@ def serialize_goal(goal, include_children=True):
         "attributes": {
             "id": goal.id,
             "type": goal_type,
+            "level_id": goal.level_id,
             "parent_id": goal.parent_id,
             "root_id": goal.root_id,
             "owner_id": getattr(goal, 'owner_id', None),
@@ -165,6 +167,25 @@ def serialize_goal(goal, include_children=True):
         },
         "children": []
     }
+    
+    # Attach level characteristics if level is loaded
+    level = getattr(goal, 'level', None)
+    if level:
+        result["level_characteristics"] = {
+            "can_have_targets": getattr(level, 'can_have_targets', True),
+            "deadline_min_value": level.deadline_min_value,
+            "deadline_min_unit": level.deadline_min_unit,
+            "deadline_max_value": level.deadline_max_value,
+            "deadline_max_unit": level.deadline_max_unit,
+            "max_children": level.max_children,
+            "auto_complete_when_children_done": getattr(level, 'auto_complete_when_children_done', False),
+            "description_required": getattr(level, 'description_required', False),
+            "default_deadline_offset_value": level.default_deadline_offset_value,
+            "default_deadline_offset_unit": level.default_deadline_offset_unit,
+            "sort_children_by": level.sort_children_by,
+            "allow_manual_completion": level.allow_manual_completion,
+            "requires_smart": getattr(level, 'requires_smart', False),
+        }
     
     if include_children:
         result["children"] = [serialize_goal(child) for child in goal.children]

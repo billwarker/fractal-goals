@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import GoalIcon from './atoms/GoalIcon';
-import { ICON_SHAPES } from '../utils/goalCharacteristics';
+import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
 import useIsMobile from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
 
@@ -241,6 +241,129 @@ const GoalCharacteristicsSettings = () => {
                                     />
                                     Requires SMART Metrics
                                 </label>
+
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.auto_complete_when_children_done ?? false}
+                                        onChange={(e) => handleChange(level.id, 'auto_complete_when_children_done', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Auto-Complete When Children Done
+                                </label>
+
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.can_have_targets ?? true}
+                                        onChange={(e) => handleChange(level.id, 'can_have_targets', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Can Have Targets
+                                </label>
+
+
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={current.description_required ?? false}
+                                        onChange={(e) => handleChange(level.id, 'description_required', e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Description Required
+                                </label>
+                            </div>
+
+                            {/* Value + Unit Controls */}
+                            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        Deadline Range
+                                    </label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input
+                                            type="number"
+                                            placeholder="Min"
+                                            min="0"
+                                            value={current.deadline_min_value ?? ''}
+                                            onChange={(e) => handleChange(level.id, 'deadline_min_value', e.target.value ? parseInt(e.target.value) : null)}
+                                            style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                        />
+                                        <select
+                                            value={current.deadline_min_unit ?? 'days'}
+                                            onChange={(e) => handleChange(level.id, 'deadline_min_unit', e.target.value)}
+                                            style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                        >
+                                            {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                        </select>
+                                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>to</span>
+                                        <input
+                                            type="number"
+                                            placeholder="Max"
+                                            min="0"
+                                            value={current.deadline_max_value ?? ''}
+                                            onChange={(e) => handleChange(level.id, 'deadline_max_value', e.target.value ? parseInt(e.target.value) : null)}
+                                            style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                        />
+                                        <select
+                                            value={current.deadline_max_unit ?? 'days'}
+                                            onChange={(e) => handleChange(level.id, 'deadline_max_unit', e.target.value)}
+                                            style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                        >
+                                            {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        Max Children <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(blank = unlimited)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        placeholder="∞"
+                                        min="0"
+                                        value={current.max_children ?? ''}
+                                        onChange={(e) => handleChange(level.id, 'max_children', e.target.value ? parseInt(e.target.value) : null)}
+                                        style={{ width: '70px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        Default Deadline Offset
+                                    </label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input
+                                            type="number"
+                                            placeholder="—"
+                                            min="0"
+                                            value={current.default_deadline_offset_value ?? ''}
+                                            onChange={(e) => handleChange(level.id, 'default_deadline_offset_value', e.target.value ? parseInt(e.target.value) : null)}
+                                            style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                        />
+                                        <select
+                                            value={current.default_deadline_offset_unit ?? 'days'}
+                                            onChange={(e) => handleChange(level.id, 'default_deadline_offset_unit', e.target.value)}
+                                            style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                        >
+                                            {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        Sort Children By
+                                    </label>
+                                    <select
+                                        value={current.sort_children_by ?? ''}
+                                        onChange={(e) => handleChange(level.id, 'sort_children_by', e.target.value || null)}
+                                        style={{ padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                    >
+                                        <option value="">Manual (default)</option>
+                                        <option value="deadline">Deadline</option>
+                                        <option value="created_at">Created Date</option>
+                                        <option value="completion_rate">Completion Rate</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>

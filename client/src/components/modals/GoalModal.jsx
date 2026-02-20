@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
-import { validateDeadline } from '../../utils/goalCharacteristics';
+import { validateDeadlineRange, getDurationInDays } from '../../utils/goalCharacteristics';
 import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import AddTargetModal from '../AddTargetModal';
@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import styles from './GoalModal.module.css';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
-    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon } = useGoalLevels();
+    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon, getDeadlineConstraints } = useGoalLevels();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
@@ -47,9 +47,12 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Validate deadline against configured characteristics
+        // Validate deadline against DB-driven level constraints (value + unit)
         if (deadline) {
-            const validation = validateDeadline(deadline, getLevelByName(goalType));
+            const { minValue, minUnit, maxValue, maxUnit } = getDeadlineConstraints(goalType);
+            const minDays = (minValue != null && minUnit) ? getDurationInDays(minValue, minUnit) : null;
+            const maxDays = (maxValue != null && maxUnit) ? getDurationInDays(maxValue, maxUnit) : null;
+            const validation = validateDeadlineRange(deadline, minDays, maxDays);
             if (!validation.isValid) {
                 toast.error(validation.message);
                 return;
