@@ -310,6 +310,7 @@ function FractalGoals() {
                         treeData={fractalData}
                         sessions={sessions}
                         activities={activities}
+                        activityGroups={activityGroups}
                         viewSettings={viewSettings}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}

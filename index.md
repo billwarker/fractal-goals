@@ -399,6 +399,7 @@ Recent focus has been on:
 - **TargetCard Safety**: Updated `TargetCard.jsx` to safely access `metric_definitions` using optional chaining to prevent crashes for activities with missing definitions.
 - **GoalDetailModal Activity Safety**: Added `Array.isArray(activityDefinitions)` checks in `GoalDetailModal` to prevent crashes when `activityDefinitions` prop is null or invalid.
 - **CRITICAL FIX: Missing onAddChild Prop**: Added `onAddChild` to `GoalDetailModal` props destructuring. This missing prop caused a `ReferenceError` that crashed the entire sidebar when clicking any goal. Also added `ErrorBoundary` component to `FractalGoals.jsx` to catch and display future errors gracefully.
+- **FlowTree Evidence Resolution**: Expanded `deriveEvidenceGoalIds` in `FlowTree.jsx` so highlights and fades accurately reflect work logged against Activity Groups (not just direct activities). Added strict fallback logic to map evidence to session-level goals dynamically if specific activities cannot be cleanly matched.
 
 ---
 

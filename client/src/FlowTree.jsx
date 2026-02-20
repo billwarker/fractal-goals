@@ -414,20 +414,42 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
     return { nodes, edges, visibleNodeIds };
 };
 
-const deriveEvidenceGoalIds = (sessions = [], activities = []) => {
+const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = []) => {
+    // 1. Map Activity ID -> Goal IDs
     const goalsByActivityId = new Map();
+    // Also track which group an activity belongs to
+    const groupIdByActivityId = new Map();
 
     activities.forEach((activity) => {
         const activityId = toId(activity?.id);
         if (!activityId) return;
+
         const associatedGoalIds = Array.isArray(activity?.associated_goal_ids)
             ? activity.associated_goal_ids.map((goalId) => toId(goalId)).filter(Boolean)
             : [];
         goalsByActivityId.set(activityId, associatedGoalIds);
+
+        if (activity?.group_id) {
+            groupIdByActivityId.set(activityId, toId(activity.group_id));
+        }
+    });
+
+    // 2. Map Activity Group ID -> Goal IDs
+    const goalsByGroupId = new Map();
+    activityGroups.forEach((group) => {
+        const groupId = toId(group?.id);
+        if (!groupId) return;
+
+        const associatedGoalIds = Array.isArray(group?.associated_goal_ids)
+            ? group.associated_goal_ids.map((goalId) => toId(goalId)).filter(Boolean)
+            : [];
+        goalsByGroupId.set(groupId, associatedGoalIds);
     });
 
     const evidenceGoalIds = new Set();
+    let hasInstanceEvidence = false;
 
+    // 3. Process completed sessions & instances
     sessions.forEach((session) => {
         if (!session?.completed) return;
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
@@ -436,10 +458,47 @@ const deriveEvidenceGoalIds = (sessions = [], activities = []) => {
             if (!instance?.completed) return;
             const activityDefinitionId = toId(instance?.activity_definition_id);
             if (!activityDefinitionId) return;
-            const goalIds = goalsByActivityId.get(activityDefinitionId) || [];
-            goalIds.forEach((goalId) => evidenceGoalIds.add(goalId));
+
+            // Direct activity evidence
+            const directGoalIds = goalsByActivityId.get(activityDefinitionId) || [];
+            directGoalIds.forEach((goalId) => {
+                evidenceGoalIds.add(goalId);
+                hasInstanceEvidence = true;
+            });
+
+            // Group-based evidence
+            const groupId = groupIdByActivityId.get(activityDefinitionId);
+            if (groupId) {
+                const groupGoalIds = goalsByGroupId.get(groupId) || [];
+                groupGoalIds.forEach((goalId) => {
+                    evidenceGoalIds.add(goalId);
+                    hasInstanceEvidence = true;
+                });
+            }
         });
     });
+
+    // 4. Fallback: If no instance evidence resolved AT ALL, check session-level goals directly.
+    // This prevents highlighting the entire tree if direct mapping fails, but handles
+    // cases where old data doesn't map to activities well.
+    if (!hasInstanceEvidence) {
+        sessions.forEach((session) => {
+            if (!session?.completed) return;
+
+            const shortTermGoals = Array.isArray(session.short_term_goals) ? session.short_term_goals : [];
+            const immediateGoals = Array.isArray(session.immediate_goals) ? session.immediate_goals : [];
+
+            shortTermGoals.forEach((goal) => {
+                const gid = toId(goal?.id);
+                if (gid) evidenceGoalIds.add(gid);
+            });
+
+            immediateGoals.forEach((goal) => {
+                const gid = toId(goal?.id);
+                if (gid) evidenceGoalIds.add(gid);
+            });
+        });
+    }
 
     return evidenceGoalIds;
 };
@@ -527,6 +586,7 @@ const buildGraphPresentation = ({
     viewSettings,
     sessions,
     activities,
+    activityGroups,
     isMobile,
 }) => {
     if (!treeData) {
@@ -539,7 +599,9 @@ const buildGraphPresentation = ({
     };
 
     const treeMaps = buildTreeMaps(treeData);
-    const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activities);
+    const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activities, activityGroups);
+    const hasAnyEvidence = evidenceGoalIds.size > 0;
+
     const activeLineageIds = getActiveLineageIds(evidenceGoalIds, treeMaps.parentById);
     const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, evidenceGoalIds);
 
@@ -568,7 +630,8 @@ const buildGraphPresentation = ({
     remappedNodes.forEach((node) => {
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
-        const shouldFade = normalizedSettings.fadeInactiveBranches && isInactive && !isActive;
+        // Do not fade anything if there is no evidence found at all
+        const shouldFade = normalizedSettings.fadeInactiveBranches && isInactive && !isActive && hasAnyEvidence;
 
         if (shouldFade) {
             nodeStyleMap.set(node.id, {
@@ -596,7 +659,8 @@ const buildGraphPresentation = ({
 
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
             && inactiveNodeIds.has(targetId)
-            && !isActiveEdge;
+            && !isActiveEdge
+            && hasAnyEvidence;
 
         const nextClassName = [
             edge.className,
@@ -654,6 +718,7 @@ const FlowTree = React.forwardRef(({
     treeData,
     sessions = [],
     activities = [],
+    activityGroups = [],
     viewSettings = DEFAULT_VIEW_SETTINGS,
     onNodeClick,
     onAddChild,
@@ -683,6 +748,7 @@ const FlowTree = React.forwardRef(({
             viewSettings,
             sessions,
             activities,
+            activityGroups,
             isMobile,
         });
     }, [
@@ -694,6 +760,7 @@ const FlowTree = React.forwardRef(({
         viewSettings,
         sessions,
         activities,
+        activityGroups,
         isMobile,
     ]);
 
