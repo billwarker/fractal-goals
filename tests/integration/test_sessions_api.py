@@ -187,6 +187,36 @@ class TestSessionCRUDEndpoints:
         data = json.loads(response.data)
         assert 'session_start' in data
         assert 'session_end' in data
+
+    def test_completing_session_marks_all_activity_instances_completed(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition
+    ):
+        """Completing a session should cascade completion to all of its activity instances."""
+        root_id = sample_practice_session.root_id
+        session_id = sample_practice_session.id
+
+        # Create two incomplete activity instances in the session.
+        for _ in range(2):
+            response = authed_client.post(
+                f'/api/{root_id}/sessions/{session_id}/activities',
+                data=json.dumps({'activity_definition_id': sample_activity_definition.id}),
+                content_type='application/json'
+            )
+            assert response.status_code == 201
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}',
+            data=json.dumps({'completed': True}),
+            content_type='application/json'
+        )
+        assert update_response.status_code == 200
+
+        activities_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}/activities')
+        assert activities_response.status_code == 200
+        activities = json.loads(activities_response.data)
+
+        assert len(activities) >= 2
+        assert all(a['completed'] is True for a in activities)
     
     def test_delete_session(self, authed_client, sample_practice_session):
         """Test deleting a session."""

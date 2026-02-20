@@ -460,7 +460,29 @@ class SessionService:
         if 'completed' in data:
             session.completed = data['completed']
             if data['completed']:
-                session.completed_at = datetime.now(timezone.utc)
+                completion_time = datetime.now(timezone.utc)
+                session.completed_at = completion_time
+
+                # Keep session card exercise state consistent with session completion.
+                instances = self.db_session.query(ActivityInstance).filter(
+                    ActivityInstance.session_id == session.id,
+                    ActivityInstance.deleted_at == None
+                ).all()
+                for instance in instances:
+                    if instance.completed:
+                        continue
+                    if not instance.time_start:
+                        # Match instant-complete semantics used by timers API.
+                        instance.time_start = completion_time
+                        instance.time_stop = completion_time
+                        instance.duration_seconds = 0
+                    elif not instance.time_stop:
+                        instance.time_stop = completion_time
+                        duration = (instance.time_stop - instance.time_start).total_seconds()
+                        instance.duration_seconds = int(duration)
+                    instance.completed = True
+            else:
+                session.completed_at = None
         
         if 'session_start' in data:
             try:

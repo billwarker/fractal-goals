@@ -91,11 +91,13 @@ function FractalGoals() {
 
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
-    const [viewSettings, setViewSettings] = useState({
+    const DEFAULT_VIEW_SETTINGS = {
         highlightActiveBranches: false,
         fadeInactiveBranches: false,
-        showCompletionJourney: false
-    });
+        showCompletionJourney: false,
+        showMetricsOverlay: false,
+    };
+    const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
 
     // Initial Data Fetch (Only for non-Query managed data)
     useEffect(() => {
@@ -305,12 +307,18 @@ function FractalGoals() {
                             checked={viewSettings.showCompletionJourney}
                             onChange={handleToggleViewSetting('showCompletionJourney')}
                         />
+                        <Checkbox
+                            label="Show metrics overlay"
+                            checked={viewSettings.showMetricsOverlay}
+                            onChange={handleToggleViewSetting('showMetricsOverlay')}
+                        />
                     </div>
                     <FractalView
                         treeData={fractalData}
                         sessions={sessions}
                         activities={activities}
                         activityGroups={activityGroups}
+                        programs={programs}
                         viewSettings={viewSettings}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}

@@ -577,6 +577,200 @@ const applyCompletionJourneyYRemap = (nodes, orderedCompletedIds, enabled, isMob
     return remappedNodes;
 };
 
+const deriveGraphMetrics = (
+    rawNodes,
+    visibleNodeIds,
+    activeLineageIds,
+    inactiveNodeIds,
+    sessions,
+    activities,
+    activityGroups,
+    programs
+) => {
+    // ROW 1: Goals
+    const totalGoals = rawNodes.length;
+    const completedGoals = rawNodes.filter((n) => n.data.completed).length;
+    const pctCompleted = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+    const smartGoals = rawNodes.filter((n) => n.data.isSmart).length;
+    const pctSmart = totalGoals > 0 ? Math.round((smartGoals / totalGoals) * 100) : 0;
+
+    const goalsByActivityId = new Map();
+    const groupIdByActivityId = new Map();
+    activities.forEach((a) => {
+        const id = toId(a.id);
+        goalsByActivityId.set(id, Array.isArray(a.associated_goal_ids) ? a.associated_goal_ids.map(toId) : []);
+        if (a.group_id) groupIdByActivityId.set(id, toId(a.group_id));
+    });
+
+    const goalsByGroupId = new Map();
+    activityGroups.forEach((g) => {
+        goalsByGroupId.set(toId(g.id), Array.isArray(g.associated_goal_ids) ? g.associated_goal_ids.map(toId) : []);
+    });
+
+    const instanceMapsToVisible = (instance) => {
+        const defId = toId(instance?.activity_definition_id);
+        if (!defId) return false;
+
+        const directGoals = goalsByActivityId.get(defId) || [];
+        if (directGoals.some((gId) => visibleNodeIds.has(gId))) return true;
+
+        const groupId = groupIdByActivityId.get(defId);
+        if (groupId) {
+            const groupGoals = goalsByGroupId.get(groupId) || [];
+            if (groupGoals.some((gId) => visibleNodeIds.has(gId))) return true;
+        }
+        return false;
+    };
+
+    const sessionMapsToVisible = (session) => {
+        if (!session) return false;
+
+        const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
+        if (instances.some((inst) => instanceMapsToVisible(inst))) return true;
+
+        const stGoals = Array.isArray(session.short_term_goals) ? session.short_term_goals : [];
+        const immGoals = Array.isArray(session.immediate_goals) ? session.immediate_goals : [];
+
+        if (stGoals.some((g) => visibleNodeIds.has(toId(g.id)))) return true;
+        if (immGoals.some((g) => visibleNodeIds.has(toId(g.id)))) return true;
+
+        return false;
+    };
+
+    let associatedActivitiesCount = 0;
+    activities.forEach((a) => {
+        const id = toId(a.id);
+        const directGoals = goalsByActivityId.get(id) || [];
+        if (directGoals.some((gId) => visibleNodeIds.has(gId))) {
+            associatedActivitiesCount += 1;
+            return;
+        }
+        const groupId = groupIdByActivityId.get(id);
+        if (groupId) {
+            const groupGoals = goalsByGroupId.get(groupId) || [];
+            if (groupGoals.some((gId) => visibleNodeIds.has(gId))) {
+                associatedActivitiesCount += 1;
+            }
+        }
+    });
+
+    let completedSessionsCount = 0;
+    let completedInstancesCount = 0;
+    let totalSessionDuration = 0;
+    let totalInstanceDuration = 0;
+
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let recentSessionsCount = 0;
+    let recentInstancesCount = 0;
+    let recentSessionDuration = 0;
+
+    let programSessionsCount = 0;
+    let recentProgramSessionsCount = 0;
+
+    sessions.forEach((session) => {
+        // Evaluate activity instances independently of session completion
+        const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
+        instances.forEach((inst) => {
+            if (!inst.completed) return;
+            if (!instanceMapsToVisible(inst)) return;
+
+            completedInstancesCount += 1;
+            totalInstanceDuration += (inst.duration_seconds || 0);
+
+            const instEnd = new Date(inst.time_stop || inst.updated_at || inst.created_at || now);
+            if (instEnd >= sevenDaysAgo) {
+                recentInstancesCount += 1;
+            }
+        });
+
+        // Now evaluate session-level metrics
+        if (!session.completed) return;
+        if (!sessionMapsToVisible(session)) return;
+
+        completedSessionsCount += 1;
+        totalSessionDuration += (session.total_duration_seconds || 0);
+
+        const sessionEnd = new Date(session.session_end || session.completed_at || session.created_at);
+        const isRecent = sessionEnd >= sevenDaysAgo;
+
+        if (isRecent) {
+            recentSessionsCount += 1;
+            recentSessionDuration += (session.total_duration_seconds || 0);
+        }
+
+        if (session.program_day_id) {
+            programSessionsCount += 1;
+            if (isRecent) recentProgramSessionsCount += 1;
+        }
+    });
+
+    const activeVisibleNodesCount = Array.from(visibleNodeIds).filter((id) => activeLineageIds.has(id)).length;
+    const inactiveVisibleNodesCount = Array.from(visibleNodeIds).filter((id) => inactiveNodeIds.has(id)).length;
+
+    const recentCompletedGoalsCount = rawNodes.filter((n) => {
+        if (!n.data.completed || !n.data.completed_at) return false;
+        return new Date(n.data.completed_at) >= sevenDaysAgo;
+    }).length;
+
+    const activeProgramGoalIds = new Set();
+    programs.forEach((prog) => {
+        if (!prog.is_active) return;
+        const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
+        blocks.forEach((b) => {
+            const gIds = Array.isArray(b.goal_ids) ? b.goal_ids : [];
+            gIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
+        });
+        const pGoals = Array.isArray(prog.goal_ids) ? prog.goal_ids : [];
+        pGoals.forEach((id) => activeProgramGoalIds.add(toId(id)));
+    });
+
+    const goalsInActiveProgramCount = rawNodes.filter((n) => activeProgramGoalIds.has(n.id) && visibleNodeIds.has(n.id)).length;
+    const programFocusEfficiency = recentSessionsCount > 0
+        ? Math.round((recentProgramSessionsCount / recentSessionsCount) * 100)
+        : 0;
+
+    const formatDuration = (seconds) => {
+        if (!seconds) return '0h';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m`;
+    };
+
+    return {
+        row1: {
+            totalGoals,
+            completedGoals,
+            pctCompleted,
+            pctSmart
+        },
+        row2: {
+            completedSessionsCount,
+            associatedActivitiesCount,
+            completedInstancesCount,
+            totalSessionDuration: formatDuration(totalSessionDuration),
+            totalInstanceDuration: formatDuration(totalInstanceDuration)
+        },
+        row3: {
+            activeVisibleNodesCount,
+            inactiveVisibleNodesCount
+        },
+        row4: {
+            recentSessionsCount,
+            recentInstancesCount,
+            recentSessionDuration: formatDuration(recentSessionDuration),
+            recentCompletedGoalsCount
+        },
+        row5: {
+            goalsInActiveProgramCount,
+            programSessionsCount,
+            programFocusEfficiency
+        }
+    };
+};
+
 const buildGraphPresentation = ({
     treeData,
     onNodeClick,
@@ -587,10 +781,11 @@ const buildGraphPresentation = ({
     sessions,
     activities,
     activityGroups,
+    programs,
     isMobile,
 }) => {
     if (!treeData) {
-        return { nodes: [], edges: [] };
+        return { nodes: [], edges: [], metrics: null };
     }
 
     const normalizedSettings = {
@@ -708,9 +903,21 @@ const buildGraphPresentation = ({
         }
     }
 
+    const metrics = deriveGraphMetrics(
+        rawNodes,
+        visibleNodeIds,
+        activeLineageIds,
+        inactiveNodeIds,
+        sessions,
+        activities,
+        activityGroups,
+        programs || []
+    );
+
     return {
         nodes,
         edges: [...baseEdges, ...journeyEdges],
+        metrics
     };
 };
 
@@ -719,6 +926,7 @@ const FlowTree = React.forwardRef(({
     sessions = [],
     activities = [],
     activityGroups = [],
+    programs = [],
     viewSettings = DEFAULT_VIEW_SETTINGS,
     onNodeClick,
     onAddChild,
@@ -738,7 +946,7 @@ const FlowTree = React.forwardRef(({
         }
     }), []);
 
-    const { nodes: graphNodes, edges: graphEdges } = useMemo(() => {
+    const { nodes: graphNodes, edges: graphEdges, metrics: graphMetrics } = useMemo(() => {
         return buildGraphPresentation({
             treeData,
             onNodeClick,
@@ -749,6 +957,7 @@ const FlowTree = React.forwardRef(({
             sessions,
             activities,
             activityGroups,
+            programs,
             isMobile,
         });
     }, [
@@ -761,6 +970,7 @@ const FlowTree = React.forwardRef(({
         sessions,
         activities,
         activityGroups,
+        programs,
         isMobile,
     ]);
 
@@ -841,6 +1051,47 @@ const FlowTree = React.forwardRef(({
                 proOptions={{ hideAttribution: true }}
             >
             </ReactFlow>
+
+            {viewSettings.showMetricsOverlay && graphMetrics && (
+                <div className={`${styles.metricsOverlay} ${sidebarOpen ? styles.metricsOverlayVertical : ''}`}>
+                    <div className={styles.metricsRow}>
+                        <div className={styles.metricsRowTitle}>Goals</div>
+                        <div className={styles.metricItem} title="Total number of goals visible in this branch">Count: <span className={styles.metricValue}>{graphMetrics.row1.totalGoals}</span></div>
+                        <div className={styles.metricItem} title="Number of goals marked as completed">Completed: <span className={styles.metricValue}>{graphMetrics.row1.completedGoals} ({graphMetrics.row1.pctCompleted}%)</span></div>
+                        <div className={styles.metricItem} title="Percentage of goals that meet SMART criteria">SMART: <span className={styles.metricValue}>{graphMetrics.row1.pctSmart}%</span></div>
+                    </div>
+
+                    <div className={styles.metricsRow}>
+                        <div className={styles.metricsRowTitle}>Work Evidence</div>
+                        <div className={styles.metricItem} title="Number of completed sessions linked to this branch">Completed Sessions: <span className={styles.metricValue}>{graphMetrics.row2.completedSessionsCount}</span></div>
+                        <div className={styles.metricItem} title="Number of unique activity definitions mapped to this branch">Associated Activities: <span className={styles.metricValue}>{graphMetrics.row2.associatedActivitiesCount}</span></div>
+                        <div className={styles.metricItem} title="Number of exact activity instances completed">Completed Activity Instances: <span className={styles.metricValue}>{graphMetrics.row2.completedInstancesCount}</span></div>
+                        <div className={styles.metricItem} title="Total time tracked in associated sessions">Completed Session Time: <span className={styles.metricValue}>{graphMetrics.row2.totalSessionDuration}</span></div>
+                        <div className={styles.metricItem} title="Total time tracked in exact activity instances">Completed Activity Time: <span className={styles.metricValue}>{graphMetrics.row2.totalInstanceDuration}</span></div>
+                    </div>
+
+                    <div className={styles.metricsRow}>
+                        <div className={styles.metricsRowTitle}>Pathways</div>
+                        <div className={styles.metricItem} title="Branches that contain tracked work or sessions">Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeVisibleNodesCount}</span></div>
+                        <div className={styles.metricItem} title="Branches completely empty of direct work evidence">Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveVisibleNodesCount}</span></div>
+                    </div>
+
+                    <div className={styles.metricsRow}>
+                        <div className={styles.metricsRowTitle}>Momentum (7D)</div>
+                        <div className={styles.metricItem} title="Sessions completed within the last 7 days">Sessions: <span className={styles.metricValue}>{graphMetrics.row4.recentSessionsCount}</span></div>
+                        <div className={styles.metricItem} title="Activities completed within the last 7 days">Activities: <span className={styles.metricValue}>{graphMetrics.row4.recentInstancesCount}</span></div>
+                        <div className={styles.metricItem} title="Total session time logged in the last 7 days">Time Spent: <span className={styles.metricValue}>{graphMetrics.row4.recentSessionDuration}</span></div>
+                        <div className={styles.metricItem} title="Number of goals marked complete in the last 7 days">Goals Hit: <span className={styles.metricValue}>{graphMetrics.row4.recentCompletedGoalsCount}</span></div>
+                    </div>
+
+                    <div className={styles.metricsRow}>
+                        <div className={styles.metricsRowTitle}>Program Alignment</div>
+                        <div className={styles.metricItem} title="Visible goals currently scheduled in an active program">Scheduled Goals: <span className={styles.metricValue}>{graphMetrics.row5.goalsInActiveProgramCount}</span></div>
+                        <div className={styles.metricItem} title="Completed sessions that belong to a program day">Program Sessions: <span className={styles.metricValue}>{graphMetrics.row5.programSessionsCount}</span></div>
+                        <div className={styles.metricItem} title="Percentage of recent tracking (7D) done through active programs">Focus Efficiency: <span className={styles.metricValue}>{graphMetrics.row5.programFocusEfficiency}%</span></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });
