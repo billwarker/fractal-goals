@@ -21,7 +21,16 @@
 
 .journey-edge .react-flow__edge-path {
     stroke-linecap: round;
-    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-brand-primary, #38bdf8) 70%, transparent));
+    animation: journeyFlow 1s linear infinite;
+}
+
+@keyframes journeyFlow {
+    from {
+        stroke-dashoffset: 22;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
 }
 
 .react-flow__edge {
