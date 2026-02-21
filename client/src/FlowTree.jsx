@@ -108,7 +108,7 @@ const CustomNode = ({ data }) => {
 
     const IconComponent = animatedIcons ? AnimatedGoalIcon : GoalIcon;
     const iconProps = animatedIcons
-        ? { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, size: 30, reduced: true }
+        ? { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: 30, reduced: true }
         : { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: 30 };
 
     return (

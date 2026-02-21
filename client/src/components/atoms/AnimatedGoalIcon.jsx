@@ -3,75 +3,30 @@ import React, { useId } from 'react';
 /**
  * AnimatedGoalIcon Component
  *
- * Renders an animated, fractal-style SVG for each goal shape.
- * Multiple scaled/rotated copies of the shape spin and pulse
- * with alternating primary and secondary colours to create
- * a psychedelic, kaleidoscopic effect.
- *
- * Same prop interface as GoalIcon for drop-in compatibility.
+ * Renders an animated SVG matching the specific static geometries of GoalIcon.
+ * The "SMART mode ring/detailing" is brought to life as a continuous ripple tunnel
+ * of the secondary color emerging from the solid primary core.
  */
 
-const LAYER_COUNT = 6;
-
-// Build a path/element for each shape at a given scale (0-1)
-const shapeElement = (shape, scale, key) => {
-    const cx = 50;
-    const cy = 50;
-    const s = scale;
-
-    switch (shape) {
-        case 'square': {
-            const half = 40 * s;
-            const rx = 6 * s;
-            return <rect key={key} x={cx - half} y={cy - half} width={half * 2} height={half * 2} rx={rx} />;
-        }
-        case 'triangle': {
-            const h = 80 * s;
-            const base = 80 * s;
-            const topY = cy - h * 0.55;
-            const botY = cy + h * 0.45;
-            return <path key={key} d={`M${cx} ${topY} L${cx + base / 2} ${botY} L${cx - base / 2} ${botY} Z`} />;
-        }
-        case 'diamond': {
-            const r = 45 * s;
-            return <path key={key} d={`M${cx} ${cy - r} L${cx + r} ${cy} L${cx} ${cy + r} L${cx - r} ${cy} Z`} />;
-        }
-        case 'hexagon': {
-            const r = 45 * s;
-            const pts = [];
-            for (let i = 0; i < 6; i++) {
-                const angle = (Math.PI / 3) * i - Math.PI / 2;
-                pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
-            }
-            return <polygon key={key} points={pts.join(' ')} />;
-        }
-        case 'star': {
-            const outerR = 45 * s;
-            const innerR = 20 * s;
-            const pts = [];
-            for (let i = 0; i < 10; i++) {
-                const angle = (Math.PI / 5) * i - Math.PI / 2;
-                const r = i % 2 === 0 ? outerR : innerR;
-                pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
-            }
-            return <polygon key={key} points={pts.join(' ')} />;
-        }
+// We use the exact path data from GoalIcon's "full" shape
+const getBasePath = (s) => {
+    switch (s.toLowerCase()) {
+        case 'square': return <rect x="5" y="5" width="90" height="90" rx="8" />;
+        case 'triangle': return <path d="M50 5 L95 85 L5 85 Z" />;
+        case 'diamond': return <path d="M50 5 L95 50 L50 95 L5 50 Z" />;
+        case 'hexagon': return <path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z" />;
         case 'twelvepointstar':
-        case 'twelve-point-star': {
-            const half = 28 * s;
-            return (
-                <g key={key}>
-                    <rect x={cx - half} y={cy - half} width={half * 2} height={half * 2} />
-                    <rect x={cx - half} y={cy - half} width={half * 2} height={half * 2} transform={`rotate(30 ${cx} ${cy})`} />
-                    <rect x={cx - half} y={cy - half} width={half * 2} height={half * 2} transform={`rotate(60 ${cx} ${cy})`} />
-                </g>
-            );
-        }
+        case 'twelve-point-star': return (
+            <g>
+                <rect x="20" y="20" width="60" height="60" />
+                <rect x="20" y="20" width="60" height="60" transform="rotate(30 50 50)" />
+                <rect x="20" y="20" width="60" height="60" transform="rotate(60 50 50)" />
+            </g>
+        );
+        case 'star': return <path d="M50 5 L64.5 35 L97 40 L73.5 63 L79 95 L50 80 L21 95 L26.5 63 L3 40 L35.5 35 Z" />;
+        case 'check': return <path d="M20 50 L40 70 L80 30" fill="none" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />;
         case 'circle':
-        default: {
-            const r = 42 * s;
-            return <circle key={key} cx={cx} cy={cy} r={r} />;
-        }
+        default: return <circle cx="50" cy="50" r="45" />;
     }
 };
 
@@ -79,93 +34,57 @@ const AnimatedGoalIcon = ({
     shape = 'circle',
     color = 'var(--color-primary)',
     secondaryColor = 'var(--color-bg-card)',
+    isSmart = false,
     size = 24,
     className,
     style = {},
     reduced = false,
 }) => {
     const uid = useId().replace(/:/g, '_');
-    const layerCount = reduced ? 4 : LAYER_COUNT;
+    const pathElem = getBasePath(shape);
+    const isStrokeBased = shape.toLowerCase() === 'check';
 
-    // Generate animation keyframes as inline style element
-    const buildKeyframes = () => {
-        let css = '';
-        for (let i = 0; i < layerCount; i++) {
-            const dir = i % 2 === 0 ? 1 : -1;
-            const duration = reduced ? 12 + i * 3 : 8 + i * 2;
-            const scaleMin = 0.92 - i * 0.02;
-            const scaleMax = 1.08 + i * 0.02;
+    const RING_LAYERS = 3;
 
-            css += `
-@keyframes fractal_spin_${uid}_${i} {
-  0% {
-    transform: rotate(0deg) scale(${scaleMin});
-  }
-  50% {
-    transform: rotate(${dir * 180}deg) scale(${scaleMax});
-  }
-  100% {
-    transform: rotate(${dir * 360}deg) scale(${scaleMin});
-  }
+    const buildKeyframes = () => `
+@keyframes l_ripple_tunnel_${uid} {
+  0% { transform: scale(0.01); stroke-width: 1px; opacity: 0; }
+  10% { opacity: 1; stroke-width: 5px; }
+  85% { stroke-width: 16px; opacity: 1; }
+  100% { transform: scale(1.1); stroke-width: 20px; opacity: 0; }
 }
 `;
+
+    const duration = reduced ? 3.5 : 2.5;
+    const animatedRings = [];
+
+    // Only generate the complex rippling rings for non-stroke shapes when isSmart is true
+    if (!isStrokeBased && isSmart) {
+        for (let i = 0; i < RING_LAYERS; i++) {
+            const delay = (i / RING_LAYERS) * -duration;
+            animatedRings.push(
+                <g
+                    key={i}
+                    style={{
+                        transformOrigin: '50px 50px',
+                        animation: `l_ripple_tunnel_${uid} ${duration}s linear ${delay}s infinite`,
+                        willChange: 'transform, stroke-width, opacity',
+                    }}
+                >
+                    {React.cloneElement(pathElem, {
+                        fill: 'none',
+                        stroke: secondaryColor,
+                    })}
+                </g>
+            );
         }
-
-        // Pulse glow for the innermost layer
-        css += `
-@keyframes fractal_pulse_${uid} {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
-}
-`;
-        return css;
-    };
-
-    const layers = [];
-    for (let i = 0; i < layerCount; i++) {
-        const t = i / (layerCount - 1); // 0 = outermost, 1 = innermost
-        const scale = 1.0 - t * 0.55; // outer=1.0, inner=0.45
-        const isPrimary = i % 2 === 0;
-        const fillColor = isPrimary ? color : secondaryColor;
-        const opacity = 0.75 + t * 0.25; // outer=0.75, inner=1.0
-        const initialRotation = i * (360 / layerCount / 2);
-        const duration = reduced ? 12 + i * 3 : 8 + i * 2;
-
-        layers.push(
-            <g
-                key={i}
-                style={{
-                    transformOrigin: '50px 50px',
-                    animation: `fractal_spin_${uid}_${i} ${duration}s ease-in-out infinite`,
-                    willChange: 'transform',
-                }}
-                transform={`rotate(${initialRotation} 50 50)`}
-                fill={fillColor}
-                fillOpacity={opacity}
-                stroke={isPrimary ? secondaryColor : color}
-                strokeWidth={2.5}
-                strokeOpacity={1}
-            >
-                {shapeElement(shape.toLowerCase(), scale, `layer-${i}`)}
-            </g>
-        );
     }
 
-    // Innermost core — fully solid, with pulse
-    const coreDuration = reduced ? 6 : 4;
-    layers.push(
-        <g
-            key="core"
-            style={{
-                transformOrigin: '50px 50px',
-                animation: `fractal_pulse_${uid} ${coreDuration}s ease-in-out infinite`,
-            }}
-            fill={color}
-            fillOpacity={1}
-        >
-            {shapeElement(shape.toLowerCase(), 0.22, 'core')}
-        </g>
-    );
+    const baseCore = React.cloneElement(pathElem, {
+        fill: isStrokeBased ? 'none' : color,
+        stroke: isStrokeBased ? color : 'none',
+        strokeWidth: isStrokeBased ? (pathElem.props.strokeWidth || '12') : '0',
+    });
 
     return (
         <svg
@@ -175,10 +94,41 @@ const AnimatedGoalIcon = ({
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className={className}
-            style={{ display: 'block', pointerEvents: 'none', ...style }}
+            style={{ display: 'block', pointerEvents: 'none', overflow: 'visible', ...style }}
         >
             <style>{buildKeyframes()}</style>
-            {layers}
+
+            <defs>
+                <mask id={`mask_${uid}`}>
+                    {/* The mask geometry: solid white means fully opaque (visible) */}
+                    {React.cloneElement(pathElem, { fill: 'white', stroke: 'none' })}
+                </mask>
+            </defs>
+
+            {/* Render the Solid Primary Base FIRST so it is in the background */}
+            {baseCore}
+
+            {/* Render the SMART Detailing Ripples ON TOP of the base core,
+                masked exactly to the solid shape's geometry! */}
+            {!isStrokeBased && isSmart && (
+                <g mask={`url(#mask_${uid})`}>
+                    {animatedRings}
+                </g>
+            )}
+
+            {/* Center Core Dot overlay for SMART goals */}
+            {!isStrokeBased && isSmart && React.cloneElement(pathElem, {
+                fill: color, // The very center is solid primary color again
+                stroke: 'none',
+                style: { transformOrigin: '50px 50px', transform: 'scale(0.18)' }
+            })}
+
+            {/* Optional Outer Border to sharply define the edge against the background */}
+            {!isStrokeBased && React.cloneElement(pathElem, {
+                fill: 'none',
+                stroke: color,
+                strokeWidth: '4',
+            })}
         </svg>
     );
 };

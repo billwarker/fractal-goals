@@ -102,6 +102,7 @@ const GoalCharacteristicsSettings = () => {
                                         shape={current.icon || 'circle'}
                                         color={current.color || 'var(--color-brand-primary)'}
                                         secondaryColor={current.secondary_color || undefined}
+                                        isSmart={true}
                                         size={32}
                                     />
                                 ) : (
