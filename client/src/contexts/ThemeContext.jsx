@@ -34,18 +34,34 @@ export const ThemeProvider = ({ children }) => {
         return 'dark';
     });
 
+    // --- Animated Icons Preference ---
+    const [animatedIcons, setAnimatedIcons] = useState(() => {
+        const saved = localStorage.getItem('animatedIcons');
+        return saved !== null ? saved === 'true' : true; // default on
+    });
+
     useEffect(() => {
         localStorage.setItem('theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
     }, [theme]);
 
+    useEffect(() => {
+        localStorage.setItem('animatedIcons', String(animatedIcons));
+    }, [animatedIcons]);
+
     const toggleTheme = () => {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');
     };
 
+    const toggleAnimatedIcons = () => {
+        setAnimatedIcons(prev => !prev);
+    };
+
     const value = {
         theme,
-        toggleTheme
+        toggleTheme,
+        animatedIcons,
+        toggleAnimatedIcons
     };
 
     return (

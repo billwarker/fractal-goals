@@ -27,6 +27,7 @@ const toId = (value) => (value == null ? null : String(value));
 
 const CustomNode = ({ data }) => {
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getCompletionColor, getGoalIcon } = useGoalLevels();;
+    const { animatedIcons } = useTheme();
     const isCompleted = data.completed || false;
     const isSmartGoal = data.isSmart || false;
 
@@ -105,6 +106,11 @@ const CustomNode = ({ data }) => {
 
     const glowColor = isCompleted ? hexToRgba(fillColor, 0.6) : null;
 
+    const IconComponent = animatedIcons ? AnimatedGoalIcon : GoalIcon;
+    const iconProps = animatedIcons
+        ? { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, size: 30, reduced: true }
+        : { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: 30 };
+
     return (
         <div className={styles.nodeContainer}>
             <div
@@ -119,12 +125,8 @@ const CustomNode = ({ data }) => {
                     justifyContent: 'center'
                 }}
             >
-                <AnimatedGoalIcon
-                    shape={config.icon}
-                    color={fillColor}
-                    secondaryColor={smartRingFillColor}
-                    size={30}
-                    reduced
+                <IconComponent
+                    {...iconProps}
                     className={isCompleted ? styles.nodeCircleCompleted : ''}
                     style={{
                         filter: isCompleted ? `drop-shadow(0 0 3px ${glowColor})` : undefined

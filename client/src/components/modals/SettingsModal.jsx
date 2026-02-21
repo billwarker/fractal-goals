@@ -12,7 +12,9 @@ import useIsMobile from '../../hooks/useIsMobile';
 const SettingsModal = ({ isOpen, onClose }) => {
     const {
         theme,
-        toggleTheme
+        toggleTheme,
+        animatedIcons,
+        toggleAnimatedIcons
     } = useTheme();
 
     const { preference, setPreference } = useTimezone();
@@ -275,6 +277,27 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         >
                                             Toggle {theme === 'dark' ? 'Light' : 'Dark'} Mode
                                         </button>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+                                        Animated Icons
+                                    </h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <input
+                                            type="checkbox"
+                                            id="animated-icons-toggle"
+                                            checked={animatedIcons}
+                                            onChange={toggleAnimatedIcons}
+                                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                        />
+                                        <label htmlFor="animated-icons-toggle" style={{ color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                            Enable fractal animations on goal icons
+                                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                                                When disabled, static icons will be used instead
+                                            </span>
+                                        </label>
                                     </div>
                                 </section>
                             </div>

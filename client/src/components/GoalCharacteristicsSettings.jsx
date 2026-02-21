@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { useTheme } from '../contexts/ThemeContext';
 import GoalIcon from './atoms/GoalIcon';
 import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
 import { ICON_SHAPES } from '../utils/goalCharacteristics';
@@ -8,6 +9,7 @@ import toast from 'react-hot-toast';
 
 const GoalCharacteristicsSettings = () => {
     const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
+    const { animatedIcons } = useTheme();
     const isMobile = useIsMobile();
 
     // We maintain local state for active edits before saving to DB
@@ -95,12 +97,22 @@ const GoalCharacteristicsSettings = () => {
                             gap: '12px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                <AnimatedGoalIcon
-                                    shape={current.icon || 'circle'}
-                                    color={current.color || 'var(--color-brand-primary)'}
-                                    secondaryColor={current.secondary_color || undefined}
-                                    size={32}
-                                />
+                                {animatedIcons ? (
+                                    <AnimatedGoalIcon
+                                        shape={current.icon || 'circle'}
+                                        color={current.color || 'var(--color-brand-primary)'}
+                                        secondaryColor={current.secondary_color || undefined}
+                                        size={32}
+                                    />
+                                ) : (
+                                    <GoalIcon
+                                        shape={current.icon || 'circle'}
+                                        color={current.color || 'var(--color-brand-primary)'}
+                                        secondaryColor={current.secondary_color || undefined}
+                                        isSmart={true}
+                                        size={24}
+                                    />
+                                )}
                                 {current.name}
 
                                 {isCustomized && (
