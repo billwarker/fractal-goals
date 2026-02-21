@@ -552,7 +552,7 @@ const getInactiveNodeIds = (nodeById, childrenById, evidenceGoalIds) => {
     return inactiveNodeIds;
 };
 
-const applyCompletionJourneyYRemap = (nodes, orderedCompletedIds, enabled, isMobile) => {
+const applyCompletionJourneyYRemap = (nodes, orderedCompletedIds, enabled, isMobile, parentById, childrenById) => {
     if (!enabled) return nodes;
 
     const remappedNodes = nodes.map((node) => ({
@@ -575,11 +575,48 @@ const applyCompletionJourneyYRemap = (nodes, orderedCompletedIds, enabled, isMob
     const bottomY = maxY + (isMobile ? 120 : 180);
     const spacing = isMobile ? 95 : 130;
 
+    // Initial placement by completion timestamp (most recent = highest/lowest index)
     completedNodes.forEach((node, index) => {
         node.position = {
             ...node.position,
             y: bottomY - (index * spacing),
         };
+    });
+
+    // Enforce hierarchy: children must always be BELOW (higher Y) their parents.
+    // After repositioning, a completed parent may have moved far down while its
+    // non-completed children stayed at their original (higher) positions.
+    // Walk the tree top-down from roots and push any child that's above its parent.
+    const nodeMap = new Map(remappedNodes.map((n) => [n.id, n]));
+    const minGap = isMobile ? 95 : 130;
+
+    const enforceChildrenBelow = (nodeId) => {
+        const childIds = childrenById?.get(nodeId) || [];
+        const parentNode = nodeMap.get(nodeId);
+        if (!parentNode || childIds.length === 0) return;
+
+        childIds.forEach((childId) => {
+            const childNode = nodeMap.get(childId);
+            if (!childNode) return;
+
+            // If child is above or too close to parent, push it below
+            if (childNode.position.y < parentNode.position.y + minGap) {
+                childNode.position = {
+                    ...childNode.position,
+                    y: parentNode.position.y + minGap,
+                };
+            }
+
+            // Recurse to enforce for this child's descendants too
+            enforceChildrenBelow(childId);
+        });
+    };
+
+    // Start from root nodes (nodes with no parent in the tree)
+    remappedNodes.forEach((node) => {
+        if (!parentById?.has(node.id)) {
+            enforceChildrenBelow(node.id);
+        }
     });
 
     return remappedNodes;
@@ -832,6 +869,8 @@ const buildGraphPresentation = ({
         visibleCompletedIds,
         normalizedSettings.showCompletionJourney,
         isMobile,
+        treeMaps.parentById,
+        treeMaps.childrenById,
     );
 
     const nodeStyleMap = new Map();
