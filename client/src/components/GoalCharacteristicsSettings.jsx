@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import GoalIcon from './atoms/GoalIcon';
+import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
 import { ICON_SHAPES } from '../utils/goalCharacteristics';
 import useIsMobile from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
@@ -94,12 +95,11 @@ const GoalCharacteristicsSettings = () => {
                             gap: '12px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                <GoalIcon
+                                <AnimatedGoalIcon
                                     shape={current.icon || 'circle'}
                                     color={current.color || 'var(--color-brand-primary)'}
                                     secondaryColor={current.secondary_color || undefined}
-                                    isSmart={true}
-                                    size={24}
+                                    size={32}
                                 />
                                 {current.name}
 

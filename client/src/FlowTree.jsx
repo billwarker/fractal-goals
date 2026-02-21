@@ -14,6 +14,7 @@ import { isSMART } from './utils/smartHelpers';
 import { useTheme } from './contexts/ThemeContext'
 import { useGoalLevels } from './contexts/GoalLevelsContext';;
 import GoalIcon from './components/atoms/GoalIcon';
+import AnimatedGoalIcon from './components/atoms/AnimatedGoalIcon';
 import useIsMobile from './hooks/useIsMobile';
 
 const DEFAULT_VIEW_SETTINGS = {
@@ -118,12 +119,12 @@ const CustomNode = ({ data }) => {
                     justifyContent: 'center'
                 }}
             >
-                <GoalIcon
+                <AnimatedGoalIcon
                     shape={config.icon}
                     color={fillColor}
                     secondaryColor={smartRingFillColor}
-                    isSmart={isSmartGoal}
                     size={30}
+                    reduced
                     className={isCompleted ? styles.nodeCircleCompleted : ''}
                     style={{
                         filter: isCompleted ? `drop-shadow(0 0 3px ${glowColor})` : undefined
