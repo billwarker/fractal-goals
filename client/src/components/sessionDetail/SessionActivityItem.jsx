@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import GoalIcon from '../atoms/GoalIcon';
@@ -86,6 +86,18 @@ function SessionActivityItem({
     const [setMetricDrafts, setSetMetricDrafts] = useState({});
     const [singleMetricDrafts, setSingleMetricDrafts] = useState({});
 
+    // Ref to track the synchronous optimistic state of sets specifically to handle
+    // event racing (e.g. mobile Safari triggering blur + click in the same execution frame).
+    const latestSetsRef = useRef(exercise.sets || []);
+    useEffect(() => {
+        latestSetsRef.current = exercise.sets || [];
+    }, [exercise.sets]);
+
+    const handleUpdateSets = useCallback((newSets) => {
+        latestSetsRef.current = newSets;
+        onUpdate('sets', newSets);
+    }, [onUpdate]);
+
     const resolveMetricId = useCallback((metric) => (
         metric?.metric_id || metric?.metric_definition_id || null
     ), []);
@@ -93,6 +105,41 @@ function SessionActivityItem({
     const resolveSplitId = useCallback((metric) => (
         metric?.split_id || metric?.split_definition_id || null
     ), []);
+
+    const applyDraftsToSets = useCallback((baseSets, drafts) => {
+        if (!drafts || Object.keys(drafts).length === 0) return [...baseSets];
+        return baseSets.map((set, setIdx) => {
+            const newSet = { ...set };
+            if (!newSet.metrics) return newSet;
+            const newMetrics = [...newSet.metrics];
+            let changed = false;
+
+            Object.entries(drafts).forEach(([key, draftValue]) => {
+                const parts = key.split(':');
+                if (parts.length >= 2 && parseInt(parts[0], 10) === setIdx) {
+                    const metricId = parts[1];
+                    const splitId = parts[2] || null;
+
+                    const metricIdx = newMetrics.findIndex(m =>
+                        resolveMetricId(m) === metricId &&
+                        (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
+                    );
+
+                    if (metricIdx >= 0) {
+                        newMetrics[metricIdx] = { ...newMetrics[metricIdx], value: draftValue };
+                    } else {
+                        const newMetric = { metric_id: metricId, value: draftValue };
+                        if (splitId) newMetric.split_id = splitId;
+                        newMetrics.push(newMetric);
+                    }
+                    changed = true;
+                }
+            });
+
+            if (changed) newSet.metrics = newMetrics;
+            return newSet;
+        });
+    }, [resolveMetricId, resolveSplitId]);
 
     useEffect(() => {
         setSetMetricDrafts({});
@@ -145,26 +192,11 @@ function SessionActivityItem({
     const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
         if (!Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) return;
-        const value = setMetricDrafts[key];
 
-        const newSets = [...(exercise.sets || [])];
-        const set = { ...newSets[setIndex] };
-        const metrics = Array.isArray(set.metrics) ? [...set.metrics] : [];
-        const metricIdx = metrics.findIndex(m =>
-            resolveMetricId(m) === metricId && (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
-        );
-        if (metricIdx >= 0) {
-            metrics[metricIdx] = { ...metrics[metricIdx], value };
-        } else {
-            const newMetric = { metric_id: metricId, value };
-            if (splitId) newMetric.split_id = splitId;
-            metrics.push(newMetric);
-        }
-        set.metrics = metrics;
-        newSets[setIndex] = set;
-        onUpdate('sets', newSets);
-        clearSetMetricDraft(setIndex, metricId, splitId);
-    }, [exercise.sets, onUpdate, resolveMetricId, resolveSplitId, setMetricDraftKey, setMetricDrafts, clearSetMetricDraft]);
+        const newSets = applyDraftsToSets(latestSetsRef.current, setMetricDrafts);
+        handleUpdateSets(newSets);
+        setSetMetricDrafts({});
+    }, [setMetricDraftKey, setMetricDrafts, applyDraftsToSets, handleUpdateSets]);
 
     const commitSingleMetricChange = useCallback((metricId, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
@@ -390,18 +422,20 @@ function SessionActivityItem({
             metrics: def.metric_definitions.map(m => ({ metric_id: m.id, value: '' }))
         };
 
-        const newSets = [...(exercise.sets || []), newSet];
-        onUpdate('sets', newSets);
+        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts), newSet];
+        handleUpdateSets(newSets);
+        setSetMetricDrafts({}); // Clear drafts since they are now committed
     };
 
     const handleRemoveSet = (setIndex) => {
-        const newSets = [...(exercise.sets || [])];
+        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts)];
         newSets.splice(setIndex, 1);
-        onUpdate('sets', newSets);
+        handleUpdateSets(newSets);
+        setSetMetricDrafts({});
     };
 
     const handleCascade = (metricId, value, splitId = null, sourceIndex = 0) => {
-        const newSets = [...(exercise.sets || [])];
+        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts)];
         let hasChanges = false;
 
         // Iterate through all sets after the source set
@@ -410,7 +444,7 @@ function SessionActivityItem({
 
             // Should we update this set? Only if the value is empty
             const metricIdx = set.metrics.findIndex(m =>
-                m.metric_id === metricId && (splitId ? m.split_id === splitId : !m.split_id)
+                resolveMetricId(m) === metricId && (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
             );
 
             // Get current value to check if empty
@@ -431,7 +465,8 @@ function SessionActivityItem({
         }
 
         if (hasChanges) {
-            onUpdate('sets', newSets);
+            handleUpdateSets(newSets);
+            setSetMetricDrafts({});
         }
     };
 
