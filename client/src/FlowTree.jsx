@@ -10,9 +10,10 @@ import './FlowTree.css';
 import styles from './FlowTree.module.css';
 import dagre from 'dagre';
 import { isSMART } from './utils/smartHelpers';
+import { getChildType, getTypeDisplayName } from './utils/goalHelpers';
 
 import { useTheme } from './contexts/ThemeContext'
-import { useGoalLevels } from './contexts/GoalLevelsContext';;
+import { useGoalLevels } from './contexts/GoalLevelsContext';
 import GoalIcon from './components/atoms/GoalIcon';
 import AnimatedGoalIcon from './components/atoms/AnimatedGoalIcon';
 import useIsMobile from './hooks/useIsMobile';
@@ -283,30 +284,7 @@ const getLineagePath = (treeData, targetNodeId) => {
     return lineageIds;
 };
 
-const getChildType = (parentType) => {
-    const map = {
-        UltimateGoal: 'LongTermGoal',
-        LongTermGoal: 'MidTermGoal',
-        MidTermGoal: 'ShortTermGoal',
-        ShortTermGoal: 'ImmediateGoal',
-        ImmediateGoal: 'MicroGoal',
-        MicroGoal: 'NanoGoal',
-        NanoGoal: null,
-    };
-    return map[parentType];
-};
 
-const getTypeDisplayName = (type) => {
-    const names = {
-        LongTermGoal: 'Long Term Goal',
-        MidTermGoal: 'Mid Term Goal',
-        ShortTermGoal: 'Short Term Goal',
-        ImmediateGoal: 'Immediate Goal',
-        MicroGoal: 'Micro Goal',
-        NanoGoal: 'Nano Goal',
-    };
-    return names[type] || type;
-};
 
 const buildTreeMaps = (treeData) => {
     const parentById = new Map();
@@ -347,6 +325,50 @@ const buildTreeMaps = (treeData) => {
     completedGoals.sort((a, b) => a.timestamp - b.timestamp);
 
     return { parentById, childrenById, nodeById, completedGoals };
+};
+
+const sortChildren = (children, sortBy) => {
+    if (!children || !Array.isArray(children)) return [];
+    const sorted = [...children];
+
+    switch (sortBy) {
+        case 'deadline':
+            return sorted.sort((a, b) => {
+                const aDate = a.attributes?.deadline || a.deadline;
+                const bDate = b.attributes?.deadline || b.deadline;
+                if (!aDate && !bDate) return 0;
+                if (!aDate) return 1; // Goals without deadline go to end
+                if (!bDate) return -1;
+                return new Date(aDate) - new Date(bDate);
+            });
+        case 'created_at':
+            return sorted.sort((a, b) => {
+                const aDate = a.attributes?.created_at || a.created_at;
+                const bDate = b.attributes?.created_at || b.created_at;
+                if (!aDate && !bDate) return 0;
+                if (!aDate) return 1;
+                if (!bDate) return -1;
+                return new Date(aDate) - new Date(bDate);
+            });
+        case 'completion_rate':
+            // Since we don't have direct completion_rate here, fallback to completed first then by creation
+            return sorted.sort((a, b) => {
+                const aComp = a.attributes?.completed || a.completed ? 1 : 0;
+                const bComp = b.attributes?.completed || b.completed ? 1 : 0;
+                if (aComp !== bComp) return bComp - aComp;
+
+                // Fallback to creation date
+                const aDate = a.attributes?.created_at || a.created_at;
+                const bDate = b.attributes?.created_at || b.created_at;
+                if (!aDate || !bDate) return 0;
+                return new Date(aDate) - new Date(bDate);
+            });
+        case 'manual':
+            // Assume the API returned them in the manual sort_order if implemented later
+            return sorted;
+        default:
+            return sorted;
+    }
 };
 
 const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = null, completedGoalColor = '#FFD700') => {
@@ -409,7 +431,10 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
         });
 
         if (Array.isArray(node.children) && node.children.length > 0) {
-            node.children.forEach((child) => traverse(child, nodeId));
+            // Apply sorting based on parent node's level characteristics
+            const sortBy = node.level_characteristics?.sort_children_by || node.attributes?.level_characteristics?.sort_children_by;
+            const sortedChildren = sortChildren(node.children, sortBy);
+            sortedChildren.forEach((child) => traverse(child, nodeId));
         }
     };
 

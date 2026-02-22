@@ -978,6 +978,28 @@ def create_fractal_goal(current_user, root_id, validated_data):
         # Resolve level to inherit defaults
         level_obj = db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
         
+        # --- ENFORCE CHARACTERISTICS ---
+        if level_obj:
+            # 1. Enforce description_required
+            if getattr(level_obj, 'description_required', False):
+                if not validated_data.get('description') or not validated_data['description'].strip():
+                    return jsonify({"error": f"A description is required for {level_obj.name}s."}), 400
+            
+            # 2. Enforce max_children on the PARENT goal
+            parent_id = validated_data.get('parent_id')
+            if parent_id:
+                parent_goal = db_session.query(Goal).filter_by(id=parent_id).first()
+                if parent_goal and parent_goal.level:
+                    parent_max = parent_goal.level.max_children
+                    if parent_max is not None:
+                        current_children = db_session.query(Goal).filter_by(
+                            parent_id=parent_id, 
+                            deleted_at=None
+                        ).count()
+                        if current_children >= parent_max:
+                            return jsonify({"error": f"Cannot create goal: Parent level '{parent_goal.level.name}' allows a maximum of {parent_max} children."}), 400
+        # -------------------------------
+        
         # Inherit auto_complete_when_children_done from level if not explicitly set
         completed_via_children = validated_data.get('completed_via_children', False)
         if not completed_via_children and level_obj and getattr(level_obj, 'auto_complete_when_children_done', False):
@@ -1137,6 +1159,14 @@ def update_fractal_goal(current_user, root_id, goal_id):
             goal.name = data['name']
         if 'description' in data:
             goal.description = data['description']
+        
+        # Enforce description_required for updates
+        level = getattr(goal, 'level', None)
+        has_description = getattr(goal, 'description', '')
+        if level and getattr(level, 'description_required', False):
+            if not has_description or not has_description.strip():
+                return jsonify({"error": f"A description is required for {level.name}s."}), 400
+
         if 'deadline' in data:
             if data['deadline']:
                 try:
@@ -1154,8 +1184,21 @@ def update_fractal_goal(current_user, root_id, goal_id):
             goal.targets = None
             
         if 'parent_id' in data:
+            new_parent_id = data['parent_id']
+            # Enforce max_children on reparenting (only when moving to a DIFFERENT parent)
+            if new_parent_id and new_parent_id != goal.parent_id:
+                new_parent = db_session.query(Goal).filter_by(id=new_parent_id).first()
+                if new_parent and new_parent.level:
+                    parent_max = new_parent.level.max_children
+                    if parent_max is not None:
+                        current_children = db_session.query(Goal).filter_by(
+                            parent_id=new_parent_id, 
+                            deleted_at=None
+                        ).count()
+                        if current_children >= parent_max:
+                            return jsonify({"error": f"Cannot move goal: New parent level '{new_parent.level.name}' allows a maximum of {parent_max} children."}), 400
             # Allow reparenting (e.g. moving ImmediateGoal between ShortTermGoals)
-            goal.parent_id = data['parent_id']
+            goal.parent_id = new_parent_id
         
         if 'relevance_statement' in data:
             goal.relevance_statement = data['relevance_statement']

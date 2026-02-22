@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
 import { validateDeadlineRange, getDurationInDays } from '../../utils/goalCharacteristics';
 import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import AddTargetModal from '../AddTargetModal';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import styles from './GoalModal.module.css';
 
 const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
-    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon, getDeadlineConstraints } = useGoalLevels();
+    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon, getDeadlineConstraints, getLevelCharacteristics } = useGoalLevels();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
@@ -41,6 +41,29 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
             }
         }
     }, [isOpen, parent]);
+
+    // Handle initial deadline auto-filling and characteristics sync
+    const chars = getLevelCharacteristics(goalType);
+    const descriptionRequired = chars?.description_required || false;
+
+    // Auto-fill deadline from level defaults when modal first opens with a new goalType
+    const hasAutoFilledRef = React.useRef(false);
+    useEffect(() => {
+        if (!isOpen) {
+            hasAutoFilledRef.current = false;
+            return;
+        }
+        if (hasAutoFilledRef.current) return;
+        if (chars?.default_deadline_offset_value && chars?.default_deadline_offset_unit) {
+            const offsetDays = getDurationInDays(chars.default_deadline_offset_value, chars.default_deadline_offset_unit);
+            if (offsetDays) {
+                const newDeadline = new Date();
+                newDeadline.setDate(newDeadline.getDate() + Math.ceil(offsetDays));
+                setDeadline(newDeadline.toISOString().split('T')[0]);
+            }
+            hasAutoFilledRef.current = true;
+        }
+    }, [isOpen, goalType, chars?.default_deadline_offset_value, chars?.default_deadline_offset_unit]);
 
     if (!isOpen) return null;
 
@@ -160,7 +183,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
 
                         <div className={styles.formGroup}>
                             <label className={styles.label} style={{ color: themeColor }}>
-                                Description
+                                Description {descriptionRequired && <span style={{ color: 'red' }}>*</span>}
                             </label>
                             <textarea
                                 value={description}
@@ -168,6 +191,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                 placeholder="What is this goal about?"
                                 rows={2}
                                 className={styles.textarea}
+                                required={descriptionRequired}
                             />
                         </div>
 

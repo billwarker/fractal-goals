@@ -188,7 +188,7 @@ def serialize_goal(goal, include_children=True):
         }
     
     if include_children:
-        result["children"] = [serialize_goal(child) for child in goal.children]
+        result["children"] = [serialize_goal(child) for child in goal.children if child.deleted_at is None]
         
     return result
 

@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { globalApi } from '../utils/api';
 import { useAuth } from './AuthContext';
@@ -33,21 +34,13 @@ export function GoalLevelsProvider({ children }) {
 
     const [currentRootId, setCurrentRootId] = React.useState(getRootIdFromUrl);
 
-    // Keep rootId in sync with URL changes
+    const location = useLocation();
+
+    // Keep rootId in sync with URL changes efficiently
     React.useEffect(() => {
-        const handleLocationChange = () => {
-            const newRootId = getRootIdFromUrl();
-            setCurrentRootId(prev => prev !== newRootId ? newRootId : prev);
-        };
-        // Listen for popstate (back/forward) and custom navigation events
-        window.addEventListener('popstate', handleLocationChange);
-        // Also poll briefly to catch pushState navigations from React Router
-        const interval = setInterval(handleLocationChange, 500);
-        return () => {
-            window.removeEventListener('popstate', handleLocationChange);
-            clearInterval(interval);
-        };
-    }, []);
+        const newRootId = getRootIdFromUrl();
+        setCurrentRootId(prev => prev !== newRootId ? newRootId : prev);
+    }, [location.pathname]);
 
     const {
         data: goalLevels = [],
@@ -235,9 +228,17 @@ export function GoalLevelsProvider({ children }) {
     const _resolveLevel = (goalOrType) => {
         if (!goalOrType || !goalLevels) return null;
         if (typeof goalOrType === 'string') {
-            return getLevelByName(goalOrType);
+            // Normalize CamelCase to space-separated for DB match: 'LongTermGoal' -> 'Long Term Goal'
+            const normalized = goalOrType.replace(/([A-Z])/g, ' $1').trim();
+            return getLevelByName(normalized) || getLevelByName(goalOrType);
         }
-        // It's a goal object — resolve by type or level_id
+        // It's a goal object — resolve by level_id first, then type
+        const levelId = goalOrType.level_id || goalOrType.attributes?.level_id;
+        if (levelId) {
+            const level = getLevelById(levelId);
+            if (level) return level;
+        }
+
         const type = goalOrType.type || goalOrType.attributes?.type;
         if (type) return getLevelByName(type);
         return null;
