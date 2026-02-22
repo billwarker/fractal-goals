@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import GoalIcon from './atoms/GoalIcon';
-<<<<<<< HEAD
 import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
-import { ICON_SHAPES } from '../utils/goalCharacteristics';
-=======
 import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
->>>>>>> main
+import { authApi } from '../utils/api';
 import useIsMobile from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
 
 const GoalCharacteristicsSettings = () => {
     const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
+    const { user, setUser } = useAuth();
     const { animatedIcons } = useTheme();
     const isMobile = useIsMobile();
 
@@ -74,6 +73,9 @@ const GoalCharacteristicsSettings = () => {
                 Customize the shape, colors, and behaviors of your goal hierarchy.
                 Any modifications you make here will be saved as personal overrides specifically for your account.
             </p>
+
+            {/* Completed Goal Global Settings */}
+            <CompletedGoalSettingsCard user={user} setUser={setUser} animatedIcons={animatedIcons} isMobile={isMobile} />
 
             {goalLevels.map((level) => {
                 // Merge DB state with local unsaved edits
@@ -386,6 +388,155 @@ const GoalCharacteristicsSettings = () => {
                     </div>
                 );
             })}
+        </div>
+    );
+};
+
+const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) => {
+    const prefs = user?.preferences || {};
+    const [edits, setEdits] = useState({});
+
+    const currentPrimary = edits.completed_primary_color ?? prefs.completed_primary_color ?? '#4caf50';
+    const currentSecondary = edits.completed_secondary_color ?? prefs.completed_secondary_color ?? '#2e7d32';
+
+    const hasUnsavedChanges = Object.keys(edits).length > 0;
+    const isCustomized = prefs.completed_primary_color || prefs.completed_secondary_color;
+
+    const handleSave = async () => {
+        try {
+            const res = await authApi.updatePreferences({ preferences: edits });
+            setUser(res.data);
+            toast.success("Completed goal colors saved.");
+            setEdits({});
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save settings.");
+        }
+    };
+
+    const handleReset = async () => {
+        if (!window.confirm("Restore completed goals to default green colors?")) return;
+        try {
+            // Nullifying them will make the app fall back to default
+            const changes = { completed_primary_color: null, completed_secondary_color: null };
+            const res = await authApi.updatePreferences({ preferences: changes });
+            setUser(res.data);
+            toast.success("Reset to defaults.");
+            setEdits({});
+        } catch (error) {
+            toast.error("Failed to reset colors.");
+        }
+    };
+
+    return (
+        <div
+            style={{
+                padding: '16px',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                backgroundColor: 'var(--color-bg-card-alt)'
+            }}
+        >
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                flexWrap: 'wrap',
+                gap: '12px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                    {animatedIcons ? (
+                        <AnimatedGoalIcon
+                            shape="check"
+                            color={currentPrimary}
+                            secondaryColor={currentSecondary}
+                            isSmart={true}
+                            size={32}
+                        />
+                    ) : (
+                        <GoalIcon
+                            shape="check"
+                            color={currentPrimary}
+                            secondaryColor={currentSecondary}
+                            isSmart={true}
+                            size={24}
+                        />
+                    )}
+                    Completed Goals
+                    {isCustomized && (
+                        <span style={{ fontSize: '10px', background: 'var(--color-bg-primary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                            Customized
+                        </span>
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {isCustomized && (
+                        <button
+                            onClick={handleReset}
+                            style={{
+                                fontSize: '12px',
+                                background: 'transparent',
+                                border: '1px solid var(--color-border)',
+                                color: 'var(--color-text-secondary)',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Restore Default
+                        </button>
+                    )}
+                    {hasUnsavedChanges && (
+                        <button
+                            onClick={handleSave}
+                            style={{
+                                fontSize: '12px',
+                                background: 'var(--color-brand-primary)',
+                                border: 'none',
+                                color: '#fff',
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Save Changes
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                    Select the colors used for all completed goals and their connections in the FlowTree.
+                </p>
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                            Primary Color
+                        </label>
+                        <input
+                            type="color"
+                            value={currentPrimary}
+                            onChange={(e) => setEdits(prev => ({ ...prev, completed_primary_color: e.target.value }))}
+                            style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                            Secondary Color <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(SMART ring fill)</span>
+                        </label>
+                        <input
+                            type="color"
+                            value={currentSecondary}
+                            onChange={(e) => setEdits(prev => ({ ...prev, completed_secondary_color: e.target.value }))}
+                            style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

@@ -21,7 +21,7 @@ export function adjustBrightness(hex, percent) {
 }
 
 export function GoalLevelsProvider({ children }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const queryClient = useQueryClient();
 
     // Extract rootId from URL path (pattern: /:rootId/...)
@@ -117,7 +117,7 @@ export function GoalLevelsProvider({ children }) {
 
         // Handle direct string passes (e.g., 'LongTermGoal' or 'Completed') from legacy components
         if (typeof goal === 'string') {
-            if (goal === 'Completed') return '#4caf50'; // Default success color
+            if (goal === 'Completed') return user?.preferences?.completed_primary_color || FALLBACK_COLOR;
 
             // Convert 'LongTermGoal' to 'Long Term Goal'
             const normalizedName = goal.replace(/([A-Z])/g, ' $1').trim();
@@ -130,6 +130,7 @@ export function GoalLevelsProvider({ children }) {
 
     // For when components know the name (e.g. from ThemeContext legacy calls)
     const getColorByName = (name) => {
+        if (name === 'Completed') return user?.preferences?.completed_primary_color || FALLBACK_COLOR;
         const lvl = getLevelByName(name);
         return lvl?.color || FALLBACK_COLOR;
     };
@@ -152,6 +153,12 @@ export function GoalLevelsProvider({ children }) {
 
     // Helpers relying on getGoalColor:
     const getGoalSecondaryColor = (goal) => {
+        // Handle Completed string first
+        if (goal === 'Completed') {
+            if (user?.preferences?.completed_secondary_color) return user.preferences.completed_secondary_color;
+            const primary = getGoalColor(goal);
+            return adjustBrightness(primary, -0.6);
+        }
         // Check if database has a custom secondary_color for this level
         if (goal && typeof goal === 'string') {
             const normalizedName = goal.replace(/([A-Z])/g, ' $1').trim();
