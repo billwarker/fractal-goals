@@ -1,82 +1,10 @@
 /**
- * Default Goal Characteristics
+ * Goal Characteristics - Shared Constants
  * 
- * Defines the initial settings for each goal level, including:
- * - icon: The SVG shape used for visualization (circle, square, triangle, etc.)
- * - deadlines: Min/max relative time ranges with units
- * - completion_methods: Valid ways to mark the goal as complete
+ * Pure constants and utilities used by goal-related components.
+ * Level-specific settings (deadlines, behavior flags) are now DB-driven
+ * and accessed via GoalLevelsContext.
  */
-
-export const DEFAULT_GOAL_CHARACTERISTICS = {
-    UltimateGoal: {
-        icon: 'hexagon',
-        deadlines: {
-            min: { value: 1, unit: 'years' },
-            max: { value: 10, unit: 'years' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    LongTermGoal: {
-        icon: 'star',
-        deadlines: {
-            min: { value: 3, unit: 'months' },
-            max: { value: 2, unit: 'years' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    MidTermGoal: {
-        icon: 'diamond',
-        deadlines: {
-            min: { value: 1, unit: 'months' },
-            max: { value: 6, unit: 'months' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    ShortTermGoal: {
-        icon: 'square',
-        deadlines: {
-            min: { value: 1, unit: 'weeks' },
-            max: { value: 2, unit: 'months' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    ImmediateGoal: {
-        icon: 'triangle',
-        deadlines: {
-            min: { value: 1, unit: 'days' },
-            max: { value: 14, unit: 'days' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    MicroGoal: {
-        icon: 'circle',
-        deadlines: {
-            min: { value: 1, unit: 'hours' },
-            max: { value: 3, unit: 'days' }
-        },
-        completion_methods: { manual: true, children: true, targets: true }
-    },
-    NanoGoal: {
-        icon: 'square',
-        deadline_min: { value: 0, unit: 'none' },
-        deadline_max: { value: 0, unit: 'none' }
-    },
-    Target: {
-        icon: 'twelve-point-star',
-        color: '#FFD700', // Gold default for targets
-        deadline_min: { value: 0, unit: 'none' },
-        deadline_max: { value: 0, unit: 'none' }
-    },
-    Completed: {
-        icon: 'check',
-        color: '#FFD700',
-        deadlines: {
-            min: { value: 0, unit: 'none' },
-            max: { value: 0, unit: 'none' }
-        },
-        completion_methods: { manual: false, children: false, targets: false }
-    }
-};
 
 export const DEADLINE_UNITS = [
     { label: 'Minutes', value: 'minutes' },
@@ -112,34 +40,32 @@ export const getDurationInDays = (value, unit) => {
 };
 
 /**
- * Validates if a chosen deadline date is within the allowed relative range.
+ * Validates if a chosen deadline date is within the allowed range (in days).
+ * Uses DB-driven min/max days from GoalLevelsContext instead of hardcoded defaults.
  * @param {Date|string} deadlineDate - The chosen deadline date
- * @param {Object} goalLevelSettings - The settings for this goal level (from goalCharacteristics)
+ * @param {number|null} minDays - Minimum allowed days from level characteristics
+ * @param {number|null} maxDays - Maximum allowed days from level characteristics
  * @param {Date|string} relativeBase - The start date (defaults to now)
  * @returns {Object} { isValid, message }
  */
-export const validateDeadline = (deadlineDate, goalLevelSettings, relativeBase = new Date()) => {
-    if (!goalLevelSettings || !goalLevelSettings.deadlines) return { isValid: true };
+export const validateDeadlineRange = (deadlineDate, minDays, maxDays, relativeBase = new Date()) => {
+    if (minDays == null && maxDays == null) return { isValid: true };
 
     const deadline = new Date(deadlineDate);
     const start = new Date(relativeBase);
     const diffInDays = (deadline - start) / (1000 * 60 * 60 * 24);
 
-    const { min, max } = goalLevelSettings.deadlines;
-    const minDays = getDurationInDays(min.value, min.unit);
-    const maxDays = getDurationInDays(max.value, max.unit);
-
-    if (diffInDays < minDays) {
+    if (minDays != null && diffInDays < minDays) {
         return {
             isValid: false,
-            message: `Deadline is too short. Minimum allowed is ${min.value} ${min.unit}.`
+            message: `Deadline is too short. Minimum is ${minDays} days.`
         };
     }
 
-    if (diffInDays > maxDays) {
+    if (maxDays != null && diffInDays > maxDays) {
         return {
             isValid: false,
-            message: `Deadline is too far out. Maximum allowed is ${max.value} ${max.unit}.`
+            message: `Deadline is too far out. Maximum is ${maxDays} days.`
         };
     }
 

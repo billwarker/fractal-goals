@@ -182,6 +182,60 @@ export function GoalLevelsProvider({ children }) {
 
     const getCompletionColor = () => getGoalColor('Completed');
 
+    /**
+     * Get full level characteristics for a goal type.
+     * Returns all DB-driven characteristics merged from the level.
+     */
+    const getLevelCharacteristics = (goalOrType) => {
+        const level = _resolveLevel(goalOrType);
+        if (!level) return {};
+        return {
+            allow_manual_completion: level.allow_manual_completion ?? true,
+            track_activities: level.track_activities ?? true,
+            requires_smart: level.requires_smart ?? false,
+            deadline_min_value: level.deadline_min_value,
+            deadline_min_unit: level.deadline_min_unit,
+            deadline_max_value: level.deadline_max_value,
+            deadline_max_unit: level.deadline_max_unit,
+            max_children: level.max_children,
+            auto_complete_when_children_done: level.auto_complete_when_children_done ?? false,
+            can_have_targets: level.can_have_targets ?? true,
+
+            description_required: level.description_required ?? false,
+            default_deadline_offset_value: level.default_deadline_offset_value,
+            default_deadline_offset_unit: level.default_deadline_offset_unit,
+            sort_children_by: level.sort_children_by,
+        };
+    };
+
+
+    const canHaveTargets = (goalOrType) => {
+        const chars = getLevelCharacteristics(goalOrType);
+        return chars.can_have_targets ?? true;
+    };
+
+    const getDeadlineConstraints = (goalOrType) => {
+        const chars = getLevelCharacteristics(goalOrType);
+        return {
+            minValue: chars.deadline_min_value,
+            minUnit: chars.deadline_min_unit,
+            maxValue: chars.deadline_max_value,
+            maxUnit: chars.deadline_max_unit,
+        };
+    };
+
+    // Internal helper to resolve a goal/type to a level object
+    const _resolveLevel = (goalOrType) => {
+        if (!goalOrType || !goalLevels) return null;
+        if (typeof goalOrType === 'string') {
+            return getLevelByName(goalOrType);
+        }
+        // It's a goal object — resolve by type or level_id
+        const type = goalOrType.type || goalOrType.attributes?.type;
+        if (type) return getLevelByName(type);
+        return null;
+    };
+
     const value = {
         goalLevels,
         isLoading,
@@ -195,6 +249,9 @@ export function GoalLevelsProvider({ children }) {
         getGoalTextColor,
         getGoalColorDark,
         getCompletionColor,
+        getLevelCharacteristics,
+        canHaveTargets,
+        getDeadlineConstraints,
         updateGoalLevel: updateGoalLevelMutation.mutateAsync,
         resetGoalLevel: resetGoalLevelMutation.mutateAsync
     };

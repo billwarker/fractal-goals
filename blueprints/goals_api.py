@@ -52,7 +52,11 @@ def _resolve_level_id(db_session, type_value):
     level_name = _TYPE_TO_LEVEL_NAME.get(type_value, type_value.replace('Goal', ' Goal') if isinstance(type_value, str) else None)
     if not level_name:
         return None
-    level = db_session.query(GoalLevel).filter_by(name=level_name).first()
+    # Scope to system defaults (owner_id=None) to prevent cross-user collisions
+    level = db_session.query(GoalLevel).filter_by(name=level_name, owner_id=None).first()
+    if not level:
+        # Fallback: any level with that name
+        level = db_session.query(GoalLevel).filter_by(name=level_name).first()
     return level.id if level else None
 
 
@@ -678,6 +682,22 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None):
         else:
             goal.completed = not goal.completed
         
+        # Enforce allow_manual_completion from level
+        if goal.completed:
+            level = getattr(goal, 'level', None)
+            if level and level.allow_manual_completion == False:
+                return jsonify({"error": "Manual completion is not allowed for this goal level"}), 403
+            
+            # Enforce requires_smart from level
+            if level and getattr(level, 'requires_smart', False):
+                smart_status = calculate_smart_status(goal)
+                if not all(smart_status.values()):
+                    missing = [k for k, v in smart_status.items() if not v]
+                    return jsonify({
+                        "error": f"SMART criteria not met. Missing: {', '.join(missing)}",
+                        "smart_status": smart_status
+                    }), 400
+        
         # Set or clear completed_at based on completion status
         if goal.completed:
             goal.completed_at = datetime.now(timezone.utc)
@@ -955,6 +975,14 @@ def create_fractal_goal(current_user, root_id, validated_data):
             
         level_id = _resolve_level_id(db_session, validated_data.get('type'))
         
+        # Resolve level to inherit defaults
+        level_obj = db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
+        
+        # Inherit auto_complete_when_children_done from level if not explicitly set
+        completed_via_children = validated_data.get('completed_via_children', False)
+        if not completed_via_children and level_obj and getattr(level_obj, 'auto_complete_when_children_done', False):
+            completed_via_children = True
+        
         # Create new goal
         new_goal = Goal(
             id=str(uuid.uuid4()),
@@ -964,7 +992,7 @@ def create_fractal_goal(current_user, root_id, validated_data):
             parent_id=validated_data.get('parent_id'),
             deadline=deadline,
             completed=False,
-            completed_via_children=validated_data.get('completed_via_children', False),
+            completed_via_children=completed_via_children,
             allow_manual_completion=validated_data.get('allow_manual_completion', True),
             track_activities=validated_data.get('track_activities', True),
             relevance_statement=validated_data.get('relevance_statement'),

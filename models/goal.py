@@ -70,6 +70,27 @@ class GoalLevel(Base):
     track_activities = Column(Boolean, default=True)
     requires_smart = Column(Boolean, default=False)
     
+    # Deadline constraints (value + unit pairs, e.g. value=2, unit='years')
+    deadline_min_value = Column(Integer, nullable=True)
+    deadline_min_unit = Column(String, nullable=True)  # minutes, hours, days, weeks, months, years, decades
+    deadline_max_value = Column(Integer, nullable=True)
+    deadline_max_unit = Column(String, nullable=True)
+    
+    # Hierarchy behavior
+    max_children = Column(Integer, nullable=True)  # null = unlimited
+    auto_complete_when_children_done = Column(Boolean, default=False)
+    
+    # Feature gates
+    can_have_targets = Column(Boolean, default=True)
+    
+    # Content requirements
+    description_required = Column(Boolean, default=False)
+    default_deadline_offset_value = Column(Integer, nullable=True)
+    default_deadline_offset_unit = Column(String, nullable=True)
+    
+    # Display
+    sort_children_by = Column(String, nullable=True)  # 'manual', 'deadline', 'created_at', 'completion_rate'
+    
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
