@@ -23,7 +23,7 @@ from flask import Flask
 from flask_cors import CORS
 import models
 from models import (
-    Base, Goal, UltimateGoal, ShortTermGoal, PracticeSession,
+    Base, Goal, PracticeSession,
     ActivityGroup, ActivityDefinition, MetricDefinition, SplitDefinition,
     ActivityInstance, MetricValue, SessionTemplate,
     get_engine, init_db, get_session
@@ -74,6 +74,15 @@ def app():
     test_app.register_blueprint(logs_api)
     test_app.register_blueprint(auth_bp)
     
+    # Initialize Limiter
+    from extensions import limiter
+    limiter.init_app(test_app)
+    
+    @test_app.teardown_appcontext
+    def shutdown_session(exception=None):
+        from models import remove_session
+        remove_session()
+    
     # Ensure usage of test database
     if not config.DATABASE_URL or 'test' not in config.DATABASE_URL:
          pytest.fail(f"CRITICAL: Running tests against non-test database: {config.DATABASE_URL}! Check .env.testing (ENV={config.ENV})")
@@ -105,6 +114,7 @@ def app():
     # Restore original get_engine
     models.get_engine = original_get_engine
     models.engine = None # Reset cached engine in models if any
+    models._session_factory = None # Reset the scoped session factory between tests!
 
 
 @pytest.fixture(scope='function')
@@ -155,7 +165,7 @@ def test_user(db_session):
         username="testuser",
         email="test@example.com"
     )
-    user.set_password("password123")
+    user.set_password("Password123")
     db_session.add(user)
     db_session.commit()
     return user
@@ -210,11 +220,11 @@ def authed_client(client, auth_headers):
 @pytest.fixture
 def sample_ultimate_goal(db_session, test_user):
     """Create a sample UltimateGoal for testing."""
-    goal = UltimateGoal(
+    goal = Goal(
         id=str(uuid.uuid4()),
         name="Master Software Engineering",
         description="Become a world-class software engineer",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         owner_id=test_user.id,
         root_id=None  # Will be set to self
     )
@@ -227,39 +237,38 @@ def sample_ultimate_goal(db_session, test_user):
 @pytest.fixture
 def sample_goal_hierarchy(db_session, sample_ultimate_goal):
     """Create a complete goal hierarchy for testing."""
-    from models import LongTermGoal, MidTermGoal, ShortTermGoal
     
     # Long-term goal
-    long_term = LongTermGoal(
+    long_term = Goal(
         id=str(uuid.uuid4()),
         name="Master Backend Development",
         description="Become expert in backend systems",
         parent_id=sample_ultimate_goal.id,
         root_id=sample_ultimate_goal.id,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(long_term)
     
     # Mid-term goal
-    mid_term = MidTermGoal(
+    mid_term = Goal(
         id=str(uuid.uuid4()),
         name="Learn Python Advanced Concepts",
         description="Master decorators, metaclasses, async",
         parent_id=long_term.id,
         root_id=sample_ultimate_goal.id,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(mid_term)
     
     # Short-term goal
-    short_term = ShortTermGoal(
+    short_term = Goal(
         id=str(uuid.uuid4()),
         name="Complete Python Testing Course",
         description="Learn pytest and testing best practices",
         parent_id=mid_term.id,
         root_id=sample_ultimate_goal.id,
-        deadline=datetime.utcnow() + timedelta(days=30),
-        created_at=datetime.utcnow()
+        deadline=datetime.now(timezone.utc) + timedelta(days=30),
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(short_term)
     
@@ -281,7 +290,7 @@ def sample_activity_group(db_session, sample_ultimate_goal):
         root_id=sample_ultimate_goal.id,
         name="Strength Training",
         description="Resistance exercises",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         sort_order=1
     )
     db_session.add(group)
@@ -302,7 +311,7 @@ def sample_activity_definition(db_session, sample_ultimate_goal, sample_activity
         metrics_multiplicative=False,
         has_splits=False,
         group_id=sample_activity_group.id,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(activity)
     db_session.commit()
@@ -317,7 +326,7 @@ def sample_activity_definition(db_session, sample_ultimate_goal, sample_activity
         is_top_set_metric=True,
         is_multiplicative=False,
         is_active=True,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     reps_metric = MetricDefinition(
         id=str(uuid.uuid4()),
@@ -328,7 +337,7 @@ def sample_activity_definition(db_session, sample_ultimate_goal, sample_activity
         is_top_set_metric=False,
         is_multiplicative=False,
         is_active=True,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(weight_metric)
     db_session.add(reps_metric)
@@ -345,8 +354,8 @@ def sample_practice_session(db_session, sample_goal_hierarchy):
         name="Morning Workout",
         description="Strength training session",
         root_id=sample_goal_hierarchy['ultimate'].id,
-        session_start=datetime.utcnow(),
-        created_at=datetime.utcnow(),
+        session_start=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
         attributes=json.dumps({})
     )
     db_session.add(session)
@@ -362,7 +371,7 @@ def sample_activity_instance(db_session, sample_practice_session, sample_activit
         session_id=sample_practice_session.id,
         activity_definition_id=sample_activity_definition.id,
         root_id=sample_practice_session.root_id,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         time_start=None,
         time_stop=None,
         duration_seconds=None,
@@ -381,7 +390,7 @@ def sample_session_template(db_session, sample_ultimate_goal):
         name="Full Body Workout",
         description="Complete full body training session",
         root_id=sample_ultimate_goal.id,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         template_data=json.dumps({
             'sections': [
                 {
@@ -406,31 +415,14 @@ def sample_session_template(db_session, sample_ultimate_goal):
 
 def create_goal(db_session, goal_type, name, parent=None, root=None):
     """Helper function to create a goal of any type."""
-    from models import (
-        UltimateGoal, LongTermGoal, MidTermGoal, ShortTermGoal,
-        ImmediateGoal, MicroGoal, NanoGoal
-    )
     
-    goal_classes = {
-        'UltimateGoal': UltimateGoal,
-        'LongTermGoal': LongTermGoal,
-        'MidTermGoal': MidTermGoal,
-        'ShortTermGoal': ShortTermGoal,
-        'ImmediateGoal': ImmediateGoal,
-        'MicroGoal': MicroGoal,
-        'NanoGoal': NanoGoal,
-    }
-    
-    GoalClass = goal_classes.get(goal_type)
-    if not GoalClass:
-        raise ValueError(f"Unknown goal type: {goal_type}")
-    
-    goal = GoalClass(
+    goal = Goal(
         id=str(uuid.uuid4()),
         name=name,
+        description=goal_type, # just store type as a string for now
         parent_id=parent.id if parent else None,
         root_id=root.id if root else None,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     
     # If this is an UltimateGoal, set root_id to self

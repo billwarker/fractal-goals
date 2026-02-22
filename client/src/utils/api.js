@@ -22,6 +22,81 @@ axios.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// Add interceptor to catch 401 queries and silently refresh token
+axios.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+
+        // If the error is 401 and we haven't already retried
+        if (error.response?.status === 401 && !originalRequest._retry) {
+
+            // Prevent infinite login loops on auth routes
+            if (originalRequest.url.includes('/auth/refresh') || originalRequest.url.includes('/auth/login')) {
+                return Promise.reject(error);
+            }
+
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalRequest.headers['Authorization'] = 'Bearer ' + token;
+                    return axios(originalRequest);
+                }).catch(err => {
+                    return Promise.reject(err);
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            try {
+                // Use a direct axios call to avoid circular dependency loops
+                const response = await axios.post(`${API_BASE}/auth/refresh`, {}, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+
+                const { token, user } = response.data;
+                localStorage.setItem('token', token);
+
+                // Emit custom event for AuthContext to sync user state if needed
+                window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token, user } }));
+
+                originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                processQueue(null, token);
+
+                return axios(originalRequest);
+            } catch (refreshError) {
+                processQueue(refreshError, null);
+
+                // If refresh failed (e.g., token past 7-day grace period), force a hard logout
+                localStorage.removeItem('token');
+                window.dispatchEvent(new Event('auth:unauthorized'));
+
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 /**
  * Authentication API endpoints
  */
@@ -32,6 +107,7 @@ export const authApi = {
     updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),
     updatePassword: (data) => axios.put(`${API_BASE}/auth/account/password`, data),
     updateEmail: (data) => axios.put(`${API_BASE}/auth/account/email`, data),
+    updateUsername: (data) => axios.put(`${API_BASE}/auth/account/username`, data),
     deleteAccount: (data) => axios.delete(`${API_BASE}/auth/account`, { data }), // DELETE requests often need data in config
 };
 

@@ -66,6 +66,11 @@ app.config['COMPRESS_MIMETYPES'] = [
 ]
 Compress(app)
 
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    from models import remove_session
+    remove_session()
+
 # Initialize Rate Limiter
 limiter.init_app(app)
 # Configure storage URI if backend is not memory

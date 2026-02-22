@@ -8,7 +8,7 @@ from models import get_engine, get_session, User
 from config import config
 from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
-    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema
+    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema
 )
 from services.serializers import serialize_user
 from extensions import limiter
@@ -44,12 +44,13 @@ def token_required(f):
                 current_user = db_session.query(User).filter_by(id=data['user_id']).first()
                 if not current_user:
                     return jsonify({'error': 'User not found'}), 401
-                # We can't easily persist the user object in db_session between requests 
-                # but for the duration of this call it's fine.
-                # Pass user as first argument
-                return f(current_user, *args, **kwargs)
+                
+                # Detach the user from the session so it remains usable
+                db_session.expunge(current_user)
             finally:
                 db_session.close()
+                
+            return f(current_user, *args, **kwargs)
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
@@ -94,6 +95,58 @@ def signup(validated_data):
     finally:
         db_session.close()
 
+@auth_bp.route('/refresh', methods=['POST'])
+def refresh_token():
+    """Silent token refresh endpoint."""
+    token = None
+    if 'Authorization' in request.headers:
+        auth_header = request.headers['Authorization']
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(" ")[1]
+            
+    if not token:
+        return jsonify({'error': 'Token is missing'}), 401
+    
+    try:
+        # Decode without verifying expiration to check the payload
+        data = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False})
+        
+        # Check if the token is *too* old (outside refresh window)
+        exp_timestamp = data.get('exp', 0)
+        exp_time = datetime.datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+        refresh_window = datetime.timedelta(days=getattr(config, 'JWT_REFRESH_WINDOW_DAYS', 7))
+        
+        if datetime.datetime.now(timezone.utc) > (exp_time + refresh_window):
+            return jsonify({'error': 'Refresh window expired. Please log in again.'}), 401
+            
+        engine = models.get_engine()
+        db_session = get_session(engine)
+        try:
+            user = db_session.query(User).filter_by(id=data['user_id']).first()
+            
+            if not user or not user.is_active:
+                return jsonify({'error': 'User invalid or disabled'}), 401
+                
+            # Issue new token
+            new_token = jwt.encode({
+                'user_id': user.id,
+                'exp': datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS)
+            }, config.JWT_SECRET_KEY, algorithm="HS256")
+            
+            return jsonify({
+                'token': new_token,
+                'user': serialize_user(user)
+            })
+        finally:
+            db_session.close()
+        
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    except Exception as e:
+        logger.exception("Error in refresh_token")
+        return jsonify({'error': 'Failed to refresh token'}), 500
+
+
 @auth_bp.route('/login', methods=['POST'])
 @validate_request(UserLoginSchema)
 @limiter.limit("10 per minute")  # Strict limit for login attempts
@@ -107,11 +160,35 @@ def login(validated_data):
             (User.email == validated_data['username_or_email'])
         ).first()
         
-        if not user or not user.check_password(validated_data['password']):
+        if not user:
             return jsonify({"error": "Invalid username or password"}), 401
             
         if not user.is_active:
             return jsonify({"error": "User account is disabled"}), 403
+            
+        # Check lockout
+        if user.locked_until:
+            now = datetime.datetime.now(timezone.utc)
+            locked_until = user.locked_until
+            if locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+                
+            if locked_until > now:
+                minutes_left = int((locked_until - now).total_seconds() / 60) + 1
+                return jsonify({"error": f"Account temporarily locked. Try again in {minutes_left} minutes."}), 403
+            
+        if not user.check_password(validated_data['password']):
+            user.failed_login_count = (user.failed_login_count or 0) + 1
+            if user.failed_login_count >= 5:
+                user.locked_until = datetime.datetime.now(timezone.utc) + datetime.timedelta(minutes=15)
+            db_session.commit()
+            return jsonify({"error": "Invalid username or password"}), 401
+            
+        # Success: reset lockdown & update last login
+        user.failed_login_count = 0
+        user.locked_until = None
+        user.last_login_at = datetime.datetime.now(timezone.utc)
+        db_session.commit()
             
         token = jwt.encode({
             'user_id': user.id,
@@ -123,6 +200,7 @@ def login(validated_data):
             'user': serialize_user(user)
         })
     except Exception as e:
+        db_session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
@@ -238,21 +316,16 @@ def delete_account(current_user, validated_data):
         if not user.check_password(validated_data['password']):
             return jsonify({"error": "Invalid password"}), 401
             
-        # Hard delete? Or soft delete? 
-        # Models usually support soft delete if they have deleted_at, but User might not.
-        # User model HAS is_active, but no deleted_at in the audit view (let me check).
-        # Actually models.py showed:
-        # User: is_active, no deleted_at.
-        # Goals: deleted_at. 
-        # So we should probably cascade delete everything OR just mark is_active=False + sanitize PII.
-        # For "Right to be forgotten", we should randomize PII and set is_active=False.
+        # Anonymize PII and deactivate account
         
         # Anonymize
         import uuid
         user.username = f"deleted_{uuid.uuid4()}"
         user.email = f"deleted_{uuid.uuid4()}@fractalgoals.com"
         user.is_active = False
-        user.password_hash = "deleted"
+        
+        from werkzeug.security import generate_password_hash
+        user.password_hash = generate_password_hash(str(uuid.uuid4()))
         
         db_session.commit()
         return jsonify({"message": "Account deleted successfully"})
@@ -261,3 +334,35 @@ def delete_account(current_user, validated_data):
         return jsonify({"error": str(e)}), 500
     finally:
         db_session.close()
+
+@auth_bp.route('/account/username', methods=['PUT'])
+@token_required
+@validate_request(UserUsernameUpdateSchema)
+@limiter.limit("5 per minute")
+def update_username(current_user, validated_data):
+    """Update user username."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        user = db_session.query(User).get(current_user.id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        if not user.check_password(validated_data['password']):
+            return jsonify({"error": "Incorrect password"}), 401
+            
+        # Check uniqueness
+        existing = db_session.query(User).filter(User.username == validated_data['username'], User.id != user.id).first()
+        if existing:
+            return jsonify({"error": "Username already exists"}), 400
+            
+        user.username = validated_data['username']
+        db_session.commit()
+        
+        return jsonify(serialize_user(user))
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+

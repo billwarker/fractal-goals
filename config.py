@@ -63,20 +63,21 @@ class Config:
     # Secret Key for JWT
     # In production, we should fail if these are not set
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default-jwt-secret-keep-it-safe')
-    JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
+    JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '72'))
+    JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
 
     # Rate Limiting Storage URL (Redis)
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
 
     @classmethod
     def check_production_security(cls):
-        """Verify critical security settings in production."""
-        if cls.ENV == 'production':
+        """Verify critical security settings in production/staging environments."""
+        if cls.ENV not in ('development', 'testing'):
             if cls.JWT_SECRET_KEY == 'default-jwt-secret-keep-it-safe':
-                raise ValueError("CRITICAL: JWT_SECRET_KEY must be set in production environment!")
+                raise ValueError(f"CRITICAL: JWT_SECRET_KEY must be set in {cls.ENV} environment!")
             
             if '*' in cls.CORS_ORIGINS:
-                raise ValueError("CRITICAL: Wildcard CORS origin (*) is NOT allowed in production!")
+                raise ValueError(f"CRITICAL: Wildcard CORS origin (*) is NOT allowed in {cls.ENV} environment!")
 
     @classmethod
     def get_database_url(cls):

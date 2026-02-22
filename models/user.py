@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Integer
 from sqlalchemy.orm import relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
@@ -16,6 +16,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     preferences = Column(JSON_TYPE, default={})  # Store UI preferences like goal colors
+    
+    # Auth & Security Improvements
+    last_login_at = Column(DateTime, nullable=True)
+    failed_login_count = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     

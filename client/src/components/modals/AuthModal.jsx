@@ -188,6 +188,11 @@ function AuthModal({ isOpen, onClose }) {
                             placeholder="••••••••"
                             fullWidth
                         />
+                        {!isLogin && (
+                            <Text size="xs" color="muted" style={{ marginTop: '4px', opacity: 0.8 }}>
+                                Password must be at least 8 characters long, contain an uppercase letter, and a number.
+                            </Text>
+                        )}
                     </div>
 
                     {generalError && (
@@ -217,7 +222,6 @@ function AuthModal({ isOpen, onClose }) {
                         </Button>
                     </div>
 
-                    {/* Sign up temporarily disabled for public launch
                     <div className={styles.toggleContainer}>
                         <Text size="sm" as="span" style={{ marginRight: '8px' }}>
                             {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
@@ -231,7 +235,6 @@ function AuthModal({ isOpen, onClose }) {
                             {isLogin ? 'SIGN UP' : 'LOGIN'}
                         </button>
                     </div>
-                    */}
                 </form>
             </div>
         </div>

@@ -138,6 +138,14 @@ def parse_date_string(value: str) -> date:
 # AUTH SCHEMAS
 # =============================================================================
 
+def validate_strong_password(v: str) -> str:
+    """Shared validator for password strength requirements."""
+    if not re.search(r'[A-Z]', v):
+        raise ValueError('Must contain at least one uppercase letter')
+    if not re.search(r'[0-9]', v):
+        raise ValueError('Must contain at least one digit')
+    return v
+
 class UserSignupSchema(BaseModel):
     """Schema for user registration."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -150,6 +158,11 @@ class UserSignupSchema(BaseModel):
     @classmethod
     def sanitize_username(cls, v: str) -> str:
         return sanitize_string(v)
+
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return validate_strong_password(v)
 
 
 class UserLoginSchema(BaseModel):
@@ -172,6 +185,11 @@ class UserPasswordUpdateSchema(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8)
 
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return validate_strong_password(v)
+
 
 class UserEmailUpdateSchema(BaseModel):
     """Schema for updating email."""
@@ -180,6 +198,18 @@ class UserEmailUpdateSchema(BaseModel):
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     password: str = Field(..., min_length=1)  # Require password to change email
 
+
+class UserUsernameUpdateSchema(BaseModel):
+    """Schema for updating username."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    username: str = Field(..., min_length=3, max_length=80)
+    password: str = Field(..., min_length=1)  # Require password to change username
+    
+    @field_validator('username')
+    @classmethod
+    def sanitize_username(cls, v: str) -> str:
+        return sanitize_string(v)
 
 class UserDeleteSchema(BaseModel):
     """Schema for deleting account."""

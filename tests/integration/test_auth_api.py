@@ -3,11 +3,13 @@ Integration tests for Auth API endpoints.
 
 Tests cover:
 - POST /api/auth/signup - Register a new user
-- POST /api/auth/login - Authenticate user
+- POST /api/auth/login - Authenticate user (includes lockout behavior)
+- POST /api/auth/refresh - Silent token refresh
 - GET /api/auth/me - Get current user info
 - PATCH /api/auth/preferences - Update user preferences
 - PUT /api/auth/account/password - Change password
 - PUT /api/auth/account/email - Change email  
+- PUT /api/auth/account/username - Change username
 - DELETE /api/auth/account - Delete account
 """
 
@@ -24,7 +26,7 @@ class TestSignupEndpoint:
         payload = {
             'username': 'newuser',
             'email': 'newuser@example.com',
-            'password': 'securepassword123'
+            'password': 'Securepassword123'
         }
         response = client.post(
             '/api/auth/signup',
@@ -45,7 +47,7 @@ class TestSignupEndpoint:
         payload = {
             'username': 'testuser',  # Same as test_user
             'email': 'different@example.com',
-            'password': 'securepassword123'
+            'password': 'Securepassword123'
         }
         response = client.post(
             '/api/auth/signup',
@@ -61,7 +63,7 @@ class TestSignupEndpoint:
         payload = {
             'username': 'differentuser',
             'email': 'test@example.com',  # Same as test_user
-            'password': 'securepassword123'
+            'password': 'Securepassword123'
         }
         response = client.post(
             '/api/auth/signup',
@@ -77,7 +79,7 @@ class TestSignupEndpoint:
         payload = {
             'username': 'newuser',
             'email': 'not-an-email',
-            'password': 'securepassword123'
+            'password': 'Securepassword123'
         }
         response = client.post(
             '/api/auth/signup',
@@ -101,6 +103,19 @@ class TestSignupEndpoint:
         )
         assert response.status_code == 400
 
+    def test_signup_missing_fields(self, client):
+        """Test signup with missing fields fails."""
+        payload = {
+            'username': 'newuser'
+            # Missing email and password
+        }
+        response = client.post(
+            '/api/auth/signup',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 400
+
 
 @pytest.mark.integration
 class TestLoginEndpoint:
@@ -110,7 +125,7 @@ class TestLoginEndpoint:
         """Test successful login with username."""
         payload = {
             'username_or_email': 'testuser',
-            'password': 'password123'
+            'password': 'Password123'
         }
         response = client.post(
             '/api/auth/login',
@@ -127,7 +142,7 @@ class TestLoginEndpoint:
         """Test successful login with email."""
         payload = {
             'username_or_email': 'test@example.com',
-            'password': 'password123'
+            'password': 'Password123'
         }
         response = client.post(
             '/api/auth/login',
@@ -174,7 +189,7 @@ class TestLoginEndpoint:
         
         payload = {
             'username_or_email': 'testuser',
-            'password': 'password123'
+            'password': 'Password123'
         }
         response = client.post(
             '/api/auth/login',
@@ -184,6 +199,15 @@ class TestLoginEndpoint:
         assert response.status_code == 403
         data = json.loads(response.data)
         assert 'disabled' in data['error'].lower() or 'inactive' in data['error'].lower()
+
+    def test_login_empty_body(self, client):
+        """Test login without JSON payload fails."""
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        assert response.status_code == 400
 
 
 @pytest.mark.integration
@@ -235,8 +259,8 @@ class TestPasswordChangeEndpoint:
     def test_change_password_success(self, authed_client, client, test_user):
         """Test successful password change."""
         payload = {
-            'current_password': 'password123',
-            'new_password': 'newpassword456'
+            'current_password': 'Password123',
+            'new_password': 'Newpassword456'
         }
         response = authed_client.put(
             '/api/auth/account/password',
@@ -248,7 +272,7 @@ class TestPasswordChangeEndpoint:
         # Verify we can login with new password
         login_payload = {
             'username_or_email': 'testuser',
-            'password': 'newpassword456'
+            'password': 'Newpassword456'
         }
         login_response = client.post(
             '/api/auth/login',
@@ -261,7 +285,7 @@ class TestPasswordChangeEndpoint:
         """Test password change with wrong current password fails."""
         payload = {
             'current_password': 'wrongpassword',
-            'new_password': 'newpassword456'
+            'new_password': 'Newpassword456'
         }
         response = authed_client.put(
             '/api/auth/account/password',
@@ -269,6 +293,19 @@ class TestPasswordChangeEndpoint:
             content_type='application/json'
         )
         assert response.status_code == 401
+        
+    def test_change_password_weak_new_password(self, authed_client):
+        """Test password change to a weak password fails validation."""
+        payload = {
+            'current_password': 'Password123',
+            'new_password': 'weak' # Fails Strong Password requirements
+        }
+        response = authed_client.put(
+            '/api/auth/account/password',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 400
 
 
 @pytest.mark.integration
@@ -279,7 +316,7 @@ class TestEmailChangeEndpoint:
         """Test successful email change."""
         payload = {
             'email': 'newemail@example.com',
-            'password': 'password123'
+            'password': 'Password123'
         }
         response = authed_client.put(
             '/api/auth/account/email',
@@ -317,7 +354,7 @@ class TestEmailChangeEndpoint:
         
         payload = {
             'email': 'taken@example.com',
-            'password': 'password123'
+            'password': 'Password123'
         }
         response = authed_client.put(
             '/api/auth/account/email',
@@ -334,7 +371,7 @@ class TestAccountDeletionEndpoint:
     def test_delete_account_success(self, authed_client, db_session, test_user):
         """Test successful account deletion (anonymization)."""
         payload = {
-            'password': 'password123',
+            'password': 'Password123',
             'confirmation': 'DELETE'
         }
         response = authed_client.delete(
@@ -367,7 +404,7 @@ class TestAccountDeletionEndpoint:
     def test_delete_account_wrong_confirmation(self, authed_client):
         """Test account deletion with wrong confirmation fails."""
         payload = {
-            'password': 'password123',
+            'password': 'Password123',
             'confirmation': 'delete'  # Should be uppercase DELETE
         }
         response = authed_client.delete(
@@ -377,3 +414,129 @@ class TestAccountDeletionEndpoint:
         )
         # Should fail validation
         assert response.status_code == 400
+
+
+@pytest.mark.integration
+class TestTokenRefreshEndpoint:
+    """Test token refresh endpoint."""
+    
+    def test_refresh_token_success(self, client, test_user):
+        import jwt
+        from datetime import datetime, timedelta, timezone
+        from config import config
+        # Create an expired token within refresh window
+        token = jwt.encode({
+            'user_id': test_user.id,
+            'exp': datetime.now(timezone.utc) - timedelta(hours=1)
+        }, config.JWT_SECRET_KEY, algorithm='HS256')
+        
+        response = client.post(
+            '/api/auth/refresh',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'token' in data
+        assert 'user' in data
+
+    def test_refresh_token_past_window(self, client, test_user):
+        import jwt
+        from datetime import datetime, timedelta, timezone
+        from config import config
+        # Token expired 8 days ago (window is 7 days)
+        token = jwt.encode({
+            'user_id': test_user.id,
+            'exp': datetime.now(timezone.utc) - timedelta(days=8)
+        }, config.JWT_SECRET_KEY, algorithm='HS256')
+        
+        response = client.post(
+            '/api/auth/refresh',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 401
+
+    def test_refresh_token_invalid(self, client):
+        """Test refresh with un-decodable garbage string."""
+        response = client.post(
+            '/api/auth/refresh',
+            headers={'Authorization': 'Bearer garbage'}
+        )
+        assert response.status_code == 401
+
+
+@pytest.mark.integration
+class TestAccountLockout:
+    """Test account lockout mechanism."""
+
+    def test_account_lockout_after_five_failures(self, client, test_user):
+        payload = {'username_or_email': 'testuser', 'password': 'wrongpassword'}
+        # 5 failed attempts
+        for _ in range(5):
+            response = client.post('/api/auth/login', data=json.dumps(payload), content_type='application/json')
+            assert response.status_code == 401
+            
+        # 6th attempt even with correct password should fail
+        correct_payload = {'username_or_email': 'testuser', 'password': 'Password123'}
+        response = client.post('/api/auth/login', data=json.dumps(correct_payload), content_type='application/json')
+        assert response.status_code == 403
+        data = json.loads(response.data)
+        assert 'locked' in data['error'].lower()
+
+    def test_account_lockout_recovers_after_15_minutes(self, client, db_session, test_user):
+        from datetime import datetime, timedelta, timezone
+        from models import User
+        # Manually lock account from 16 minutes ago
+        test_user.locked_until = datetime.now(timezone.utc) - timedelta(minutes=16)
+        db_session.commit()
+        
+        # Should succeed now
+        correct_payload = {'username_or_email': 'testuser', 'password': 'Password123'}
+        response = client.post('/api/auth/login', data=json.dumps(correct_payload), content_type='application/json')
+        assert response.status_code == 200
+
+
+@pytest.mark.integration
+class TestUsernameUpdateEndpoint:
+    """Test username update endpoint."""
+
+    def test_update_username_success(self, authed_client, db_session, test_user):
+        payload = {
+            'username': 'new_awesome_name',
+            'password': 'Password123'
+        }
+        response = authed_client.put(
+            '/api/auth/account/username',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['username'] == 'new_awesome_name'
+        
+        db_session.expire_all()
+        from models import User
+        user = db_session.query(User).get(test_user.id)
+        assert user.username == 'new_awesome_name'
+
+    def test_update_username_conflict_fails(self, authed_client, db_session):
+        # Create another user to conflict with
+        from models import User
+        other_user = User(
+            username='takenname',
+            email='taken2@example.com'
+        )
+        other_user.set_password('password')
+        db_session.add(other_user)
+        db_session.commit()
+        
+        payload = {
+            'username': 'takenname',
+            'password': 'Password123'
+        }
+        response = authed_client.put(
+            '/api/auth/account/username',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 400
+

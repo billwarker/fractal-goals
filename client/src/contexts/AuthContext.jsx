@@ -20,6 +20,26 @@ export function AuthProvider({ children }) {
         }
     }, [token]);
 
+    // Handle events from axios interceptors
+    useEffect(() => {
+        const handleUnauthorized = () => {
+            setToken(null);
+            setUser(null);
+        };
+        const handleTokenRefresh = (e) => {
+            if (e.detail?.token) {
+                setToken(e.detail.token);
+                if (e.detail.user) setUser(e.detail.user);
+            }
+        };
+        window.addEventListener('auth:unauthorized', handleUnauthorized);
+        window.addEventListener('auth:token_refreshed', handleTokenRefresh);
+        return () => {
+            window.removeEventListener('auth:unauthorized', handleUnauthorized);
+            window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
+        };
+    }, []);
+
     const fetchCurrentUser = async () => {
         try {
             const res = await authApi.getMe();
