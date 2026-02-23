@@ -53,6 +53,8 @@ function SessionSidePane({
         targetAchievements,
         achievedTargetIds,
         toggleSessionComplete: onToggleComplete,
+        pauseSession,
+        resumeSession,
     } = useActiveSession();
 
     // Derived values
@@ -132,11 +134,12 @@ function SessionSidePane({
                                 Save
                             </Button>
                             <Button
-                                onClick={onCancel}
-                                variant="secondary" // Grey
-                                title="Cancel (Go Back)"
+                                onClick={() => session?.is_paused ? resumeSession() : pauseSession()}
+                                variant="secondary"
+                                title={session?.is_paused ? "Resume Session" : "Pause Session"}
+                                disabled={isCompleted}
                             >
-                                Cancel
+                                {session?.is_paused ? "Resume" : "Pause"}
                             </Button>
                             <Button
                                 onClick={onDelete}

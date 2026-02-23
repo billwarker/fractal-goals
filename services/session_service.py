@@ -488,11 +488,30 @@ class SessionService:
                         instance.duration_seconds = 0
                     elif not instance.time_stop:
                         instance.time_stop = completion_time
+                        
+                        # Apply any active straggler paused time if the session was currently paused
+                        if instance.is_paused and instance.last_paused_at:
+                            paused_duration = (completion_time - instance.last_paused_at).total_seconds()
+                            instance.total_paused_seconds = (instance.total_paused_seconds or 0) + int(paused_duration)
+                            instance.is_paused = False
+                            instance.last_paused_at = None
+                            
                         duration = (instance.time_stop - instance.time_start).total_seconds()
-                        instance.duration_seconds = int(duration)
+                        active_duration = max(0, duration - (instance.total_paused_seconds or 0))
+                        instance.duration_seconds = int(active_duration)
                     instance.completed = True
             else:
                 session.completed_at = None
+                session.session_end = None
+                session.total_duration_seconds = None
+                
+                # Also clear it from the nested session_data if it exists
+                if isinstance(session.attributes, dict) and 'session_data' in session.attributes:
+                    session.attributes['session_data']['session_end'] = None
+                    session.attributes['session_data']['total_duration_seconds'] = None
+                    # Flag the JSON column as modified so SQLAlchemy knows to save it
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(session, "attributes")
         
         if 'session_start' in data:
             try:

@@ -306,18 +306,42 @@ function SessionActivityItem({
 
         const updateTimerLocal = () => {
             if (exercise.time_start && !exercise.time_stop) {
-                const start = new Date(exercise.time_start);
-                const now = new Date();
-                const seconds = Math.floor((now - start) / 1000);
-                setRealtimeDuration(seconds >= 0 ? seconds : 0);
+                const start = new Date(exercise.time_start).getTime();
+                const now = Date.now();
+
+                // Account for paused time tied to the activity instance
+                const totalPaused = exercise.total_paused_seconds || 0;
+
+                // Also account for session-level pause state if it relates to this activity
+                // Note: If the session pauses, we probably just stop this local timer from advancing.
+                const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
+                const sessionLastPausedAt = session?.last_paused_at || session?.attributes?.last_paused_at;
+
+                let currentPausedStraggler = 0;
+                if (isSessionPaused && sessionLastPausedAt) {
+                    const pausedTime = new Date(sessionLastPausedAt).getTime();
+                    // Has to be after activity start
+                    if (pausedTime > start) {
+                        currentPausedStraggler = Math.floor((now - pausedTime) / 1000);
+                    }
+                }
+
+                const diffSeconds = Math.floor((now - start) / 1000);
+                const activeSeconds = Math.max(0, diffSeconds - totalPaused - currentPausedStraggler);
+                setRealtimeDuration(activeSeconds);
             }
         };
 
         if (exercise.time_start && !exercise.time_stop) {
             // Initial update
             updateTimerLocal();
-            // Start interval
-            intervalId = setInterval(updateTimerLocal, 1000);
+
+            // Only tick if not paused
+            const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
+            if (!isSessionPaused) {
+                // Start interval
+                intervalId = setInterval(updateTimerLocal, 1000);
+            }
         } else if (exercise.duration_seconds != null) {
             // Use stored duration if available (completed)
             setRealtimeDuration(exercise.duration_seconds);
@@ -328,7 +352,16 @@ function SessionActivityItem({
         return () => {
             if (intervalId) clearInterval(intervalId);
         };
-    }, [exercise.time_start, exercise.time_stop, exercise.duration_seconds]);
+    }, [
+        exercise.time_start,
+        exercise.time_stop,
+        exercise.duration_seconds,
+        exercise.total_paused_seconds,
+        session?.is_paused,
+        session?.attributes?.is_paused,
+        session?.last_paused_at,
+        session?.attributes?.last_paused_at
+    ]);
 
     // Filter notes for this activity
     const activityNotes = Array.isArray(activityNotesProp)

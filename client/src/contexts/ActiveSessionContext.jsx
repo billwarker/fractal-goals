@@ -166,6 +166,30 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
     });
 
+    const pauseSessionMutation = useMutation({
+        mutationFn: () => fractalApi.pauseSession(rootId, sessionId),
+        onSuccess: (res) => {
+            queryClient.setQueryData(['session', rootId, sessionId], res.data);
+            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            notify.success('Session paused');
+        },
+        onError: (err) => {
+            notify.error(`Failed to pause: ${err?.response?.data?.error || err.message}`);
+        }
+    });
+
+    const resumeSessionMutation = useMutation({
+        mutationFn: () => fractalApi.resumeSession(rootId, sessionId),
+        onSuccess: (res) => {
+            queryClient.setQueryData(['session', rootId, sessionId], res.data);
+            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            notify.success('Session resumed');
+        },
+        onError: (err) => {
+            notify.error(`Failed to resume: ${err?.response?.data?.error || err.message}`);
+        }
+    });
+
     const updateGoalMutation = useMutation({
         mutationFn: ({ goalId, updates }) => fractalApi.updateGoal(rootId, goalId, updates),
         onSuccess: () => {
@@ -673,7 +697,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         for (const goalId of prevCompleted) {
             if (!currentCompleteds.has(goalId)) {
                 const status = goalAchievements.get(goalId);
-                newlyUncompleted.push(status);
+                if (status) newlyUncompleted.push(status);
             }
         }
         if (newlyUncompleted.length > 0) {
@@ -764,6 +788,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         reorderActivity: handleReorderActivity,
         moveActivity: handleMoveActivity,
         deleteSession: deleteSessionMutation.mutateAsync,
+        pauseSession: pauseSessionMutation.mutateAsync,
+        resumeSession: resumeSessionMutation.mutateAsync,
         toggleSessionComplete: handleToggleSessionComplete,
         calculateTotalDuration
     }), [
@@ -781,6 +807,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         handleReorderActivity,
         handleMoveActivity,
         deleteSessionMutation.mutateAsync,
+        pauseSessionMutation.mutateAsync,
+        resumeSessionMutation.mutateAsync,
         handleToggleSessionComplete,
         calculateTotalDuration
     ]);

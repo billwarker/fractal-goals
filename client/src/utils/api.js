@@ -271,6 +271,22 @@ export const fractalApi = {
         axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
 
     /**
+     * Pause a practice session and its active timers
+     * @param {string} rootId
+     * @param {string} sessionId
+     */
+    pauseSession: (rootId, sessionId) =>
+        axios.post(`${API_BASE}/${rootId}/timers/session/${sessionId}/pause`),
+
+    /**
+     * Resume a paused practice session
+     * @param {string} rootId
+     * @param {string} sessionId
+     */
+    resumeSession: (rootId, sessionId) =>
+        axios.post(`${API_BASE}/${rootId}/timers/session/${sessionId}/resume`),
+
+    /**
      * Add a goal association to a session
      * @param {string} rootId - ID of the fractal
      * @param {string} sessionId - ID of the session

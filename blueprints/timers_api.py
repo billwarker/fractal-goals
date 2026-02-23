@@ -180,6 +180,16 @@ def start_activity_timer(current_user, root_id, instance_id):
         instance.time_stop = None
         instance.duration_seconds = None
         
+        # If the session is currently paused, immediately pause this new activity
+        # so it doesn't accrue time while the session is paused.
+        session_record = db_session.query(Session).filter_by(id=instance.session_id, root_id=root_id, deleted_at=None).first()
+        if session_record and session_record.is_paused:
+            instance.is_paused = True
+            instance.last_paused_at = start_time
+        else:
+            instance.is_paused = False
+            instance.last_paused_at = None
+        
         # Get activity name directly from definition
         activity_def = db_session.query(ActivityDefinition).filter_by(
             id=instance.activity_definition_id, root_id=root_id, deleted_at=None
@@ -238,9 +248,18 @@ def complete_activity_instance(current_user, root_id, instance_id):
             instance.completed = True
         else:
             # Normal completion
-            instance.time_stop = datetime.utcnow()
+            now = datetime.utcnow()
+            instance.time_stop = now
+            
+            if instance.is_paused and instance.last_paused_at:
+                paused_duration = (now - instance.last_paused_at).total_seconds()
+                instance.total_paused_seconds = (instance.total_paused_seconds or 0) + int(paused_duration)
+                instance.is_paused = False
+                instance.last_paused_at = None
+                
             duration = (instance.time_stop - instance.time_start).total_seconds()
-            instance.duration_seconds = int(duration)
+            final_duration = max(0, int(duration) - (instance.total_paused_seconds or 0))
+            instance.duration_seconds = final_duration
             instance.completed = True
         
         # Get activity name directly from definition
@@ -438,5 +457,112 @@ def update_activity_instance(current_user, root_id, instance_id):
     except Exception as e:
         db_session.rollback()
         return internal_error(logger, "Unexpected error updating activity instance")
+    finally:
+        db_session.close()
+
+@timers_bp.route('/<root_id>/timers/session/<session_id>/pause', methods=['POST'])
+@token_required
+def pause_session(current_user, root_id, session_id):
+    """Pause the session and all currently active activity instances."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        root = require_owned_root(db_session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
+        session = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+            
+        if session.is_paused:
+            return jsonify({"error": "Session is already paused"}), 400
+            
+        now = datetime.utcnow()
+        session.is_paused = True
+        session.last_paused_at = now
+        
+        # Pause active activity instances
+        active_instances = db_session.query(ActivityInstance).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.time_start != None,
+            ActivityInstance.time_stop == None,
+            ActivityInstance.is_paused == False,
+            ActivityInstance.deleted_at == None
+        ).all()
+        
+        for instance in active_instances:
+            instance.is_paused = True
+            instance.last_paused_at = now
+            
+        db_session.commit()
+        
+        event_bus.emit(Event(Events.SESSION_UPDATED, {
+            'session_id': session.id,
+            'root_id': root_id,
+        }, source='timers_api.pause_session'))
+        
+        from services.serializers import serialize_session
+        return jsonify(serialize_session(session))
+    except Exception as e:
+        db_session.rollback()
+        return internal_error(logger, "Error pausing session")
+    finally:
+        db_session.close()
+
+@timers_bp.route('/<root_id>/timers/session/<session_id>/resume', methods=['POST'])
+@token_required
+def resume_session(current_user, root_id, session_id):
+    """Resume the session and all currently paused activity instances."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        root = require_owned_root(db_session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
+        session = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+            
+        if not session.is_paused:
+            return jsonify({"error": "Session is not paused"}), 400
+            
+        now = datetime.utcnow()
+        if session.last_paused_at:
+            paused_duration = (now - session.last_paused_at).total_seconds()
+            session.total_paused_seconds = (session.total_paused_seconds or 0) + int(paused_duration)
+        
+        session.is_paused = False
+        session.last_paused_at = None
+        
+        # Resume paused activity instances
+        paused_instances = db_session.query(ActivityInstance).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.time_start != None,
+            ActivityInstance.time_stop == None,
+            ActivityInstance.is_paused == True,
+            ActivityInstance.deleted_at == None
+        ).all()
+        
+        for instance in paused_instances:
+            if instance.last_paused_at:
+                paused_duration = (now - instance.last_paused_at).total_seconds()
+                instance.total_paused_seconds = (instance.total_paused_seconds or 0) + int(paused_duration)
+            instance.is_paused = False
+            instance.last_paused_at = None
+            
+        db_session.commit()
+        
+        event_bus.emit(Event(Events.SESSION_UPDATED, {
+            'session_id': session.id,
+            'root_id': root_id,
+        }, source='timers_api.resume_session'))
+        
+        from services.serializers import serialize_session
+        return jsonify(serialize_session(session))
+    except Exception as e:
+        db_session.rollback()
+        return internal_error(logger, "Error resuming session")
     finally:
         db_session.close()
