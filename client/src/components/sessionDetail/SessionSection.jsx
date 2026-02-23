@@ -28,8 +28,11 @@ const SessionSection = ({
         activityGroups,
         groupMap,
         groupedActivities,
-        instancesLoading
+        instancesLoading,
+        session
     } = useActiveSessionData();
+
+    const isCompleted = session?.completed || session?.attributes?.completed;
 
     const {
         showActivitySelector,
@@ -317,8 +320,8 @@ const SessionSection = ({
                 </div>
             </div>
 
-                <div className={styles.activitiesContainer}>
-                    {section.activity_ids?.map((instanceId) => {
+            <div className={styles.activitiesContainer}>
+                {section.activity_ids?.map((instanceId) => {
                     const instance = instanceById.get(instanceId);
                     if (!instance) return null;
                     const definition = definitionById.get(instance.activity_definition_id);
@@ -379,28 +382,30 @@ const SessionSection = ({
                 )}
 
                 {/* Add Activity Button / Selector */}
-                {isSelectorOpen ? (
-                    isMobile ? (
-                        <div
-                            className={styles.mobileSelectorOverlay}
-                            onClick={closeSelector}
-                            role="presentation"
-                        >
-                            <div className={styles.mobileSelectorSheet} onClick={(event) => event.stopPropagation()}>
-                                {selectorContent}
+                {!isCompleted && (
+                    isSelectorOpen ? (
+                        isMobile ? (
+                            <div
+                                className={styles.mobileSelectorOverlay}
+                                onClick={closeSelector}
+                                role="presentation"
+                            >
+                                <div className={styles.mobileSelectorSheet} onClick={(event) => event.stopPropagation()}>
+                                    {selectorContent}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            selectorContent
+                        )
                     ) : (
-                        selectorContent
+                        <button
+                            type="button"
+                            onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
+                            className={styles.addActivityButton}
+                        >
+                            + Add Activity
+                        </button>
                     )
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
-                        className={styles.addActivityButton}
-                    >
-                        + Add Activity
-                    </button>
                 )}
             </div>
         </div>
