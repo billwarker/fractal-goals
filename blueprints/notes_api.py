@@ -77,7 +77,7 @@ def get_activity_instance_notes(current_user, root_id, instance_id):
 @token_required
 def get_previous_session_notes(current_user, root_id, session_id):
     """
-    Get session-level notes from the last 3 sessions (excluding current).
+    Get session-level notes from the last 5 sessions (excluding current).
     
     Returns notes grouped by session, ordered by session date (most recent first).
     """

@@ -133,11 +133,12 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
     }
 
     const highlightStyle = isSelected ? styles.highlightSelected : '';
+    const pastStyle = note.isPast ? styles.pastNoteItem : '';
 
     return (
         <>
             <div
-                className={`${styles.noteItem} ${compact ? styles.compact : ''} ${hasImage ? styles.hasImage : ''} ${highlightStyle}`}
+                className={`${styles.noteItem} ${compact ? styles.compact : ''} ${hasImage ? styles.hasImage : ''} ${highlightStyle} ${pastStyle}`}
                 onClick={handleClick}
             >
                 {note.activityName && (
@@ -164,7 +165,14 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                             <span className={styles.setSeparator}>-</span>
                         </>
                     )}
-                    <span className={styles.noteDate}>{formatDate(note.created_at)}</span>
+                    <span className={styles.noteDate}>
+                        {formatDate(note.created_at)}
+                        {note.isPast && note.session_name && (
+                            <span className={styles.pastSessionName}>
+                                ({note.session_name})
+                            </span>
+                        )}
+                    </span>
                 </div>
 
                 {/* Image display */}
@@ -207,7 +215,7 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                                 <Linkify>{note.content}</Linkify>
                             </div>
                         )}
-                        {(onUpdate || onDelete) && (
+                        {(onUpdate || onDelete) && !note.isPast && (
                             <div className={styles.noteItemActions}>
                                 {onUpdate && !isImageOnly && (
                                     <button

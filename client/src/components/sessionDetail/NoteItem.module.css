@@ -239,3 +239,19 @@
     border: 1px solid var(--secondary-color);
     letter-spacing: 0.5px;
 }
+
+/* Past session styling */
+.pastNoteItem {
+    background-color: var(--color-bg-card-alt);
+    border-radius: 4px;
+    padding: 8px;
+    /* Override zero horizontal padding from noteItem base */
+    margin-bottom: 4px;
+    border: 1px solid var(--color-border);
+}
+
+.pastSessionName {
+    font-weight: 600;
+    margin-left: 6px;
+    color: var(--color-text-secondary);
+}

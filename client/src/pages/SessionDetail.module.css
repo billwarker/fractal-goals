@@ -7,7 +7,6 @@
     width: 100%;
     position: relative;
     padding: var(--spacing-xl);
-    padding-bottom: 120px;
     color: var(--color-text-primary);
     box-sizing: border-box;
     padding-top: 84px;
@@ -15,6 +14,7 @@
 
 .sessionMainContent {
     min-width: 0;
+    padding-bottom: 120px;
 }
 
 .mobileSessionHeader {

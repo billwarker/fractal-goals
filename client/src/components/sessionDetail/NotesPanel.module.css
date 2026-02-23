@@ -4,10 +4,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-}
-
-.notesSection {
-    margin-bottom: 8px;
+    height: 100%;
 }
 
 .notesSection h4 {
@@ -18,6 +15,12 @@
     letter-spacing: 0.5px;
 }
 
+/* Container for the scrollable list of notes */
+.notesListContainer {
+    display: flex;
+    flex-direction: column;
+}
+
 .notesEmpty {
     text-align: center;
     color: var(--color-text-muted);
@@ -26,77 +29,15 @@
     font-style: italic;
 }
 
-.previousNotesSection {
-    margin-top: 8px;
-    padding-top: 12px;
+/* Container for the quick add widget so it stays at the bottom */
+.notesInputContainer {
+    position: sticky;
+    bottom: calc(-1 * var(--spacing-lg, 24px));
+    margin-bottom: calc(-1 * var(--spacing-lg, 24px));
+    margin-left: calc(-1 * var(--spacing-lg, 24px));
+    margin-right: calc(-1 * var(--spacing-lg, 24px));
+    padding: var(--spacing-md, 16px) var(--spacing-lg, 24px) var(--spacing-lg, 24px);
+    background: var(--color-bg-sidebar, #1e1e1e);
+    z-index: 10;
     border-top: 1px solid var(--color-border);
-}
-
-.previousNotesHeader {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    margin-bottom: 10px;
-    transition: opacity 0.2s;
-}
-
-.previousNotesHeader:hover {
-    opacity: 0.8;
-}
-
-.previousNotesToggle {
-    font-size: 10px;
-    color: var(--color-text-muted);
-}
-
-.previousNotesContent {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.previousSessionGroup {
-    background: var(--color-bg-card-alt);
-    border-radius: 6px;
-    padding: 10px;
-}
-
-.previousSessionDate {
-    font-size: 12px;
-    color: #4caf50;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.previousSessionName {
-    color: var(--color-text-secondary);
-    font-size: 11px;
-}
-
-.previousSessionNotes {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.previousNoteItem {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
-    padding-left: 8px;
-    border-left: 2px solid var(--color-border);
-    cursor: pointer;
-    transition: all 0.2s;
-    padding: 4px 8px;
-}
-
-.previousNoteItemHighlighted {
-    background: rgba(33, 150, 243, 0.15);
-    border-left: 3px solid #2196f3;
-    color: #fff;
-    border-radius: 0 4px 4px 0;
-    padding-left: 8px;
 }

@@ -9,7 +9,7 @@
  * Note: Activity-level previous notes are shown in HistoryPanel instead.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Linkify from '../atoms/Linkify';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
@@ -46,8 +46,26 @@ function NotesPanel({
         setShowSessionNotes(true);
     }, [isMobile]);
 
-    // Filter for Session-Level Notes (always show these)
-    const sessionNotes = notes.filter(n => n.context_type === 'session');
+    // Merge notes
+    const combinedNotes = useMemo(() => {
+        const currentSessionNotes = notes.filter(n => n.context_type === 'session');
+        let allNotes = [...currentSessionNotes];
+
+        if (previousSessionNotes && previousSessionNotes.length > 0) {
+            previousSessionNotes.forEach(session => {
+                const pastNotes = session.notes.map(n => ({
+                    ...n,
+                    isPast: true,
+                    session_name: session.session_name,
+                    session_date: session.session_date
+                }));
+                allNotes = [...allNotes, ...pastNotes];
+            });
+        }
+
+        // Sort descending by created_at (newest first)
+        return allNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }, [notes, previousSessionNotes]);
 
     const handleAddNote = async (content, imageData = null) => {
         try {
@@ -66,90 +84,37 @@ function NotesPanel({
 
     return (
         <div className={styles.notesPanel}>
-            {/* Quick Add - Session Notes Only */}
-            <NoteQuickAdd
-                onSubmit={handleAddNote}
-                placeholder="Add a session note..."
-            />
-
-            {/* Current Session Notes */}
-            <div className={styles.notesSection}>
-                <div
-                    className={styles.previousNotesHeader}
-                    onClick={() => setShowSessionNotes(prev => !prev)}
-                >
-                    <span className={styles.previousNotesToggle}>
-                        {showSessionNotes ? '▼' : '▶'}
-                    </span>
+            {/* Unified Session Notes Timeline */}
+            <div className={styles.notesListContainer}>
+                <div className={styles.notesSection}>
                     <h4>
                         Session Notes
-                        {sessionNotes.length > 0 && ` (${sessionNotes.length})`}
+                        {combinedNotes.length > 0 && ` (${combinedNotes.length})`}
                     </h4>
                 </div>
-                {showSessionNotes && (
-                    sessionNotes.length > 0 ? (
-                        <NoteTimeline
-                            notes={sessionNotes}
-                            onUpdate={updateNote}
-                            onDelete={deleteNote}
-                            compact={false}
-                            selectedNoteId={selectedNoteId}
-                            onNoteSelect={setSelectedNoteId}
-                        />
-                    ) : (
-                        <div className={styles.notesEmpty}>
-                            No session notes yet
-                        </div>
-                    )
-                )}
-                {!showSessionNotes && (
+                {combinedNotes.length > 0 ? (
+                    <NoteTimeline
+                        notes={combinedNotes}
+                        onUpdate={updateNote}
+                        onDelete={deleteNote}
+                        compact={false}
+                        selectedNoteId={selectedNoteId}
+                        onNoteSelect={setSelectedNoteId}
+                    />
+                ) : (
                     <div className={styles.notesEmpty}>
-                        Tap to expand notes
+                        No session notes yet
                     </div>
                 )}
             </div>
 
-            {/* Previous Session Notes (from last 3 sessions) */}
-            {previousSessionNotes && previousSessionNotes.length > 0 && (
-                <div className={styles.previousNotesSection}>
-                    <div
-                        className={styles.previousNotesHeader}
-                        onClick={() => setShowPreviousSessionNotes(!showPreviousSessionNotes)}
-                    >
-                        <span className={styles.previousNotesToggle}>
-                            {showPreviousSessionNotes ? '▼' : '▶'}
-                        </span>
-                        <h4>Previous Session Notes</h4>
-                    </div>
-                    {showPreviousSessionNotes && (
-                        <div className={styles.previousNotesContent}>
-                            {previousSessionNotes.map(session => (
-                                <div key={session.session_id} className={styles.previousSessionGroup}>
-                                    <div className={styles.previousSessionDate}>
-                                        {session.session_date}
-                                        <span className={styles.previousSessionName}>
-                                            {session.session_name}
-                                        </span>
-                                    </div>
-                                    <div className={styles.previousSessionNotes}>
-                                        {session.notes.map(note => (
-                                            <div
-                                                key={note.id}
-                                                className={`${styles.previousNoteItem} ${selectedNoteId === note.id ? styles.previousNoteItemHighlighted : ''}`}
-                                                onClick={() => setSelectedNoteId(note.id)}
-                                            >
-                                                <Linkify>{note.content}</Linkify>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-
+            {/* Quick Add - Always at the bottom */}
+            <div className={styles.notesInputContainer}>
+                <NoteQuickAdd
+                    onSubmit={handleAddNote}
+                    placeholder="Add a session note..."
+                />
+            </div>
         </div>
     );
 }
