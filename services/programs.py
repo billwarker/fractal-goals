@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from services.serializers import format_utc
 from models import (
-    Program, ProgramBlock, ProgramDay, Goal, SessionTemplate, Session,
+    Program, ProgramBlock, ProgramDay, ProgramDaySession, Goal, SessionTemplate, Session,
     validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
@@ -172,6 +172,102 @@ class ProgramService:
             return None
         
         return serialize_program(program)
+
+    @staticmethod
+    def create_block(session, root_id: str, program_id: str, data: Dict) -> Dict:
+        root = validate_root_goal(session, root_id)
+        if not root:
+            raise ValueError("Fractal not found")
+        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        if not program:
+            raise ValueError("Program not found")
+
+        start_date_val = None
+        end_date_val = None
+        if data.get('start_date'):
+            try:
+                start_date_val = datetime.strptime(data['start_date'][:10], '%Y-%m-%d').date()
+            except ValueError:
+                raise ValueError("Invalid start_date format")
+        if data.get('end_date'):
+            try:
+                end_date_val = datetime.strptime(data['end_date'][:10], '%Y-%m-%d').date()
+            except ValueError:
+                raise ValueError("Invalid end_date format")
+
+        new_block = ProgramBlock(
+            program_id=program.id,
+            name=data['name'],
+            start_date=start_date_val,
+            end_date=end_date_val,
+            color=data.get('color')
+        )
+        session.add(new_block)
+        session.flush() # Get ID
+
+        # Generate 7 empty days (Monday-Sunday)
+        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        for i, dow in enumerate(days_of_week):
+            new_day = ProgramDay(
+                block_id=new_block.id,
+                day_number=i+1,
+                name=f"Day {i+1}",
+                day_of_week=[dow]
+            )
+            session.add(new_day)
+
+        if data.get('goal_ids'):
+            ProgramService._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
+
+        return serialize_program_block(new_block)
+
+    @staticmethod
+    def update_block(session, root_id: str, program_id: str, block_id: str, data: Dict) -> Dict:
+        root = validate_root_goal(session, root_id)
+        if not root:
+            raise ValueError("Fractal not found")
+        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        if not program:
+            raise ValueError("Program not found")
+        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
+        if not block:
+            raise ValueError("Block not found")
+
+        if 'name' in data:
+            block.name = data['name']
+        if 'color' in data:
+            block.color = data['color']
+            
+        if 'start_date' in data:
+            try:
+                block.start_date = datetime.strptime(data['start_date'][:10], '%Y-%m-%d').date() if data['start_date'] else None
+            except ValueError:
+                raise ValueError("Invalid start_date format")
+        if 'end_date' in data:
+            try:
+                block.end_date = datetime.strptime(data['end_date'][:10], '%Y-%m-%d').date() if data['end_date'] else None
+            except ValueError:
+                raise ValueError("Invalid end_date format")
+
+        if 'goal_ids' in data:
+            ProgramService._replace_block_goals(session, block.id, data['goal_ids'], root_id)
+            session.expire(block, ['goals'])
+
+        return serialize_program_block(block)
+
+    @staticmethod
+    def delete_block(session, root_id: str, program_id: str, block_id: str):
+        root = validate_root_goal(session, root_id)
+        if not root:
+            raise ValueError("Fractal not found")
+        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        if not program:
+            raise ValueError("Program not found")
+        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
+        if not block:
+            raise ValueError("Block not found")
+
+        session.delete(block)
 
     @staticmethod
     def create_program(session, root_id: str, validated_data: Dict) -> Dict:
@@ -543,6 +639,53 @@ class ProgramService:
         return result
 
     @staticmethod
+    def attach_goal_to_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict) -> Dict:
+        """Attach a single goal to a specific program day."""
+        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        if not day or day.block.program_id != program_id:
+            raise ValueError("Program Day not found")
+
+        goal_id = data.get('goal_id')
+        if not goal_id:
+             raise ValueError("Goal ID required")
+
+        goal = session.query(Goal).filter(
+            Goal.id == goal_id,
+            Goal.root_id == root_id,
+            Goal.deleted_at == None
+        ).first()
+        if not goal:
+            raise ValueError("Goal not found in this fractal")
+
+        # Insert directly into program_day_goals junction
+        from models.goal import program_day_goals
+        from sqlalchemy.exc import IntegrityError
+        stmt = program_day_goals.insert().values(
+            program_day_id=day_id,
+            goal_id=goal_id
+        )
+        
+        try:
+            session.execute(stmt)
+        except IntegrityError:
+            # Goal already attached to this day — idempotent
+            session.rollback()
+            logger.debug(f"Goal {goal_id} already attached to day {day_id}")
+
+        session.expire(day, ['goals'])
+
+        event_bus.emit(Event(Events.GOAL_DAY_ASSOCIATED, {
+            'day_id': day.id,
+            'day_name': day.name,
+            'goal_id': goal_id,
+            'block_id': block_id,
+            'program_id': program_id,
+            'root_id': root_id
+        }, source='ProgramService.attach_goal_to_day'))
+
+        return serialize_program_day(day)
+
+    @staticmethod
     def attach_goal_to_block(session, root_id: str, program_id: str, block_id: str, data: Dict) -> Dict:
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
@@ -576,6 +719,7 @@ class ProgramService:
             ProgramService._replace_block_goals(
                 session, block.id, current_block_goal_ids + [goal.id], root_id
             )
+            session.expire(block, ['goals'])
             
         if deadline_str:
             try:
@@ -620,6 +764,16 @@ class ProgramService:
         if not p_day:
             return False
 
+        # Record the session explicitly
+        if completed_session.template_id:
+            day_session = ProgramDaySession(
+                program_day_id=p_day.id,
+                session_template_id=completed_session.template_id,
+                session_id=session_id,
+                execution_status='completed'
+            )
+            session.add(day_session)
+
         # Check if the day is now complete based on all templates
         is_now_complete = p_day.check_completion()
         
@@ -655,16 +809,21 @@ class ProgramService:
         all_days = block.days
         if not all_days: return # No days, maybe empty block?
 
-        if all(d.is_completed for d in all_days):
-            logger.info(f"Program Block Completed: {block.name}")
-            event_bus.emit(Event(Events.PROGRAM_BLOCK_COMPLETED, {
-                'block_id': block.id,
-                'block_name': block.name,
-                'program_id': block.program_id
-            }, source='ProgramService._check_block_completion'))
+        if all_days and all(d.is_completed for d in all_days):
+            if not block.is_completed:
+                block.is_completed = True
+                logger.info(f"Program Block Completed: {block.name}")
+                event_bus.emit(Event(Events.PROGRAM_BLOCK_COMPLETED, {
+                    'block_id': block.id,
+                    'block_name': block.name,
+                    'program_id': block.program_id
+                }, source='ProgramService._check_block_completion'))
 
             # Check Program Completion
             ProgramService._check_program_completion(session, block.program_id)
+        else:
+            if block.is_completed:
+                block.is_completed = False
 
     @staticmethod
     def _check_program_completion(session, program_id: str):
@@ -675,14 +834,22 @@ class ProgramService:
         # Is every day in every block complete?
         all_blocks_complete = True
         for block in program.blocks:
+            if not block.days:
+                all_blocks_complete = False
+                break
             if not all(d.is_completed for d in block.days):
                 all_blocks_complete = False
                 break
         
         if all_blocks_complete:
-             logger.info(f"Program Completed: {program.name}")
-             event_bus.emit(Event(Events.PROGRAM_COMPLETED, {
-                'program_id': program.id,
-                'program_name': program.name,
-                'root_id': program.root_id
-            }, source='ProgramService._check_program_completion'))
+            if not program.is_completed:
+                 program.is_completed = True
+                 logger.info(f"Program Completed: {program.name}")
+                 event_bus.emit(Event(Events.PROGRAM_COMPLETED, {
+                    'program_id': program.id,
+                    'program_name': program.name,
+                    'root_id': program.root_id
+                }, source='ProgramService._check_program_completion'))
+        else:
+            if program.is_completed:
+                program.is_completed = False

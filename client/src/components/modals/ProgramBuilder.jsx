@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { fractalApi } from '../../utils/api';
+import { flattenGoals } from '../../utils/goalHelpers';
 import moment from 'moment';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
@@ -60,7 +61,7 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
     const fetchGoals = async () => {
         try {
             const res = await fractalApi.getGoal(rootId, rootId);
-            const allGoals = collectGoals(res.data);
+            const allGoals = flattenGoals([res.data]);
             const eligibleGoals = allGoals.filter(g =>
                 ['MidTermGoal', 'LongTermGoal'].includes(g.attributes?.type)
             );
@@ -68,16 +69,6 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
         } catch (err) {
             console.error('Failed to fetch goals:', err);
         }
-    };
-
-    const collectGoals = (goal, collected = []) => {
-        if (goal) {
-            collected.push(goal);
-            if (goal.children && Array.isArray(goal.children)) {
-                goal.children.forEach(child => collectGoals(child, collected));
-            }
-        }
-        return collected;
     };
 
     const toggleGoal = (goalId) => {

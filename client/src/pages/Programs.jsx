@@ -10,18 +10,7 @@ import notify from '../utils/notify';
 import { Heading, Text } from '../components/atoms/Typography';
 import { useGoals } from '../contexts/GoalsContext';
 import { useProgramsPageData } from '../hooks/useProgramsPageData';
-
-const GOAL_COLORS = {
-    Amercement: '#FF6B6B',
-    Anchoring: '#4ECDC4',
-    Balance: '#FFE66D',
-    ShortTermGoal: '#FF9F1C',
-    ImmediateGoal: '#FFD166',
-    Value: '#A06CD5',
-    Vision: '#3A86FF',
-    LongTermGoal: '#7B5CFF',
-    MidTermGoal: '#3A86FF'
-};
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 
 /**
  * Programs Page - Create and manage training programs
@@ -30,6 +19,7 @@ function Programs() {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
     const { setActiveRootId } = useGoals();
+    const { getGoalColor } = useGoalLevels();
     const [showBuilder, setShowBuilder] = useState(false);
     const [selectedProgram, setSelectedProgram] = useState(null);
 
@@ -246,7 +236,7 @@ function Programs() {
                                                 return progGoals.length > 0 ? (
                                                     entries.map(([type, count]) => (
                                                         <div key={type} className={styles.goalItem} style={{
-                                                            color: GOAL_COLORS[type] || '#ccc',
+                                                            color: getGoalColor(type),
                                                         }}>
                                                             {count} {type.replace(/([A-Z])/g, ' $1').trim()}{count !== 1 ? 's' : ''}
                                                         </div>

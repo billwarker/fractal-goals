@@ -627,6 +627,18 @@ export const fractalApi = {
     getProgramSessionCount: (rootId, programId) =>
         axios.get(`${API_BASE}/${rootId}/programs/${programId}/session-count`),
 
+    createBlock: (rootId, programId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks`, data),
+
+    updateBlock: (rootId, programId, blockId, data) =>
+        axios.put(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}`, data),
+
+    deleteBlock: (rootId, programId, blockId) =>
+        axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}`),
+
+    attachGoalToDay: (rootId, programId, blockId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/goals`, data),
+
     /**
      * Add a configured day to a program block
      * @param {string} rootId

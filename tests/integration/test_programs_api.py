@@ -127,68 +127,58 @@ class TestProgramCRUD:
 class TestProgramStructure:
     """Test Program Blocks, Days, and Sessions."""
 
-    def test_update_program_structure(self, authed_client, sample_ultimate_goal, sample_program):
-        """Test updating program structure (Shadow Sync)."""
+    def test_block_crud(self, authed_client, sample_ultimate_goal, sample_program):
+        """Test creating, updating, and deleting a block via dedicated endpoints."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         
-        # New structure with a second block
+        # 1. Create a Block
         start_date = datetime.utcnow()
         end_date = start_date + timedelta(days=7)
-        block2_start = end_date + timedelta(days=1)
-        block2_end = block2_start + timedelta(days=7)
         
-        new_schedule = [
-            {
-                'id': sample_program.get('weekly_schedule', [{}])[0].get('id'), # Keep existing block
-                'name': 'Week 1 Updated',
-                'startDate': sample_program.get('weekly_schedule', [{}])[0].get('startDate'), # Assuming output format
-                'endDate': sample_program.get('weekly_schedule', [{}])[0].get('endDate'),
-                'color': 'blue'
-            },
-            {
-                'id': str(uuid.uuid4()),
-                'name': 'Week 2',
-                'startDate': block2_start.isoformat(),
-                'endDate': block2_end.isoformat(),
-                'color': 'green',
-                'weeklySchedule': {}
-            }
-        ]
+        create_payload = {
+            'name': 'New Phase Block',
+            'start_date': start_date.strftime('%Y-%m-%d'),
+            'end_date': end_date.strftime('%Y-%m-%d'),
+            'color': '#ff0000'
+        }
         
-        # Need to be careful with date formats in comparison vs input
-        # sample_program came from API, so dates are strings (ISO)
-        # Note: sample_program fixture construct payload uses 'startDate' (ISO)
-        # But 'blocks' in response might use snake_case 'start_date'?
-        # Let's inspect sample_program keys if needed. 
-        # Standard to_dict usually returns keys matching model/API.
-        # programs_api.py sync_program_structure expects 'weeklySchedule' list of dicts with 'startDate'.
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks',
+            data=json.dumps(create_payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 201
+        new_block = json.loads(response.data)
+        assert new_block['name'] == 'New Phase Block'
+        block_id = new_block['id']
         
-        # Let's fetch clean program first to get current structure
-        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
-        program_data = json.loads(response.data)
-        
-        # The API returns 'blocks' list in the program object.
-        # We need to construct 'weeklySchedule' for the PUT request.
-        # Ideally, the frontend maintains 'weeklySchedule' and sends it back.
-        
-        # Construct payload
-        payload = {
-            'weeklySchedule': new_schedule
+        # 2. Update the Block
+        update_payload = {
+            'name': 'Updated Phase Block',
+            'color': '#00ff00'
         }
         
         response = authed_client.put(
-            f'/api/{root_id}/programs/{program_id}',
-            data=json.dumps(payload),
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}',
+            data=json.dumps(update_payload),
             content_type='application/json'
         )
-        
         assert response.status_code == 200
-        data = json.loads(response.data)
+        updated_block = json.loads(response.data)
+        assert updated_block['name'] == 'Updated Phase Block'
+        assert updated_block['color'] == '#00ff00'
         
-        # Verify 2 blocks now
-        assert len(data['blocks']) == 2
-        assert any(b['name'] == 'Week 2' for b in data['blocks'])
+        # 3. Delete the Block
+        response = authed_client.delete(f'/api/{root_id}/programs/{program_id}/blocks/{block_id}')
+        assert response.status_code == 200
+        delete_data = json.loads(response.data)
+        assert delete_data['message'] == 'Block deleted'
+        
+        # Verify deletion via program fetch
+        response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
+        program_data = json.loads(response.data)
+        assert not any(b['id'] == block_id for b in program_data['blocks'])
 
     def test_add_block_day_endpoint(self, authed_client, sample_ultimate_goal, sample_program, sample_session_template):
         """Test adding a day configuration manually (legacy/specific endpoint)."""
@@ -201,7 +191,7 @@ class TestProgramStructure:
         
         payload = {
             'name': 'Heavy Day',
-            'day_of_week': datetime.utcnow().strftime('%A'), # Current day
+            'day_of_week': [datetime.utcnow().strftime('%A')], # Current day
             'template_id': sample_session_template.id
         }
         

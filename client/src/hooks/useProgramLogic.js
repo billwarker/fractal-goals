@@ -12,8 +12,8 @@ export function useProgramLogic(rootId, program, refreshData) {
             description: programData.description || '',
             start_date: programData.startDate,
             end_date: programData.endDate,
-            selectedGoals: programData.selectedGoals,
-            weeklySchedule: Array.isArray(program.weekly_schedule) ? program.weekly_schedule : []
+            selectedGoals: programData.selectedGoals
+            // omitted weeklySchedule to avoid triggering legacy shadow sync
         };
         await fractalApi.updateProgram(rootId, program.id, apiData);
         await refreshData();
@@ -21,62 +21,27 @@ export function useProgramLogic(rootId, program, refreshData) {
 
     // --- Block Management ---
     const saveBlock = useCallback(async (blockData) => {
-        const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
-        let updatedSchedule;
+        // If the ID contains a dash, it's a real UUID from the DB (or crypto.randomUUID).
+        // If it's short/numeric, it was likely from the legacy Date.now() generator.
+        // We'll trust the presence of an ID as an indicator of an existing block,
+        // EXCEPT if the UI is explicitly passing a flag to create.
+        // Because the frontend assigns an ID before creation to handle local state in the UI builder,
+        // we should check if this block actually exists in the program's relational blocks array.
 
-        if (blockData.id) {
+        const existingBlock = program.blocks?.find(b => b.id === blockData.id);
+
+        if (existingBlock) {
             // Update
-            updatedSchedule = currentSchedule.map(block =>
-                block.id === blockData.id
-                    ? {
-                        ...block,
-                        name: blockData.name,
-                        startDate: blockData.startDate,
-                        endDate: blockData.endDate,
-                        color: blockData.color
-                    }
-                    : block
-            );
+            await fractalApi.updateBlock(rootId, program.id, blockData.id, blockData);
         } else {
             // Create
-            const newBlock = {
-                id: Date.now().toString(),
-                name: blockData.name,
-                startDate: blockData.startDate,
-                endDate: blockData.endDate,
-                color: blockData.color,
-                weeklySchedule: { daily: [] }
-            };
-            updatedSchedule = [...currentSchedule, newBlock];
+            await fractalApi.createBlock(rootId, program.id, blockData);
         }
-
-        const apiData = {
-            name: program.name,
-            description: program.description || '',
-            start_date: program.start_date,
-            end_date: program.end_date,
-            selectedGoals: program.goal_ids || [],
-            weeklySchedule: updatedSchedule
-        };
-
-        await fractalApi.updateProgram(rootId, program.id, apiData);
         await refreshData();
     }, [rootId, program, refreshData]);
 
     const deleteBlock = useCallback(async (blockId) => {
-        const currentSchedule = Array.isArray(program.weekly_schedule) ? program.weekly_schedule : [];
-        const updatedSchedule = currentSchedule.filter(block => block.id !== blockId);
-
-        const apiData = {
-            name: program.name,
-            description: program.description || '',
-            start_date: program.start_date,
-            end_date: program.end_date,
-            selectedGoals: program.goal_ids || [],
-            weeklySchedule: updatedSchedule
-        };
-
-        await fractalApi.updateProgram(rootId, program.id, apiData);
+        await fractalApi.deleteBlock(rootId, program.id, blockId);
         await refreshData();
     }, [rootId, program, refreshData]);
 

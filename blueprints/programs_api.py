@@ -3,8 +3,13 @@ import logging
 import models
 from models import get_session, validate_root_goal
 from validators import (
-    validate_request,
-    ProgramCreateSchema, ProgramUpdateSchema
+    ProgramCreateSchema,
+    ProgramUpdateSchema,
+    ProgramDayCreateSchema,
+    ProgramDayUpdateSchema,
+    ProgramBlockSchema,
+    ProgramBlockUpdateSchema,
+    validate_request
 )
 from services.programs import ProgramService
 from blueprints.auth_api import token_required
@@ -160,9 +165,85 @@ def get_program_session_count(current_user, root_id, program_id):
     finally:
         session.close()
 
+# =============================================================================
+# BLOCK MANAGEMENT
+# =============================================================================
+
+@programs_bp.route('/<root_id>/programs/<program_id>/blocks', methods=['POST'])
+@token_required
+@validate_request(ProgramBlockSchema)
+def create_block(current_user, root_id, program_id, validated_data):
+    """Create a new program block."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
+        block_dict = ProgramService.create_block(session, root_id, program_id, validated_data)
+        session.commit()
+        return jsonify(block_dict), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error creating program block")
+        return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
+@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>', methods=['PUT'])
+@token_required
+@validate_request(ProgramBlockUpdateSchema)
+def update_block(current_user, root_id, program_id, block_id, validated_data):
+    """Update a specific program block."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
+        block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data)
+        session.commit()
+        return jsonify(block_dict)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error updating program block")
+        return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
+@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>', methods=['DELETE'])
+@token_required
+def delete_block(current_user, root_id, program_id, block_id):
+    """Delete a program block."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+            
+        ProgramService.delete_block(session, root_id, program_id, block_id)
+        session.commit()
+        return jsonify({"message": "Block deleted"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error deleting program block")
+        return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days', methods=['POST'])
 @token_required
-def add_block_day(current_user, root_id, program_id, block_id):
+@validate_request(ProgramDayCreateSchema)
+def add_block_day(current_user, root_id, program_id, block_id, validated_data):
     """Add a configured day to a program block if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -171,8 +252,7 @@ def add_block_day(current_user, root_id, program_id, block_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
-        data = request.get_json()
-        count = ProgramService.add_block_day(session, root_id, program_id, block_id, data)
+        count = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data)
         session.commit()
         return jsonify({"message": f"Added {count} days/sessions"}), 201
     except ValueError as e:
@@ -186,7 +266,8 @@ def add_block_day(current_user, root_id, program_id, block_id):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['PUT'])
 @token_required
-def update_block_day(current_user, root_id, program_id, block_id, day_id):
+@validate_request(ProgramDayUpdateSchema)
+def update_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Update a specific program day."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -195,8 +276,7 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
-        data = request.get_json()
-        ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, data)
+        ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data)
         session.commit()
         return jsonify({"message": "Day updated successfully"})
     except ValueError as e:
@@ -291,6 +371,30 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id):
     except Exception as e:
         session.rollback()
         logger.exception("Error attaching goal to block")
+        return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
+@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/goals', methods=['POST'])
+@token_required
+def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id):
+    """Attach a goal directly to a program day."""
+    engine = models.get_engine()
+    session = get_session(engine)
+    try:
+        root = validate_root_goal(session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        data = request.get_json()
+        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, data)
+        session.commit()
+        return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
+    except ValueError as e:
+         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error attaching goal to day")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()

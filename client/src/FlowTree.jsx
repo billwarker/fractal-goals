@@ -745,6 +745,8 @@ const deriveGraphMetrics = (
     let recentProgramSessionsCount = 0;
 
     safeSessions.forEach((session) => {
+        if (!session) return;
+
         // Evaluate activity instances independently of session completion
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
         instances.forEach((inst) => {
@@ -1014,7 +1016,7 @@ const FlowTree = React.forwardRef(({
     const [isVisible, setIsVisible] = useState(false);
     const isMobile = useIsMobile();
 
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
     const completedGoalColor = getGoalColor('Completed');
 
     React.useImperativeHandle(ref, () => ({

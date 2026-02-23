@@ -2,15 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
-// Helper to flatten goal tree
-const collectGoals = (goal, collected = []) => {
-    if (!goal) return collected;
-    collected.push(goal);
-    if (goal.children && Array.isArray(goal.children)) {
-        goal.children.forEach(c => collectGoals(c, collected));
-    }
-    return collected;
-};
+import { flattenGoals } from '../utils/goalHelpers';
 
 export function useProgramData(rootId, programId) {
     const queryClient = useQueryClient();
@@ -58,7 +50,7 @@ export function useProgramData(rootId, programId) {
     // Derived State: Flattened Goals
     const flattenedGoals = useMemo(() => {
         if (!goalsQuery.data) return [];
-        return collectGoals(goalsQuery.data);
+        return flattenGoals([goalsQuery.data]);
     }, [goalsQuery.data]);
 
     // Aggregate Loading State

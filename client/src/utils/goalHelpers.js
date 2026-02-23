@@ -107,3 +107,15 @@ export const collectImmediateGoals = (node, collected = []) => {
     }
     return collected;
 };
+
+export const flattenGoals = (nodes, result = []) => {
+    if (!nodes) return result;
+    nodes.forEach(node => {
+        if (!node) return;
+        result.push(node);
+        if (node.children && node.children.length > 0) {
+            flattenGoals(node.children, result);
+        }
+    });
+    return result;
+};

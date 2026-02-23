@@ -1,15 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
-
-function flattenGoals(goalNode, accumulator = []) {
-    if (!goalNode) return accumulator;
-    accumulator.push(goalNode);
-    if (Array.isArray(goalNode.children)) {
-        goalNode.children.forEach((child) => flattenGoals(child, accumulator));
-    }
-    return accumulator;
-}
+import { flattenGoals } from '../utils/goalHelpers';
 
 export function useProgramsPageData(rootId) {
     const programsQuery = useQuery({
@@ -30,7 +22,10 @@ export function useProgramsPageData(rootId) {
         }
     });
 
-    const goals = useMemo(() => flattenGoals(goalsQuery.data, []), [goalsQuery.data]);
+    const goals = useMemo(() => {
+        if (!goalsQuery.data) return [];
+        return flattenGoals([goalsQuery.data]);
+    }, [goalsQuery.data]);
 
     return {
         programs: programsQuery.data || [],

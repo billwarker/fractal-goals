@@ -114,6 +114,7 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - `ix_activity_instances_session_deleted`: (session_id, deleted_at)
   - `ix_notes_root_context_deleted`: (root_id, context_type, context_id, deleted_at)
 - **Additional Foreign Key Indexes:** Migration `94a9feab5041` added indexes to `activity_definitions.group_id`, `activity_instances.activity_definition_id`, `metric_definitions.activity_id`, `split_definitions.activity_id`, `program_blocks.program_id`, and `program_days.block_id`.
+- **Program Day Session N+1 Resolution:** `serialize_program_day_session_light` reduces frontend payload nesting to prevent N+1 serialization bloat on the Programs page.
 - **Frontend Code Splitting:** Implemented `React.lazy` and `Suspense` in `AppRouter.jsx` to lazy load non-critical pages (Programs, Sessions, Analytics, Logs), reducing initial bundle size.
 - **API Rate Limiting:** Implemented strict rate limits on goal/fractal creation endpoints via `Flask-Limiter`.
 - **TanStack Query (React Query):** Implemented on the frontend for `GoalsContext` and `SessionsContext`:
@@ -210,7 +211,7 @@ The database is normalized and split into domain-specific tables. See `models/` 
 | **Fractal** | `goals`, `targets` | The 7-level goal hierarchy and measurable targets. |
 | **Sessions** | `sessions`, `activity_instances` | Practice sessions and their tracked activities. |
 | **Activities** | `activity_definitions`, `activity_groups` | Reusable activity templates and metrics. |
-| **Programs** | `programs`, `program_blocks`, `program_days` | Training macro-cycles and schedules. |
+| **Programs** | `programs`, `program_blocks`, `program_days` | Training macro-cycles, auto-completed blocks, and day-goal `program_day_goals` mappings. |
 | **Data** | `notes`, `metric_values` | Polymorphic notes and discrete metric data points. |
 | **Logs** | `event_logs` | System-wide event audit trail. |
 

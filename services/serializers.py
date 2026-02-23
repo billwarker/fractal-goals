@@ -367,6 +367,29 @@ def serialize_session(session, include_image_data=False):
     
     return result
 
+def serialize_program_day_session_light(session):
+    """
+    Lightweight serializer for sessions embedded inside a ProgramDay.
+    Only includes primitive fields and avoids N+1 query hydration overhead
+    (no activity instances, no goals, no notes).
+    """
+    return {
+        "id": session.id,
+        "name": session.name,
+        "description": session.description,
+        "root_id": session.root_id,
+        "session_start": format_utc(session.session_start),
+        "session_end": format_utc(session.session_end),
+        "duration_minutes": session.duration_minutes,
+        "total_duration_seconds": session.total_duration_seconds,
+        "template_id": session.template_id,
+        "program_day_id": session.program_day_id,
+        "completed": session.completed,
+        "completed_at": format_utc(session.completed_at),
+        "created_at": format_utc(session.created_at),
+        "updated_at": format_utc(session.updated_at)
+    }
+
 def serialize_user(user):
     """Serialize a User object."""
     return {
@@ -449,6 +472,10 @@ def serialize_program(program):
         "name": program.name,
         "description": program.description,
         "is_active": program.is_active,
+        "is_completed": program.is_completed,
+        "goals_completed": program.goals_completed,
+        "goals_total": program.goals_total,
+        "completion_percentage": program.completion_percentage,
         "start_date": format_utc(program.start_date),
         "end_date": format_utc(program.end_date),
         "weekly_schedule": schedule_from_db or _safe_load_json(program.weekly_schedule, []),
@@ -470,6 +497,7 @@ def serialize_program_block(block):
         "start_date": format_utc(block.start_date),
         "end_date": format_utc(block.end_date),
         "color": block.color,
+        "is_completed": block.is_completed,
         "goal_ids": block_goal_ids or program_goal_ids,
         "days": [serialize_program_day(d) for d in block.days]
     }
@@ -486,7 +514,14 @@ def serialize_program_day(day):
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
         "is_completed": day.is_completed,
-        "sessions": [serialize_session(s) for s in day.completed_sessions if not s.deleted_at]
+        "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
+        "day_sessions": [{
+            "id": ds.id,
+            "session_template_id": ds.session_template_id,
+            "session_id": ds.session_id,
+            "execution_status": ds.execution_status,
+            "created_at": format_utc(ds.created_at)
+        } for ds in (day.day_sessions or [])]
     }
 
 def serialize_note(note, include_image=False):

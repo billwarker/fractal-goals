@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, Text, Table
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -39,6 +39,12 @@ class Program(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     is_active = Column(Boolean, default=True)
+    is_completed = Column(Boolean, default=False)
+    
+    # Progress tracking
+    goals_completed = Column(Integer, default=0)
+    goals_total = Column(Integer, default=0)
+    completion_percentage = Column(Float, nullable=True)
     
     weekly_schedule = Column(JSON_TYPE, nullable=False) # JSON object with days -> template IDs
     
@@ -60,6 +66,7 @@ class ProgramBlock(Base):
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     color = Column(String)
+    is_completed = Column(Boolean, default=False)
     
     program = relationship("Program", back_populates="blocks")
     days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")

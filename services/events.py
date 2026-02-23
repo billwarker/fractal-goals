@@ -237,6 +237,7 @@ class Events:
 
     # Association events
     GOAL_BLOCK_ASSOCIATED = 'goal.block_associated'
+    GOAL_DAY_ASSOCIATED = 'goal.day_associated'
 
     # Session Template events
     SESSION_TEMPLATE_CREATED = 'session_template.created'
