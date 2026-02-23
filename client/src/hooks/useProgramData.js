@@ -10,40 +10,50 @@ export function useProgramData(rootId, programId) {
     // 1. Program Query
     const programQuery = useQuery({
         queryKey: ['program', rootId, programId],
-        queryFn: () => fractalApi.getProgram(rootId, programId),
-        select: (res) => res.data,
+        queryFn: async () => {
+            const res = await fractalApi.getProgram(rootId, programId);
+            return res.data;
+        },
         enabled: !!rootId && !!programId,
     });
 
     // 2. Goals (Tree) Query
     const goalsQuery = useQuery({
         queryKey: ['goals-tree', rootId],
-        queryFn: () => fractalApi.getGoal(rootId, rootId),
-        select: (res) => res.data,
+        queryFn: async () => {
+            const res = await fractalApi.getGoal(rootId, rootId);
+            return res.data;
+        },
         enabled: !!rootId,
     });
 
     // 3. Activities Query
     const activitiesQuery = useQuery({
         queryKey: ['activities', rootId],
-        queryFn: () => fractalApi.getActivities(rootId),
-        select: (res) => res.data || [],
+        queryFn: async () => {
+            const res = await fractalApi.getActivities(rootId);
+            return res.data || [];
+        },
         enabled: !!rootId,
     });
 
     // 4. Activity Groups Query
     const groupsQuery = useQuery({
         queryKey: ['activity-groups', rootId],
-        queryFn: () => fractalApi.getActivityGroups(rootId),
-        select: (res) => res.data || [],
+        queryFn: async () => {
+            const res = await fractalApi.getActivityGroups(rootId);
+            return res.data || [];
+        },
         enabled: !!rootId,
     });
 
     // 5. Sessions Query
     const sessionsQuery = useQuery({
         queryKey: ['sessions', rootId, 'all'], // 'all' to differentiate from paginated lists if needed
-        queryFn: () => fractalApi.getSessions(rootId, { limit: 1000 }),
-        select: (res) => res.data.sessions || res.data || [],
+        queryFn: async () => {
+            const res = await fractalApi.getSessions(rootId, { limit: 1000 });
+            return res.data.sessions || res.data || [];
+        },
         enabled: !!rootId,
     });
 
