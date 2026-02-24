@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import select, inspect, text
 from models import (
     get_session,
-    Session, Goal, ActivityInstance, MetricValue, session_goals,
+    Session, Goal, ActivityInstance, MetricValue, MetricDefinition, session_goals,
     program_goals,
     ActivityDefinition, ProgramDay, ProgramBlock, SessionTemplate, Program,
     validate_root_goal, get_session_by_id
@@ -473,6 +473,108 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
         }, source='sessions_api.remove_activity_from_session'))
         
         return jsonify({"message": "Activity instance removed"})
+        
+    except Exception as e:
+        db_session.rollback()
+        logger.exception("An error occurred")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db_session.close()
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics', methods=['PUT'])
+@token_required
+@validate_request(ActivityMetricsUpdateSchema)
+def update_activity_metrics(current_user, root_id, session_id, instance_id, validated_data):
+    """Update metrics for an activity instance."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    try:
+        # Verify ownership
+        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+        
+        session = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).first()
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+            
+        instance = db_session.query(ActivityInstance).options(
+            joinedload(ActivityInstance.definition)
+        ).filter_by(
+            id=instance_id,
+            session_id=session_id
+        ).first()
+        if not instance:
+            return jsonify({"error": "Instance not found"}), 404
+
+        metric_data_list = validated_data.get('metrics', [])
+        
+        # Validate that metrics belong to this activity definition
+        valid_metric_ids = {m.id for m in db_session.query(MetricDefinition.id).filter_by(
+            activity_id=instance.activity_definition_id
+        ).all()}
+        
+        for m_data in metric_data_list:
+            if m_data.get('metric_id') not in valid_metric_ids:
+                return jsonify({
+                    "error": "Invalid metric_id",
+                    "details": f"Metric {m_data.get('metric_id')} does not belong to activity {instance.activity_definition_id}"
+                }), 400
+        
+        # Get existing metric values
+        existing_metrics = db_session.query(MetricValue).filter_by(
+            activity_instance_id=instance_id
+        ).all()
+        existing_dict = {(m.metric_definition_id, m.split_definition_id): m for m in existing_metrics}
+        
+        updated_keys = set()
+        
+        for m_data in metric_data_list:
+            metric_id = m_data.get('metric_id')
+            split_id = m_data.get('split_id')
+            value = m_data.get('value')
+            
+            key = (metric_id, split_id)
+            updated_keys.add(key)
+            if key in existing_dict:
+                existing_dict[key].value = value
+            else:
+                new_metric_val = MetricValue(
+                    activity_instance_id=instance_id,
+                    metric_definition_id=metric_id,
+                    split_definition_id=split_id,
+                    value=value
+                )
+                db_session.add(new_metric_val)
+                
+        # Remove any metrics that were not included in the payload
+        for key, existing_m in existing_dict.items():
+            if key not in updated_keys:
+                db_session.delete(existing_m)
+                
+        # Get activity name directly from definition
+        activity_def = db_session.query(ActivityDefinition).filter_by(id=instance.activity_definition_id).first()
+        activity_name = activity_def.name if activity_def else 'Unknown'
+        
+        db_session.commit()
+        db_session.refresh(instance)
+        
+        # Emit activity instance updated event
+        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
+            'session_id': session_id,
+            'root_id': root_id,
+            'updated_fields': ['metrics']
+        }, source='sessions_api.update_activity_metrics'))
+        
+        # Return updated serialized instance
+        return jsonify(serialize_activity_instance(instance))
         
     except Exception as e:
         db_session.rollback()

@@ -284,7 +284,97 @@ class TestSessionActivityEndpoints:
             content_type='application/json'
         )
         assert response.status_code == 200
-    
+        
+    def test_update_activity_metrics(self, authed_client, db_session, sample_activity_instance):
+        """Test updating activity metrics."""
+        from models import PracticeSession, MetricDefinition, MetricValue
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        session_id = session.id
+        instance_id = sample_activity_instance.id
+        
+        # Create a dummy metric definition
+        metric_def = MetricDefinition(
+            activity_id=sample_activity_instance.activity_definition_id,
+            root_id=root_id,
+            name='Test Metric',
+            unit='kg'
+        )
+        db_session.add(metric_def)
+        db_session.commit()
+        db_session.refresh(metric_def)
+        
+        payload = {
+            'metrics': [
+                {
+                    'metric_id': metric_def.id,
+                    'value': 100.5
+                }
+            ]
+        }
+        
+        response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+        
+        # Verify db persistence
+        db_metric = db_session.query(MetricValue).filter_by(activity_instance_id=instance_id).first()
+        assert db_metric is not None
+        assert db_metric.value == 100.5
+        assert db_metric.metric_definition_id == metric_def.id
+
+    def test_update_activity_metrics_invalid_coupling(self, authed_client, db_session, sample_activity_instance, sample_activity_definition):
+        """Test that updating metrics fails if the metric doesn't belong to the activity."""
+        from models import PracticeSession, MetricDefinition
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        session_id = session.id
+        instance_id = sample_activity_instance.id
+        
+        # Create an UNRELATED activity definition
+        other_activity = sample_activity_definition
+        # Note: sample_activity_definition is already created by fixture, but we need a different one for the metric
+        from models import ActivityDefinition
+        another_activity = ActivityDefinition(
+            root_id=root_id,
+            name='Another Activity',
+            group_id=other_activity.group_id
+        )
+        db_session.add(another_activity)
+        db_session.commit()
+        
+        # Create a metric on the WRONG activity
+        wrong_metric_def = MetricDefinition(
+            activity_id=another_activity.id,
+            root_id=root_id,
+            name='Wrong Metric',
+            unit='reps'
+        )
+        db_session.add(wrong_metric_def)
+        db_session.commit()
+        db_session.refresh(wrong_metric_def)
+        
+        payload = {
+            'metrics': [
+                {
+                    'metric_id': wrong_metric_def.id,
+                    'value': 50.0
+                }
+            ]
+        }
+        
+        response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert "Invalid metric_id" in data['error']
+
     def test_reorder_activities(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test reordering activities in a session."""
         root_id = sample_practice_session.root_id
