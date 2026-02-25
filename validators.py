@@ -618,6 +618,8 @@ class NoteUpdateSchema(BaseModel):
 # PROGRAM SCHEMAS
 # =============================================================================
 
+VALID_DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 class ProgramCreateSchema(BaseModel):
     """Schema for creating a program."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -735,6 +737,16 @@ class ProgramDayCreateSchema(BaseModel):
     template_ids: Optional[List[str]] = None
     cascade: Optional[bool] = False
 
+    @field_validator('day_of_week')
+    @classmethod
+    def validate_day_of_week(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        for day in v:
+            if day not in VALID_DAYS_OF_WEEK:
+                raise ValueError(f"Invalid day of week: {day}. Must be one of {VALID_DAYS_OF_WEEK}")
+        return v
+
 
 class ProgramDayUpdateSchema(BaseModel):
     """Schema for updating a program day."""
@@ -745,6 +757,40 @@ class ProgramDayUpdateSchema(BaseModel):
     day_of_week: Optional[List[str]] = None
     template_ids: Optional[List[str]] = None
     cascade: Optional[bool] = False
+
+    @field_validator('day_of_week')
+    @classmethod
+    def validate_day_of_week(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        for day in v:
+            if day not in VALID_DAYS_OF_WEEK:
+                raise ValueError(f"Invalid day of week: {day}. Must be one of {VALID_DAYS_OF_WEEK}")
+        return v
+
+class ProgramBlockGoalAttachSchema(BaseModel):
+    """Schema for attaching a goal to a block."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    goal_id: str = Field(..., min_length=1)
+    deadline: Optional[str] = None
+    
+    @field_validator('deadline')
+    @classmethod
+    def validate_deadline(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '': 
+            return None
+        try:
+            parse_date_string(v)
+            return v
+        except ValueError:
+            raise ValueError('Invalid date format')
+
+class ProgramDayGoalAttachSchema(BaseModel):
+    """Schema for attaching a goal to a program day."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    goal_id: str = Field(..., min_length=1)
 
 
 # =============================================================================

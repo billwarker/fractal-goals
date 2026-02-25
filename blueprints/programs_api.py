@@ -9,6 +9,8 @@ from validators import (
     ProgramDayUpdateSchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
+    ProgramBlockGoalAttachSchema,
+    ProgramDayGoalAttachSchema,
     validate_request
 )
 from services.programs import ProgramService
@@ -353,7 +355,8 @@ def get_active_program_days(current_user, root_id):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/goals', methods=['POST'])
 @token_required
-def attach_goal_to_block(current_user, root_id, program_id, block_id):
+@validate_request(ProgramBlockGoalAttachSchema)
+def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_data):
     """Attach a goal to a block and update its deadline."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -362,8 +365,7 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
-        data = request.get_json()
-        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, data)
+        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data)
         session.commit()
         return jsonify({"message": "Goal attached and updated", "block": block_dict})
     except ValueError as e:
@@ -377,7 +379,8 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/goals', methods=['POST'])
 @token_required
-def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id):
+@validate_request(ProgramDayGoalAttachSchema)
+def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Attach a goal directly to a program day."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -386,8 +389,7 @@ def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
-        data = request.get_json()
-        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, data)
+        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data)
         session.commit()
         return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
     except ValueError as e:

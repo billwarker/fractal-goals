@@ -20,9 +20,9 @@ class Session(Base):
     duration_minutes = Column(Integer, nullable=True)
     total_duration_seconds = Column(Integer, nullable=True)
     
-    is_paused = Column(Boolean, default=False)
+    is_paused = Column(Boolean, nullable=False, server_default=sa.text('false'), default=False)
     last_paused_at = Column(DateTime, nullable=True)
-    total_paused_seconds = Column(Integer, default=0)
+    total_paused_seconds = Column(Integer, nullable=False, server_default=sa.text('0'), default=0)
     
     __table_args__ = (
         sa.Index('ix_sessions_root_deleted_completed', 'root_id', 'deleted_at', 'completed'),

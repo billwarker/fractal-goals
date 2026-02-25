@@ -10,7 +10,7 @@ from models import (
     validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
-from services.serializers import serialize_program, serialize_program_block
+from services.serializers import serialize_program, serialize_program_block, serialize_program_day
 
 logger = logging.getLogger(__name__)
 
@@ -660,17 +660,32 @@ class ProgramService:
         # Insert directly into program_day_goals junction
         from models.goal import program_day_goals
         from sqlalchemy.exc import IntegrityError
+        
+        # Check if already attached to avoid IntegrityError triggering overall rollback
+        existing = session.execute(
+            program_day_goals.select().where(
+                (program_day_goals.c.program_day_id == day_id) &
+                (program_day_goals.c.goal_id == goal_id)
+            )
+        ).first()
+        
+        if existing:
+            logger.debug(f"Goal {goal_id} already attached to day {day_id}")
+            return serialize_program_day(day)
+            
         stmt = program_day_goals.insert().values(
             program_day_id=day_id,
             goal_id=goal_id
         )
         
         try:
-            session.execute(stmt)
+            # Use nested transaction for safe concurrency handling
+            with session.begin_nested():
+                session.execute(stmt)
         except IntegrityError:
-            # Goal already attached to this day — idempotent
-            session.rollback()
-            logger.debug(f"Goal {goal_id} already attached to day {day_id}")
+            # Goal already attached to this day concurrently — idempotent
+            logger.debug(f"Goal {goal_id} already attached to day {day_id} (concurrent)")
+            return serialize_program_day(day)
 
         session.expire(day, ['goals'])
 

@@ -405,6 +405,11 @@ Recent focus has been on:
 - **FlowTree Metrics Overlay**: Implemented a comprehensive dynamic metrics overlay in `FlowTree.jsx` that computes statistics exactly on the currently visible goal lineage, displaying key insights across Goals, Work Evidence, Pathways, Momentum (Last 7 Days), and Program Alignment.
 - **Goal Mapping Centralization (2026-02-20)**: Replaced duplicate, fallback `_goal_type_from_level` logic across the backend with a single `get_canonical_goal_type` and `get_canonical_goal_level_name` utility in `services/goal_type_utils.py`. Enforced strict foreign-keys and visual characteristics by backfilling `level_id` values for all existing goals, resolving a major bug where unmapped goals rendered incorrectly as a generic `"Goal"` in the UI.
 - **Metric Persistence Fix (2026-02-24)**: Resolved "disappearing metrics" bug by implementing the missing `PUT /api/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics` binary-safe upsert endpoint in `sessions_api.py`. Added strict validation to ensure metric IDs belong to the activity definition and added integration tests.
+- **Backend Stability & Integrity Fixes (2026-02-24)**: Overhauled several backend endpoints to improve data security and stability:
+  - Enforced `root_id` context filtering on all parent goal assignments to prevent cross-fractal data leakage.
+  - Implemented strict Pydantic JSON validation on Program Day/Block attachment routes to handle malformed requests gracefully.
+  - Safely migrated nullable pause activity/session fields (`is_paused`, `total_paused_seconds`) to strict booleans/integers via Alembic.
+  - Re-implemented idempotent insertion logic in `attach_goal_to_day` using nested transactions (`session.begin_nested()`) to prevent `IntegrityError` collisions from rolling back outer transaction scopes.
 
 ---
 
@@ -727,7 +732,7 @@ When making changes, update these files as needed:
 
 ---
 
-**Last Updated:** 2026-02-20
+**Last Updated:** 2026-02-24
 **Version:** 2.0.0 (Refactored Architecture)
 **Maintained By:** Project AI Agents
 

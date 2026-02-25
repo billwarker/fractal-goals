@@ -988,7 +988,9 @@ def create_fractal_goal(current_user, root_id, validated_data):
             # 2. Enforce max_children on the PARENT goal
             parent_id = validated_data.get('parent_id')
             if parent_id:
-                parent_goal = db_session.query(Goal).filter_by(id=parent_id).first()
+                parent_goal = db_session.query(Goal).filter_by(id=parent_id, root_id=root_id).first()
+                if not parent_goal:
+                     return jsonify({"error": "Parent goal not found in this fractal."}), 400
                 if parent_goal and parent_goal.level:
                     parent_max = parent_goal.level.max_children
                     if parent_max is not None:
@@ -1187,7 +1189,9 @@ def update_fractal_goal(current_user, root_id, goal_id):
             new_parent_id = data['parent_id']
             # Enforce max_children on reparenting (only when moving to a DIFFERENT parent)
             if new_parent_id and new_parent_id != goal.parent_id:
-                new_parent = db_session.query(Goal).filter_by(id=new_parent_id).first()
+                new_parent = db_session.query(Goal).filter_by(id=new_parent_id, root_id=root_id).first()
+                if not new_parent:
+                     return jsonify({"error": "New parent goal not found in this fractal."}), 400
                 if new_parent and new_parent.level:
                     parent_max = new_parent.level.max_children
                     if parent_max is not None:
