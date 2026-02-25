@@ -397,8 +397,7 @@ const ProgramDetail = () => {
     // 1. Initialize Date Groups with Scheduled Days
     program.blocks?.forEach(block => {
         block.days?.forEach(day => {
-            if (day.date) {
-                const dateStr = getDatePart(day.date);
+            const addDayToDate = (dateStr) => {
                 if (!dateGroups[dateStr]) dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
 
                 const name = day.name || 'Untitled Day';
@@ -414,8 +413,32 @@ const ProgramDetail = () => {
                 const group = dateGroups[dateStr].groupsByName[name];
                 (day.templates || []).forEach(t => {
                     if (!group.templatesByName[t.name]) group.templatesByName[t.name] = { templates: [], sessions: [] };
-                    group.templatesByName[t.name].templates.push(t);
+                    // Avoid duplicate template entries for the same day
+                    if (!group.templatesByName[t.name].templates.some(existing => existing.id === t.id)) {
+                        group.templatesByName[t.name].templates.push(t);
+                    }
                 });
+            };
+
+            if (day.date) {
+                addDayToDate(getDatePart(day.date));
+            }
+
+            if (day.day_of_week && day.day_of_week.length > 0 && block.start_date && block.end_date) {
+                const start = moment(getDatePart(block.start_date));
+                const end = moment(getDatePart(block.end_date));
+                const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+
+                const dows = Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week];
+                const activeDays = dows.map(d => dayMap[d]).filter(d => d !== undefined);
+
+                let curr = start.clone();
+                while (curr.isSameOrBefore(end)) {
+                    if (activeDays.includes(curr.day())) {
+                        addDayToDate(curr.format('YYYY-MM-DD'));
+                    }
+                    curr.add(1, 'days');
+                }
             }
         });
     });
