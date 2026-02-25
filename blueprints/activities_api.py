@@ -4,7 +4,7 @@ import models
 from models import (
     get_session,
     ActivityDefinition, MetricDefinition, SplitDefinition, ActivityGroup,
-    validate_root_goal
+    validate_root_goal, Goal
 )
 from sqlalchemy import func
 from validators import (
