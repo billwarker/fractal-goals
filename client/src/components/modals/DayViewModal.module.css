@@ -126,6 +126,12 @@
     font-weight: 600;
 }
 
+.programDayStatus {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
 .removeButton {
     background: transparent;
     border: none;
@@ -330,6 +336,21 @@
 
 .actionToggle:hover {
     background: var(--color-bg-hover);
+}
+
+.actionToggleDisabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.actionToggleDisabled:hover {
+    background: transparent;
+}
+
+.actionHint {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    margin-top: 6px;
 }
 
 .actionPanel {

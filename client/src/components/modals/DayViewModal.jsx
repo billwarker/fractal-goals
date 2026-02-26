@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import React, { useState } from 'react';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getISOYMDInTimezone, getDatePart, formatLiteralDate } from '../../utils/dateUtils';
 import styles from './DayViewModal.module.css';
@@ -11,12 +10,13 @@ import moment from 'moment';
  * Shows all program days scheduled for the selected date and allows adding new ones
  */
 const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, onUnscheduleDay, blocks, sessions }) => {
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
     const { timezone } = useTimezone();
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);
     const [selectedBlockId, setSelectedBlockId] = useState('');
+    const isPastDate = moment(date).isBefore(moment().startOf('day'), 'day');
 
     // Find which blocks contain this date
     const blocksContainingDate = blocks ? blocks.filter(block => {
@@ -25,38 +25,53 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         const end = getDatePart(block.end_date);
         return date >= start && date <= end;
     }) : [];
-
-    // Auto-select block if exactly one block contains this date
-    useEffect(() => {
-        if (blocksContainingDate.length === 1 && !selectedBlockId) {
-            setSelectedBlockId(blocksContainingDate[0].id);
-        }
-    }, [blocksContainingDate, selectedBlockId, date]);
-
-    // Reset state when modal closes or date changes
-    useEffect(() => {
-        if (!isOpen) {
-            setSelectedBlockId('');
-            setShowAddDaySection(false);
-            setShowGoalSection(false);
-            setSelectedGoalId('');
-        }
-    }, [isOpen]);
+    const effectiveBlockId = selectedBlockId || (blocksContainingDate.length === 1 ? blocksContainingDate[0].id : '');
+    const resetLocalState = () => {
+        setSelectedBlockId('');
+        setShowAddDaySection(false);
+        setShowGoalSection(false);
+        setSelectedGoalId('');
+    };
+    const handleClose = () => {
+        resetLocalState();
+        onClose();
+    };
 
     if (!isOpen || !date || !program) return null;
 
-    // 1. Program Days (Legacy Days / Instance Copies)
+    // 1. Program Days (Legacy Days / Instance Copies & Recurring Days)
     const scheduledProgramDays = [];
     if (program.blocks) {
         program.blocks.forEach(block => {
             if (block.days) {
                 block.days.forEach(day => {
+                    let isScheduledForDate = false;
+
                     if (day.date && getDatePart(day.date) === date) {
+                        isScheduledForDate = true;
+                    } else if (day.day_of_week && block.start_date && block.end_date) {
+                        const start = getDatePart(block.start_date);
+                        const end = getDatePart(block.end_date);
+                        if (date >= start && date <= end) {
+                            const dows = Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week];
+                            if (dows.length > 0) {
+                                const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                                const activeDays = dows.map(d => dayMap[d]).filter(d => d !== undefined);
+                                const targetDayOfWeek = moment(date).day();
+                                if (activeDays.includes(targetDayOfWeek)) {
+                                    isScheduledForDate = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (isScheduledForDate) {
                         scheduledProgramDays.push({
                             ...day,
                             blockName: block.name,
                             blockId: block.id,
                             blockColor: block.color,
+                            isRecurringTemplate: !day.date && !!day.day_of_week && day.day_of_week.length > 0,
                             type: 'program_day'
                         });
                     }
@@ -112,6 +127,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
     const looseScheduledSessions = scheduledSessions.filter(s => !claimedSessionIds.has(s.id));
     const looseCompletedSessions = completedSessions.filter(s => !claimedSessionIds.has(s.id));
+    const scheduledTemplateCount = scheduledProgramDayData.reduce((sum, day) => sum + (day.templates?.length || 0), 0);
+    const scheduledSessionCount = scheduledTemplateCount + looseScheduledSessions.length;
+    const completedSessionCount = completedSessions.length;
 
     // Find goals due on this date
     // Note: Goal deadlines are likely just YYYY-MM-DD or ISO.
@@ -135,8 +153,10 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         return formatLiteralDate(dateString, 'dddd, MMMM D, YYYY');
     };
 
+    const formatSessionCount = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`;
+
     return (
-        <div className={styles.modalOverlay} onClick={onClose}>
+        <div className={styles.modalOverlay} onClick={handleClose}>
             <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className={styles.header}>
@@ -145,7 +165,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             {formatDate(date)}
                         </h2>
                         <div className={styles.headerMeta}>
-                            {scheduledSessions.length + scheduledProgramDays.length} scheduled • {completedSessions.length} completed • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
+                            {formatSessionCount(scheduledSessionCount, 'scheduled session')} • {formatSessionCount(completedSessionCount, 'completed session')} • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
                         </div>
                         {blocksContainingDate.length > 0 && (
                             <div className={styles.headerTags}>
@@ -162,7 +182,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         )}
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={styles.closeButton}
                     >
                         ×
@@ -192,6 +212,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                 const isPDCompleted = templates.length > 0 &&
                                     templates.every(t => sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed));
+                                const completedTemplateCount = templates.filter(t =>
+                                    sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed)
+                                ).length;
 
                                 return (
                                     <div key={idx} className={`${styles.programDayCard} ${isPDCompleted ? styles.programDayCardCompleted : ''}`}
@@ -199,14 +222,17 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         <div className={styles.programDayHeader}>
                                             <div>
                                                 <div className={styles.programDayBlockName} style={{ color: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF') }}>
-                                                    {day.blockName} {isPDCompleted && '✓'}
+                                                    {day.blockName}
                                                 </div>
                                                 <div className={styles.programDayTitle}>{day.name}</div>
+                                                <div className={styles.programDayStatus}>
+                                                    {isPDCompleted ? '✓ Program day completed' : `${completedTemplateCount}/${templates.length || 0} program sessions completed`}
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
                                                 className={styles.removeButton}
-                                                title="Unschedule Day"
+                                                title={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule Day'}
                                             >
                                                 ✕
                                             </button>
@@ -234,9 +260,15 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                                 <div className={styles.templateSessions}>
                                                                     {tSessions.map(s => (
                                                                         <div key={s.id} className={styles.sessionItem}>
-                                                                            <div className={s.completed || s.attributes?.completed ? styles.sessionLinkCompleted : styles.sessionLink}>
-                                                                                {moment.utc(s.session_start || s.start_time).local().format('h:mm A')} - {s.name}
-                                                                            </div>
+                                                                            {(() => {
+                                                                                const showSessionName = tSessions.length > 1 || s.name !== t.name;
+                                                                                return (
+                                                                                    <div className={s.completed || s.attributes?.completed ? styles.sessionLinkCompleted : styles.sessionLink}>
+                                                                                        {moment.utc(s.session_start || s.start_time).local().format('h:mm A')}
+                                                                                        {showSessionName ? ` - ${s.name}` : ''}
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
                                                                             {(s.completed || s.attributes?.completed) && (
                                                                                 <div className={styles.sessionDuration}>
                                                                                     Duration: {s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
@@ -381,13 +413,17 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         <div>
                             <button
                                 onClick={() => setShowGoalSection(!showGoalSection)}
-                                className={styles.actionToggle}
+                                disabled={isPastDate}
+                                className={`${styles.actionToggle} ${isPastDate ? styles.actionToggleDisabled : ''}`}
                             >
                                 <span>🎯 Set Goal Deadline for This Date</span>
                                 <span>{showGoalSection ? '−' : '+'}</span>
                             </button>
+                            {isPastDate && (
+                                <div className={styles.actionHint}>Not available for past dates.</div>
+                            )}
 
-                            {showGoalSection && (
+                            {showGoalSection && !isPastDate && (
                                 <div className={styles.actionPanel}>
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>
@@ -422,7 +458,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         style={{
                                             background: selectedGoalId ? '#3A86FF' : 'var(--color-bg-input)',
                                             color: selectedGoalId ? 'white' : 'var(--color-text-muted)',
-                                            cursor: selectedBlockId ? 'pointer' : 'not-allowed',
+                                            cursor: selectedGoalId ? 'pointer' : 'not-allowed',
                                         }}
                                     >
                                         Set Deadline
@@ -436,13 +472,17 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                             <div>
                                 <button
                                     onClick={() => setShowAddDaySection(!showAddDaySection)}
-                                    className={styles.actionToggle}
+                                    disabled={isPastDate}
+                                    className={`${styles.actionToggle} ${isPastDate ? styles.actionToggleDisabled : ''}`}
                                 >
                                     <span>📅 Schedule Day for This Date</span>
                                     <span>{showAddDaySection ? '−' : '+'}</span>
                                 </button>
+                                {isPastDate && (
+                                    <div className={styles.actionHint}>Not available for past dates.</div>
+                                )}
 
-                                {showAddDaySection && (
+                                {showAddDaySection && !isPastDate && (
                                     <div className={styles.actionPanel}>
                                         {/* Block Selection */}
                                         {blocksContainingDate.length > 1 && (
@@ -489,7 +529,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                 </div>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
                                                     {(() => {
-                                                        const blockId = selectedBlockId || (blocksContainingDate.length === 1 ? blocksContainingDate[0].id : null);
+                                                        const blockId = effectiveBlockId || null;
                                                         const block = blocks?.find(b => b.id === blockId);
                                                         const allDays = block?.days || [];
 
@@ -542,7 +582,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                                 <button
                                                     onClick={() => {
-                                                        const blockId = selectedBlockId || (blocksContainingDate.length === 1 ? blocksContainingDate[0].id : null);
+                                                        const blockId = effectiveBlockId || null;
                                                         if (blockId) {
                                                             onScheduleDay(blockId, date, null); // Null means create blank
                                                             setShowAddDaySection(false);
@@ -564,7 +604,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                 {/* Footer */}
                 <div className={styles.footer}>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={styles.closeFooterButton}
                     >
                         Close

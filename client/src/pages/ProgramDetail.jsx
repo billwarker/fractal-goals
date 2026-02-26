@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
-import { useTheme } from '../contexts/ThemeContext'
-import { useGoalLevels } from '../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { getISOYMDInTimezone, formatDateInTimezone, getDatePart, formatLiteralDate } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
@@ -27,7 +26,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
 
 const ProgramDetail = () => {
-    const { getGoalColor, getGoalTextColor } = useGoalLevels();;
+    const { getGoalColor, getGoalTextColor } = useGoalLevels();
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
@@ -244,7 +243,38 @@ const ProgramDetail = () => {
         if (!itemToUnschedule) return;
 
         try {
-            await actions.unscheduleDay(itemToUnschedule);
+            const isRecurringTemplateUnschedule =
+                itemToUnschedule.type === 'program_day' &&
+                itemToUnschedule.isRecurringTemplate &&
+                !!selectedDate;
+
+            if (isRecurringTemplateUnschedule) {
+                const matchingScheduledSessions = sessions.filter((session) => {
+                    const isCompleted = session.completed || session.attributes?.completed;
+                    if (isCompleted) return false;
+
+                    let pDayId = session.program_day_id;
+                    if (!pDayId && session.attributes) {
+                        try {
+                            const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
+                            pDayId = attr?.program_context?.day_id;
+                        } catch (e) { }
+                    }
+
+                    if (pDayId !== itemToUnschedule.id) return false;
+                    const localDate = getISOYMDInTimezone(session.session_start || session.start_time || session.created_at, timezone);
+                    return localDate === selectedDate;
+                });
+
+                if (matchingScheduledSessions.length === 0) {
+                    toast('No scheduled sessions to remove on this date.');
+                } else {
+                    await Promise.all(matchingScheduledSessions.map((session) => fractalApi.deleteSession(rootId, session.id)));
+                    await refreshData();
+                }
+            } else {
+                await actions.unscheduleDay(itemToUnschedule);
+            }
         } catch (err) {
             console.error('Failed to unschedule day:', err);
             toast.error('Failed to unschedule day: ' + (err.response?.data?.error || err.message));
@@ -430,15 +460,18 @@ const ProgramDetail = () => {
                 const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
 
                 const dows = Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week];
-                const activeDays = dows.map(d => dayMap[d]).filter(d => d !== undefined);
+                const activeDays = [...new Set(dows.map(d => dayMap[d]).filter(d => d !== undefined))];
 
-                let curr = start.clone();
-                while (curr.isSameOrBefore(end)) {
-                    if (activeDays.includes(curr.day())) {
-                        addDayToDate(curr.format('YYYY-MM-DD'));
+                activeDays.forEach((dow) => {
+                    const curr = start.clone().day(dow);
+                    if (curr.isBefore(start)) {
+                        curr.add(7, 'days');
                     }
-                    curr.add(1, 'days');
-                }
+                    while (curr.isSameOrBefore(end)) {
+                        addDayToDate(curr.format('YYYY-MM-DD'));
+                        curr.add(7, 'days');
+                    }
+                });
             }
         });
     });
@@ -511,7 +544,7 @@ const ProgramDetail = () => {
 
             const templatePairs = Object.values(group.templatesByName);
             const isPDCompleted = templatePairs.length > 0 &&
-                templatePairs.every(pair => pair.sessions.length > 0);
+                templatePairs.every(pair => pair.sessions.some(s => s.completed || s.attributes?.completed));
 
             // Main Program Day Event
             calendarEvents.push({
@@ -534,14 +567,15 @@ const ProgramDetail = () => {
             // Consolidated Session Template Events
             templatePairs.forEach(pair => {
                 const tName = pair.templates[0]?.name || 'Untitled Template';
-                const sCount = pair.sessions.length;
-                const isTemplateCompleted = sCount > 0;
+                const completedSessions = pair.sessions.filter(s => s.completed || s.attributes?.completed);
+                const completedCount = completedSessions.length;
+                const isTemplateCompleted = completedCount > 0;
 
                 let displayTitle = tName;
                 if (isTemplateCompleted) {
                     displayTitle = `✓ ${tName}`;
-                    if (sCount > 1) {
-                        displayTitle += ` (${sCount})`;
+                    if (completedCount > 1) {
+                        displayTitle += ` (${completedCount})`;
                     }
                 }
 
@@ -558,7 +592,7 @@ const ProgramDetail = () => {
                         type: 'template',
                         templateId: pair.templates[0]?.id,
                         isCompleted: isTemplateCompleted,
-                        count: sCount,
+                        count: completedCount,
                         sortOrder: 1
                     }
                 });
@@ -567,15 +601,16 @@ const ProgramDetail = () => {
 
         // Render remaining Unlinked Sessions
         data.unlinkedSessions.forEach(s => {
+            const isCompleted = s.completed || s.attributes?.completed;
             calendarEvents.push({
                 id: `session-${s.id}`,
-                title: `✓ ${s.name}`,
+                title: `${isCompleted ? '✓ ' : '📋 '}${s.name}`,
                 start: dateStr,
                 allDay: true,
-                backgroundColor: '#2e7d32',
+                backgroundColor: isCompleted ? '#2e7d32' : '#546e7a',
                 borderColor: 'transparent',
                 textColor: 'white',
-                extendedProps: { type: 'session', sortOrder: 2, ...s }
+                extendedProps: { type: 'session', sortOrder: 2, isCompleted, ...s }
             });
         });
     });
@@ -902,7 +937,11 @@ const ProgramDetail = () => {
                 onClose={() => setUnscheduleConfirmOpen(false)}
                 onConfirm={executeUnscheduleDay}
                 title="Unschedule Day"
-                message={`Are you sure you want to unschedule ${itemToUnschedule?.name || 'this day'}?`}
+                message={
+                    itemToUnschedule?.isRecurringTemplate
+                        ? `Remove scheduled sessions for "${itemToUnschedule?.name || 'this day'}" on ${selectedDate || 'this date'}?`
+                        : `Are you sure you want to unschedule ${itemToUnschedule?.name || 'this day'}?`
+                }
                 confirmText="Unschedule"
             />
 
