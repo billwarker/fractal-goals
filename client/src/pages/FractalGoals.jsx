@@ -109,6 +109,7 @@ function FractalGoals() {
             return;
         }
         setActiveRootId(rootId);
+        localStorage.setItem('fractal_recent_root_id', rootId);
         fetchActivities(rootId);
         fetchActivityGroups(rootId);
         fetchPrograms(rootId);

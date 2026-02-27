@@ -17,6 +17,8 @@ Tests cover:
 import pytest
 import json
 from datetime import datetime, timedelta
+from datetime import timezone
+import uuid
 
 
 @pytest.mark.integration
@@ -328,3 +330,106 @@ class TestGoalSearch:
         )
         assert response.status_code == 200
         # Test documents expected behavior
+
+
+@pytest.mark.integration
+class TestGlobalGoalEndpointProtection:
+    """Auth and ownership checks for global goal endpoints."""
+
+    @pytest.mark.parametrize("method,path,payload", [
+        ("get", "/api/goals", None),
+        ("post", "/api/goals", {"name": "Unauthorized Goal", "type": "LongTermGoal", "parent_id": "missing-root"}),
+        ("delete", "/api/goals/some-goal-id", None),
+        ("get", "/api/goals/some-goal-id", None),
+        ("put", "/api/goals/some-goal-id", {"name": "Updated"}),
+        ("post", "/api/goals/some-goal-id/targets", {"name": "Target"}),
+        ("delete", "/api/goals/some-goal-id/targets/some-target-id", None),
+    ])
+    def test_endpoints_require_auth(self, client, method, path, payload):
+        kwargs = {}
+        if payload is not None:
+            kwargs["data"] = json.dumps(payload)
+            kwargs["content_type"] = "application/json"
+        response = getattr(client, method)(path, **kwargs)
+        assert response.status_code == 401
+
+    @pytest.mark.parametrize("method,endpoint_kind", [
+        ("get", "list_goals"),
+        ("post", "create_goal"),
+        ("delete", "delete_goal"),
+        ("get", "get_goal"),
+        ("put", "update_goal"),
+        ("post", "add_target"),
+        ("delete", "delete_target"),
+    ])
+    def test_endpoints_return_404_for_wrong_owner(
+        self, client, db_session, sample_ultimate_goal, method, endpoint_kind
+    ):
+        import jwt
+        from config import config
+        from models import User, Target
+
+        other_user = User(
+            id=str(uuid.uuid4()),
+            username="otheruser",
+            email="other@example.com"
+        )
+        other_user.set_password("Password123")
+        db_session.add(other_user)
+        db_session.commit()
+
+        token = jwt.encode({
+            'user_id': other_user.id,
+            'exp': datetime.now(timezone.utc) + timedelta(hours=24)
+        }, config.JWT_SECRET_KEY, algorithm="HS256")
+
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+
+        target_id = str(uuid.uuid4())
+        if endpoint_kind == "delete_target":
+            target = Target(
+                id=target_id,
+                goal_id=sample_ultimate_goal.id,
+                root_id=sample_ultimate_goal.id,
+                name="Protected Target"
+            )
+            db_session.add(target)
+            db_session.commit()
+
+        if endpoint_kind == "list_goals":
+            path = "/api/goals"
+            payload = None
+        elif endpoint_kind == "create_goal":
+            path = "/api/goals"
+            payload = {
+                "name": "Cross User Goal",
+                "type": "LongTermGoal",
+                "parent_id": sample_ultimate_goal.id,
+                "root_id": sample_ultimate_goal.id
+            }
+        elif endpoint_kind == "delete_goal":
+            path = f"/api/goals/{sample_ultimate_goal.id}"
+            payload = None
+        elif endpoint_kind == "get_goal":
+            path = f"/api/goals/{sample_ultimate_goal.id}"
+            payload = None
+        elif endpoint_kind == "update_goal":
+            path = f"/api/goals/{sample_ultimate_goal.id}"
+            payload = {"name": "Cross User Update"}
+        elif endpoint_kind == "add_target":
+            path = f"/api/goals/{sample_ultimate_goal.id}/targets"
+            payload = {"name": "Cross User Target"}
+        else:
+            path = f"/api/goals/{sample_ultimate_goal.id}/targets/{target_id}"
+            payload = None
+
+        kwargs = {"headers": headers}
+        if payload is not None:
+            kwargs["data"] = json.dumps(payload)
+            kwargs["content_type"] = "application/json"
+
+        response = getattr(client, method)(path, **kwargs)
+        assert response.status_code == 404

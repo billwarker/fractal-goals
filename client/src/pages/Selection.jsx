@@ -5,6 +5,7 @@ import { getTypeDisplayName } from '../utils/goalHelpers';
 import GoalModal from '../components/modals/GoalModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
+import GoalIcon from '../components/atoms/GoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useTheme } from '../contexts/ThemeContext'
@@ -16,27 +17,95 @@ import useIsMobile from '../hooks/useIsMobile';
  * Displays all root goals as cards and allows navigation to specific fractal views
  */
 function Selection() {
+    const RECENT_ROOT_STORAGE_KEY = 'fractal_recent_root_id';
     const navigate = useNavigate();
     const [fractals, setFractals] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [recentRootId, setRecentRootId] = useState(() => localStorage.getItem(RECENT_ROOT_STORAGE_KEY));
+    const [recentGoalLevels, setRecentGoalLevels] = useState([]);
+    const [goalLevelsByRootId, setGoalLevelsByRootId] = useState({});
 
     // Modal States
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isAuthModalOpen, setAuthModalOpen] = useState(false);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
-    const { user, logout, isAuthenticated } = useAuth();
-    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor } = useGoalLevels();;
+    const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
     const isMobile = useIsMobile();
 
     useEffect(() => {
+        if (authLoading) return;
         if (isAuthenticated) {
             fetchFractals();
         } else {
             setFractals([]);
             setLoading(false);
+            setRecentGoalLevels([]);
+            setGoalLevelsByRootId({});
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, authLoading]);
+
+    useEffect(() => {
+        setRecentRootId(localStorage.getItem(RECENT_ROOT_STORAGE_KEY));
+    }, [fractals.length]);
+
+    useEffect(() => {
+        if (!isAuthenticated || !recentRootId) {
+            setRecentGoalLevels([]);
+            return;
+        }
+        let cancelled = false;
+        const fetchRecentLevels = async () => {
+            try {
+                const res = await globalApi.getGoalLevels(recentRootId);
+                if (!cancelled) setRecentGoalLevels(Array.isArray(res.data) ? res.data : []);
+            } catch (err) {
+                if (!cancelled) setRecentGoalLevels([]);
+                console.error('Failed to fetch recent fractal goal levels', err);
+            }
+        };
+        fetchRecentLevels();
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, recentRootId]);
+
+    useEffect(() => {
+        if (!isAuthenticated || !Array.isArray(fractals) || fractals.length === 0) {
+            setGoalLevelsByRootId({});
+            return;
+        }
+
+        let cancelled = false;
+        const fetchLevelColorsByRoot = async () => {
+            try {
+                const entries = await Promise.all(
+                    fractals.map(async (fractal) => {
+                        const res = await globalApi.getGoalLevels(fractal.id);
+                        return [fractal.id, Array.isArray(res.data) ? res.data : []];
+                    })
+                );
+                if (!cancelled) {
+                    setGoalLevelsByRootId(Object.fromEntries(entries));
+                }
+            } catch (err) {
+                if (!cancelled) setGoalLevelsByRootId({});
+                console.error('Failed to fetch per-fractal goal levels', err);
+            }
+        };
+
+        fetchLevelColorsByRoot();
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, fractals]);
+
+    useEffect(() => {
+        if (isAuthenticated && isAuthModalOpen) {
+            setAuthModalOpen(false);
+        }
+    }, [isAuthenticated, isAuthModalOpen]);
 
     const fetchFractals = async () => {
         try {
@@ -51,6 +120,8 @@ function Selection() {
     };
 
     const handleSelectRoot = (rootId) => {
+        localStorage.setItem(RECENT_ROOT_STORAGE_KEY, rootId);
+        setRecentRootId(rootId);
         navigate(`/${rootId}/goals`);
     };
 
@@ -93,8 +164,27 @@ function Selection() {
         });
     };
 
+    const getFractalLevelConfig = (fractal) => {
+        const levels = goalLevelsByRootId[fractal.id];
+        if (!Array.isArray(levels)) return null;
+
+        const normalizedTypeName = fractal.type.replace(/([A-Z])/g, ' $1').trim();
+        return levels.find((candidate) => (
+            candidate?.name === normalizedTypeName || candidate?.name === fractal.type
+        )) || null;
+    };
+
+    const getFractalTypeColor = (fractal) => {
+        const level = getFractalLevelConfig(fractal);
+        return level?.color || getGoalColor(fractal.type);
+    };
+
     const getHighestPriorityRoot = () => {
         if (!fractals || fractals.length === 0) return null;
+        const recentMatch = recentRootId
+            ? fractals.find((fractal) => fractal.id === recentRootId)
+            : null;
+        if (recentMatch) return recentMatch;
 
         const hierarchy = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal'];
 
@@ -125,6 +215,10 @@ function Selection() {
     const topRoot = getHighestPriorityRoot();
     const headerType = topRoot ? topRoot.type : 'UltimateGoal';
     const isHeaderSmart = topRoot ? topRoot.is_smart : false;
+    const normalizedHeaderName = headerType.replace(/([A-Z])/g, ' $1').trim();
+    const recentLevel = recentGoalLevels.find((level) => (
+        level?.name === normalizedHeaderName || level?.name === headerType
+    ));
 
     console.log('[Selection Logic Debug]', {
         fractalsCount: fractals ? fractals.length : 0,
@@ -134,17 +228,26 @@ function Selection() {
         isHeaderSmart
     });
 
-    const headerColor = getGoalColor(headerType);
+    const headerColor = recentLevel?.color || getGoalColor(headerType);
     console.log('[Selection Logic Debug] headerColor:', headerColor);
 
-    const headerSecondaryColor = getGoalSecondaryColor(headerType);
-    const headerTextColor = getGoalTextColor(headerType);
+    const headerSecondaryColor = recentLevel?.secondary_color || getGoalSecondaryColor(headerType);
+    const headerShape = recentLevel?.icon || getGoalIcon(headerType) || 'circle';
+    const headerTextColor = (() => {
+        if (recentLevel?.color) {
+            const hex = recentLevel.color.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return yiq >= 128 ? '#1a1a1a' : '#FFFFFF';
+        }
+        return getGoalTextColor(headerType);
+    })();
     const isDarkText = headerTextColor === '#1a1a1a';
-    const smartBorderWidth = isMobile ? 16 : 24;
-    const smartMiddleSize = isMobile ? 130 : 186;
-    const smartInnerSize = isMobile ? 64 : 94;
+    const headerLogoSize = isMobile ? 200 : 280;
 
-    if (loading) {
+    if (authLoading || loading) {
         return <div className={styles.loadingContainer}>Loading fractals...</div>;
     }
 
@@ -152,72 +255,21 @@ function Selection() {
         <div className={styles.container}>
             {/* Top Center Display */}
             <div className={styles.headerContainer}>
-                {/* The Goal Node Circle */}
-                <div
-                    className={styles.goalNodeCircle}
-                    style={{
-                        // SMART Goal: Secondary (Fill) with Primary Border
-                        // Normal Goal: Primary (Fill) with App-BG Border (cutout effect)
-                        backgroundColor: isHeaderSmart ? headerSecondaryColor : headerColor,
-                        border: isHeaderSmart
-                            ? `${smartBorderWidth}px solid ${headerColor}`
-                            : `5px solid var(--color-bg-app)`, // Default cutout
-                        boxShadow: isHeaderSmart ? 'none' : '0 0 50px rgba(0, 0, 0, 0.5)',
-                        position: 'relative',
-                        overflow: 'hidden', // Ensure content stays inside
-                        boxSizing: 'border-box' // Explicitly set border-box to ensure visual math works
-                    }}
-                >
-                    {/* SMART Goal Bullseye Layers */}
-                    {isHeaderSmart && (
-                        <>
-                            {/* Middle Ring 
-                                Scale: 186px / 280px ~ 66.4%
-                                Border: 24px
-                            */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    width: `${smartMiddleSize}px`,
-                                    height: `${smartMiddleSize}px`,
-                                    borderRadius: '50%',
-                                    backgroundColor: headerSecondaryColor,
-                                    border: `${smartBorderWidth}px solid ${headerColor}`,
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: 'translate(-50%, -50%)',
-                                    zIndex: 0,
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                            {/* Inner Core 
-                                Scale: 94px / 280px ~ 33.6%
-                            */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    width: `${smartInnerSize}px`,
-                                    height: `${smartInnerSize}px`,
-                                    borderRadius: '50%',
-                                    backgroundColor: headerColor,
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: 'translate(-50%, -50%)',
-                                    zIndex: 0
-                                }}
-                            />
-                        </>
-                    )}
-
+                <div className={styles.headerLogoWrapper}>
+                    <GoalIcon
+                        shape={headerShape}
+                        color={headerColor}
+                        secondaryColor={headerSecondaryColor}
+                        isSmart={isHeaderSmart}
+                        size={headerLogoSize}
+                    />
                     <h1
-                        className={styles.title}
+                        className={styles.titleOverlay}
                         style={{
-                            // Ensure text is visible on top of dark core
                             color: isHeaderSmart ? '#FFFFFF' : headerTextColor,
                             textShadow: isHeaderSmart ? '0 2px 10px rgba(0,0,0,0.8)' : (isDarkText ? 'none' : '0 2px 10px rgba(0,0,0,0.8)'),
                             fontSize: isHeaderSmart ? (isMobile ? '1.5rem' : '2.2rem') : (isMobile ? '1.5rem' : '28px'),
-                            zIndex: 10, // Text on top
-                            position: 'relative',
+                            zIndex: 10,
                             maxWidth: '90%',
                             lineHeight: 1.1,
                             fontWeight: 800
@@ -256,31 +308,49 @@ function Selection() {
             {/* Fractal Grid */}
             <div className={styles.grid}>
                 {isAuthenticated && fractals.map(fractal => (
-                    <div
-                        key={fractal.id}
-                        className={styles.card}
-                        onClick={() => handleSelectRoot(fractal.id)}
-                    >
-                        <div className={styles.cardContent}>
-                            <h3 className={styles.cardTitle}>{fractal.name}</h3>
+                    (() => {
+                        const level = getFractalLevelConfig(fractal);
+                        const fractalPrimaryColor = level?.color || getGoalColor(fractal.type);
+                        const fractalSecondaryColor = level?.secondary_color || getGoalSecondaryColor(fractal.type);
+                        const fractalShape = level?.icon || getGoalIcon(fractal.type) || 'circle';
+
+                        return (
                             <div
-                                className={styles.cardType}
-                                style={{ color: getGoalColor(fractal.type) }}
+                                key={fractal.id}
+                                className={styles.card}
+                                onClick={() => handleSelectRoot(fractal.id)}
                             >
-                                {getTypeDisplayName(fractal.type)}
+                                <div className={styles.cardContent}>
+                                    <h3 className={styles.cardTitle}>{fractal.name}</h3>
+                                    <div
+                                        className={styles.cardType}
+                                        style={{ color: getFractalTypeColor(fractal) }}
+                                    >
+                                        {getTypeDisplayName(fractal.type)}
+                                    </div>
+                                    <div className={styles.cardTypeIcon}>
+                                        <GoalIcon
+                                            shape={fractalShape}
+                                            color={fractalPrimaryColor}
+                                            secondaryColor={fractalSecondaryColor}
+                                            isSmart={Boolean(fractal.is_smart)}
+                                            size={36}
+                                        />
+                                    </div>
+                                </div>
+                                <div className={styles.cardFooter}>
+                                    <div>Created: {formatDate(fractal.created_at)}</div>
+                                </div>
+                                <button
+                                    className={styles.deleteBtn}
+                                    onClick={(e) => handleDeleteClick(e, fractal)}
+                                    title="Delete Fractal"
+                                >
+                                    ×
+                                </button>
                             </div>
-                        </div>
-                        <div className={styles.cardFooter}>
-                            <div>Created: {formatDate(fractal.created_at)}</div>
-                        </div>
-                        <button
-                            className={styles.deleteBtn}
-                            onClick={(e) => handleDeleteClick(e, fractal)}
-                            title="Delete Fractal"
-                        >
-                            ×
-                        </button>
-                    </div>
+                        );
+                    })()
                 ))}
 
                 {isAuthenticated && (

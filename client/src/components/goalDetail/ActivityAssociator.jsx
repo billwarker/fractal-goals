@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
@@ -38,7 +38,8 @@ const ActivityAssociator = ({
     isAboveShortTermGoal = false,
     headerColor,
     onClose,
-    onSave
+    onSave,
+    onRefreshAssociations
 }) => {
     const { createActivityGroup, setActivityGroupGoals, fetchActivityGroups } = useActivities();
 
@@ -59,6 +60,16 @@ const ActivityAssociator = ({
         () => new Set((associatedActivityGroups || []).map(g => g.id)),
         [associatedActivityGroups]
     );
+    const associatedActivitiesRef = useRef(associatedActivities);
+    const associatedGroupsRef = useRef(associatedActivityGroups);
+
+    useEffect(() => {
+        associatedActivitiesRef.current = associatedActivities;
+    }, [associatedActivities]);
+
+    useEffect(() => {
+        associatedGroupsRef.current = associatedActivityGroups;
+    }, [associatedActivityGroups]);
 
     // Reset selection when closing discovery; collapse all groups by default
     useEffect(() => {
@@ -136,16 +147,18 @@ const ActivityAssociator = ({
             activityDefinitions.find(d => d.id === id)
         ).filter(Boolean);
 
-        const updated = [...associatedActivities, ...newActivities];
+        const latestActivities = Array.isArray(associatedActivitiesRef.current) ? associatedActivitiesRef.current : [];
+        const latestGroups = Array.isArray(associatedGroupsRef.current) ? associatedGroupsRef.current : [];
+        const updated = [...latestActivities, ...newActivities];
         const unique = Array.from(new Map(updated.map(item => [item.id, item])).values());
 
         // Also associate selected groups
-        let finalGroups = associatedActivityGroups;
+        let finalGroups = latestGroups;
         if (tempSelectedGroups.length > 0 && setAssociatedActivityGroups) {
             const newGroups = tempSelectedGroups
                 .map(id => activityGroups.find(g => g.id === id))
                 .filter(Boolean);
-            const updatedGroups = [...associatedActivityGroups, ...newGroups];
+            const updatedGroups = [...latestGroups, ...newGroups];
             finalGroups = Array.from(new Map(updatedGroups.map(g => [g.id, g])).values());
             setAssociatedActivityGroups(finalGroups);
         }
@@ -159,6 +172,9 @@ const ActivityAssociator = ({
         if (onSave) {
             await onSave(unique, finalGroups);
         }
+        window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
+            detail: { goalId, rootId }
+        }));
 
         const parts = [];
         if (newActivities.length > 0) parts.push(`${newActivities.length} activit${newActivities.length === 1 ? 'y' : 'ies'}`);
@@ -247,13 +263,23 @@ const ActivityAssociator = ({
             // If we have the goalId, auto-associate this group with the current goal
             if (result && result.id && goalId) {
                 await setActivityGroupGoals(rootId, result.id, [goalId]);
+                const currentGroups = Array.isArray(associatedGroupsRef.current) ? associatedGroupsRef.current : [];
+                const finalGroups = currentGroups.some(g => g.id === result.id)
+                    ? currentGroups
+                    : [...currentGroups, result];
                 if (setAssociatedActivityGroups) {
-                    setAssociatedActivityGroups(prev => {
-                        if (!Array.isArray(prev)) return [result];
-                        if (prev.some(g => g.id === result.id)) return prev;
-                        return [...prev, result];
-                    });
+                    setAssociatedActivityGroups(finalGroups);
                 }
+                associatedGroupsRef.current = finalGroups;
+                if (onSave) {
+                    await onSave(associatedActivitiesRef.current || [], finalGroups);
+                }
+                if (onRefreshAssociations) {
+                    await onRefreshAssociations();
+                }
+                window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
+                    detail: { goalId, rootId }
+                }));
             }
 
             // Refresh groups and sync to parent-local state used by this modal
@@ -361,6 +387,9 @@ const ActivityAssociator = ({
         if (onSave) {
             await onSave(nextActivities, nextGroups);
         }
+        window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
+            detail: { goalId, rootId }
+        }));
 
         notify.success(`Unlinked activity group "${group.name}"`);
     };

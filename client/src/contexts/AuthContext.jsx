@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         if (token) {
             localStorage.setItem('token', token);
+            setLoading(true);
             fetchCurrentUser();
         } else {
             localStorage.removeItem('token');
@@ -25,6 +26,7 @@ export function AuthProvider({ children }) {
         const handleUnauthorized = () => {
             setToken(null);
             setUser(null);
+            setLoading(false);
         };
         const handleTokenRefresh = (e) => {
             if (e.detail?.token) {
@@ -46,9 +48,15 @@ export function AuthProvider({ children }) {
             setUser(res.data);
         } catch (err) {
             console.error("Failed to fetch current user:", err);
-            // If fetching user fails, token might be invalid/expired
-            setToken(null);
-            localStorage.removeItem('token');
+            const status = err?.response?.status;
+            const isNetworkError = !err?.response;
+
+            // Keep token for transient network failures so interceptor retries can recover.
+            if (!isNetworkError && (status === 401 || status === 403)) {
+                setToken(null);
+                setUser(null);
+                localStorage.removeItem('token');
+            }
         } finally {
             setLoading(false);
         }
@@ -98,7 +106,7 @@ export function AuthProvider({ children }) {
         signup,
         logout,
         setUser,
-        isAuthenticated: !!token && !!user
+        isAuthenticated: !!token
     };
 
     return (

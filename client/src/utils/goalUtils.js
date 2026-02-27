@@ -35,24 +35,34 @@ export const formatGoalType = (type) => {
  * Flatten a goal tree into a list of nodes that should be visible based on target IDs.
  * Includes nodes that are targets themselves or have targets as descendants.
  */
-export const buildFlattenedGoalTree = (node, targetGoalIds, filterCompleted = false, depth = 0) => {
+export const buildFlattenedGoalTree = (
+    node,
+    targetGoalIds,
+    filterCompleted = false,
+    sessionCompletedGoalIds = null,
+    depth = 0
+) => {
     if (!node) return [];
 
     const isTarget = targetGoalIds.has(node.id);
     const nodeCompleted = node.completed || node.attributes?.completed;
+    const keepCompletedForSession = !!sessionCompletedGoalIds?.has(node.id);
 
     // If filtering completed, stop at this branch if the node is completed
     // UNLESS it's a direct target for the current activity/session
-    if (filterCompleted && nodeCompleted && !isTarget) return [];
+    if (filterCompleted && nodeCompleted && !isTarget && !keepCompletedForSession) return [];
 
     // Recursively check children
     let childrenNodes = [];
     for (const child of (node.children || [])) {
-        childrenNodes = [...childrenNodes, ...buildFlattenedGoalTree(child, targetGoalIds, filterCompleted, depth + 1)];
+        childrenNodes = [
+            ...childrenNodes,
+            ...buildFlattenedGoalTree(child, targetGoalIds, filterCompleted, sessionCompletedGoalIds, depth + 1)
+        ];
     }
 
     // Include this node if it's a target or has relevant descendants
-    if (isTarget || childrenNodes.length > 0) {
+    if (isTarget || keepCompletedForSession || childrenNodes.length > 0) {
         return [
             {
                 id: node.id,

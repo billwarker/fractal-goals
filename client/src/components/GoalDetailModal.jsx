@@ -103,6 +103,8 @@ function GoalDetailModal({
     // Snapshots of initial associations for diffing on save
     const initialActivitiesRef = useRef([]);
     const initialGroupsRef = useRef([]);
+    const associatedActivitiesRef = useRef([]);
+    const associatedGroupsRef = useRef([]);
 
     // Inline activity builder form state
     const [newActivityName, setNewActivityName] = useState('');
@@ -196,6 +198,14 @@ function GoalDetailModal({
         }
     }, [activityGroupsRaw]);
 
+    useEffect(() => {
+        associatedActivitiesRef.current = associatedActivities;
+    }, [associatedActivities]);
+
+    useEffect(() => {
+        associatedGroupsRef.current = associatedActivityGroups;
+    }, [associatedActivityGroups]);
+
     const refreshAssociations = async () => {
         if (mode === 'create' || !rootId || !depGoalId) {
             setAssociatedActivities([]);
@@ -264,8 +274,8 @@ function GoalDetailModal({
 
     const persistAssociations = async (updatedActivities, updatedGroups) => {
         // Use provided values or fall back to state
-        const activs = updatedActivities || associatedActivities;
-        const groups = updatedGroups || associatedActivityGroups;
+        const activs = updatedActivities || associatedActivitiesRef.current || associatedActivities;
+        const groups = updatedGroups || associatedGroupsRef.current || associatedActivityGroups;
 
         try {
             const currentActivityIds = activs.map(a => a.id);
@@ -575,6 +585,7 @@ function GoalDetailModal({
                                     completedViaChildren={completedViaChildren}
                                     isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
                                     headerColor={goalColor}
+                                    onRefreshAssociations={refreshAssociations}
                                 />
                             </Suspense>
                         )}
@@ -972,6 +983,7 @@ function GoalDetailModal({
                     headerColor={goalColor}
                     onClose={onClose}
                     onSave={!isEditing ? persistAssociations : undefined}
+                    onRefreshAssociations={refreshAssociations}
                     onCreateActivity={() => {
                         // Reset form state and switch to activity builder view
                         setNewActivityName('');
@@ -1035,6 +1047,7 @@ function GoalDetailModal({
                 if (newActivity && newActivity.id && goalId) {
                     await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
                     await refreshAssociations();
+                    notify.success(`Created activity "${newActivity.name || newActivityName}" and associated with goal`);
                 }
 
                 // Go back to activity-associator view

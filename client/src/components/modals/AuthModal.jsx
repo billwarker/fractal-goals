@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
@@ -13,7 +13,7 @@ import notify from '../../utils/notify';
  * (Reference: GoalDetailModal style)
  */
 function AuthModal({ isOpen, onClose }) {
-    const { login, signup } = useAuth();
+    const { login, signup, isAuthenticated } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [generalError, setGeneralError] = useState(null);
 
@@ -49,6 +49,12 @@ function AuthModal({ isOpen, onClose }) {
         password: '',
         usernameOrEmail: ''
     }, validate);
+
+    useEffect(() => {
+        if (isOpen && isAuthenticated) {
+            onClose();
+        }
+    }, [isOpen, isAuthenticated, onClose]);
 
     if (!isOpen) return null;
 

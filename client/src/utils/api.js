@@ -43,10 +43,14 @@ axios.interceptors.response.use(
         const originalRequest = error.config;
 
         // If the error is 401 and we haven't already retried
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest?._retry) {
 
             // Prevent infinite login loops on auth routes
-            if (originalRequest.url.includes('/auth/refresh') || originalRequest.url.includes('/auth/login')) {
+            if (
+                originalRequest?.url?.includes('/auth/refresh') ||
+                originalRequest?.url?.includes('/auth/login') ||
+                originalRequest?.url?.includes('/auth/me')
+            ) {
                 return Promise.reject(error);
             }
 

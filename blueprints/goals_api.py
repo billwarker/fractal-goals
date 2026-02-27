@@ -85,6 +85,22 @@ def _session_goal_insert_values(db_session, session_id, goal_id, goal_type, asso
     return values
 
 
+def _authorize_goal_access(db_session, current_user_id: str, goal, root_id_hint: str = None):
+    """Validate that a goal belongs to the current user via its owned root."""
+    if not goal:
+        return None
+
+    authorized_root_id = root_id_hint or goal.root_id or goal.id
+    root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user_id)
+    if not root:
+        return None
+
+    if goal.root_id and goal.root_id != authorized_root_id:
+        return None
+
+    return authorized_root_id
+
+
 def _sync_targets(db_session, goal, incoming_targets: list):
     """
     Sync relational Target records with incoming target data.
@@ -227,12 +243,17 @@ def _sync_targets(db_session, goal, incoming_targets: list):
 # ============================================================================
 
 @goals_bp.route('/goals', methods=['GET'])
-def get_goals():
+@token_required
+def get_goals(current_user):
     """Get all root goals with their complete trees."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        roots_q = db_session.query(Goal).filter(Goal.parent_id == None, Goal.deleted_at == None).order_by(Goal.created_at.desc())
+        roots_q = db_session.query(Goal).filter(
+            Goal.parent_id == None,
+            Goal.deleted_at == None,
+            Goal.owner_id == current_user.id
+        ).order_by(Goal.created_at.desc())
         limit, offset = parse_optional_pagination(request, max_limit=200)
         if limit is not None:
             roots_q = roots_q.offset(offset).limit(limit)
@@ -249,7 +270,8 @@ def get_goals():
 @goals_bp.route('/goals', methods=['POST'])
 @validate_request(GoalCreateSchema)
 @limiter.limit("30 per minute")
-def create_goal(validated_data):
+@token_required
+def create_goal(current_user, validated_data):
     """Create a new goal."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -262,6 +284,8 @@ def create_goal(validated_data):
             parent = get_goal_by_id(db_session, parent_id)
             if not parent:
                 return jsonify({"error": f"Parent not found: {parent_id}"}), 404
+            if not _authorize_goal_access(db_session, current_user.id, parent):
+                return jsonify({"error": "Parent not found or access denied"}), 404
         
         # Parse deadline if provided (already validated by schema)
         deadline = None
@@ -279,7 +303,8 @@ def create_goal(validated_data):
             completed=False,
             completed_via_children=validated_data.get('completed_via_children', False),
             relevance_statement=validated_data.get('relevance_statement'),
-            parent_id=parent_id
+            parent_id=parent_id,
+            owner_id=parent.owner_id if parent else current_user.id
         )
         
         # Set root_id
@@ -292,6 +317,8 @@ def create_goal(validated_data):
         
         db_session.add(new_goal)
         db_session.flush()
+        if not parent:
+            new_goal.root_id = new_goal.id
 
         # Handle targets if provided
         if validated_data.get('targets'):
@@ -384,7 +411,8 @@ def get_session_micro_goals(current_user, root_id, session_id):
 
 
 @goals_bp.route('/goals/<goal_id>', methods=['DELETE'])
-def delete_goal_endpoint(goal_id: str):
+@token_required
+def delete_goal_endpoint(current_user, goal_id: str):
     """Delete a goal and all its children."""
     logger.debug(f"Attempting to delete goal with ID: {goal_id}")
     
@@ -393,6 +421,8 @@ def delete_goal_endpoint(goal_id: str):
     try:
         goal = get_goal_by_id(db_session, goal_id)
         if goal:
+            if not _authorize_goal_access(db_session, current_user.id, goal):
+                return jsonify({"error": "Goal not found or access denied"}), 404
             is_root = goal.parent_id is None
             goal_name = goal.name
             root_id = goal.root_id
@@ -423,13 +453,16 @@ def delete_goal_endpoint(goal_id: str):
 
 
 @goals_bp.route('/goals/<goal_id>', methods=['GET'])
-def get_goal_endpoint(goal_id: str):
+@token_required
+def get_goal_endpoint(current_user, goal_id: str):
     """Get a goal by ID."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
         goal = get_goal_by_id(db_session, goal_id)
         if goal:
+            if not _authorize_goal_access(db_session, current_user.id, goal):
+                return jsonify({"error": "Goal not found or access denied"}), 404
             return jsonify(serialize_goal(goal, include_children=False))
             
         return jsonify({"error": "Goal not found"}), 404
@@ -438,7 +471,8 @@ def get_goal_endpoint(goal_id: str):
 
 
 @goals_bp.route('/goals/<goal_id>', methods=['PUT'])
-def update_goal_endpoint(goal_id: str):
+@token_required
+def update_goal_endpoint(current_user, goal_id: str):
     """Update goal details."""
     data = request.get_json()
     
@@ -457,6 +491,8 @@ def update_goal_endpoint(goal_id: str):
         
         goal = get_goal_by_id(db_session, goal_id)
         if goal:
+            if not _authorize_goal_access(db_session, current_user.id, goal):
+                return jsonify({"error": "Goal not found or access denied"}), 404
             if 'name' in data and data['name'] is not None:
                 goal.name = data['name']
             if 'description' in data and data['description'] is not None:
@@ -494,7 +530,8 @@ def update_goal_endpoint(goal_id: str):
 
 
 @goals_bp.route('/goals/<goal_id>/targets', methods=['POST'])
-def add_goal_target(goal_id):
+@token_required
+def add_goal_target(current_user, goal_id):
     """Add a target to a goal using relational Target model."""
     data = request.get_json()
     engine = models.get_engine()
@@ -503,6 +540,8 @@ def add_goal_target(goal_id):
         goal = get_goal_by_id(db_session, goal_id)
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
+        if not _authorize_goal_access(db_session, current_user.id, goal):
+            return jsonify({"error": "Goal not found or access denied"}), 404
         
         # Create new Target object
         target_id = data.get('id') or str(uuid.uuid4())
@@ -562,7 +601,8 @@ def add_goal_target(goal_id):
 
 
 @goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['DELETE'])
-def remove_goal_target(goal_id, target_id):
+@token_required
+def remove_goal_target(current_user, goal_id, target_id):
     """Remove a target from a goal (soft delete)."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -570,6 +610,8 @@ def remove_goal_target(goal_id, target_id):
         goal = get_goal_by_id(db_session, goal_id)
         if not goal:
             return jsonify({"error": "Goal not found"}), 404
+        if not _authorize_goal_access(db_session, current_user.id, goal):
+            return jsonify({"error": "Goal not found or access denied"}), 404
         
         # Find the target in the relational model
         target = db_session.query(Target).filter(

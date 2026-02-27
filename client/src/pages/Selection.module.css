@@ -33,22 +33,16 @@
     position: relative;
 }
 
-.goalNodeCircle {
-    width: 280px;
-    height: 280px;
-    border-radius: 50%;
-    /* Background set dynamically in JS */
-    border: 5px solid var(--color-bg-app);
-    /* Use app bg to create "cutout" effect, or white if intended */
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+.headerLogoWrapper {
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 0;
-    transition: background-color 0.5s ease;
+    filter: drop-shadow(0 0 50px rgba(0, 0, 0, 0.5));
 }
 
-.title {
+.titleOverlay {
+    position: absolute;
     /* Color dynamic in JS */
     font-weight: 800;
     font-size: 28px;
@@ -181,6 +175,13 @@
     font-weight: bold;
 }
 
+.cardTypeIcon {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .cardFooter {
     font-size: 11px;
     color: var(--color-text-secondary);
@@ -233,13 +234,7 @@
         margin-bottom: 30px;
     }
 
-    .goalNodeCircle {
-        width: 200px;
-        height: 200px;
-        border-width: 4px !important;
-    }
-
-    .title {
+    .titleOverlay {
         font-size: 22px;
         letter-spacing: 1px;
     }

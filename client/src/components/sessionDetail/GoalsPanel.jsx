@@ -145,16 +145,6 @@ function GoalsPanel({
         };
     }, [rootId, selectedActivity, activeActivityDef]);
 
-    const flattenedHierarchy = useMemo(() => {
-        if (!goalTree) return [];
-        const targetGoalIds = new Set(
-            viewMode === 'activity' && activeActivityDef
-                ? activeActivityDef.associated_goal_ids || []
-                : (session?.immediate_goals || []).map(g => g.id)
-        );
-        return buildFlattenedGoalTree(goalTree, targetGoalIds, viewMode === 'activity');
-    }, [goalTree, session, activeActivityDef, viewMode]);
-
     const toggleExpand = (goalId) => {
         setExpandedGoals(prev => ({ ...prev, [goalId]: !prev[goalId] }));
     };
@@ -346,13 +336,42 @@ function GoalsPanel({
             .filter(Boolean);
     }, [localSessionData, activityDefinitions, activityInstances]);
 
+    const sessionCompletedGoalIds = useMemo(() => {
+        if (!goalTree || !session) return new Set();
+
+        const toMillis = (value) => {
+            if (!value) return null;
+            const parsed = Date.parse(value);
+            return Number.isNaN(parsed) ? null : parsed;
+        };
+
+        const sessionStartMs = toMillis(session.session_start || session.created_at);
+        const sessionEndMs = toMillis(session.session_end || session.completed_at || session.updated_at);
+        if (sessionStartMs === null || sessionEndMs === null) return new Set();
+
+        const ids = new Set();
+        const visit = (node) => {
+            if (!node) return;
+            const completedAtRaw = node.attributes?.completed_at || node.completed_at;
+            const completedAtMs = toMillis(completedAtRaw);
+            if (completedAtMs !== null && completedAtMs >= sessionStartMs && completedAtMs <= sessionEndMs) {
+                ids.add(node.id);
+            }
+            for (const child of (node.children || [])) {
+                visit(child);
+            }
+        };
+        visit(goalTree);
+        return ids;
+    }, [goalTree, session]);
+
     // Unified hierarchy builder
     const getHierarchy = useCallback((goalIds, mode = 'activity', specificActivityId = null, allowedSessionActivityDefIds = null) => {
         if (!goalTree) return [];
         const targetGoalIds = new Set(goalIds || []);
 
         // 1. Get base hierarchy
-        let hierarchy = buildFlattenedGoalTree(goalTree, targetGoalIds, true);
+        let hierarchy = buildFlattenedGoalTree(goalTree, targetGoalIds, true, sessionCompletedGoalIds);
 
         // 2. Filter MicroGoals
         // If mode is 'session', take ALL session microgoals
@@ -401,7 +420,7 @@ function GoalsPanel({
         });
 
         return newHierarchy;
-    }, [goalTree, microGoals]);
+    }, [goalTree, microGoals, sessionCompletedGoalIds]);
 
     const sessionHierarchy = useMemo(() => {
         if (viewMode !== 'session') return [];
