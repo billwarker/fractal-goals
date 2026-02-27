@@ -29,7 +29,13 @@ from blueprints.api_utils import (
     etag_json_response,
 )
 from services import event_bus, Event, Events
-from services.serializers import serialize_goal, serialize_target, calculate_smart_status, format_utc
+from services.serializers import (
+    serialize_goal,
+    serialize_target,
+    serialize_activity_instance,
+    calculate_smart_status,
+    format_utc,
+)
 from extensions import limiter
 from services.metrics import GoalMetricsService
 from services.analytics_cache import get_analytics, set_analytics
@@ -338,7 +344,7 @@ def create_goal(validated_data):
 @token_required
 def get_session_micro_goals(current_user, root_id, session_id):
     """Get all micro goals linked to a session, including their nano children."""
-    from sqlalchemy import select
+    from sqlalchemy import select, or_
     from sqlalchemy.orm import selectinload
     
     engine = models.get_engine()
@@ -354,9 +360,14 @@ def get_session_micro_goals(current_user, root_id, session_id):
         stmt = (
             select(Goal)
             .join(session_goals, Goal.id == session_goals.c.goal_id)
-            .join(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
+            .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
             .where(session_goals.c.session_id == session_id)
-            .where(models.GoalLevel.name == 'Micro Goal')
+            .where(
+                or_(
+                    models.GoalLevel.name == 'Micro Goal',
+                    session_goals.c.goal_type == 'MicroGoal'
+                )
+            )
             .options(selectinload(Goal.children)) # Load NanoGoals
         )
         

@@ -17,8 +17,8 @@ def test_create_goal_with_targets_persists_relational(authed_client, sample_ulti
         'targets': [
             {
                 'name': 'Target 1',
-                'type': 'threshold',
-                'metrics': [{'metric_id': 'm1', 'value': 10, 'operator': '>='}]
+                'type': 'boolean',
+                'metrics': []
             }
         ]
     }

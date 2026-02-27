@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
 import uuid
-from models import Goal, Session, ActivityDefinition, ActivityInstance, session_goals, activity_goal_associations, UltimateGoal, ShortTermGoal, ImmediateGoal
+from models import Goal, Session, ActivityDefinition, ActivityInstance, session_goals, activity_goal_associations
 from services.metrics import GoalMetricsService
 
 @pytest.fixture
@@ -14,19 +14,19 @@ def test_recursive_metrics(db_session):
     
     # Create Root
     root_id = str(uuid.uuid4())
-    root = UltimateGoal(id=root_id, name="Root Goal", root_id=root_id)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
     db_session.add(root)
     db_session.flush()
     
     # Create Child A
     child_a_id = str(uuid.uuid4())
-    child_a = ShortTermGoal(id=child_a_id, name="Child A", parent_id=root_id, root_id=root_id)
+    child_a = Goal(id=child_a_id, name="Child A", parent_id=root_id, root_id=root_id)
     db_session.add(child_a)
     db_session.flush()
     
     # Create Child B
     child_b_id = str(uuid.uuid4())
-    child_b = ImmediateGoal(id=child_b_id, name="Child B", parent_id=child_a_id, root_id=root_id)
+    child_b = Goal(id=child_b_id, name="Child B", parent_id=child_a_id, root_id=root_id)
     db_session.add(child_b)
     db_session.flush()
     
@@ -84,12 +84,12 @@ def test_recursive_metrics(db_session):
 def test_recursive_activity_metrics(db_session):
     # Similar hierarchy
     root_id = str(uuid.uuid4())
-    root = UltimateGoal(id=root_id, name="Root Activity Goal", root_id=root_id)
+    root = Goal(id=root_id, name="Root Activity Goal", root_id=root_id)
     db_session.add(root)
     db_session.flush()
     
     child_id = str(uuid.uuid4())
-    child = ShortTermGoal(id=child_id, name="Child Activity Goal", parent_id=root_id, root_id=root_id)
+    child = Goal(id=child_id, name="Child Activity Goal", parent_id=root_id, root_id=root_id)
     db_session.add(child)
     db_session.flush()
     

@@ -16,7 +16,6 @@ def test_metric_value_to_dict_includes_metric_id(db_session, sample_activity_ins
     mv = MetricValue(
         activity_instance_id=sample_activity_instance.id,
         metric_definition_id=metric_def.id,
-        root_id=sample_activity_instance.root_id,
         value=100.0
     )
     db_session.add(mv)
@@ -43,7 +42,6 @@ def test_session_hydration_includes_metric_id(authed_client, db_session, sample_
     mv = MetricValue(
         activity_instance_id=sample_activity_instance.id,
         metric_definition_id=metric_def.id,
-        root_id=sample_activity_instance.root_id,
         value=50.0
     )
     db_session.add(mv)

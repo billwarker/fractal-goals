@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../../test/test-utils';
 import SessionInfoPanel from '../SessionInfoPanel';
 
 const updateSession = vi.fn(() => Promise.resolve());
@@ -23,9 +24,13 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     })
 }));
 
-vi.mock('../../../contexts/TimezoneContext', () => ({
-    useTimezone: () => ({ timezone: 'UTC' })
-}));
+vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useTimezone: () => ({ timezone: 'UTC' })
+    };
+});
 
 describe('SessionInfoPanel', () => {
     beforeEach(() => {
@@ -33,7 +38,12 @@ describe('SessionInfoPanel', () => {
     });
 
     it('submits edited start time through async updateSession', async () => {
-        render(<SessionInfoPanel />);
+        renderWithProviders(<SessionInfoPanel />, {
+            withTimezone: false,
+            withAuth: false,
+            withGoalLevels: false,
+            withTheme: false
+        });
 
         fireEvent.click(screen.getByTitle('Expand'));
         fireEvent.click(screen.getByTitle('Edit start time'));

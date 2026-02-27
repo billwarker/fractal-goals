@@ -12,7 +12,6 @@ class TestMicroGoals:
         immediate = Goal(
             id=str(uuid.uuid4()),
             name="Immediate Goal",
-            type="ImmediateGoal",
             owner_id=test_user.id,
             parent_id=sample_goal_hierarchy['short_term'].id,
             root_id=root.id
@@ -55,28 +54,36 @@ class TestMicroGoals:
     def test_nano_goal_creation(self, authed_client, db_session, test_user, sample_goal_hierarchy):
         """Verify NanoGoal creation works with MicroGoal parent."""
         root = sample_goal_hierarchy['ultimate']
-        micro = Goal(
+        immediate = Goal(
             id=str(uuid.uuid4()),
-            name="Micro Goal",
-            type="MicroGoal",
+            name="Immediate Goal",
             owner_id=test_user.id,
             parent_id=sample_goal_hierarchy['short_term'].id,
             root_id=root.id
         )
-        db_session.add(micro)
+        db_session.add(immediate)
         db_session.commit()
+
+        # Create a real MicroGoal via API so it gets the proper level assignment.
+        micro_response = authed_client.post("/api/goals", data=json.dumps({
+            "name": "Micro Goal",
+            "type": "MicroGoal",
+            "parent_id": immediate.id
+        }))
+        assert micro_response.status_code == 201
+        micro_data = json.loads(micro_response.data)
         
         payload = {
             "name": "Nano Goal 1",
             "type": "NanoGoal",
-            "parent_id": micro.id
+            "parent_id": micro_data['id']
         }
         
         response = authed_client.post("/api/goals", data=json.dumps(payload))
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['attributes']['type'] == "NanoGoal"
-        assert data['attributes']['parent_id'] == micro.id
+        assert data['attributes']['parent_id'] == micro_data['id']
 
     def test_micro_goal_validation_failure(self, authed_client, test_user, sample_goal_hierarchy):
         """Verify MicroGoal fails validation if parent_id is missing."""
@@ -108,36 +115,33 @@ class TestMicroGoals:
         )
         db_session.add(session)
         
-        micro = Goal(
+        immediate = Goal(
             id=str(uuid.uuid4()),
-            name="Micro 1",
-            type="MicroGoal",
+            name="Immediate 1",
             owner_id=test_user.id,
             parent_id=sample_goal_hierarchy['short_term'].id,
             root_id=root.id
         )
-        db_session.add(micro)
+        db_session.add(immediate)
         db_session.commit()
-        
-        # Manually link micro goal to session via junction table
-        db_session.execute(session_goals.insert().values(
-            session_id=session.id, 
-            goal_id=micro.id,
-            goal_type='MicroGoal'
-        ))
-        db_session.commit()
+
+        # Create and auto-link a real MicroGoal via API.
+        micro_response = authed_client.post("/api/goals", data=json.dumps({
+            "name": "Micro 1",
+            "type": "MicroGoal",
+            "parent_id": immediate.id,
+            "session_id": session.id
+        }))
+        assert micro_response.status_code == 201
+        micro_data = json.loads(micro_response.data)
         
         # Add a nano goal to that micro goal
-        nano = Goal(
-            id=str(uuid.uuid4()),
-            name="Nano 1",
-            type="NanoGoal",
-            owner_id=test_user.id,
-            parent_id=micro.id,
-            root_id=root.id
-        )
-        db_session.add(nano)
-        db_session.commit()
+        nano_response = authed_client.post("/api/goals", data=json.dumps({
+            "name": "Nano 1",
+            "type": "NanoGoal",
+            "parent_id": micro_data['id']
+        }))
+        assert nano_response.status_code == 201
         
         # This endpoint uses the custom route I added
         response = authed_client.get(f"/api/fractal/{root.id}/sessions/{session.id}/micro-goals")

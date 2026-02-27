@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../../test/test-utils';
 import SessionActivityItem from '../SessionActivityItem';
 
 const createGoal = vi.fn(() => Promise.resolve({ id: 'nano-1' }));
@@ -44,17 +45,46 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     })
 }));
 
-vi.mock('../../../contexts/TimezoneContext', () => ({
-    useTimezone: () => ({ timezone: 'UTC' })
-}));
+vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useTimezone: () => ({ timezone: 'UTC' })
+    };
+});
 
-vi.mock('../../../contexts/ThemeContext', () => ({
-    useTheme: () => ({
-        getGoalColor: () => '#00aa00',
-        getGoalSecondaryColor: () => '#005500',
-        getScopedCharacteristics: () => ({ icon: 'circle' })
-    })
-}));
+vi.mock('../../../contexts/ThemeContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useTheme: () => ({
+            getGoalColor: () => '#00aa00',
+            getGoalSecondaryColor: () => '#005500',
+            getScopedCharacteristics: () => ({ icon: 'circle' })
+        })
+    };
+});
+
+vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    const level = {
+        id: 'level-1',
+        name: 'Fallback Goal',
+        icon: 'circle',
+        color: '#00aa00',
+        secondary_color: '#005500'
+    };
+    return {
+        ...actual,
+        useGoalLevels: () => ({
+            goalLevels: [],
+            getGoalColor: () => '#00aa00',
+            getGoalSecondaryColor: () => '#005500',
+            getGoalIcon: () => 'circle',
+            getLevelByName: () => level
+        })
+    };
+});
 
 describe('SessionActivityItem nano note flow', () => {
     beforeEach(() => {
@@ -66,7 +96,7 @@ describe('SessionActivityItem nano note flow', () => {
     });
 
     it('creates a nano goal note without runtime errors', async () => {
-        render(
+        renderWithProviders(
             <SessionActivityItem
                 exercise={{
                     id: 'instance-1',
@@ -91,7 +121,13 @@ describe('SessionActivityItem nano note flow', () => {
                 onDeleteNote={vi.fn()}
                 onOpenGoals={vi.fn()}
                 isDragging={false}
-            />
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
         );
 
         fireEvent.click(screen.getByText('Add Nano Goal Note'));
@@ -107,7 +143,7 @@ describe('SessionActivityItem nano note flow', () => {
     });
 
     it('buffers single metric edits and commits on blur', async () => {
-        render(
+        renderWithProviders(
             <SessionActivityItem
                 exercise={{
                     id: 'instance-2',
@@ -141,7 +177,13 @@ describe('SessionActivityItem nano note flow', () => {
                     has_sets: false,
                     has_splits: false
                 }}
-            />
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
         );
 
         const input = screen.getByDisplayValue('5');

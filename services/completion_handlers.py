@@ -455,10 +455,9 @@ def handle_activity_instance_completed(event: Event):
     When an activity instance is completed, evaluate THRESHOLD targets for linked goals.
     """
     instance_id = event.data.get('instance_id')
-    session_id = event.data.get('session_id')
     root_id = event.data.get('root_id')
     
-    if not all([instance_id, session_id, root_id]):
+    if not all([instance_id, root_id]): # Removed session_id from this check
         return
     
     db_session = _get_db_session()
@@ -467,7 +466,7 @@ def handle_activity_instance_completed(event: Event):
         if not instance:
             return
             
-        _run_evaluation_for_instance(db_session, instance, session_id, root_id)
+        _run_evaluation_for_instance(db_session, instance, instance.session_id, root_id)
         db_session.commit()
     except Exception as e:
         db_session.rollback()

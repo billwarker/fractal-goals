@@ -15,8 +15,7 @@ import uuid
 import json
 
 from models import (
-    Goal, UltimateGoal, LongTermGoal, MidTermGoal, ShortTermGoal,
-    PracticeSession, ImmediateGoal, MicroGoal, NanoGoal,
+    Goal, Session,
     ActivityGroup, ActivityDefinition, MetricDefinition,
     ActivityInstance, MetricValue
 )
@@ -30,11 +29,11 @@ from services.serializers import (
 class TestGoalHierarchy:
     """Test goal hierarchy creation and relationships."""
     
-    def test_create_ultimate_goal(self, db_session):
-        """Test creating an UltimateGoal."""
-        goal = UltimateGoal(
+    def test_create_goal(self, db_session):
+        """Test creating a Goal."""
+        goal = Goal(
             id=str(uuid.uuid4()),
-            name="Test Ultimate Goal",
+            name="Test Goal",
             description="Test description",
             created_at=datetime.utcnow()
         )
@@ -43,8 +42,7 @@ class TestGoalHierarchy:
         db_session.commit()
         
         assert goal.id is not None
-        assert goal.name == "Test Ultimate Goal"
-        assert goal.type == "UltimateGoal"
+        assert goal.name == "Test Goal"
         assert goal.root_id == goal.id
         assert goal.parent_id is None
         assert goal.created_at is not None
@@ -88,18 +86,18 @@ class TestGoalHierarchy:
         assert goal_dict['id'] == sample_ultimate_goal.id
         assert goal_dict['name'] == sample_ultimate_goal.name
         # type is nested in attributes
-        assert goal_dict['attributes']['type'] == 'UltimateGoal'
+        # assert goal_dict['attributes']['type'] == 'UltimateGoal' (legacy)
         assert goal_dict['attributes']['completed'] == sample_ultimate_goal.completed
         assert 'created_at' in goal_dict['attributes']
 
 
 @pytest.mark.unit
-class TestPracticeSession:
-    """Test PracticeSession model functionality."""
+class TestSession:
+    """Test Session model functionality."""
     
-    def test_create_practice_session(self, db_session, sample_goal_hierarchy):
-        """Test creating a PracticeSession."""
-        session = PracticeSession(
+    def test_create_session(self, db_session, sample_goal_hierarchy):
+        """Test creating a Session."""
+        session = Session(
             id=str(uuid.uuid4()),
             name="Test Session",
             root_id=sample_goal_hierarchy['ultimate'].id,
@@ -199,8 +197,6 @@ class TestActivityInstance:
         
         assert instance.id is not None
         assert instance.session_id == sample_practice_session.id
-        # Legacy field should be populated automatically
-        assert instance.practice_session_id == sample_practice_session.id
         assert instance.activity_definition_id == sample_activity_definition.id
     
     def test_activity_instance_timer(self, db_session, sample_activity_instance):
@@ -225,8 +221,6 @@ class TestActivityInstance:
         
         assert instance_dict['id'] == sample_activity_instance.id
         assert 'session_id' in instance_dict
-        # Legacy field support
-        assert 'practice_session_id' in instance_dict
         assert 'activity_definition_id' in instance_dict
 
 
@@ -247,8 +241,7 @@ class TestMetricValue:
             activity_instance_id=sample_activity_instance.id,
             metric_definition_id=metric_def.id,
             value=225.0,  # 225 lbs
-            created_at=datetime.utcnow(),
-            root_id=sample_activity_instance.root_id
+            created_at=datetime.utcnow()
         )
         db_session.add(metric_value)
         db_session.commit()
@@ -268,8 +261,7 @@ class TestMetricValue:
             activity_instance_id=sample_activity_instance.id,
             metric_definition_id=metric_def.id,
             value=10.0,
-            created_at=datetime.utcnow(),
-            root_id=sample_activity_instance.root_id
+            created_at=datetime.utcnow()
         )
         db_session.add(metric_value)
         db_session.commit()
@@ -345,8 +337,8 @@ class TestSoftDeletes:
             
             # Query should exclude deleted goals
             # (requires implementation of default query filter)
-            active_goals = db_session.query(UltimateGoal).filter(
-                UltimateGoal.deleted_at.is_(None)
+            active_goals = db_session.query(Goal).filter(
+                Goal.deleted_at.is_(None)
             ).all()
             
             assert sample_ultimate_goal not in active_goals

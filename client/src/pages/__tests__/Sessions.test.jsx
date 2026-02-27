@@ -1,7 +1,6 @@
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders } from '../../test/test-utils';
 import Sessions from '../Sessions';
 
 const getSessions = vi.fn();
@@ -16,13 +15,13 @@ vi.mock('../../utils/api', () => ({
     }
 }));
 
-vi.mock('../../contexts/ThemeContext', () => ({
-    useTheme: () => ({ getGoalColor: () => '#00aa00' })
-}));
-
-vi.mock('../../contexts/TimezoneContext', () => ({
-    useTimezone: () => ({ timezone: 'UTC' })
-}));
+vi.mock('../../contexts/TimezoneContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useTimezone: () => ({ timezone: 'UTC' })
+    };
+});
 
 vi.mock('../../contexts/GoalsContext', () => ({
     useGoals: () => ({ setActiveRootId: vi.fn() })
@@ -45,6 +44,7 @@ describe('Sessions page data loading', () => {
             value: {
                 getItem: vi.fn(() => null),
                 setItem: vi.fn(),
+                removeItem: vi.fn(),
             },
             configurable: true
         });
@@ -67,19 +67,12 @@ describe('Sessions page data loading', () => {
         });
         getActivities.mockResolvedValue({ data: [] });
 
-        const queryClient = new QueryClient({
-            defaultOptions: { queries: { retry: false } }
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
         });
-
-        render(
-            <QueryClientProvider client={queryClient}>
-                <MemoryRouter initialEntries={['/root-1/sessions']}>
-                    <Routes>
-                        <Route path="/:rootId/sessions" element={<Sessions />} />
-                    </Routes>
-                </MemoryRouter>
-            </QueryClientProvider>
-        );
 
         await waitFor(() => {
             expect(screen.getByText('instances:1')).toBeInTheDocument();
