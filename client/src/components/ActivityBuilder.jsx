@@ -290,9 +290,10 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
 
         if (editingActivity) {
             if (editingActivity.metric_definitions) {
+                // Compare by ID so renaming a metric doesn't falsely flag it as removed
                 const removedMetrics = editingActivity.metric_definitions.filter(
                     oldMetric => !validMetrics.find(
-                        newMetric => newMetric.name === oldMetric.name && newMetric.unit === oldMetric.unit
+                        newMetric => newMetric.id && newMetric.id === oldMetric.id
                     )
                 );
 
@@ -300,7 +301,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                     const metricNames = removedMetrics.map(m => `"${m.name}"`).join(', ');
                     setMetricWarningMessage(
                         `You are removing ${removedMetrics.length} metric(s): ${metricNames}. ` +
-                        `This may affect existing session data. Metrics from old sessions will no longer display.`
+                        `Historical session data for these metrics will be preserved but won't display on new sessions.`
                     );
                     setPendingSubmission(payloadData);
                     setShowMetricWarning(true);
@@ -636,6 +637,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 onConfirm={() => processSubmission(pendingSubmission)}
                 title="Removing Metrics"
                 message={metricWarningMessage}
+                confirmText="Save Anyway"
             />
 
             {/* Association Modal */}

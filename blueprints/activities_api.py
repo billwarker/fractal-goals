@@ -550,8 +550,11 @@ def update_activity(current_user, root_id, activity_id):
             if len(metrics_data) > 3:
                 return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
             
-            # Get existing metrics
-            existing_metrics = session.query(MetricDefinition).filter_by(activity_id=activity_id).all()
+            # Get existing active metrics only
+            existing_metrics = session.query(MetricDefinition).filter(
+                MetricDefinition.activity_id == activity_id,
+                MetricDefinition.deleted_at.is_(None)
+            ).all()
             existing_metrics_dict = {m.id: m for m in existing_metrics}
             
             # Track which existing metrics were updated
@@ -597,10 +600,12 @@ def update_activity(current_user, root_id, activity_id):
                             )
                             session.add(new_metric)
             
-            # Delete metrics that were not in the update
+            # Soft-delete metrics that were not in the update
             for existing_metric in existing_metrics:
                 if existing_metric.id not in updated_metric_ids:
-                    session.delete(existing_metric)
+                    from models import utc_now
+                    existing_metric.deleted_at = utc_now()
+                    existing_metric.is_active = False
         
         # Update splits if provided
         if 'splits' in data:

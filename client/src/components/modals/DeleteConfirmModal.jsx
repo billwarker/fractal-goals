@@ -4,16 +4,16 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
 
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText }) => {
-    const [confirmText, setConfirmText] = useState('');
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete' }) => {
+    const [matchingText, setMatchingText] = useState('');
 
     useEffect(() => {
         if (isOpen) {
-            setConfirmText('');
+            setMatchingText('');
         }
     }, [isOpen]);
 
-    const isConfirmDisabled = requireMatchingText && confirmText !== requireMatchingText;
+    const isConfirmDisabled = requireMatchingText && matchingText !== requireMatchingText;
 
     return (
         <Modal
@@ -35,8 +35,8 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
                         </Text>
                         <Input
                             type="text"
-                            value={confirmText}
-                            onChange={(e) => setConfirmText(e.target.value)}
+                            value={matchingText}
+                            onChange={(e) => setMatchingText(e.target.value)}
                             placeholder={`Type "${requireMatchingText}"`}
                             autoFocus
                         />
@@ -69,7 +69,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
                     onClick={onConfirm}
                     disabled={isConfirmDisabled}
                 >
-                    Delete
+                    {confirmText}
                 </Button>
             </div>
         </Modal>

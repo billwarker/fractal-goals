@@ -438,7 +438,7 @@ def serialize_activity_definition(activity):
         "metrics_multiplicative": activity.metrics_multiplicative,
         "has_splits": activity.has_splits,
         "created_at": format_utc(activity.created_at),
-        "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions],
+        "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions],
         "associated_goal_ids": [g.id for g in activity.associated_goals] if activity.associated_goals else [],
         "associated_goals": [{"id": g.id, "name": g.name, "type": get_canonical_goal_type(g)} for g in activity.associated_goals] if activity.associated_goals else []
