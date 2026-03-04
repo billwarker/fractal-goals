@@ -197,10 +197,12 @@ function FractalGoals() {
 
     const handleCreateGoal = async (goalData) => {
         try {
-            await createGoal(rootId, goalData);
+            const newGoal = await createGoal(rootId, goalData);
             setShowGoalModal(false);
+            return newGoal;
         } catch (err) {
             showAlert('Creation Failed', 'Error creating goal: ' + err.message);
+            return null;
         }
     };
 

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
+import { fractalApi } from '../../utils/api';
+import { sortGroupsTreeOrder, getGroupBreadcrumb as sharedGetGroupBreadcrumb } from '../../utils/manageActivities';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
 import notify from '../../utils/notify';
@@ -29,6 +31,7 @@ const ActivityAssociator = ({
     setTargets,
     rootId,
     goalId,
+    parentGoalId,
     goalName,
     isEditing,
     onOpenSelector,
@@ -56,6 +59,8 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
+    const [inheritFromParent, setInheritFromParent] = useState(false);
+    const [parentActivities, setParentActivities] = useState([]);
     const linkedGroupIds = useMemo(
         () => new Set((associatedActivityGroups || []).map(g => g.id)),
         [associatedActivityGroups]
@@ -260,9 +265,20 @@ const ActivityAssociator = ({
             };
             const result = await createActivityGroup(rootId, data);
 
-            // If we have the goalId, auto-associate this group with the current goal
-            if (result && result.id && goalId) {
-                await setActivityGroupGoals(rootId, result.id, [goalId]);
+            // Auto-associate this group with the current goal
+            if (result && result.id) {
+                if (goalId) {
+                    // Goal exists: persist association immediately
+                    await setActivityGroupGoals(rootId, result.id, [goalId]);
+                    if (onRefreshAssociations) {
+                        await onRefreshAssociations();
+                    }
+                    window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
+                        detail: { goalId, rootId }
+                    }));
+                }
+
+                // Always buffer in local state (for both create mode and view mode)
                 const currentGroups = Array.isArray(associatedGroupsRef.current) ? associatedGroupsRef.current : [];
                 const finalGroups = currentGroups.some(g => g.id === result.id)
                     ? currentGroups
@@ -271,15 +287,9 @@ const ActivityAssociator = ({
                     setAssociatedActivityGroups(finalGroups);
                 }
                 associatedGroupsRef.current = finalGroups;
-                if (onSave) {
+                if (goalId && onSave) {
                     await onSave(associatedActivitiesRef.current || [], finalGroups);
                 }
-                if (onRefreshAssociations) {
-                    await onRefreshAssociations();
-                }
-                window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
-                    detail: { goalId, rootId }
-                }));
             }
 
             // Refresh groups and sync to parent-local state used by this modal
@@ -324,6 +334,41 @@ const ActivityAssociator = ({
         });
         return { roots, map };
     };
+
+    // Compute depth of a group (0 = root, 1 = child, 2 = grandchild)
+    const getGroupDepth = (groupId) => {
+        let depth = 0;
+        let currentId = groupId;
+        const seen = new Set();
+        while (currentId) {
+            if (seen.has(currentId)) break;
+            seen.add(currentId);
+            const group = (activityGroups || []).find(g => g.id === currentId);
+            if (!group || !group.parent_id) break;
+            depth++;
+            currentId = group.parent_id;
+        }
+        return depth;
+    };
+
+    // Build breadcrumb path using shared utility
+    const groupBreadcrumb = (groupId) => sharedGetGroupBreadcrumb(groupId, activityGroups || []);
+
+    // Filter groups eligible as parents for new group creation (max 3 levels = depth <= 1)
+    const eligibleParentGroups = useMemo(() => {
+        return sortGroupsTreeOrder((activityGroups || []).filter(g => getGroupDepth(g.id) < 2));
+    }, [activityGroups]);
+
+    // Fetch parent activities when inherit checkbox changes
+    useEffect(() => {
+        if (inheritFromParent && parentGoalId && rootId) {
+            fractalApi.getGoalActivities(rootId, parentGoalId)
+                .then(res => setParentActivities(res.data || []))
+                .catch(() => setParentActivities([]));
+        } else {
+            setParentActivities([]);
+        }
+    }, [inheritFromParent, parentGoalId, rootId]);
 
     const groupsById = useMemo(() => {
         const map = new Map();
@@ -394,11 +439,21 @@ const ActivityAssociator = ({
         notify.success(`Unlinked activity group "${group.name}"`);
     };
 
+    // Merge parent activities for display
+    const displayActivities = useMemo(() => {
+        if (!inheritFromParent || parentActivities.length === 0) return associatedActivities;
+        const existing = new Set(associatedActivities.map(a => a.id));
+        const inherited = parentActivities
+            .filter(a => !existing.has(a.id))
+            .map(a => ({ ...a, is_inherited: true, source_goal_name: 'Parent Goal' }));
+        return [...associatedActivities, ...inherited];
+    }, [associatedActivities, inheritFromParent, parentActivities]);
+
     // Build the tree of associated activities organized by group
     const buildRelevantTree = () => {
         const relevantGroupIds = new Set();
         associatedActivityGroups.forEach(g => relevantGroupIds.add(g.id));
-        associatedActivities.forEach(a => {
+        displayActivities.forEach(a => {
             if (a.group_id) relevantGroupIds.add(a.group_id);
         });
 
@@ -420,7 +475,7 @@ const ActivityAssociator = ({
 
         const ungrouped = { id: 'ungrouped', name: 'Ungrouped', children: [], activities: [] };
 
-        associatedActivities.forEach(a => {
+        displayActivities.forEach(a => {
             if (a.group_id && map[a.group_id]) {
                 map[a.group_id].activities.push(a);
             } else {
@@ -771,6 +826,24 @@ const ActivityAssociator = ({
                             <span className={styles.metricLabel}>Inherited</span>
                         </div>
                     </div>
+
+                    {/* Inherit from parent checkbox */}
+                    {parentGoalId && (
+                        <label style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '6px 12px',
+                            fontSize: '12px', color: 'var(--color-text-secondary)',
+                            cursor: 'pointer'
+                        }}>
+                            <input
+                                type="checkbox"
+                                checked={inheritFromParent}
+                                onChange={(e) => setInheritFromParent(e.target.checked)}
+                                style={{ accentColor: headerColor || 'var(--color-brand-primary)' }}
+                            />
+                            Inherit activities from parent goals
+                        </label>
+                    )}
                 </div>
             )}
 
@@ -905,8 +978,10 @@ const ActivityAssociator = ({
                                     className={styles.groupCreatorSelect}
                                 >
                                     <option value="">(Root level)</option>
-                                    {activityGroups.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                    {eligibleParentGroups.map(g => (
+                                        <option key={g.id} value={g.id}>
+                                            {groupBreadcrumb(g.id)}
+                                        </option>
                                     ))}
                                 </select>
                             </div>

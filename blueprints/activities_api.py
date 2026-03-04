@@ -39,6 +39,22 @@ def _validate_activity_group_parent(session, root_id, group_id, parent_id):
     if group_id and parent_id == group_id:
         return "A group cannot be its own parent"
 
+    # Enforce max 3 levels of nesting (depth 0=root, 1=child, 2=grandchild)
+    # The NEW group would sit at parent_depth + 1, so parent must be at depth <= 1
+    depth = 0
+    cursor = parent
+    seen = set()
+    while cursor and cursor.parent_id:
+        if cursor.id in seen:
+            return "Invalid parent group: cycle detected"
+        seen.add(cursor.id)
+        depth += 1
+        cursor = session.query(ActivityGroup).filter_by(id=cursor.parent_id, root_id=root_id).first()
+    # depth is now the depth of `parent` (0 = root, 1 = child, etc.)
+    # The new group would be at depth + 1
+    if depth + 1 >= 3:
+        return "Maximum nesting depth (3 levels) reached. Cannot nest deeper."
+
     if not group_id:
         return None
 

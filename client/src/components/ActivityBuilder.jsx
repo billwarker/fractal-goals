@@ -12,6 +12,7 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import DeleteConfirmModal from './modals/DeleteConfirmModal';
 import ActivityAssociationModal from './sessionDetail/ActivityAssociationModal';
 import { buildActivityPayload } from '../utils/activityBuilder';
+import { sortGroupsTreeOrder, getGroupBreadcrumb } from '../utils/manageActivities';
 import styles from './ActivityBuilder.module.css';
 
 /**
@@ -460,9 +461,9 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                                     fullWidth
                                 >
                                     <option value="">(No Group)</option>
-                                    {activityGroups && activityGroups.map(group => (
+                                    {sortGroupsTreeOrder(activityGroups || []).map(group => (
                                         <option key={group.id} value={group.id}>
-                                            {group.name}
+                                            {getGroupBreadcrumb(group.id, activityGroups)}
                                         </option>
                                     ))}
                                 </Select>

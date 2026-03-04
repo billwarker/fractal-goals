@@ -116,3 +116,67 @@ export function buildGroupReorderPayload(activityGroups = [], movingGroupId, dir
 
     return orderedIds;
 }
+
+/**
+ * Sort groups in tree order (DFS pre-order) so children appear right after their parent.
+ * @param {Array} groups - flat array of activity group objects with `id`, `parent_id`, `sort_order`
+ * @returns {Array} - new array sorted in tree-walk order
+ */
+export function sortGroupsTreeOrder(groups = []) {
+    if (!Array.isArray(groups) || groups.length === 0) return [];
+
+    const childrenByParent = {};
+    groups.forEach(g => {
+        const key = g.parent_id || '__root__';
+        if (!childrenByParent[key]) childrenByParent[key] = [];
+        childrenByParent[key].push(g);
+    });
+
+    // Sort each set of siblings by sort_order
+    Object.keys(childrenByParent).forEach(key => {
+        childrenByParent[key].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    });
+
+    const result = [];
+    const visited = new Set();
+
+    const walk = (parentKey) => {
+        const children = childrenByParent[parentKey] || [];
+        children.forEach(group => {
+            if (visited.has(group.id)) return;
+            visited.add(group.id);
+            result.push(group);
+            walk(group.id);
+        });
+    };
+
+    walk('__root__');
+
+    // Safety: include any orphans not reached from root
+    groups.forEach(g => {
+        if (!visited.has(g.id)) result.push(g);
+    });
+
+    return result;
+}
+
+/**
+ * Build a breadcrumb path string for a group (e.g. "Warm Ups - Pickup Music Exercises").
+ * @param {string} groupId - the group's ID
+ * @param {Array} groups - flat array of all activity groups
+ * @returns {string}
+ */
+export function getGroupBreadcrumb(groupId, groups = []) {
+    const parts = [];
+    let currentId = groupId;
+    const seen = new Set();
+    while (currentId) {
+        if (seen.has(currentId)) break;
+        seen.add(currentId);
+        const group = groups.find(g => g.id === currentId);
+        if (!group) break;
+        parts.unshift(group.name);
+        currentId = group.parent_id;
+    }
+    return parts.join(' - ');
+}

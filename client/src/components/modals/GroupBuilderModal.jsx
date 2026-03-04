@@ -5,6 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
+import { sortGroupsTreeOrder, getGroupBreadcrumb } from '../../utils/manageActivities';
 
 export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
@@ -94,29 +95,55 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
         }
     };
 
-    // Filter available parent groups to avoid cycles and self-selection
+    // Compute depth of a group (0 = root, 1 = child, 2 = grandchild)
+    const getGroupDepth = (groupId) => {
+        let depth = 0;
+        let currentId = groupId;
+        const seen = new Set();
+        while (currentId) {
+            if (seen.has(currentId)) break;
+            seen.add(currentId);
+            const group = (activityGroups || []).find(g => g.id === currentId);
+            if (!group || !group.parent_id) break;
+            depth++;
+            currentId = group.parent_id;
+        }
+        return depth;
+    };
+
+    // Build breadcrumb path using shared utility
+    const groupBreadcrumb = (groupId) => getGroupBreadcrumb(groupId, activityGroups || []);
+
+    // Filter available parent groups to avoid cycles, self-selection, and enforce max 3 levels
     const availableParentGroups = useMemo(() => {
         if (!activityGroups) return [];
-        if (!editingGroup) return activityGroups;
 
-        const childrenByParent = activityGroups.reduce((acc, group) => {
-            const key = group.parent_id || '__root__';
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(group.id);
-            return acc;
-        }, {});
+        let candidates = activityGroups;
 
-        const blocked = new Set([editingGroup.id]);
-        const stack = [...(childrenByParent[editingGroup.id] || [])];
-        while (stack.length > 0) {
-            const current = stack.pop();
-            if (!current || blocked.has(current)) continue;
-            blocked.add(current);
-            const children = childrenByParent[current] || [];
-            children.forEach((childId) => stack.push(childId));
+        // When editing, exclude the group itself and all its descendants to prevent cycles
+        if (editingGroup) {
+            const childrenByParent = activityGroups.reduce((acc, group) => {
+                const key = group.parent_id || '__root__';
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(group.id);
+                return acc;
+            }, {});
+
+            const blocked = new Set([editingGroup.id]);
+            const stack = [...(childrenByParent[editingGroup.id] || [])];
+            while (stack.length > 0) {
+                const current = stack.pop();
+                if (!current || blocked.has(current)) continue;
+                blocked.add(current);
+                const children = childrenByParent[current] || [];
+                children.forEach((childId) => stack.push(childId));
+            }
+
+            candidates = activityGroups.filter(g => !blocked.has(g.id));
         }
 
-        return activityGroups.filter(g => !blocked.has(g.id));
+        // Only show groups at depth < 2 (so new child would be at depth <= 2, max 3 levels)
+        return sortGroupsTreeOrder(candidates.filter(g => getGroupDepth(g.id) < 2));
     }, [activityGroups, editingGroup]);
 
     if (!isOpen) return null;
@@ -181,7 +208,7 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
                             <option value="">(No Parent - Root Level)</option>
                             {availableParentGroups.map(group => (
                                 <option key={group.id} value={group.id}>
-                                    {group.name}
+                                    {groupBreadcrumb(group.id)}
                                 </option>
                             ))}
                         </select>

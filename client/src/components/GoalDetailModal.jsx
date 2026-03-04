@@ -272,15 +272,21 @@ function GoalDetailModal({
         : (goal.attributes?.type || goal.type);
     const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
 
-    const persistAssociations = async (updatedActivities, updatedGroups) => {
+    const persistAssociations = async (updatedActivities, updatedGroups, overrideGoalId) => {
         // Use provided values or fall back to state
         const activs = updatedActivities || associatedActivitiesRef.current || associatedActivities;
         const groups = updatedGroups || associatedGroupsRef.current || associatedActivityGroups;
+        const targetGoalId = overrideGoalId || goalId;
+
+        if (!targetGoalId) {
+            console.warn('persistAssociations: no goalId available, skipping');
+            return false;
+        }
 
         try {
             const currentActivityIds = activs.map(a => a.id);
             const currentGroupIds = groups.map(g => g.id);
-            await fractalApi.setGoalAssociationsBatch(rootId, goalId, {
+            await fractalApi.setGoalAssociationsBatch(rootId, targetGoalId, {
                 activity_ids: currentActivityIds,
                 group_ids: currentGroupIds
             });
@@ -293,10 +299,8 @@ function GoalDetailModal({
             if (onAssociationsChanged) onAssociationsChanged();
 
             window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
-                detail: { goalId: goalId, rootId: rootId }
+                detail: { goalId: targetGoalId, rootId: rootId }
             }));
-
-            notify.success("Goal associations updated");
 
             return true;
         } catch (err) {
@@ -329,7 +333,19 @@ function GoalDetailModal({
         };
 
         if (mode === 'create') {
-            onCreate(payload);
+            const newGoal = await onCreate(payload);
+
+            // Persist any pending activity/group associations using the new goal's ID
+            const newGoalId = newGoal?.id || newGoal?.attributes?.id;
+            const hasPendingActivities = associatedActivities.length > 0;
+            const hasPendingGroups = associatedActivityGroups.length > 0;
+
+            if (newGoalId && (hasPendingActivities || hasPendingGroups)) {
+                const ok = await persistAssociations(null, null, newGoalId);
+                if (ok) {
+                    notify.success(`Goal created with ${hasPendingActivities ? associatedActivities.length + ' activities' : ''}${hasPendingActivities && hasPendingGroups ? ' and ' : ''}${hasPendingGroups ? associatedActivityGroups.length + ' groups' : ''} associated`);
+                }
+            }
         } else {
             onUpdate(goalId, payload);
 
@@ -576,6 +592,7 @@ function GoalDetailModal({
                                     setActivityGroups={setActivityGroups}
                                     rootId={rootId}
                                     goalId={goalId}
+                                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
                                     setTargets={setTargets}
                                     isEditing={true}
                                     targets={targets}
@@ -974,6 +991,7 @@ function GoalDetailModal({
                     setActivityGroups={setActivityGroups}
                     rootId={rootId}
                     goalId={goalId}
+                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
                     goalName={name}
                     setTargets={setTargets}
                     isEditing={true}
@@ -1044,10 +1062,19 @@ function GoalDetailModal({
                 const newActivity = response.data;
 
                 // Automatically associate with this goal
-                if (newActivity && newActivity.id && goalId) {
-                    await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
-                    await refreshAssociations();
-                    notify.success(`Created activity "${newActivity.name || newActivityName}" and associated with goal`);
+                if (newActivity && newActivity.id) {
+                    if (goalId) {
+                        // Goal already exists: persist association immediately
+                        await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
+                        await refreshAssociations();
+                    } else {
+                        // Create mode: buffer the association in local state for deferred persistence
+                        setAssociatedActivities(prev => {
+                            const updated = [...prev, newActivity];
+                            return Array.from(new Map(updated.map(item => [item.id, item])).values());
+                        });
+                    }
+                    notify.success(`Created activity "${newActivity.name || newActivityName}"${goalId ? ' and associated with goal' : ''}`);
                 }
 
                 // Go back to activity-associator view
