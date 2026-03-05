@@ -140,7 +140,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                             fontSize: '14px',
                             color: statusObj.color
                         }}>
-                            {target.name || activityDef.name}
+                            {activityDef.name}
                         </div>
                         {target.description && (
                             <div style={{
