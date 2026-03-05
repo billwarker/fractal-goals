@@ -17,7 +17,7 @@ const ActivityAssociationModal = ({
     initialActivityName = '',
     initialSelectedGoalIds = []
 }) => {
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();;
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon, getLevelByName } = useGoalLevels();;
     const [searchTerm, setSearchTerm] = useState('');
 
     // Multi-select state - initialize with passed IDs
@@ -188,8 +188,7 @@ const ActivityAssociationModal = ({
     const renderSection = (type, typeGoals) => {
         if (!typeGoals || typeGoals.length === 0) return null;
 
-        const characteristics = getLevelByName(type);
-        const shape = characteristics?.icon || 'circle';
+        const shape = getGoalIcon ? getGoalIcon(type) : 'circle';
         const isCollapsed = collapsedSections.has(type);
 
         return (
@@ -246,6 +245,7 @@ const ActivityAssociationModal = ({
                                             </svg>
                                         )}
                                     </div>
+
                                     <div className={styles.goalInfo}>
                                         <div className={styles.goalName}>{goal.name}</div>
                                         {goal.parentName && <div className={styles.goalParent}>via {goal.parentName}</div>}
