@@ -7,21 +7,24 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';;
  * TargetCard Component
  * Displays an activity target with metrics and completion status
  */
-function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, isCompleted, isEditMode = false }) {
+function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, isCompleted, isEditMode = false, goalType = null }) {
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
-    const { getLevelByName, getGoalColor, getGoalSecondaryColor } = useGoalLevels();;
-    const targetChar = getLevelByName('Target')?.icon || 'twelve-point-star';
-    const targetColor = getGoalColor('Target');
-    const targetSecondaryColor = getGoalSecondaryColor('Target');
+    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
+
+    // Use the owning goal's icon, falling back to Target icon if unavailable
+    const resolvedType = goalType || target._goalType || 'Target';
+    const iconShape = getGoalIcon ? getGoalIcon(resolvedType) : (getLevelByName(resolvedType)?.icon || 'twelve-point-star');
+    const iconColor = getGoalColor(resolvedType);
+    const iconSecondaryColor = getGoalSecondaryColor(resolvedType);
 
     const statusObj = isCompleted ? {
-        color: targetColor,
-        icon: <GoalIcon shape={targetChar} color={targetColor} secondaryColor={targetSecondaryColor} size={20} />
+        color: iconColor,
+        icon: <GoalIcon shape={iconShape} color={iconColor} secondaryColor={iconSecondaryColor} size={20} />
     } : {
-        color: 'var(--color-text-muted)',
-        icon: <GoalIcon shape={targetChar} color="var(--color-text-muted)" size={20} />
+        color: iconColor,
+        icon: <GoalIcon shape={iconShape} color={iconColor} secondaryColor={iconSecondaryColor} size={20} style={{ opacity: 0.55 }} />
     };
 
     if (!activityDef) {
@@ -67,8 +70,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             style={{
                 padding: '12px',
                 background: 'var(--color-bg-card-alt)',
-                border: `1px solid ${isCompleted ? targetColor : 'var(--color-border)'}`,
-                borderLeft: `4px solid ${isCompleted ? targetColor : 'var(--color-warning, #ff9800)'}`,
+                border: `1px solid ${isCompleted ? iconColor : 'var(--color-border)'}`,
+                borderLeft: `4px solid ${iconColor}`,
                 borderRadius: '6px',
                 marginBottom: '10px',
                 cursor: onClick ? 'pointer' : 'default',

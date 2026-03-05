@@ -10,7 +10,7 @@ import notify from '../utils/notify';
  * AddTargetModal Component
  * Modal for creating or editing activity targets
  */
-function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existingTarget = null }) {
+function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existingTarget = null, preselectedActivityId = null }) {
     const [selectedActivityId, setSelectedActivityId] = useState('');
     const [targetName, setTargetName] = useState('');
     const [targetDescription, setTargetDescription] = useState('');
@@ -30,13 +30,18 @@ function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existing
             });
             setMetricValues(metricsObj);
         } else {
-            // Reset form for new target
-            setSelectedActivityId('');
+            // Reset form for new target, respecting preselectedActivityId
+            setSelectedActivityId(preselectedActivityId || '');
             setTargetName('');
             setTargetDescription('');
             setMetricValues({});
+            // Auto-fill name if an activity is preselected
+            if (preselectedActivityId) {
+                const activity = activityDefinitions.find(a => a.id === preselectedActivityId);
+                if (activity) setTargetName(activity.name);
+            }
         }
-    }, [existingTarget, isOpen]);
+    }, [existingTarget, isOpen, preselectedActivityId]);
 
     const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
 

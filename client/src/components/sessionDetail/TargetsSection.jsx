@@ -104,6 +104,7 @@ function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, allowe
                             activityDefinitions={activityDefinitions}
                             isCompleted={target.is_completed_realtime}
                             isEditMode={false}
+                            goalType={target._goalType}
                         />
                     </div>
                 ))}

@@ -66,7 +66,7 @@ const AnimatedGoalIcon = ({
                 <g
                     key={i}
                     style={{
-                        transformOrigin: '50px 50px',
+                        transformOrigin: shape.toLowerCase() === 'triangle' ? '50px 58px' : '50px 50px',
                         animation: `l_ripple_tunnel_${uid} ${duration}s linear ${delay}s infinite`,
                         willChange: 'transform, stroke-width, opacity',
                     }}
@@ -120,7 +120,10 @@ const AnimatedGoalIcon = ({
             {!isStrokeBased && isSmart && React.cloneElement(pathElem, {
                 fill: color, // The very center is solid primary color again
                 stroke: 'none',
-                style: { transformOrigin: '50px 50px', transform: 'scale(0.18)' }
+                style: {
+                    transformOrigin: shape.toLowerCase() === 'triangle' ? '50px 58px' : '50px 50px',
+                    transform: 'scale(0.18)'
+                }
             })}
 
             {/* Optional Outer Border to sharply define the edge against the background */}

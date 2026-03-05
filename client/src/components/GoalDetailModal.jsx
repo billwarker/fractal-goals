@@ -479,20 +479,22 @@ function GoalDetailModal({
                             />
                         </div>
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.label} style={{ color: goalColor }}>
-                                Description
-                            </label>
-                            <textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                rows={3}
-                                className={styles.textarea}
-                            />
-                        </div>
+                        {goalType !== 'NanoGoal' && (
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.label} style={{ color: goalColor }}>
+                                    Description
+                                </label>
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    rows={3}
+                                    className={styles.textarea}
+                                />
+                            </div>
+                        )}
 
                         {/* Relevance Statement - SMART "R" Criterion */}
-                        {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
+                        {goalType !== 'NanoGoal' && ((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
                             <div className={styles.fieldGroup}>
                                 <label className={styles.label} style={{ color: goalColor }}>
                                     Relevance (SMART)
@@ -516,71 +518,76 @@ function GoalDetailModal({
                             </div>
                         )}
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.label} style={{ color: goalColor }}>
-                                Deadline
-                            </label>
-                            <Input
-                                type="date"
-                                value={deadline}
-                                onChange={(e) => setDeadline(e.target.value)}
-                            />
-                        </div>
+                        {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.label} style={{ color: goalColor }}>
+                                    Deadline
+                                </label>
+                                <Input
+                                    type="date"
+                                    value={deadline}
+                                    onChange={(e) => setDeadline(e.target.value)}
+                                    max={parentGoal?.attributes?.deadline?.split('T')[0] || parentGoal?.deadline?.split('T')[0]}
+                                />
+                            </div>
+                        )}
 
                         {/* How is progress measured? */}
-                        <div className={styles.progressBox}>
-                            <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
-                                How is progress measured? (Select all that apply)
-                            </label>
-                            <div className={styles.checkboxGroup}>
-                                <Checkbox
-                                    label="Activities & Targets"
-                                    checked={trackActivities}
-                                    onChange={(e) => setTrackActivities(e.target.checked)}
-                                    className={styles.checkboxLabel}
-                                />
-                                {isAboveShortTermGoal(goalType) && (
+                        {goalType !== 'NanoGoal' && (
+                            <div className={styles.progressBox}>
+                                <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
+                                    How is progress measured? (Select all that apply)
+                                </label>
+                                <div className={styles.checkboxGroup}>
                                     <Checkbox
-                                        label="Completed via Children"
-                                        checked={completedViaChildren}
-                                        onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                        label="Activities & Targets"
+                                        checked={trackActivities}
+                                        onChange={(e) => setTrackActivities(e.target.checked)}
                                         className={styles.checkboxLabel}
                                     />
-                                )}
-                                <Checkbox
-                                    label="Manual Completion"
-                                    checked={allowManualCompletion}
-                                    onChange={(e) => setAllowManualCompletion(e.target.checked)}
-                                    className={styles.checkboxLabel}
-                                />
+                                    {isAboveShortTermGoal(goalType) && (
+                                        <Checkbox
+                                            label="Completed via Children"
+                                            checked={completedViaChildren}
+                                            onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                            className={styles.checkboxLabel}
+                                        />
+                                    )}
+                                    <Checkbox
+                                        label="Manual Completion"
+                                        checked={allowManualCompletion}
+                                        onChange={(e) => setAllowManualCompletion(e.target.checked)}
+                                        className={styles.checkboxLabel}
+                                    />
+                                </div>
+
+                                <div className={styles.infoList}>
+                                    {trackActivities && (
+                                        <div className={styles.infoItem}>
+                                            <span style={{ fontSize: '13px' }}>✓</span>
+                                            <span>Goal is complete when target(s) are achieved.</span>
+                                        </div>
+                                    )}
+
+                                    {completedViaChildren && (
+                                        <div className={styles.infoItem}>
+                                            <span style={{ fontSize: '13px' }}>✓</span>
+                                            <span>Goal is complete when all child goals are done (Delegated).</span>
+                                        </div>
+                                    )}
+
+                                    {allowManualCompletion && (
+                                        <div className={styles.infoItem}>
+                                            <span style={{ fontSize: '13px' }}>✓</span>
+                                            <span>Goal can be marked as complete by the user.</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-
-                            <div className={styles.infoList}>
-                                {trackActivities && (
-                                    <div className={styles.infoItem}>
-                                        <span style={{ fontSize: '13px' }}>✓</span>
-                                        <span>Goal is complete when target(s) are achieved.</span>
-                                    </div>
-                                )}
-
-                                {completedViaChildren && (
-                                    <div className={styles.infoItem}>
-                                        <span style={{ fontSize: '13px' }}>✓</span>
-                                        <span>Goal is complete when all child goals are done (Delegated).</span>
-                                    </div>
-                                )}
-
-                                {allowManualCompletion && (
-                                    <div className={styles.infoItem}>
-                                        <span style={{ fontSize: '13px' }}>✓</span>
-                                        <span>Goal can be marked as complete by the user.</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        )}
 
                         {/* Associated Activities Section - Edit/Create Mode */}
-                        {trackActivities && (
+                        {trackActivities && goalType !== 'NanoGoal' && (
                             <Suspense fallback={null}>
                                 <ActivityAssociator
                                     associatedActivities={associatedActivities}
@@ -608,7 +615,7 @@ function GoalDetailModal({
                         )}
 
                         {/* Targets Section - Edit/Create Mode */}
-                        {trackActivities && (
+                        {trackActivities && goalType !== 'NanoGoal' && (
                             <Suspense fallback={null}>
                                 <TargetManager
                                     targets={targets}
@@ -695,15 +702,20 @@ function GoalDetailModal({
                             {onAddChild && childType && (
                                 <button
                                     onClick={() => {
+                                        if (goalType === 'ImmediateGoal') return;
                                         if (displayMode === 'modal' && onClose) onClose();
                                         onAddChild(goal);
                                     }}
                                     className={styles.btnAction}
+                                    disabled={goalType === 'ImmediateGoal'}
+                                    title={goalType === 'ImmediateGoal' ? "MicroGoals can only be created from the Session Detail page" : ""}
                                     style={{
                                         background: 'transparent',
                                         border: `1px solid ${getGoalColor(childType)}`,
                                         color: getGoalColor(childType),
-                                        fontWeight: 'bold'
+                                        fontWeight: 'bold',
+                                        opacity: goalType === 'ImmediateGoal' ? 0.5 : 1,
+                                        cursor: goalType === 'ImmediateGoal' ? 'not-allowed' : 'pointer'
                                     }}
                                 >
                                     + Add {childType}
@@ -867,7 +879,7 @@ function GoalDetailModal({
                         )}
 
                         {/* Targets Section - View Mode (Read-only) */}
-                        {trackActivities && levelConfig.track_activities !== false && (
+                        {trackActivities && levelConfig.track_activities !== false && goalType !== 'NanoGoal' && (
                             <Suspense fallback={null}>
                                 <TargetManager
                                     targets={targets}

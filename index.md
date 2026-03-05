@@ -18,10 +18,11 @@
 
 ## Status & Recent Changes
 
-### Phase 2: Core Architecture (Current)
-- **Goal Level Characteristics:** Expanded `GoalLevel` model with 12 behavioral characteristics (deadline constraints, hierarchy behavior, feature gates, content requirements, display). Settings UI in `GoalCharacteristicsSettings.jsx`. Backend enforces `allow_manual_completion` (403) and `requires_smart` (400) in completion endpoint. `auto_complete_when_children_done` level default cascades via event bus. Deleted superseded `goalColors.js`, cleaned up `goalCharacteristics.js`.
-- **Database Refactoring:** Split monolithic `models.py` into domain-specific modules (`models/user.py`, `models/goal.py`, etc.).
-- **Frontend State Consolidation:** Centralized session detail logic into `ActiveSessionContext.jsx`, eliminating significant prop drilling and standardizing state management with TanStack Query.
+- **Goal Architecture & UI Refinements (2026-03-04):** 
+  - **Deadlines**: Enforced parent-child deadline constraints (backend validation + UI max attribute) and implemented auto-cascading. Child goals now default to parent's deadline.
+  - **Transient Goals**: Hidden deadlines for Micro/Nano goals. Added simplified UI for Nano goals (name-only, hidden targets/activities).
+  - **Icon Aesthetics**: Refined triangle geometry for even SMART ring line thickness and fixed ripple animation transform origin to the centroid.
+  - **Settings**: Hidden deadline range and offset options for transient goals in Characteristics settings.
 - **Backend Stability:** Fixed critical recursion/serialization bugs, improved error logging, and resolved session retrieval API gaps.
 - **Legacy Cleanup:** Removed deprecated `PracticeSession` aliases and unused fields.
 

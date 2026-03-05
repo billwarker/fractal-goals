@@ -13,18 +13,15 @@ function HierarchySection({
     getGoalIcon,
     completedColor,
     completedSecondaryColor,
-    creatingSubGoal,
-    subGoalName,
-    setSubGoalName,
     onStartSubGoalCreation,
-    onConfirmSubGoalCreation,
-    onCancelSubGoalCreation,
-    onOpenAssociate
+    onOpenAssociate,
+    onAddTargetForGoal,
 }) {
     // if (flattenedHierarchy.length === 0) return null; // Removed to allow empty state rendering
 
     const canAddChild = (goalType) => {
-        return goalType !== 'NanoGoal';
+        // NanoGoal cannot have children; ImmediateGoal opens target builder instead
+        return goalType !== 'NanoGoal' && goalType !== 'MicroGoal';
     };
 
     return (
@@ -44,7 +41,6 @@ function HierarchySection({
             </div>
             <div className={styles.hierarchyList}>
                 {flattenedHierarchy.map((node, index) => {
-                    const isCreatingForThisNode = creatingSubGoal?.parentId === node.id;
 
                     return (
                         <div key={node.id || `node-${index}`}>
@@ -73,54 +69,19 @@ function HierarchySection({
                                             className={styles.addSubGoalBtn}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onStartSubGoalCreation(node);
+                                                if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
+                                                    onAddTargetForGoal(node);
+                                                } else {
+                                                    onStartSubGoalCreation(node);
+                                                }
                                             }}
-                                            title="Add Sub-goal"
+                                            title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
                                         >
                                             +
                                         </button>
                                     )}
                                 </div>
                             </div>
-
-                            {isCreatingForThisNode && (
-                                <div
-                                    className={styles.creationRow}
-                                    style={{ paddingLeft: `${(node.depth + 1) * 28}px` }}
-                                >
-                                    <div className={styles.creationLabel}>
-                                        New {(() => {
-                                            const typeMap = {
-                                                'UltimateGoal': 'Long Term Goal',
-                                                'LongTermGoal': 'Mid Term Goal',
-                                                'MidTermGoal': 'Short Term Goal',
-                                                'ShortTermGoal': 'Immediate Goal',
-                                                'ImmediateGoal': 'Micro Goal',
-                                                'MicroGoal': 'Nano Goal'
-                                            };
-                                            return typeMap[node.type] || 'Sub-goal';
-                                        })()}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-                                        <input
-                                            type="text"
-                                            className={styles.creationInput}
-                                            value={subGoalName}
-                                            onChange={(e) => setSubGoalName(e.target.value)}
-                                            placeholder="Enter goal name..."
-                                            autoFocus
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') onConfirmSubGoalCreation();
-                                                if (e.key === 'Escape') onCancelSubGoalCreation();
-                                            }}
-                                        />
-                                        <div className={styles.creationActions}>
-                                            <button onClick={onConfirmSubGoalCreation} className={styles.confirmBtn} title="Confirm">✓</button>
-                                            <button onClick={onCancelSubGoalCreation} className={styles.cancelBtn} title="Cancel">✕</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     );
                 })}

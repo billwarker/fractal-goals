@@ -291,6 +291,15 @@ def create_goal(current_user, validated_data):
         deadline = None
         if validated_data.get('deadline'):
             deadline = parse_date_string(validated_data['deadline'])
+            
+            # Parent deadline enforcement
+            if parent and parent.deadline:
+                p_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
+                if deadline > p_deadline:
+                    return jsonify({
+                        "error": "Child deadline cannot be later than parent deadline",
+                        "parent_deadline": p_deadline.isoformat()
+                    }), 400
 
         level_id = _resolve_level_id(db_session, validated_data.get('type'))
         
@@ -493,18 +502,54 @@ def update_goal_endpoint(current_user, goal_id: str):
         if goal:
             if not _authorize_goal_access(db_session, current_user.id, goal):
                 return jsonify({"error": "Goal not found or access denied"}), 404
+                
+            if 'deadline' in data:
+                # Parent deadline enforcement
+                if deadline and goal.parent_id:
+                    parent = get_goal_by_id(db_session, goal.parent_id)
+                    if parent and parent.deadline:
+                        p_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
+                        if deadline > p_deadline:
+                            return jsonify({
+                                "error": "Child deadline cannot be later than parent deadline",
+                                "parent_deadline": p_deadline.isoformat()
+                            }), 400
+                
+                # Auto-cascade if shortening
+                # Ensure we compare dates
+                old_deadline = goal.deadline
+                if isinstance(old_deadline, datetime):
+                    old_deadline = old_deadline.date()
+                
+                goal.deadline = deadline
+                
+                if deadline and (not old_deadline or deadline < old_deadline):
+                    # Recursive cascade to children
+                    def cascade_deadline(parent_goal, new_max):
+                        for child in (parent_goal.children or []):
+                            if child.deadline:
+                                c_deadline = child.deadline.date() if isinstance(child.deadline, datetime) else child.deadline
+                                if c_deadline > new_max:
+                                    child.deadline = new_max
+                                    logger.info(f"Cascaded deadline update to child goal {child.id}")
+                                    cascade_deadline(child, new_max)
+                    
+                    cascade_deadline(goal, deadline)
+
             if 'name' in data and data['name'] is not None:
                 goal.name = data['name']
             if 'description' in data and data['description'] is not None:
+                # Nano goal description restriction (also handled by validator, but safe to guard here)
+                if goal.level and goal.level.name == 'Nano Goal' and data['description'].strip():
+                    return jsonify({"error": "NanoGoal cannot have a description"}), 400
                 goal.description = data['description']
-            if 'deadline' in data:
-                goal.deadline = deadline
             if 'targets' in data:
                 logger.debug(f"Received targets data: {data['targets']}")
                 # Sync relational targets
                 _sync_targets(db_session, goal, data['targets'] or [])
             if 'completed_via_children' in data:
                 goal.completed_via_children = data['completed_via_children']
+            
             db_session.commit()
             db_session.refresh(goal)
             logger.debug(f"Committed changes. Goal has {len([t for t in goal.targets_rel if t.deleted_at is None])} active targets")
@@ -1086,7 +1131,8 @@ def create_fractal_goal(current_user, root_id, validated_data):
             new_goal.targets = None
         
         # Link to session if session_id provided and it's a MicroGoal
-        is_micro = getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal'
+        # Use the type string directly (not new_goal.level.name which may not be lazy-loaded yet)
+        is_micro = validated_data.get('type') == 'MicroGoal'
         if validated_data.get('session_id') and is_micro:
             db_session.execute(session_goals.insert().values(
                 **_session_goal_insert_values(

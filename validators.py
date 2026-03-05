@@ -266,6 +266,19 @@ class GoalCreateSchema(BaseModel):
             raise ValueError('MicroGoal must have a parent_id (ImmediateGoal)')
         if self.type == 'NanoGoal' and not self.parent_id:
             raise ValueError('NanoGoal must have a parent_id (MicroGoal)')
+            
+        # Transient Goal Constraints (Micro & Nano)
+        if self.type in ('MicroGoal', 'NanoGoal') and self.deadline:
+            raise ValueError(f'{self.type} goals are transient and cannot have deadlines')
+            
+        # Nano Goal property restrictions
+        if self.type == 'NanoGoal':
+            if self.description and self.description.strip():
+                raise ValueError('NanoGoal cannot have a description')
+            self.track_activities = False
+            self.completed_via_children = False
+            self.allow_manual_completion = True
+            
         return self
     
     @field_validator('name')
@@ -342,6 +355,18 @@ class GoalUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
+
+    @field_validator('deadline')
+    @classmethod
+    def validate_deadline(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '':
+            return None
+        try:
+            # Validate it can be parsed
+            parse_date_string(v)
+            return v
+        except ValueError:
+            raise ValueError("Invalid deadline format. Use YYYY-MM-DD")
 
 
 class FractalCreateSchema(BaseModel):

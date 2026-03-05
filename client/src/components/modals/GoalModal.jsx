@@ -38,6 +38,15 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                 if (childType) {
                     setGoalType(childType);
                 }
+
+                // Default deadline to parent's deadline if available
+                const parentDeadline = parent.attributes?.deadline || parent.deadline;
+                if (parentDeadline) {
+                    // Extract date part from ISO string
+                    const pDate = parentDeadline.split('T')[0];
+                    setDeadline(pDate);
+                    hasAutoFilledRef.current = true;
+                }
             }
         }
     }, [isOpen, parent]);
@@ -223,6 +232,7 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                                     type="date"
                                     value={deadline}
                                     onChange={e => setDeadline(e.target.value)}
+                                    max={parent?.attributes?.deadline?.split('T')[0] || parent?.deadline?.split('T')[0]}
                                     fullWidth
                                 />
                             </div>

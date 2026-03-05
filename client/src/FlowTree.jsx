@@ -408,7 +408,9 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
         }
 
         const nodeType = node.attributes?.type || node.type;
-        const childType = getChildType(nodeType);
+        // Transient goals (Immediate/Micro/Nano) cannot have children added from the fractal tree
+        const transientTypes = new Set(['ImmediateGoal', 'MicroGoal', 'NanoGoal']);
+        const childType = !transientTypes.has(nodeType) ? getChildType(nodeType) : null;
         const childTypeName = childType ? getTypeDisplayName(childType) : null;
 
         nodes.push({

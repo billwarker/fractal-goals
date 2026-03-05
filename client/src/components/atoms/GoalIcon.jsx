@@ -6,18 +6,10 @@ import React from 'react';
  * Renders a goal node icon matching the FlowTree graph style.
  * 
  * For SMART goals: concentric rings (primary color strokes, secondary color gaps, primary core)
- * For non-SMART goals: solid circle of the primary color
+ * For non-SMART goals: solid shape of the primary color
  * 
- * Color mapping (matches FlowTree CustomNode + favicon.svg geometry):
- *   - Rings/strokes: primary goal color (e.g. teal for MidTerm)
- *   - Gaps between rings: secondary goal color (lighter shade)
- *   - Inner core: primary goal color
- * 
- * @param {string} color - The primary goal color (ring strokes + core fill).
- * @param {string} secondaryColor - The secondary goal color (gap fill between rings).
- * @param {boolean} isSmart - Whether to render concentric SMART rings.
- * @param {number} size - Rendered size in pixels (default: 24).
- * @param {string} className - Optional CSS class.
+ * All three rings now use identical strokeWidth so the detailing lines
+ * are visually uniform across every shape and every ring.
  */
 const GoalIcon = ({
     shape = 'circle',
@@ -35,29 +27,38 @@ const GoalIcon = ({
             case 'square':
                 return {
                     outer: <rect x="5" y="5" width="90" height="90" rx="8" />,
-                    middle: <rect x="20" y="20" width="60" height="60" rx="6" />,
-                    inner: <rect x="35" y="35" width="30" height="30" rx="4" />,
+                    middle: <rect x="22" y="22" width="56" height="56" rx="6" />,
+                    inner: <rect x="38" y="38" width="24" height="24" rx="4" />,
+                    core: <rect x="46" y="46" width="8" height="8" rx="2" />,
                     full: <rect x="5" y="5" width="90" height="90" rx="8" />
                 };
             case 'triangle':
+                // Each ring is a proportional triangle, uniformly spaced so all strokes appear equal width.
+                // Outer: full-size. Middle: ~55% area. Inner: ~25% area. Core: tiny dot.
                 return {
-                    outer: <path d="M50 5 L95 85 L5 85 Z" />,
-                    middle: <path d="M50 25 L80 80 L20 80 Z" />,
-                    inner: <path d="M50 45 L65 75 L35 75 Z" />,
+                    // Centroid of outer triangle ≈ (50, 57).
+                    // Each ring is scaled from the centroid so stroked edges have equal perpendicular spacing.
+                    // Scale factors: outer=1.0, middle=0.60, inner=0.40
+                    outer: <path d="M50 8 L93 82 L7 82 Z" />,
+                    middle: <path d="M50 28 L76 72 L24 72 Z" />,
+                    inner: <path d="M50 38 L67 67 L33 67 Z" />,
+                    core: null,
                     full: <path d="M50 5 L95 85 L5 85 Z" />
                 };
             case 'diamond':
                 return {
                     outer: <path d="M50 5 L95 50 L50 95 L5 50 Z" />,
-                    middle: <path d="M50 20 L80 50 L50 80 L20 50 Z" />,
-                    inner: <path d="M50 35 L65 50 L50 65 L35 50 Z" />,
+                    middle: <path d="M50 22 L78 50 L50 78 L22 50 Z" />,
+                    inner: <path d="M50 37 L63 50 L50 63 L37 50 Z" />,
+                    core: <circle cx="50" cy="50" r="5" />,
                     full: <path d="M50 5 L95 50 L50 95 L5 50 Z" />
                 };
             case 'hexagon':
                 return {
                     outer: <path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z" />,
-                    middle: <path d="M50 20 L80.6 37.5 L80.6 62.5 L50 80 L19.4 62.5 L19.4 37.5 Z" />,
-                    inner: <path d="M50 35 L67.9 45 L67.9 55 L50 65 L32.1 55 L32.1 45 Z" />,
+                    middle: <path d="M50 21 L79.6 38 L79.6 62 L50 79 L20.4 62 L20.4 38 Z" />,
+                    inner: <path d="M50 37 L66.2 46.5 L66.2 53.5 L50 63 L33.8 53.5 L33.8 46.5 Z" />,
+                    core: <circle cx="50" cy="50" r="5" />,
                     full: <path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z" />
                 };
             case 'twelvepointstar':
@@ -84,6 +85,7 @@ const GoalIcon = ({
                             <rect x="40" y="40" width="20" height="20" transform="rotate(60 50 50)" />
                         </g>
                     ),
+                    core: <circle cx="50" cy="50" r="5" />,
                     full: (
                         <g>
                             <rect x="20" y="20" width="60" height="60" />
@@ -97,6 +99,7 @@ const GoalIcon = ({
                     outer: <path d="M50 5 L64.5 35 L97 40 L73.5 63 L79 95 L50 80 L21 95 L26.5 63 L3 40 L35.5 35 Z" />,
                     middle: <path d="M50 20 L59.5 40 L81 43 L65.5 58.5 L69 80 L50 70 L31 80 L34.5 58.5 L19 43 L40.5 40 Z" />,
                     inner: <path d="M50 35 L54.5 45 L65 46.5 L57.5 54 L59 65 L50 60 L41 65 L42.5 54 L35 46.5 L45.5 45 Z" />,
+                    core: <circle cx="50" cy="50" r="5" />,
                     full: <path d="M50 5 L64.5 35 L97 40 L73.5 63 L79 95 L50 80 L21 95 L26.5 63 L3 40 L35.5 35 Z" />
                 };
             case 'check':
@@ -104,22 +107,24 @@ const GoalIcon = ({
                     outer: <path d="M20 50 L40 70 L80 30" fill="none" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />,
                     middle: <path d="M25 50 L40 65 L75 30" fill="none" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />,
                     inner: <path d="M30 50 L40 60 L70 30" fill="none" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />,
+                    core: null,
                     full: <path d="M20 50 L40 70 L80 30" fill="none" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
                 };
             case 'circle':
             default:
                 return {
-                    outer: <circle cx="50" cy="50" r="45" />,
-                    middle: <circle cx="50" cy="50" r="30" />,
+                    outer: <circle cx="50" cy="50" r="44" />,
+                    middle: <circle cx="50" cy="50" r="29" />,
                     inner: <circle cx="50" cy="50" r="15" />,
-                    full: <circle cx="50" cy="50" r="45" />
+                    core: <circle cx="50" cy="50" r="5" />,
+                    full: <circle cx="50" cy="50" r="44" />
                 };
         }
     };
 
     const paths = getPath(shape);
-
     const isStrokeBased = shape.toLowerCase() === 'check';
+    const STROKE_WIDTH = "5";
 
     return (
         <svg
@@ -133,23 +138,23 @@ const GoalIcon = ({
         >
             {isSmart ? (
                 <>
-                    {/* Outer Ring */}
+                    {/* Outer Ring — stroke only */}
                     {React.cloneElement(paths.outer, {
                         fill: isStrokeBased ? 'none' : secondaryColor,
                         stroke: color,
-                        strokeWidth: isStrokeBased ? (paths.outer.props.strokeWidth || "5") : "5"
+                        strokeWidth: isStrokeBased ? (paths.outer.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
                     })}
-                    {/* Middle Ring */}
+                    {/* Middle Ring — stroke only */}
                     {React.cloneElement(paths.middle, {
                         fill: isStrokeBased ? 'none' : secondaryColor,
                         stroke: color,
-                        strokeWidth: isStrokeBased ? (paths.middle.props.strokeWidth || "5") : "5"
+                        strokeWidth: isStrokeBased ? (paths.middle.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
                     })}
-                    {/* Inner Core */}
+                    {/* Inner Ring — stroke only, same weight */}
                     {React.cloneElement(paths.inner, {
-                        fill: isStrokeBased ? 'none' : color,
-                        stroke: isStrokeBased ? color : 'none',
-                        strokeWidth: isStrokeBased ? (paths.inner.props.strokeWidth || "5") : "0"
+                        fill: isStrokeBased ? 'none' : secondaryColor,
+                        stroke: color,
+                        strokeWidth: isStrokeBased ? (paths.inner.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
                     })}
                 </>
             ) : (
