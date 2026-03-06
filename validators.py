@@ -620,6 +620,8 @@ class NoteCreateSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
     image_data: Optional[str] = None  # Base64 encoded image
+    nano_goal_id: Optional[str] = None
+    is_nano_goal: Optional[bool] = False
     
     @field_validator('content')
     @classmethod

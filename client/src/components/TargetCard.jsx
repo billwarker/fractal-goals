@@ -177,6 +177,18 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 )}
             </div>
 
+            {/* Completion target indicator */}
+            {target.type === 'completion' && (
+                <div style={{
+                    paddingLeft: '28px',
+                    fontSize: '12px',
+                    color: isCompleted ? iconColor : 'var(--color-text-muted)',
+                    fontStyle: 'italic',
+                }}>
+                    {isCompleted ? '✓ Completed' : 'Completion target'}
+                </div>
+            )}
+
             {/* Progress Bar for Accumulation/Frequency */}
             {(target.type === 'sum' || target.type === 'frequency') && (
                 <div style={{ paddingLeft: '28px', marginTop: '6px', marginBottom: '8px' }}>
@@ -203,41 +215,43 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 </div>
             )}
 
-            {/* Target metrics */}
-            <div style={{
-                display: 'flex',
-                gap: '12px',
-                flexWrap: 'wrap',
-                paddingLeft: '28px'
-            }}>
-                {target.metrics?.map(metric => {
-                    const metricDef = activityDef.metric_definitions?.find(m => m.id === metric.metric_id);
-                    if (!metricDef) return null;
+            {/* Target metrics (only for non-completion targets) */}
+            {target.type !== 'completion' && target.metrics?.length > 0 && (
+                <div style={{
+                    display: 'flex',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                    paddingLeft: '28px'
+                }}>
+                    {target.metrics.map(metric => {
+                        const metricDef = activityDef.metric_definitions?.find(m => m.id === metric.metric_id);
+                        if (!metricDef) return null;
 
-                    const operator = metric.operator || '>=';
+                        const operator = metric.operator || '>=';
 
-                    return (
-                        <div
-                            key={metric.metric_id}
-                            style={{
-                                background: 'var(--color-bg-input)',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--color-border)',
-                                fontSize: '12px'
-                            }}
-                        >
-                            <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}</span>
-                            {' '}
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
-                            {' '}
-                            <span style={{ fontWeight: 'bold', color: isCompleted ? targetColor : 'var(--color-text-primary)' }}>
-                                {metric.value} {metricDef.unit}
-                            </span>
-                        </div>
-                    );
-                })}
-            </div>
+                        return (
+                            <div
+                                key={metric.metric_id}
+                                style={{
+                                    background: 'var(--color-bg-input)',
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--color-border)',
+                                    fontSize: '12px'
+                                }}
+                            >
+                                <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}</span>
+                                {' '}
+                                <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
+                                {' '}
+                                <span style={{ fontWeight: 'bold', color: isCompleted ? targetColor : 'var(--color-text-primary)' }}>
+                                    {metric.value} {metricDef.unit}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

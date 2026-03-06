@@ -167,6 +167,7 @@ def _sync_targets(db_session, goal, incoming_targets: list):
             
             # Sanitize inputs
             activity_id = target_data.get('activity_id') or None
+            activity_instance_id = target_data.get('activity_instance_id') or None
             linked_block_id = target_data.get('linked_block_id') or None
             start_date = _parse_date(target_data.get('start_date'))
             end_date = _parse_date(target_data.get('end_date'))
@@ -179,6 +180,7 @@ def _sync_targets(db_session, goal, incoming_targets: list):
                 target = current_targets[target_id]
                 target.name = target_data.get('name', target.name)
                 target.activity_id = activity_id
+                target.activity_instance_id = activity_instance_id
                 target.type = target_data.get('type', target.type)
                 target.time_scope = target_data.get('time_scope', target.time_scope)
                 target.start_date = start_date
@@ -211,6 +213,7 @@ def _sync_targets(db_session, goal, incoming_targets: list):
                     goal_id=goal.id,
                     root_id=goal.root_id or goal.id,
                     activity_id=activity_id,
+                    activity_instance_id=activity_instance_id,
                     name=target_data.get('name', 'Measure'),
                     type=target_data.get('type', 'threshold'),
                     time_scope=target_data.get('time_scope', 'all_time'),
@@ -595,6 +598,7 @@ def add_goal_target(current_user, goal_id):
             goal_id=goal_id,
             root_id=goal.root_id or goal_id,  # For root goals, use goal_id
             activity_id=data.get('activity_id'),
+            activity_instance_id=data.get('activity_instance_id'),
             name=data.get('name', 'Measure'),
             type=data.get('type', 'threshold'),
             time_scope=data.get('time_scope', 'all_time'),

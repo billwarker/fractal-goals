@@ -282,7 +282,8 @@ def create_note(current_user, root_id, validated_data):
             activity_definition_id=validated_data.get('activity_definition_id'),
             set_index=validated_data.get('set_index'),
             content=content,
-            image_data=image_data
+            image_data=image_data,
+            nano_goal_id=validated_data.get('nano_goal_id')
         )
         
         db.add(note)

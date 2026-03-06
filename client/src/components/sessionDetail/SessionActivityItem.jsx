@@ -59,6 +59,7 @@ function SessionActivityItem({
         updateTimer,
         removeActivity,
         createGoal,
+        updateGoal,
     } = useActiveSessionActions();
 
     const activityDefinition = activityDefinitionProp
@@ -232,7 +233,7 @@ function SessionActivityItem({
     const activeMicroGoal = microGoals.find(mg =>
         !mg.completed &&
         mg.attributes?.session_id === sessionId &&
-        activityDefinition?.associated_goal_ids?.includes(mg.parent_id)
+        (activityDefinition?.associated_goal_ids?.includes(mg.parent_id) || activityDefinition?.associated_goal_ids?.includes(mg.id))
     );
 
     const onCreateNanoGoal = async (parentId, name) => {
@@ -248,45 +249,15 @@ function SessionActivityItem({
     const microChars = getLevelByName('MicroGoal');
     const nanoChars = getLevelByName('NanoGoal');
     const immediateChars = getLevelByName('ImmediateGoal');
-    const [nanoMode, setNanoMode] = useState(false);
 
-    // Helper: Determine the next goal action based on activity's current associations
-    const getNextGoalContext = () => {
-        if (!activityDefinition) {
-            return null;
-        }
+    const [nanoMode, setNanoMode] = useState(!!activeMicroGoal);
+    useEffect(() => {
+        setNanoMode(!!activeMicroGoal);
+    }, [activeMicroGoal]);
 
-        const associatedGoalIds = activityDefinition.associated_goal_ids || [];
-        const associatedGoals = activityDefinition.associated_goals || [];
-
-        // Check if associated with any Short-Term or Immediate goals
-        // We use associatedGoals directly check the types of associated goals, regardless of current session context
-        const hasShortTermGoal = (Array.isArray(associatedGoals) && associatedGoals.some(g => g.type === 'ShortTermGoal')) || (Array.isArray(parentGoals) && parentGoals.some(g => associatedGoalIds.includes(g.id)));
-        const iGoals = Array.isArray(session?.immediate_goals) ? session.immediate_goals : (Array.isArray(immediateGoals) ? immediateGoals : []);
-        const hasImmediateGoal = iGoals.some(g => associatedGoalIds.includes(g.id));
-
-        // Case 1: Not associated with STG or IG -> need to associate
-        // Case 1 & 2: No longer prompting for association here. 
-        // Association is handled in the sidepane.
-        // Fall through to Micro/Nano goal creation.
-
-        // Case 3: Has IG but no active micro -> create Micro Goal
-        // Check if there's an active micro goal for this activity in the session
-        if (!activeMicroGoal) {
-            return null;
-        }
-
-        // Case 4: Has active micro -> create Nano Goal (toggle mode)
-        return {
-            type: 'NanoGoal',
-            label: nanoMode ? 'Cancel Nano Note' : 'Add Nano Goal Note',
-            icon: nanoChars.icon || 'star',
-            color: getGoalColor('NanoGoal'),
-            secondaryColor: getGoalSecondaryColor('NanoGoal')
-        };
-    };
-
-    const goalContext = getNextGoalContext();
+    const handleToggleNanoMode = useCallback(() => {
+        setNanoMode(prev => !prev);
+    }, []);
 
     // Local state for editing datetime fields
     const [localStartTime, setLocalStartTime] = useState('');
@@ -295,10 +266,7 @@ function SessionActivityItem({
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
 
-    // Reset nano mode when active micro goal changes (e.g. completes or switch activity)
-    useEffect(() => {
-        if (!activeMicroGoal) setNanoMode(false);
-    }, [activeMicroGoal]);
+
 
     // Real-time timer effect
     useEffect(() => {
@@ -431,6 +399,11 @@ function SessionActivityItem({
             console.error("Failed to create nano note", err);
         }
     };
+
+    const handleToggleNanoGoal = useCallback((nanoGoalId, completed) => {
+        if (!updateGoal || !nanoGoalId) return;
+        updateGoal({ goalId: nanoGoalId, updates: { completed } });
+    }, [updateGoal]);
 
     // Sync local state when exercise times change
     useEffect(() => {
@@ -572,8 +545,18 @@ function SessionActivityItem({
                         }}
                         className={styles.activityNameContainer}
                     >
-                        <div className={styles.activityName}>
-                            {def.name}
+                        <div className={styles.activityName} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {activeMicroGoal && (
+                                <div title={`Micro Goal: ${activeMicroGoal.name}`}>
+                                    <GoalIcon
+                                        shape={microChars?.icon || 'target'}
+                                        color={getGoalColor('MicroGoal')}
+                                        secondaryColor={getGoalSecondaryColor('MicroGoal')}
+                                        size={14}
+                                    />
+                                </div>
+                            )}
+                            <span>{def.name}</span>
                         </div>
                         {exercise.group_name && (
                             <div className={styles.activityGroupLabel}>{exercise.group_name}</div>
@@ -583,43 +566,6 @@ function SessionActivityItem({
                 </div>
 
                 <div className={styles.activityHeaderRight}>
-                    {/* Smart Goal Creator Button */}
-                    {/* Smart Goal Creator Button */}
-                    {goalContext && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-
-                                if (goalContext.type === 'NanoGoal') {
-                                    // Toggle nano mode for existing behavior
-                                    setNanoMode(!nanoMode);
-                                } else {
-                                    // Open goals panel with context for creating IG or Micro
-                                    if (onOpenGoals) {
-                                        onOpenGoals(exercise, {
-                                            suggestedType: goalContext.type,
-                                            activityDefinition: activityDefinition
-                                        });
-                                    }
-                                }
-                            }}
-                            className={`${styles.microGoalActionButton} ${goalContext.type === 'NanoGoal' && nanoMode ? styles.activeNanoMode : ''}`}
-                            title={goalContext.label}
-                            style={{
-                                borderColor: goalContext.color,
-                                color: goalContext.color
-                            }}
-                        >
-                            <GoalIcon
-                                shape={goalContext.icon}
-                                color={goalContext.color}
-                                secondaryColor={goalContext.secondaryColor}
-                                size={14}
-                            />
-                            <span>{goalContext.label}</span>
-                        </button>
-                    )}
-
                     {/* Timer Controls - New Design */}
                     {exercise.id && (
                         <div className={styles.timerControlsGrid}>
@@ -949,6 +895,7 @@ function SessionActivityItem({
                                 notes={activityNotes}
                                 onUpdate={onUpdateNote}
                                 onDelete={onDeleteNote}
+                                onToggleNanoGoal={handleToggleNanoGoal}
                                 compact={false}
                                 selectedNoteId={selectedNoteId} // Use local state
                                 onNoteSelect={setSelectedNoteId}
@@ -965,6 +912,8 @@ function SessionActivityItem({
                         }
                         buttonLabel={nanoMode ? "Add Nano" : "Add Note"}
                         isNanoMode={nanoMode}
+                        hasMicroGoal={!!activeMicroGoal}
+                        onToggleNanoMode={handleToggleNanoMode}
                     />
                 </div>
             </div>

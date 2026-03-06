@@ -34,6 +34,7 @@ class Note(Base):
     session = relationship("Session", backref="notes_list")
     activity_instance = relationship("ActivityInstance", backref="notes_list")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
+    nano_goal = relationship("Goal", foreign_keys=[nano_goal_id])
 
 class VisualizationAnnotation(Base):
     __tablename__ = 'visualization_annotations'

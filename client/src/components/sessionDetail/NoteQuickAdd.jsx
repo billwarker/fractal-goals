@@ -6,9 +6,12 @@
  */
 
 import React, { useState, useRef } from 'react';
+import GoalIcon from '../atoms/GoalIcon';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './NoteQuickAdd.module.css';
 
-function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false }) {
+function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false, hasMicroGoal = false, onToggleNanoMode }) {
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [pastedImage, setPastedImage] = useState(null);
@@ -108,6 +111,20 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
             )}
 
             <div className={styles.noteInputRow}>
+                {hasMicroGoal && (
+                    <button
+                        type="button"
+                        className={`${styles.nanoToggleBtn} ${isNanoMode ? styles.nanoModeActive : ''}`}
+                        onClick={onToggleNanoMode}
+                        title={isNanoMode ? "Switch to regular note" : "Create as Nano Goal"}
+                    >
+                        <GoalIcon
+                            shape={getLevelByName('NanoGoal')?.icon || 'circle'}
+                            color={isNanoMode ? getGoalColor('NanoGoal') : 'var(--color-text-muted)'}
+                            size={18}
+                        />
+                    </button>
+                )}
                 <textarea
                     ref={inputRef}
                     value={content}

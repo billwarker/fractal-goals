@@ -10,7 +10,8 @@ import notify from '../utils/notify';
  * MicroGoalModal
  *
  * Lets the user set target metric values for a locked activity.
- * The micro goal name is auto-generated from the metric values.
+ * If the activity has no metrics, creates a completion-based target instead.
+ * The micro goal name is auto-generated from the metric values or activity name.
  */
 function MicroGoalModal({
     isOpen,
@@ -26,60 +27,86 @@ function MicroGoalModal({
     const microIcon = getGoalIcon ? getGoalIcon('MicroGoal') : 'circle';
 
     const [metricValues, setMetricValues] = useState({});
+    const [intentionText, setIntentionText] = useState('');
     const [saving, setSaving] = useState(false);
 
     const lockedActivity = activityDefinitions.find(a => a.id === preselectedActivityId);
+    const hasMetrics = lockedActivity?.metric_definitions?.length > 0;
 
     // Reset on open
     useEffect(() => {
         if (!isOpen) return;
         setMetricValues({});
+        setIntentionText('');
     }, [isOpen]);
 
     const handleMetricChange = (metricId, value) => {
         setMetricValues(prev => ({ ...prev, [metricId]: value }));
     };
 
-    // Auto-generate name from filled-in metric values
+    // Auto-generate name from filled-in metric values (metric targets only)
     const generatedName = useMemo(() => {
-        if (!lockedActivity?.metric_definitions?.length) return '';
+        if (!hasMetrics || !lockedActivity?.metric_definitions?.length) return '';
         const parts = lockedActivity.metric_definitions
             .filter(m => metricValues[m.id] !== undefined && metricValues[m.id] !== '')
             .map(m => `${m.name} ${metricValues[m.id]}${m.unit ? ' ' + m.unit : ''}`);
         return parts.join(', ');
-    }, [metricValues, lockedActivity]);
+    }, [metricValues, lockedActivity, hasMetrics]);
 
-    const hasAnyValue = Object.values(metricValues).some(v => v !== '' && v !== undefined);
+    const hasAnyMetricValue = Object.values(metricValues).some(v => v !== '' && v !== undefined);
+
+    // For completion targets, always allow saving
+    const canSave = hasMetrics ? hasAnyMetricValue : !!lockedActivity;
 
     const handleSave = async () => {
         if (!preselectedActivityId) {
             notify.error('No activity associated — select an activity first');
             return;
         }
-        if (!hasAnyValue) {
-            notify.error('Please enter at least one target value');
+        if (!canSave) {
+            notify.error('Cannot create micro goal without an activity');
             return;
         }
 
-        const metrics = Object.entries(metricValues)
-            .filter(([, v]) => v !== '' && v !== undefined)
-            .map(([metric_id, value]) => ({
-                metric_id,
-                value: parseFloat(value) || 0,
-            }));
+        let target;
+        let goalName;
 
-        const goalName = generatedName || lockedActivity?.name || 'Micro Goal';
+        if (hasMetrics) {
+            // Metric-based target (existing flow)
+            const metrics = Object.entries(metricValues)
+                .filter(([, v]) => v !== '' && v !== undefined)
+                .map(([metric_id, value]) => ({
+                    metric_id,
+                    value: parseFloat(value) || 0,
+                }));
 
-        const target = {
-            id: crypto.randomUUID(),
-            activity_id: preselectedActivityId,
-            name: goalName,
-            metrics,
-        };
+            goalName = generatedName || lockedActivity?.name || 'Micro Goal';
+            target = {
+                id: crypto.randomUUID(),
+                activity_id: preselectedActivityId,
+                name: goalName,
+                type: 'threshold',
+                metrics,
+            };
+        } else {
+            // Completion target (new flow)
+            goalName = `Complete ${lockedActivity?.name || 'Activity'}`;
+            target = {
+                id: crypto.randomUUID(),
+                activity_id: preselectedActivityId,
+                name: goalName,
+                type: 'completion',
+                metrics: [],
+            };
+        }
 
         setSaving(true);
         try {
-            await onSave({ goalName, target });
+            await onSave({
+                goalName,
+                target,
+                description: intentionText.trim() || '',
+            });
             onClose();
         } catch (err) {
             console.error('Failed to create Micro Goal', err);
@@ -145,8 +172,8 @@ function MicroGoalModal({
                         </div>
                     </div>
 
-                    {/* Metric value inputs */}
-                    {lockedActivity?.metric_definitions?.length > 0 ? (
+                    {/* Metric value inputs OR completion target */}
+                    {hasMetrics ? (
                         <div>
                             <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                                 Target Values
@@ -181,14 +208,59 @@ function MicroGoalModal({
                             </div>
                         </div>
                     ) : (
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                            {lockedActivity ? 'This activity has no metrics defined.' : 'No activity selected.'}
+                        <div style={{
+                            padding: '12px',
+                            background: 'var(--color-bg-card-alt)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '6px',
+                        }}>
+                            <div style={{
+                                fontSize: '13px',
+                                color: 'var(--color-text-primary)',
+                                fontWeight: 500,
+                                marginBottom: '4px',
+                            }}>
+                                ✓ Complete {lockedActivity?.name || 'activity'}
+                            </div>
+                            <div style={{
+                                fontSize: '11px',
+                                color: 'var(--color-text-muted)',
+                            }}>
+                                Completion target — achieved when this activity is marked complete.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Intention text (optional, for completion targets) */}
+                    {!hasMetrics && lockedActivity && (
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                                Intention <span style={{ fontSize: '11px', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>(optional)</span>
+                            </label>
+                            <textarea
+                                value={intentionText}
+                                onChange={e => setIntentionText(e.target.value)}
+                                placeholder="e.g. Focus on smooth transitions..."
+                                rows={2}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'var(--color-bg-card-alt)',
+                                    border: '1px solid var(--color-border)',
+                                    borderRadius: '4px',
+                                    color: 'var(--color-text-primary)',
+                                    fontSize: '13px',
+                                    resize: 'vertical',
+                                    fontFamily: 'inherit',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
                         </div>
                     )}
                 </div>
 
-                {/* Auto-generated goal name preview */}
-                {generatedName && (
+                {/* Auto-generated goal name preview (metric targets only) */}
+                {hasMetrics && generatedName && (
                     <div style={{
                         borderTop: '1px solid var(--color-border)',
                         paddingTop: '14px',
@@ -217,7 +289,7 @@ function MicroGoalModal({
                     <Button
                         onClick={handleSave}
                         variant="primary"
-                        disabled={saving || !hasAnyValue}
+                        disabled={saving || !canSave}
                     >
                         {saving ? 'Creating…' : 'Create Micro Goal'}
                     </Button>

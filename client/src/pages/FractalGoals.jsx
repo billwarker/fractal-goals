@@ -99,6 +99,7 @@ function FractalGoals() {
         fadeInactiveBranches: false,
         showCompletionJourney: false,
         showMetricsOverlay: false,
+        showMicroNanoGoals: false,
     };
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
 
@@ -317,6 +318,11 @@ function FractalGoals() {
                             label="Show metrics overlay"
                             checked={viewSettings.showMetricsOverlay}
                             onChange={handleToggleViewSetting('showMetricsOverlay')}
+                        />
+                        <Checkbox
+                            label="Show Micro & Nano Goals"
+                            checked={viewSettings.showMicroNanoGoals}
+                            onChange={handleToggleViewSetting('showMicroNanoGoals')}
                         />
                     </div>
                     <FractalView

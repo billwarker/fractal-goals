@@ -14,6 +14,7 @@ import SessionFocusSection from './SessionFocusSection';
 import AddTargetModal from '../AddTargetModal';
 import MicroGoalModal from '../MicroGoalModal';
 import GoalDetailModal from '../GoalDetailModal';
+import Checkbox from '../atoms/Checkbox';
 import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
 
@@ -55,6 +56,7 @@ function GoalsPanel({
     const [allShortTermGoals, setAllShortTermGoals] = useState([]);
 
     // Inline IG creator state
+    const [showMicroNanoGoals, setShowMicroNanoGoals] = useState(false);
     const [showIGCreator, setShowIGCreator] = useState(false);
     const [igName, setIGName] = useState('');
     const [igParentId, setIGParentId] = useState('');
@@ -264,18 +266,24 @@ function GoalsPanel({
         setShowMicroTargetBuilder(true);
     }, []);
 
-    const handleSaveMicroGoal = useCallback(async ({ goalName, target }) => {
+    const handleSaveMicroGoal = useCallback(async ({ goalName, target, description }) => {
         if (!targetBuilderGoal || !rootId) return;
         const parentId = targetBuilderGoal.id || targetBuilderGoal.attributes?.id;
         if (!parentId) return;
         try {
             // 1. Create the MicroGoal
+            const enrichedTarget = { ...target };
+            if (activeActivityDef && selectedActivity?.id) {
+                enrichedTarget.activity_instance_id = selectedActivity.id;
+            }
+
             const newGoal = await createGoal({
                 name: goalName,
                 type: 'MicroGoal',
                 parent_id: parentId,
                 session_id: sessionId,
-                targets: [target],
+                targets: [enrichedTarget],
+                description: description || '',
             });
             // 2. Associate the new micro goal with the current activity (if activity-focused)
             if (activeActivityDef) {
@@ -389,7 +397,7 @@ function GoalsPanel({
         // 2. Filter MicroGoals
         // If mode is 'session', take ALL session microgoals
         // If mode is 'activity', take only linked microgoals
-        const relevantMicroGoals = mode === 'session'
+        const relevantMicroGoals = !showMicroNanoGoals ? [] : mode === 'session'
             ? microGoals.filter((microGoal) => {
                 if (!allowedSessionActivityDefIds) return false;
                 return allowedSessionActivityDefIds.has(microGoal.activity_definition_id);
@@ -398,8 +406,9 @@ function GoalsPanel({
 
         if (relevantMicroGoals.length === 0) {
             return hierarchy.filter(node => {
+                const id = node.id;
                 if (!node.completed) return true;
-                return sessionCompletedGoalIds && sessionCompletedGoalIds.has(node.id);
+                return sessionCompletedGoalIds && sessionCompletedGoalIds.has(id);
             });
         }
 
@@ -443,7 +452,7 @@ function GoalsPanel({
             if (!node.completed) return true;
             return sessionCompletedGoalIds && sessionCompletedGoalIds.has(id);
         });
-    }, [goalTree, microGoals, sessionCompletedGoalIds]);
+    }, [goalTree, microGoals, sessionCompletedGoalIds, showMicroNanoGoals]);
 
     const sessionHierarchy = useMemo(() => {
         if (viewMode !== 'session') return [];
@@ -501,7 +510,7 @@ function GoalsPanel({
                                 flattenedHierarchy={activeActivityHierarchy}
                                 viewMode={viewMode}
                                 onGoalClick={onGoalClick}
-                                getLevelByName={getLevelByName}
+                                getScopedCharacteristics={getLevelByName}
                                 getGoalColor={getGoalColor}
                                 getGoalSecondaryColor={getGoalSecondaryColor}
                                 getGoalIcon={getGoalIcon}
@@ -545,7 +554,7 @@ function GoalsPanel({
                                 flattenedHierarchy={sessionHierarchy}
                                 viewMode="session"
                                 onGoalClick={onGoalClick}
-                                getLevelByName={getLevelByName}
+                                getScopedCharacteristics={getLevelByName}
                                 getGoalColor={getGoalColor}
                                 getGoalSecondaryColor={getGoalSecondaryColor}
                                 getGoalIcon={getGoalIcon}

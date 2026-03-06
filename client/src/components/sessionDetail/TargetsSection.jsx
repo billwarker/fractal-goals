@@ -43,6 +43,9 @@ function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, allowe
                     // Filter by allowedActivityIds if provided (scoping to session activities)
                     if (allowedActivityIds && !allowedActivityIds.has(target.activity_id)) return;
 
+                    // Filter out instance-bound targets (handled inside activity instance cards)
+                    if (target.activity_instance_id) return;
+
                     // Get real-time achievement status if available
                     const achievement = targetAchievements?.get(target.id);
                     // Check if either the activity metrics, the event listener, or the backend says it's achieved

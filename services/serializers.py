@@ -56,6 +56,7 @@ def serialize_target(target):
         "goal_id": target.goal_id,
         "root_id": target.root_id,
         "activity_id": target.activity_id,
+        "activity_instance_id": getattr(target, 'activity_instance_id', None),
         "activity_group_id": getattr(target, 'activity_group_id', None),
         "template_id": getattr(target, 'template_id', None),
         "name": target.name,
@@ -167,6 +168,7 @@ def serialize_goal(goal, include_children=True):
             "smart_status": smart_status,
             "associated_activity_ids": [a.id for a in goal.associated_activities] if goal.associated_activities else [],
             "associated_activity_group_ids": [g.id for g in goal.associated_activity_groups] if goal.associated_activity_groups else [],
+            "session_id": goal.sessions[0].id if goal.sessions else None,
         },
         "children": []
     }
@@ -551,7 +553,8 @@ def serialize_note(note, include_image=False):
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
         "nano_goal_id": note.nano_goal_id,
-        "is_nano_goal": note.nano_goal_id is not None
+        "is_nano_goal": note.nano_goal_id is not None,
+        "nano_goal_completed": note.nano_goal.completed if getattr(note, 'nano_goal', None) else False
     }
     if include_image:
         result["image_data"] = note.image_data

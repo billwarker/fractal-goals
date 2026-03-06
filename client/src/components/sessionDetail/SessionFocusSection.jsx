@@ -39,7 +39,7 @@ function SessionFocusSection({
                     <div key={micro.id} className={styles.microGoalRow}>
                         <div className={styles.microGoalHeader}>
                             <GoalIcon
-                                shape={microChars.icon || 'circle'}
+                                shape={microChars?.icon || 'circle'}
                                 color={micro.completed ? completedColor : getGoalColor('MicroGoal')}
                                 secondaryColor={micro.completed ? completedSecondaryColor : getGoalSecondaryColor('MicroGoal')}
                                 isSmart={micro.is_smart}
@@ -87,7 +87,7 @@ function SessionFocusSection({
                             {micro.children?.map(nano => (
                                 <div key={nano.id} className={styles.nanoGoalRow}>
                                     <GoalIcon
-                                        shape={nanoChars.icon || 'star'}
+                                        shape={nanoChars?.icon || 'star'}
                                         color={nano.completed ? completedColor : getGoalColor('NanoGoal')}
                                         secondaryColor={nano.completed ? completedSecondaryColor : getGoalSecondaryColor('NanoGoal')}
                                         isSmart={false}

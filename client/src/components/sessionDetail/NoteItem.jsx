@@ -4,16 +4,19 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Linkify from '../atoms/Linkify';
+import GoalIcon from '../atoms/GoalIcon';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from './ImageViewerModal';
 import styles from './NoteItem.module.css';
 
-function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSelect }) {
+function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false, isSelected, onSelect }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showImageViewer, setShowImageViewer] = useState(false);
     const { timezone } = useTimezone();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
     const textareaRef = useRef(null);
 
     const adjustHeight = (el) => {
@@ -211,8 +214,30 @@ function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSel
                     <>
                         {/* Only show text content if it's not just the placeholder */}
                         {!isImageOnly && (
-                            <div className={styles.noteItemContent}>
-                                <Linkify>{note.content}</Linkify>
+                            <div className={`${styles.noteItemContent} ${note.is_nano_goal ? styles.nanoGoalContent : ''}`}>
+                                {note.is_nano_goal && (
+                                    <div className={styles.nanoBadgeIcon}>
+                                        <GoalIcon
+                                            shape={getLevelByName('NanoGoal')?.icon || 'circle'}
+                                            color={note.nano_goal_completed ? getGoalColor('Completed') : getGoalColor('NanoGoal')}
+                                            secondaryColor={note.nano_goal_completed ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor('NanoGoal')}
+                                            size={14}
+                                        />
+                                    </div>
+                                )}
+                                <div style={{ textDecoration: note.nano_goal_completed ? 'line-through' : 'none', opacity: note.nano_goal_completed ? 0.7 : 1, flex: 1, paddingRight: note.is_nano_goal ? '8px' : '0' }}>
+                                    <Linkify>{note.content}</Linkify>
+                                </div>
+                                {note.is_nano_goal && (
+                                    <input
+                                        type="checkbox"
+                                        checked={note.nano_goal_completed || false}
+                                        onChange={(e) => onToggleNanoGoal && onToggleNanoGoal(note.nano_goal_id, e.target.checked)}
+                                        className={styles.nanoCheckbox}
+                                        onClick={(e) => e.stopPropagation()}
+                                        title={note.nano_goal_completed ? "Mark incomplete" : "Mark complete"}
+                                    />
+                                )}
                             </div>
                         )}
                         {(onUpdate || onDelete) && !note.isPast && (

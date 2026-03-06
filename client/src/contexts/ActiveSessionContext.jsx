@@ -452,6 +452,34 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
         try {
             if (newCompleted) {
+                // Carry forward logic for uncompleted instance-bound Micro Goals
+                const uncompletedInstanceMicroGoals = microGoals.filter(mg =>
+                    !mg.completed &&
+                    mg.attributes?.targets?.some(t => t.activity_instance_id)
+                );
+
+                if (uncompletedInstanceMicroGoals.length > 0) {
+                    const carryForward = window.confirm(
+                        "You have uncompleted Micro Goals bound to this session's activities. " +
+                        "Would you like to carry them forward to the next time you do these activities?"
+                    );
+
+                    if (carryForward) {
+                        for (const mg of uncompletedInstanceMicroGoals) {
+                            const updatedTargets = (mg.attributes?.targets || []).map(t => ({
+                                ...t,
+                                activity_instance_id: null,
+                                session_id: null
+                            }));
+
+                            await fractalApi.updateGoal(rootId, mg.id, {
+                                session_id: null,
+                                targets: updatedTargets
+                            });
+                        }
+                    }
+                }
+
                 updatePayload.session_end = new Date().toISOString();
                 for (const instance of activityInstances) {
                     if (instance.time_start && !instance.time_stop) {
@@ -466,7 +494,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             console.error('Failed to toggle session completion', err);
             notify.error(`Failed to update session completion: ${err?.response?.data?.error || err?.message || 'Unknown error'}`);
         }
-    }, [session, activityInstances, handleUpdateTimer, updateSessionMutation]);
+    }, [session, activityInstances, handleUpdateTimer, updateSessionMutation, microGoals, rootId]);
 
     const calculateTotalDuration = useCallback(() => {
         return activityInstances.reduce((sum, inst) => sum + (inst.duration_seconds || 0), 0);

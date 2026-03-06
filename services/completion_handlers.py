@@ -200,14 +200,51 @@ def _evaluate_threshold_targets_for_activity(
             logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - already completed")
             continue
         
-        # Only evaluate threshold targets
-        if target_type != 'threshold':
-            logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - not threshold type")
-            continue
-        
         # Only evaluate if target references this activity
         if target_activity != activity_id:
             logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - activity mismatch")
+            continue
+
+        # If target is bound to a specific instance, only evaluate against that instance
+        instances = instances_by_activity.get(activity_id, [])
+        target_instance_id = getattr(target, 'activity_instance_id', None)
+        if target_instance_id:
+            instances = [inst for inst in instances if inst.get('id') == target_instance_id]
+            if not instances:
+                logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - instance mismatch")
+                continue
+
+        # --- Completion targets: achieved when any completed instance matches ---
+        if target_type == 'completion':
+            if any(inst.get('completed', False) for inst in instances):
+                logger.info(f"[TARGET_EVAL] COMPLETION TARGET ACHIEVED: '{target_name}'")
+                target.completed = True
+                target.completed_at = completed_at
+                target.completed_session_id = session_id
+                target.completed_instance_id = instances[0].get('id') if instances else None
+                newly_completed.append(target)
+                _track_target_achievement({
+                    'id': target.id,
+                    'name': target.name,
+                    'goal_id': goal.id,
+                    'goal_name': goal.name
+                })
+                event_bus.emit(Event(Events.TARGET_ACHIEVED, {
+                    'target_id': target.id,
+                    'target_name': target.name,
+                    'goal_id': goal.id,
+                    'goal_name': goal.name,
+                    'root_id': goal.root_id,
+                    'session_id': session_id,
+                    'target_type': 'completion',
+                    'triggered_by': 'activity_instance_completed'
+                }))
+                logger.info(f"Completion target '{target.name}' achieved for goal '{goal.name}'")
+            continue
+        
+        # Only evaluate threshold targets from here
+        if target_type != 'threshold':
+            logger.info(f"[TARGET_EVAL] Skipping '{target_name}' - not threshold type")
             continue
         
         # Evaluate threshold target - convert Target object to dict for evaluation
@@ -315,6 +352,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             'name': target.name,
             'type': target.type,
             'activity_id': target.activity_id,
+            'activity_instance_id': getattr(target, 'activity_instance_id', None),
             'metrics': _target_metrics_from_conditions(target),
             'time_scope': target.time_scope,
             'start_date': target.start_date,
@@ -324,7 +362,16 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             'frequency_count': target.frequency_count,
         }
         
-        if target_type == 'threshold':
+        if target_type == 'completion':
+            # Completion target: achieved if any completed instance matches the activity
+            activity_id = target.activity_id
+            if activity_id:
+                instances = instances_by_activity.get(activity_id, [])
+                target_instance_id = getattr(target, 'activity_instance_id', None)
+                if target_instance_id:
+                    instances = [inst for inst in instances if inst.get('id') == target_instance_id]
+                target_achieved = any(inst.get('completed', False) for inst in instances)
+        elif target_type == 'threshold':
             # Classic logic: Check if CURRENT session meets criteria
             target_achieved = _evaluate_threshold_target(target_dict, instances_by_activity)
         elif target_type in ('sum', 'frequency'):
@@ -549,8 +596,10 @@ def _evaluate_threshold_target(target, instances_by_activity):
     
     if not activity_id or not target_metrics:
         return False
-    
     instances = instances_by_activity.get(activity_id, [])
+    target_instance_id = target.get('activity_instance_id')
+    if target_instance_id:
+        instances = [inst for inst in instances if inst.get('id') == target_instance_id]
     for inst in instances:
         # Check sets first
         sets = inst.get('sets', [])

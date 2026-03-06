@@ -255,3 +255,28 @@
     margin-left: 6px;
     color: var(--color-text-secondary);
 }
+
+.nanoGoalContent {
+    display: flex;
+    align-items: flex-start;
+}
+
+.nanoBadgeIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.nanoCheckbox {
+    margin-top: 2px;
+    margin-right: 0;
+    margin-left: 8px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--color-success);
+    flex-shrink: 0;
+}

@@ -371,7 +371,7 @@ const sortChildren = (children, sortBy) => {
     }
 };
 
-const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = null, completedGoalColor = '#FFD700') => {
+const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = null, completedGoalColor = '#FFD700', showMicroNanoGoals = false) => {
     const nodes = [];
     const edges = [];
     const addedNodeIds = new Set();
@@ -388,6 +388,13 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
 
         if (addedNodeIds.has(nodeId)) return;
         if (lineagePath && !lineagePath.has(nodeId)) return;
+
+        const nodeType = node.attributes?.type || node.type;
+
+        // Skip Micro and Nano goals if the setting is disabled
+        if (!showMicroNanoGoals && (nodeType === 'MicroGoal' || nodeType === 'NanoGoal')) {
+            return;
+        }
 
         addedNodeIds.add(nodeId);
         visibleNodeIds.add(nodeId);
@@ -407,7 +414,6 @@ const convertTreeToFlow = (treeData, onNodeClick, onAddChild, selectedNodeId = n
             });
         }
 
-        const nodeType = node.attributes?.type || node.type;
         // Transient goals (Immediate/Micro/Nano) cannot have children added from the fractal tree
         const transientTypes = new Set(['ImmediateGoal', 'MicroGoal', 'NanoGoal']);
         const childType = !transientTypes.has(nodeType) ? getChildType(nodeType) : null;
@@ -885,6 +891,7 @@ const buildGraphPresentation = ({
         onAddChild,
         selectedNodeId,
         completedGoalColor,
+        normalizedSettings.showMicroNanoGoals
     );
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);
