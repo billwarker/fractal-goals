@@ -23,7 +23,9 @@ const TargetManager = ({
     onOpenBuilder, // (target?) => void
     onCloseBuilder,
     initialTarget = null, // Target to edit if opening in builder mode
-    headerColor // New prop for header color
+    headerColor, // New prop for header color
+    goalType = null,
+    goalCompleted = false,
 }) => {
     // Internal view state: 'list' | 'add' | 'edit' (still used for internal builder state)
     // BUT we prioritize props if provided for view switching
@@ -688,10 +690,11 @@ const TargetManager = ({
                             <div onClick={() => isEditing && handleOpenEditTarget(target)} style={{ cursor: isEditing ? 'pointer' : 'default' }}>
                                 <TargetCard
                                     target={target}
-                                    isCompleted={target.completed}
+                                    isCompleted={Boolean(target.completed || goalCompleted)}
                                     activityDefinitions={activityDefinitions}
                                     onEdit={undefined} // Handled by parent div click
                                     onDelete={() => confirmAndDeleteTarget(target.id)}
+                                    goalType={goalType}
                                 />
                             </div>
                         </div>

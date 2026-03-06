@@ -658,6 +658,8 @@ function GoalDetailModal({
                                         setViewState('target-manager');
                                     }}
                                     headerColor={goalColor}
+                                    goalType={goalType}
+                                    goalCompleted={isCompleted}
                                 />
                             </Suspense>
                         )}
@@ -929,6 +931,8 @@ function GoalDetailModal({
                                         }
                                     }}
                                     headerColor={goalColor}
+                                    goalType={goalType}
+                                    goalCompleted={isCompleted}
                                 />
                             </Suspense>
                         )}
@@ -1002,6 +1006,8 @@ function GoalDetailModal({
                         setTargetToEdit(null);
                         setViewState('goal');
                     }}
+                    goalType={goalType}
+                    goalCompleted={isCompleted}
                     onSave={(newTargets) => {
                         if (onUpdate && goalId) {
                             onUpdate(goalId, {

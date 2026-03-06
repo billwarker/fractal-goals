@@ -1,6 +1,7 @@
 import React from 'react';
 import GoalIcon from './atoms/GoalIcon';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';;
+import styles from './TargetCard.module.css';
 
 /**
  * TargetCard Component
@@ -10,16 +11,30 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
-    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon, getCompletionColor } = useGoalLevels();;
+    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
 
     // Use the owning goal's icon, falling back to Target icon if unavailable
     const resolvedType = goalType || target._goalType || 'Target';
     const iconShape = getGoalIcon ? getGoalIcon(resolvedType) : (getLevelByName(resolvedType)?.icon || 'twelve-point-star');
     const iconColor = getGoalColor(resolvedType);
     const iconSecondaryColor = getGoalSecondaryColor(resolvedType);
-    const completionColor = getCompletionColor ? getCompletionColor() : '#4caf50';
+    const completionColor = getGoalColor('Completed');
     const accentColor = isCompleted ? completionColor : iconColor;
     const accentSecondaryColor = isCompleted ? getGoalSecondaryColor('Completed') : iconSecondaryColor;
+    const cardBackground = 'var(--color-bg-card-alt)';
+    const cardBorderColor = isCompleted ? accentColor : 'var(--color-border)';
+    const metricBorderColor = isCompleted ? `${accentColor}55` : 'var(--color-border)';
+    const metricLabelColor = isCompleted ? `${accentColor}cc` : 'var(--color-text-muted)';
+    const metricValueColor = isCompleted ? accentColor : 'var(--color-text-primary)';
+    const cardStyleVars = {
+        '--target-card-accent': accentColor,
+        '--target-card-border': cardBorderColor,
+        '--target-card-shadow': isCompleted ? `${`0 0 0 1px ${accentColor}22 inset`}` : 'none',
+        '--target-card-progress': isCompleted ? accentColor : 'var(--color-primary)',
+        '--target-card-metric-border': metricBorderColor,
+        '--target-card-metric-label': metricLabelColor,
+        '--target-card-metric-value': metricValueColor,
+    };
 
     const statusObj = isCompleted ? {
         color: accentColor,
@@ -36,29 +51,13 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
         }
         // In edit mode, show a warning so user can delete it
         return (
-            <div style={{
-                padding: '12px',
-                background: 'var(--color-bg-card-alt)',
-                border: '1px solid #f44336',
-                borderRadius: '6px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-            }}>
-                <span style={{ color: '#f44336', fontSize: '13px' }}>
+            <div className={styles.missingActivityCard}>
+                <span className={styles.missingActivityText}>
                     Activity not found (may have been deleted)
                 </span>
                 <button
                     onClick={onDelete}
-                    style={{
-                        padding: '4px 8px',
-                        background: 'transparent',
-                        border: '1px solid #f44336',
-                        borderRadius: '3px',
-                        color: '#f44336',
-                        cursor: 'pointer',
-                        fontSize: '11px'
-                    }}
+                    className={styles.missingActivityButton}
                 >
                     Delete
                 </button>
@@ -69,25 +68,8 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     return (
         <div
             onClick={onClick}
-            style={{
-                padding: '12px',
-                background: isCompleted ? 'rgba(76, 175, 80, 0.08)' : 'var(--color-bg-card-alt)',
-                border: `1px solid ${isCompleted ? accentColor : 'var(--color-border)'}`,
-                borderLeft: `4px solid ${accentColor}`,
-                borderRadius: '6px',
-                marginBottom: '10px',
-                cursor: onClick ? 'pointer' : 'default',
-                transition: 'background-color 0.2s, border-color 0.2s',
-                color: 'var(--color-text-primary)',
-                position: 'relative',
-                boxShadow: isCompleted ? `0 0 0 1px ${accentColor}22 inset` : 'none'
-            }}
-            onMouseEnter={(e) => {
-                if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-hover)';
-            }}
-            onMouseLeave={(e) => {
-                if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-alt)';
-            }}
+            className={`${styles.card} ${onClick ? styles.clickable : ''}`}
+            style={cardStyleVars}
         >
             {onDelete && (
                 <button
@@ -95,100 +77,38 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         e.stopPropagation();
                         onDelete();
                     }}
-                    style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#f44336',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        padding: '0 4px',
-                        lineHeight: '1',
-                        opacity: 0.75,
-                        transition: 'opacity 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.opacity = '1'}
-                    onMouseLeave={(e) => e.target.style.opacity = '0.75'}
+                    className={styles.deleteButton}
                     title="Delete Target"
                 >
                     ×
                 </button>
             )}
 
-            {/* Header with name and completion status */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '8px'
-            }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    flex: 1
-                }}>
-                    <span style={{
-                        fontSize: '16px',
-                        color: statusObj.color
-                    }}>
+            <div className={styles.header}>
+                <div className={styles.titleRow}>
+                    <span className={styles.iconWrap}>
                         {statusObj.icon}
                     </span>
                     <div>
-                        <div style={{
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: statusObj.color
-                        }}>
+                        <div className={styles.title}>
                             {activityDef.name}
                         </div>
                         {target.description && (
-                            <div style={{
-                                fontSize: '11px',
-                                color: 'var(--color-text-muted)',
-                                marginTop: '2px'
-                            }}>
+                            <div className={styles.description}>
                                 {target.description}
                             </div>
                         )}
                     </div>
                 </div>
 
-                {isCompleted && (
-                    <div style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        color: accentColor,
-                        padding: '3px 6px',
-                        border: `1px solid ${accentColor}`,
-                        borderRadius: '999px',
-                        lineHeight: 1.1
-                    }}>
-                        Complete
-                    </div>
-                )}
-
                 {isEditMode && onEdit && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: onDelete ? '20px' : 0 }}>
+                    <div className={styles.editActions} style={{ paddingRight: onDelete ? '20px' : 0 }}>
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onEdit();
                             }}
-                            style={{
-                                padding: '4px 8px',
-                                background: 'transparent',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '3px',
-                                color: 'var(--color-text-secondary)',
-                                cursor: 'pointer',
-                                fontSize: '11px'
-                            }}
+                            className={styles.editButton}
                         >
                             Edit
                         </button>
@@ -196,52 +116,33 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 )}
             </div>
 
-            {/* Completion target indicator */}
             {target.type === 'completion' && (
-                <div style={{
-                    paddingLeft: '28px',
-                    fontSize: '12px',
-                    color: isCompleted ? accentColor : 'var(--color-text-muted)',
-                    fontStyle: 'italic',
-                }}>
+                <div className={styles.completionLabel}>
                     {isCompleted ? '✓ Completed' : 'Completion target'}
                 </div>
             )}
 
-            {/* Progress Bar for Accumulation/Frequency */}
             {(target.type === 'sum' || target.type === 'frequency') && (
-                <div style={{ paddingLeft: '28px', marginTop: '6px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                <div className={styles.progressWrap}>
+                    <div className={styles.progressMeta}>
                         <span>Progress</span>
                         <span>
                             {target.current_value !== undefined ? target.current_value : 0} / {target.target_value || target.metrics?.[0]?.value || '?'}
                         </span>
                     </div>
-                    <div style={{ height: '6px', width: '100%', background: 'var(--color-bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{
-                            height: '100%',
-                            width: `${Math.min(100, target.progress || 0)}%`,
-                            background: isCompleted ? accentColor : 'var(--color-primary)',
-                            borderRadius: '3px',
-                            transition: 'width 0.5s ease-out'
-                        }} />
+                    <div className={styles.progressTrack}>
+                        <div className={styles.progressBar} style={{ width: `${Math.min(100, target.progress || 0)}%` }} />
                     </div>
                     {target.time_scope === 'program_block' && (
-                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
+                        <div className={styles.programBlockHint}>
                             Linked to Program Block
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Target metrics (only for non-completion targets) */}
             {target.type !== 'completion' && target.metrics?.length > 0 && (
-                <div style={{
-                    display: 'flex',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                    paddingLeft: '28px'
-                }}>
+                <div className={styles.metrics}>
                     {target.metrics.map(metric => {
                         const metricDef = activityDef.metric_definitions?.find(m => m.id === metric.metric_id);
                         if (!metricDef) return null;
@@ -249,21 +150,12 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         const operator = metric.operator || '>=';
 
                         return (
-                            <div
-                                key={metric.metric_id}
-                                style={{
-                                    background: 'var(--color-bg-input)',
-                                    padding: '4px 10px',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--color-border)',
-                                    fontSize: '12px'
-                                }}
-                            >
-                                <span style={{ color: 'var(--color-text-muted)' }}>{metricDef.name}</span>
+                            <div key={metric.metric_id} className={styles.metricChip}>
+                                <span className={styles.metricLabel}>{metricDef.name}</span>
                                 {' '}
-                                <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
+                                <span className={styles.metricOperator}>{operator}</span>
                                 {' '}
-                                <span style={{ fontWeight: 'bold', color: isCompleted ? accentColor : 'var(--color-text-primary)' }}>
+                                <span className={styles.metricValue}>
                                     {metric.value} {metricDef.unit}
                                 </span>
                             </div>

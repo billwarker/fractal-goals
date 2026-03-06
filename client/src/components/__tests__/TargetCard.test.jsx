@@ -5,10 +5,9 @@ import TargetCard from '../TargetCard';
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
         getLevelByName: () => ({ icon: 'circle' }),
-        getGoalColor: () => '#22d3ee',
-        getGoalSecondaryColor: () => '#0f766e',
+        getGoalColor: (type) => (type === 'Completed' ? '#4caf50' : '#22d3ee'),
+        getGoalSecondaryColor: (type) => (type === 'Completed' ? '#2e7d32' : '#0f766e'),
         getGoalIcon: () => 'circle',
-        getCompletionColor: () => '#4caf50',
     })
 }));
 
@@ -17,7 +16,7 @@ vi.mock('../atoms/GoalIcon', () => ({
 }));
 
 describe('TargetCard', () => {
-    it('shows completed state when target is completed', () => {
+    it('shows completed styling without a completion pill when target is completed', () => {
         render(
             <TargetCard
                 target={{
@@ -36,7 +35,7 @@ describe('TargetCard', () => {
             />
         );
 
-        expect(screen.getByText('Complete')).toBeInTheDocument();
         expect(screen.getByText('10 %')).toBeInTheDocument();
+        expect(screen.queryByText('Complete')).not.toBeInTheDocument();
     });
 });
