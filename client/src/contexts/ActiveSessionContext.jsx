@@ -14,6 +14,11 @@ const SessionActionsContext = createContext(null);
 
 const ActiveSessionContext = createContext(null);
 
+function formatGoalTypeLabel(type) {
+    if (!type) return 'Goal';
+    return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+}
+
 function patchGoalCompletion(goal, goalId, completed, completedAt) {
     if (!goal || goal.id !== goalId) return goal;
     return {
@@ -282,8 +287,10 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
             // Toast for manual completion
             const goalResponse = res?.data;
-            if (goalResponse && variables.completed) {
-                notify.success(`Goal completed: ${goalResponse.name}`, { duration: 5000 });
+            if (goalResponse) {
+                const goalType = formatGoalTypeLabel(goalResponse.attributes?.type || goalResponse.type);
+                const action = variables.completed ? 'Completed' : 'Uncompleted';
+                notify.success(`${goalType} ${action}: ${goalResponse.name}`, { duration: 5000 });
             }
         }
     });
@@ -907,8 +914,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             }
         }
         if (newlyCompleted.length > 0) {
-            const names = newlyCompleted.map(s => s.goalName).join(', ');
-            notify.success(`Goal completed: ${names}`, { duration: 6000 });
+            const messages = newlyCompleted.map((status) => `${status.goalType || 'Goal'} Completed: ${status.goalName}`);
+            notify.success(messages.join(', '), { duration: 6000 });
         }
         const newlyUncompleted = [];
         for (const goalId of prevCompleted) {
@@ -918,8 +925,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             }
         }
         if (newlyUncompleted.length > 0) {
-            const names = newlyUncompleted.map(s => s.goalName).join(', ');
-            notify.success(`Goal uncompleted: ${names}`, { duration: 6000 });
+            const messages = newlyUncompleted.map((status) => `${status.goalType || 'Goal'} Uncompleted: ${status.goalName}`);
+            notify.success(messages.join(', '), { duration: 6000 });
         }
         prevCompletedIdsRef.current = currentCompleteds;
     }, [goalAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);

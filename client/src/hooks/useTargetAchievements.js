@@ -1,5 +1,10 @@
 import { useMemo } from 'react';
 
+function formatGoalTypeLabel(type) {
+    if (!type) return 'Goal';
+    return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+}
+
 /**
  * Hook for real-time target achievement detection during a session
  * 
@@ -90,12 +95,14 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
                     wasAlreadyCompleted: shouldRespectPersistedCompletion,
                     target,
                     goalId: goal.id,
-                    goalName: goal.attributes?.name || goal.name
+                    goalName: goal.attributes?.name || goal.name,
+                    goalType: goal.attributes?.type || goal.type,
                 });
             }
 
             goalAchievements.set(goal.id, {
                 goalName: goal.attributes?.name || goal.name,
+                goalType: formatGoalTypeLabel(goal.attributes?.type || goal.type),
                 totalTargets: targets.length,
                 achievedTargets: achievedForGoal.length,
                 achievedTargetIds: achievedForGoal,

@@ -435,7 +435,7 @@ function SessionActivityItem({
                 }
             }
 
-            if (newNanoGoal) notify.success(`Nano goal created: ${newNanoGoal.name || content.trim()}`);
+            if (newNanoGoal) notify.success(`Created Nano Goal: ${newNanoGoal.name || content.trim()}`);
 
             // 2. Create the Note (timeline/log) independently.
             try {

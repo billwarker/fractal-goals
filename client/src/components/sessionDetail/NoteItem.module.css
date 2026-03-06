@@ -296,6 +296,42 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: var(--color-checkbox-accent);
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nanoCheckbox:checked {
+    background: rgba(76, 175, 80, 0.18);
+    border-color: #4caf50;
+    box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.12) inset;
+}
+
+.nanoCheckbox::after {
+    content: "";
+    width: 8px;
+    height: 4px;
+    border-left: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    transform: rotate(-45deg) scale(0);
+    transform-origin: center;
+    transition: transform 0.12s ease;
+}
+
+.nanoCheckbox:checked::after {
+    border-left-color: #2e7d32;
+    border-bottom-color: #2e7d32;
+    transform: rotate(-45deg) scale(1);
+}
+
+.nanoCheckbox:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

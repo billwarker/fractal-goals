@@ -59,6 +59,14 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         refreshNotes
     } = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
 
+    const handleUpdateNote = async (noteId, content) => {
+        const note = sessionNotes.find((item) => item.id === noteId);
+        await updateNote(noteId, content);
+        if (note?.is_nano_goal) {
+            notify.success(`Updated Nano Goal: ${content}`);
+        }
+    };
+
     const handleActivityFocus = (instance, setIndex = null) => {
         setSelectedActivity(instance);
         setSelectedSetIndex(setIndex);
@@ -120,6 +128,10 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
             }
 
             await deleteNote(note.id);
+            if (note.is_nano_goal) {
+                const nanoGoalName = note.content || 'Untitled';
+                notify.success(`Deleted Nano Goal: ${nanoGoalName}`);
+            }
         } catch (err) {
             console.error("Failed to delete note/goal", err);
             notify.error("Failed to delete");
@@ -164,7 +176,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         previousNotes,
         previousSessionNotes,
         addNote,
-        updateNote,
+        updateNote: handleUpdateNote,
         deleteNote: handleDeleteNote,
         refreshNotes,
         handleActivityFocus,
