@@ -154,12 +154,21 @@ function parseTargets(goal) {
 function checkTargetAchieved(target, instance) {
     if (!target || !instance || !instance.completed) return false;
 
+    // Completion targets are achieved when the matching activity instance is completed.
+    if (target.type === 'completion') {
+        const instanceActivityId = instance.activity_definition_id || instance.activity_id;
+        if (target.activity_id !== instanceActivityId) return false;
+        if (target.activity_instance_id && target.activity_instance_id !== instance.id) return false;
+        return true;
+    }
+
     const targetMetrics = target.metrics || [];
     if (targetMetrics.length === 0) return false;
 
     // Check activity ID matches
     const instanceActivityId = instance.activity_definition_id || instance.activity_id;
     if (target.activity_id !== instanceActivityId) return false;
+    if (target.activity_instance_id && target.activity_instance_id !== instance.id) return false;
 
     // For activities with sets, check if ANY set achieves all target metrics
     const sets = instance.sets || [];
@@ -200,7 +209,16 @@ function checkMetricsMeetTarget(targetMetrics, actualMetrics) {
         const actualValue = actualMap[metricId];
         if (actualValue == null) return false; // Missing metric
 
-        return actualValue >= parseFloat(targetValue); // Met or exceeded
+        const expectedValue = parseFloat(targetValue);
+        const operator = tm.operator || '>=';
+        if (Number.isNaN(expectedValue)) return false;
+
+        if (operator === '>') return actualValue > expectedValue;
+        if (operator === '>=') return actualValue >= expectedValue;
+        if (operator === '<') return actualValue < expectedValue;
+        if (operator === '<=') return actualValue <= expectedValue;
+        if (operator === '==') return Math.abs(actualValue - expectedValue) < 0.001;
+        return actualValue >= expectedValue;
     });
 }
 

@@ -7,7 +7,10 @@ import { useGoals } from '../../contexts/GoalsContext';
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
  * Targets are sorted by goal depth (deepest first, e.g., Nano -> Micro -> Immediate -> ShortTerm).
  */
-function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds }) {
+function TargetsSection({
+    rootId, sessionId, hierarchy, activeActivityId, activeActivityInstanceId,
+    allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds
+}) {
     const { useFractalTreeQuery } = useGoals();
     const { data: goalTree } = useFractalTreeQuery(rootId);
 
@@ -43,13 +46,19 @@ function TargetsSection({ rootId, sessionId, hierarchy, activeActivityId, allowe
                     // Filter by allowedActivityIds if provided (scoping to session activities)
                     if (allowedActivityIds && !allowedActivityIds.has(target.activity_id)) return;
 
-                    // Filter out instance-bound targets (handled inside activity instance cards)
-                    if (target.activity_instance_id) return;
+                    // Filter out instance-bound targets IF they don't match the current focused instance
+                    if (target.activity_instance_id) {
+                        if (!activeActivityInstanceId || target.activity_instance_id !== activeActivityInstanceId) return;
+                    }
 
                     // Get real-time achievement status if available
                     const achievement = targetAchievements?.get(target.id);
                     // Check if either the activity metrics, the event listener, or the backend says it's achieved
-                    const isCompleted = (achievement ? achievement.achieved : target.completed) || (achievedTargetIds?.has(target.id));
+                    const isCompleted = Boolean(
+                        (achievement ? achievement.achieved : target.completed)
+                        || achievedTargetIds?.has(target.id)
+                        || goal.completed
+                    );
 
                     targets.push({
                         ...target,

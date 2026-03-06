@@ -202,7 +202,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         <div style={{
                             height: '100%',
                             width: `${Math.min(100, target.progress || 0)}%`,
-                            background: isCompleted ? targetColor : 'var(--color-primary)',
+                            background: isCompleted ? iconColor : 'var(--color-primary)',
                             borderRadius: '3px',
                             transition: 'width 0.5s ease-out'
                         }} />
@@ -244,7 +244,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 {' '}
                                 <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
                                 {' '}
-                                <span style={{ fontWeight: 'bold', color: isCompleted ? targetColor : 'var(--color-text-primary)' }}>
+                                <span style={{ fontWeight: 'bold', color: isCompleted ? iconColor : 'var(--color-text-primary)' }}>
                                     {metric.value} {metricDef.unit}
                                 </span>
                             </div>

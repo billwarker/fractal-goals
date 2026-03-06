@@ -152,3 +152,28 @@ class TestMicroGoals:
         assert data[0]['name'] == "Micro 1"
         assert len(data[0].get('children', [])) == 1
         assert data[0]['children'][0]['name'] == "Nano 1"
+
+    def test_get_session_micro_goals_rejects_cross_fractal_session(self, authed_client, db_session, test_user, sample_goal_hierarchy):
+        """Endpoint must reject a session that is not in the provided fractal root."""
+        root_one = sample_goal_hierarchy['ultimate']
+        root_two = Goal(
+            id=str(uuid.uuid4()),
+            name="Other Root",
+            owner_id=test_user.id,
+            parent_id=None,
+            root_id=None
+        )
+        root_two.root_id = root_two.id
+        db_session.add(root_two)
+        db_session.flush()
+
+        session_two = Session(
+            id=str(uuid.uuid4()),
+            name="Other Root Session",
+            root_id=root_two.id
+        )
+        db_session.add(session_two)
+        db_session.commit()
+
+        response = authed_client.get(f"/api/fractal/{root_one.id}/sessions/{session_two.id}/micro-goals")
+        assert response.status_code == 404

@@ -126,49 +126,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         }
     };
 
-    const handleCreateNanoGoal = async (parent_id, content, activity_id) => {
-        try {
-            const goalData = {
-                name: content,
-                type: 'NanoGoal',
-                parent_id: parent_id,
-            };
-            const newGoal = await createGoal(goalData);
-
-            // Auto-associate the new Nano Goal with the current activity context
-            if (newGoal && newGoal.id && activity_id) {
-                try {
-                    // Get parent's activities for inheritance
-                    let parentActivityIds = [];
-                    try {
-                        const parentRes = await fractalApi.getGoalActivities(rootId, parent_id);
-                        if (parentRes.data) {
-                            parentActivityIds = parentRes.data.map(a => a.id);
-                        }
-                    } catch (e) {
-                        console.warn("Could not fetch parent activities for Nano Goal inheritance", e);
-                    }
-
-                    // Combine inherited activities with the current activity context, avoiding duplicates
-                    const activitiesToAssociate = [...new Set([...parentActivityIds, activity_id])];
-
-                    await fractalApi.setGoalAssociationsBatch(rootId, newGoal.id, {
-                        activity_ids: activitiesToAssociate,
-                        group_ids: []
-                    });
-                } catch (assocErr) {
-                    console.error("Failed to auto-associate activity to Nano Goal", assocErr);
-                }
-            }
-
-            return newGoal;
-        } catch (err) {
-            console.error("Failed to create Nano Goal", err);
-            notify.error("Failed to create Nano Goal");
-            throw err;
-        }
-    };
-
     const handleSaveSession = () => {
         notify.success('Session saved successfully');
         navigate(`/${rootId}/sessions`);

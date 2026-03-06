@@ -399,6 +399,14 @@ def get_session_micro_goals(current_user, root_id, session_id):
         root = require_owned_root(db_session, root_id, current_user.id)
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        session_obj = db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).first()
+        if not session_obj:
+            return jsonify({"error": "Session not found in this fractal"}), 404
         
         # Query micro goals linked to session
         # Junction table query
@@ -407,6 +415,7 @@ def get_session_micro_goals(current_user, root_id, session_id):
             .join(session_goals, Goal.id == session_goals.c.goal_id)
             .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
             .where(session_goals.c.session_id == session_id)
+            .where(Goal.root_id == root_id)
             .where(
                 or_(
                     models.GoalLevel.name == 'Micro Goal',
@@ -1143,7 +1152,8 @@ def create_fractal_goal(current_user, root_id, validated_data):
             allow_manual_completion=validated_data.get('allow_manual_completion', True),
             track_activities=validated_data.get('track_activities', True),
             relevance_statement=validated_data.get('relevance_statement'),
-            root_id=root_id  # Set root_id for performance
+            root_id=root_id,  # Set root_id for performance
+            owner_id=current_user.id
         )
         
         db_session.add(new_goal)

@@ -9,9 +9,21 @@ from datetime import datetime, timezone
 import uuid
 import logging
 
-from models import get_engine, get_session, Note, Session, ActivityInstance, ActivityDefinition, format_utc, validate_root_goal
+from models import (
+    get_engine,
+    get_session,
+    Note,
+    Session,
+    ActivityInstance,
+    ActivityDefinition,
+    Goal,
+    session_goals,
+    format_utc,
+    validate_root_goal
+)
 from validators import validate_request, NoteCreateSchema, NoteUpdateSchema
 from services.serializers import serialize_note, serialize_activity_instance
+from services.goal_type_utils import get_canonical_goal_type
 from blueprints.auth_api import token_required
 
 logger = logging.getLogger(__name__)
@@ -271,19 +283,75 @@ def create_note(current_user, root_id, validated_data):
         # If only image, set a default content placeholder
         if not content and image_data:
             content = "[Image]"
+
+        session_id = validated_data.get('session_id')
+        if session_id:
+            session_obj = db.query(Session).filter(
+                Session.id == session_id,
+                Session.root_id == root_id,
+                Session.deleted_at == None
+            ).first()
+            if not session_obj:
+                return jsonify({"error": "Session not found in this fractal"}), 400
+
+        nano_goal_id = validated_data.get('nano_goal_id')
+        if nano_goal_id:
+            nano_goal = db.query(Goal).filter(
+                Goal.id == nano_goal_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).first()
+            if not nano_goal:
+                return jsonify({"error": "Nano goal not found in this fractal"}), 400
+            if get_canonical_goal_type(nano_goal) != 'NanoGoal':
+                return jsonify({"error": "nano_goal_id must reference a NanoGoal"}), 400
+
+            if session_id:
+                # Validate session coherence:
+                # either note is tied to an instance in this session,
+                # or this nano's ancestry includes a micro goal linked to the session.
+                activity_instance_id = validated_data.get('activity_instance_id')
+                if activity_instance_id:
+                    instance = db.query(ActivityInstance).filter(
+                        ActivityInstance.id == activity_instance_id,
+                        ActivityInstance.root_id == root_id,
+                        ActivityInstance.deleted_at == None
+                    ).first()
+                    if not instance:
+                        return jsonify({"error": "Activity instance not found in this fractal"}), 400
+                    if instance.session_id != session_id:
+                        return jsonify({"error": "Activity instance does not belong to the provided session"}), 400
+
+                ancestor_ids = []
+                current = nano_goal
+                while current and current.parent_id:
+                    ancestor_ids.append(current.parent_id)
+                    current = db.query(Goal).filter(Goal.id == current.parent_id).first()
+
+                has_session_link = False
+                if ancestor_ids:
+                    has_session_link = db.query(session_goals).filter(
+                        session_goals.c.session_id == session_id,
+                        session_goals.c.goal_id.in_(ancestor_ids)
+                    ).first() is not None
+
+                if not has_session_link and not validated_data.get('activity_instance_id'):
+                    return jsonify({
+                        "error": "nano_goal_id is not linked to the provided session"
+                    }), 400
         
         note = Note(
             id=str(uuid.uuid4()),
             root_id=root_id,
             context_type=validated_data['context_type'],  # Already validated by schema
             context_id=validated_data['context_id'],
-            session_id=validated_data.get('session_id'),
+            session_id=session_id,
             activity_instance_id=validated_data.get('activity_instance_id'),
             activity_definition_id=validated_data.get('activity_definition_id'),
             set_index=validated_data.get('set_index'),
             content=content,
             image_data=image_data,
-            nano_goal_id=validated_data.get('nano_goal_id')
+            nano_goal_id=nano_goal_id
         )
         
         db.add(note)

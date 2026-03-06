@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
+import notify from '../../utils/notify';
+import { fractalApi } from '../../utils/api';
 import styles from './SessionActivityItem.module.css';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
@@ -46,10 +48,9 @@ function SessionActivityItem({
 }) {
     // Context
     const {
+        rootId,
         sessionId,
         activities,
-        parentGoals,
-        immediateGoals,
         microGoals,
         session,
     } = useActiveSessionData();
@@ -59,7 +60,6 @@ function SessionActivityItem({
         updateTimer,
         removeActivity,
         createGoal,
-        updateGoal,
         toggleGoalCompletion,
     } = useActiveSessionActions();
 
@@ -76,7 +76,8 @@ function SessionActivityItem({
 
     // Get timezone from context
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();;
+    const queryClient = useQueryClient();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
 
     const setMetricDraftKey = useCallback((setIndex, metricId, splitId = null) => (
         `${setIndex}:${metricId}:${splitId || ''}`
@@ -242,14 +243,12 @@ function SessionActivityItem({
             name,
             type: 'NanoGoal',
             parent_id: parentId,
-            attributes: { session_id: sessionId }
+            session_id: sessionId
         });
     };
 
     // Characteristics for goal icons
     const microChars = getLevelByName('MicroGoal');
-    const nanoChars = getLevelByName('NanoGoal');
-    const immediateChars = getLevelByName('ImmediateGoal');
 
     const [nanoMode, setNanoMode] = useState(!!activeMicroGoal);
     useEffect(() => {
@@ -266,6 +265,7 @@ function SessionActivityItem({
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
+    const [pendingNanoGoalIds, setPendingNanoGoalIds] = useState(() => new Set());
 
 
 
@@ -371,13 +371,56 @@ function SessionActivityItem({
     const handleAddNanoNote = async (content, imageData = null) => {
         if (!content.trim() && !imageData) return;
 
+        let newNanoGoalId = null;
+        let newNanoGoal = null;
+        let appliedOptimisticNano = false;
         try {
             // 1. Create the NanoGoal (goal hierarchy)
-            let newNanoGoalId = null;
             if (onCreateNanoGoal && content.trim()) {
                 // Expect onCreateNanoGoal to return the created goal object
                 const res = await onCreateNanoGoal(activeMicroGoal.id, content.trim(), activityDefinition?.id);
-                if (res && res.id) newNanoGoalId = res.id;
+                if (res && res.id) {
+                    newNanoGoalId = res.id;
+                    newNanoGoal = res;
+
+                    // Optimistically add nano child to the session micro-goals cache
+                    // so it appears in Goals hierarchy immediately.
+                    queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
+                        if (!Array.isArray(old)) return old;
+                        return old.map((micro) => {
+                            if (micro.id !== activeMicroGoal.id) return micro;
+                            return {
+                                ...micro,
+                                children: [...(micro.children || []), {
+                                    id: newNanoGoalId,
+                                    name: res.name || content.trim(),
+                                    type: 'NanoGoal',
+                                    completed: false,
+                                    attributes: res.attributes || {}
+                                }]
+                            };
+                        });
+                    });
+                    appliedOptimisticNano = true;
+                }
+            }
+
+            // Replace optimistic children with authoritative parent children payload.
+            // This avoids stale hierarchy states when session-micro-goals refetch lags.
+            if (newNanoGoalId && rootId && activeMicroGoal?.id) {
+                try {
+                    const parentRes = await fractalApi.getGoal(rootId, activeMicroGoal.id);
+                    const parentChildren = parentRes?.data?.children || [];
+                    queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
+                        if (!Array.isArray(old)) return old;
+                        return old.map((micro) => {
+                            if (micro.id !== activeMicroGoal.id) return micro;
+                            return { ...micro, children: parentChildren };
+                        });
+                    });
+                } catch (parentRefreshErr) {
+                    console.warn("Failed to refresh parent micro goal children", parentRefreshErr);
+                }
             }
 
             // 2. Create the Note (note timeline)
@@ -396,15 +439,56 @@ function SessionActivityItem({
             });
 
             if (onNoteCreated) onNoteCreated();
+            if (newNanoGoal) notify.success(`Nano goal created: ${newNanoGoal.name || content.trim()}`);
+            // Revalidate caches used by hierarchy + target cards.
+            await queryClient.refetchQueries({ queryKey: ['session-micro-goals', rootId, sessionId], type: 'active' });
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
         } catch (err) {
+            if (appliedOptimisticNano) {
+                queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
+                    if (!Array.isArray(old)) return old;
+                    return old.map((micro) => {
+                        if (micro.id !== activeMicroGoal?.id) return micro;
+                        return {
+                            ...micro,
+                            children: (micro.children || []).filter((child) => child.id !== newNanoGoalId)
+                        };
+                    });
+                });
+            }
+            if (newNanoGoalId && rootId) {
+                try {
+                    await fractalApi.deleteGoal(rootId, newNanoGoalId);
+                } catch (rollbackErr) {
+                    console.error("Failed to rollback orphan nano goal", rollbackErr);
+                }
+            }
             console.error("Failed to create nano note", err);
+            notify.error(err?.response?.data?.error || "Failed to create nano goal note");
         }
     };
 
-    const handleToggleNanoGoal = useCallback((nanoGoalId, completed) => {
-        if (!toggleGoalCompletion || !nanoGoalId) return;
-        toggleGoalCompletion({ goalId: nanoGoalId, completed });
-    }, [toggleGoalCompletion]);
+    const handleToggleNanoGoal = useCallback(async (nanoGoalId, completed) => {
+        if (!toggleGoalCompletion || !nanoGoalId || pendingNanoGoalIds.has(nanoGoalId)) return;
+        setPendingNanoGoalIds((prev) => {
+            const next = new Set(prev);
+            next.add(nanoGoalId);
+            return next;
+        });
+        try {
+            await toggleGoalCompletion({ goalId: nanoGoalId, completed });
+        } catch (err) {
+            console.error("Failed to toggle nano goal completion", err);
+            notify.error("Failed to update nano goal");
+        } finally {
+            setPendingNanoGoalIds((prev) => {
+                const next = new Set(prev);
+                next.delete(nanoGoalId);
+                return next;
+            });
+        }
+    }, [toggleGoalCompletion, pendingNanoGoalIds]);
 
     // Sync local state when exercise times change
     useEffect(() => {
@@ -897,6 +981,7 @@ function SessionActivityItem({
                                 onUpdate={onUpdateNote}
                                 onDelete={onDeleteNote}
                                 onToggleNanoGoal={handleToggleNanoGoal}
+                                pendingNanoGoalIds={pendingNanoGoalIds}
                                 compact={false}
                                 selectedNoteId={selectedNoteId} // Use local state
                                 onNoteSelect={setSelectedNoteId}

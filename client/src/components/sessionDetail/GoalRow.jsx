@@ -1,15 +1,14 @@
 import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { parseTargets, formatTargetDescription } from '../../utils/goalUtils';
 import styles from './GoalsPanel.module.css';
 
 function GoalRow({
-    goal, icon, color, secondaryColor, completedColor, completedSecondaryColor,
-    isExpanded, onToggle, onGoalClick, targetAchievements, achievedTargetIds,
+    goal, icon, color, secondaryColor,
+    isExpanded, onToggle, onGoalClick, achievedTargetIds,
 }) {
-    const { getLevelByName, getCompletionColor, getGoalSecondaryColor } = useGoalLevels();;
+    const { getCompletionColor, getGoalSecondaryColor } = useGoalLevels();
     const targets = parseTargets(goal);
 
     const isCompleted = goal.completed || goal.attributes?.completed;

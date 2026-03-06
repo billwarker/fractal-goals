@@ -2,7 +2,16 @@ import React from 'react';
 import NoteItem from './NoteItem';
 import styles from './NoteItem.module.css';
 
-function NoteTimeline({ notes, onUpdate, onDelete, onToggleNanoGoal, compact = false, selectedNoteId, onNoteSelect }) {
+function NoteTimeline({
+    notes,
+    onUpdate,
+    onDelete,
+    onToggleNanoGoal,
+    pendingNanoGoalIds = new Set(),
+    compact = false,
+    selectedNoteId,
+    onNoteSelect
+}) {
     if (!notes || notes.length === 0) {
         return null;
     }
@@ -16,6 +25,7 @@ function NoteTimeline({ notes, onUpdate, onDelete, onToggleNanoGoal, compact = f
                     onUpdate={onUpdate}
                     onDelete={onDelete}
                     onToggleNanoGoal={onToggleNanoGoal}
+                    nanoToggleDisabled={Boolean(note.nano_goal_id && pendingNanoGoalIds.has(note.nano_goal_id))}
                     compact={compact}
                     isSelected={selectedNoteId === note.id}
                     onSelect={() => onNoteSelect && onNoteSelect(note.id)}

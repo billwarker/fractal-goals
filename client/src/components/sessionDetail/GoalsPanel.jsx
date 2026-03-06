@@ -1,21 +1,15 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import notify from '../../utils/notify';
-import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { fractalApi } from '../../utils/api';
 import {
     buildFlattenedGoalTree,
 } from '../../utils/goalUtils';
-import GoalRow from './GoalRow';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
-import SessionFocusSection from './SessionFocusSection';
-import AddTargetModal from '../AddTargetModal';
 import MicroGoalModal from '../MicroGoalModal';
 import GoalDetailModal from '../GoalDetailModal';
-import Checkbox from '../atoms/Checkbox';
 import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
 
@@ -47,17 +41,16 @@ function GoalsPanel({
         refreshSession,
         microGoals,
     } = useActiveSession();
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();;
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
     const { useFractalTreeQuery, fetchFractalTree } = useGoals();
-    const [expandedGoals, setExpandedGoals] = useState({});
 
     // Shared query cache for goal tree - ensures sync with SessionDetail
-    const { data: goalTree, isLoading: treeLoading } = useFractalTreeQuery(rootId);
+    const { data: goalTree } = useFractalTreeQuery(rootId);
 
     const [allShortTermGoals, setAllShortTermGoals] = useState([]);
 
     // Inline IG creator state
-    const [showMicroNanoGoals, setShowMicroNanoGoals] = useState(false);
+    const showMicroNanoGoals = true;
     const [showIGCreator, setShowIGCreator] = useState(false);
     const [igName, setIGName] = useState('');
     const [igParentId, setIGParentId] = useState('');
@@ -66,8 +59,6 @@ function GoalsPanel({
     // Micro Goal UX Redesign state
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
     const [targetBuilderGoal, setTargetBuilderGoal] = useState(null); // ImmediateGoal node
-    const [showParentSelector, setShowParentSelector] = useState(false);
-    const [pendingMicroGoalName, setPendingMicroGoalName] = useState('');
     const [viewMode, setViewMode] = useState('session');
     const [resolvedActivityGoalIds, setResolvedActivityGoalIds] = useState([]);
 
@@ -152,10 +143,6 @@ function GoalsPanel({
         };
     }, [rootId, selectedActivity, activeActivityDef]);
 
-    const toggleExpand = (goalId) => {
-        setExpandedGoals(prev => ({ ...prev, [goalId]: !prev[goalId] }));
-    };
-
     const handleCreateImmediateGoal = async () => {
         if (!igName.trim() || !igParentId) return;
         setIGCreating(true);
@@ -178,6 +165,7 @@ function GoalsPanel({
             if (onGoalCreated) onGoalCreated(newGoal.name);
         } catch (err) {
             console.error("Failed to create Immediate Goal", err);
+            notify.error("Failed to create immediate goal");
         } finally {
             setIGCreating(false);
         }
@@ -189,8 +177,7 @@ function GoalsPanel({
                 name,
                 type: 'MicroGoal',
                 parent_id: parentId,
-                attributes: { session_id: sessionId }, // New format: session_id in attributes
-                activity_definition_id: viewMode === 'activity' ? activeActivityDef?.id : null
+                session_id: sessionId
             });
             if (viewMode === 'activity' && activeActivityDef) {
                 try { await fractalApi.associateGoalToActivity(rootId, newGoalData.id, activeActivityDef.id); }
@@ -198,12 +185,11 @@ function GoalsPanel({
             }
 
             // Refetch is handled by createGoal invalidation in context
-            setPendingMicroGoal(newGoalData);
-            setShowMicroTargetBuilder(true);
             notify.success(`Micro goal created: ${newGoalData.name}`);
             if (onGoalCreated) onGoalCreated(newGoalData.name);
         } catch (err) {
             console.error("Failed to create micro goal", err);
+            notify.error("Failed to create micro goal");
         }
     };
 
@@ -224,8 +210,8 @@ function GoalsPanel({
         if (!name.trim()) return;
         const parentId = findParentGoalForActivity(activeActivityDef);
         if (!parentId) {
-            setShowParentSelector(true);
-            setPendingMicroGoalName(name);
+            setShowIGCreator(true);
+            setIGName(`Goal for ${activeActivityDef?.name || 'Activity'}`);
             return;
         }
         handleCreateMicroGoalWithParent(name, parentId);
@@ -261,6 +247,7 @@ function GoalsPanel({
             if (onGoalCreated) onGoalCreated(newGoal.name);
         } catch (err) {
             console.error("Failed to create nano goal", err);
+            notify.error("Failed to create nano goal");
         }
     };
 
@@ -378,7 +365,11 @@ function GoalsPanel({
         };
 
         const sessionStartMs = toMillis(session.session_start || session.created_at);
-        const sessionEndMs = toMillis(session.session_end || session.completed_at || session.updated_at);
+        // Use a generous upper bound for ongoing sessions to catch goals completed "now"
+        const sessionEndMs = session.completed
+            ? toMillis(session.session_end || session.completed_at || session.updated_at)
+            : Date.now() + 60000; // Add 1 minute buffer for active sessions
+
         if (sessionStartMs === null || sessionEndMs === null) return new Set();
 
         const ids = new Set();
@@ -413,7 +404,15 @@ function GoalsPanel({
                 if (!allowedSessionActivityDefIds) return false;
                 return allowedSessionActivityDefIds.has(microGoal.activity_definition_id);
             })
-            : microGoals.filter(m => m.activity_definition_id === specificActivityId);
+            : microGoals.filter((microGoal) => {
+                const linkedByActivityDefinition = specificActivityId
+                    && microGoal.activity_definition_id === specificActivityId;
+                // Fallback for older micro-goals that don't carry activity_definition_id:
+                // treat them as relevant if either the micro itself or its parent is linked.
+                const linkedByAssociatedHierarchy = targetGoalIds.has(microGoal.id)
+                    || targetGoalIds.has(microGoal.parent_id);
+                return linkedByActivityDefinition || linkedByAssociatedHierarchy;
+            });
 
         if (relevantMicroGoals.length === 0) {
             return hierarchy.filter(node => {
@@ -481,15 +480,8 @@ function GoalsPanel({
         return getHierarchy(resolvedActivityGoalIds, 'activity', activeActivityDef.id);
     }, [activeActivityDef, resolvedActivityGoalIds, getHierarchy]);
 
-    const microChars = getLevelByName('MicroGoal');
-    const nanoChars = getLevelByName('NanoGoal');
-    const stChars = getLevelByName('ShortTermGoal');
-    const immChars = getLevelByName('ImmediateGoal');
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
-    const microTally = { done: microGoals.filter(g => g.completed).length, total: microGoals.length };
-    const allNanoGoals = microGoals.flatMap(m => m.children || []);
-    const nanoTally = { done: allNanoGoals.filter(g => g.completed).length, total: allNanoGoals.length };
 
     const isActivityFocused = !!selectedActivity;
     const sessionActivityIds = useMemo(() => new Set(sessionActivities.map(a => a.id)), [sessionActivities]);
@@ -542,6 +534,7 @@ function GoalsPanel({
                                 sessionId={sessionId}
                                 hierarchy={activeActivityHierarchy}
                                 activeActivityId={activeActivityDef?.id}
+                                activeActivityInstanceId={selectedActivity?.id}
                                 allowedActivityIds={new Set([activeActivityDef?.id])}
                                 activityDefinitions={activityDefinitions}
                                 targetAchievements={targetAchievements}

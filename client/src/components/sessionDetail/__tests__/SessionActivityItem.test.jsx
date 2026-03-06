@@ -3,11 +3,25 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import SessionActivityItem from '../SessionActivityItem';
 
-const createGoal = vi.fn(() => Promise.resolve({ id: 'nano-1' }));
-const onAddNote = vi.fn(() => Promise.resolve());
-const updateInstance = vi.fn(() => Promise.resolve());
-const updateTimer = vi.fn();
-const removeActivity = vi.fn();
+const {
+    createGoal,
+    onAddNote,
+    updateInstance,
+    updateTimer,
+    removeActivity,
+    toggleGoalCompletion,
+    deleteGoal,
+    getGoal
+} = vi.hoisted(() => ({
+    createGoal: vi.fn(() => Promise.resolve({ id: 'nano-1' })),
+    onAddNote: vi.fn(() => Promise.resolve()),
+    updateInstance: vi.fn(() => Promise.resolve()),
+    updateTimer: vi.fn(),
+    removeActivity: vi.fn(),
+    toggleGoalCompletion: vi.fn(() => Promise.resolve()),
+    deleteGoal: vi.fn(() => Promise.resolve()),
+    getGoal: vi.fn(() => Promise.resolve({ data: { id: 'micro-1', children: [] } }))
+}));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionData: () => ({
@@ -41,8 +55,16 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         updateInstance,
         updateTimer,
         removeActivity,
-        createGoal
+        createGoal,
+        toggleGoalCompletion
     })
+}));
+
+vi.mock('../../../utils/api', () => ({
+    fractalApi: {
+        deleteGoal,
+        getGoal
+    }
 }));
 
 vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
@@ -93,6 +115,9 @@ describe('SessionActivityItem nano note flow', () => {
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
+        toggleGoalCompletion.mockClear();
+        deleteGoal.mockClear();
+        getGoal.mockClear();
     });
 
     it('creates a nano goal note without runtime errors', async () => {
@@ -130,8 +155,6 @@ describe('SessionActivityItem nano note flow', () => {
             }
         );
 
-        fireEvent.click(screen.getByText('Add Nano Goal Note'));
-
         const textarea = screen.getByPlaceholderText('Add a nano goal / sub-step...');
         fireEvent.change(textarea, { target: { value: 'Do one strict rep' } });
         fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
@@ -139,6 +162,58 @@ describe('SessionActivityItem nano note flow', () => {
         await waitFor(() => {
             expect(createGoal).toHaveBeenCalledTimes(1);
             expect(onAddNote).toHaveBeenCalledTimes(1);
+        });
+        expect(createGoal).toHaveBeenCalledWith({
+            name: 'Do one strict rep',
+            type: 'NanoGoal',
+            parent_id: 'micro-1',
+            session_id: 'session-1'
+        });
+    });
+
+    it('rolls back created nano goal if note creation fails', async () => {
+        onAddNote.mockImplementationOnce(() => Promise.reject(new Error('note failed')));
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-1',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={onAddNote}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const textarea = screen.getByPlaceholderText('Add a nano goal / sub-step...');
+        fireEvent.change(textarea, { target: { value: 'Do one strict rep' } });
+        fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
+
+        await waitFor(() => {
+            expect(deleteGoal).toHaveBeenCalledWith('root-1', 'nano-1');
         });
     });
 

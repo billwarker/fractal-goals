@@ -384,8 +384,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const immediateGoals = useMemo(() => session?.immediate_goals || [], [session]);
 
     const allGoalsForTargets = useMemo(() => {
-        return [...parentGoals, ...immediateGoals];
-    }, [parentGoals, immediateGoals]);
+        // Include micro goals so target completion state is reflected in session sidepane target cards.
+        return [...parentGoals, ...immediateGoals, ...microGoals];
+    }, [parentGoals, immediateGoals, microGoals]);
 
     const {
         targetAchievements,
@@ -860,7 +861,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         updateTimer: handleUpdateTimer,
         createGoal,
         updateGoal: updateGoalMutation.mutate,
-        toggleGoalCompletion: toggleGoalCompletionMutation.mutate,
+        toggleGoalCompletion: toggleGoalCompletionMutation.mutateAsync,
         reorderActivity: handleReorderActivity,
         moveActivity: handleMoveActivity,
         deleteSession: deleteSessionMutation.mutateAsync,
@@ -879,7 +880,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         handleUpdateTimer,
         createGoal,
         updateGoalMutation.mutate,
-        toggleGoalCompletionMutation.mutate,
+        toggleGoalCompletionMutation.mutateAsync,
         handleReorderActivity,
         handleMoveActivity,
         deleteSessionMutation.mutateAsync,

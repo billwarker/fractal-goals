@@ -10,7 +10,7 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from './ImageViewerModal';
 import styles from './NoteItem.module.css';
 
-function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false, isSelected, onSelect }) {
+function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, nanoToggleDisabled = false, compact = false, isSelected, onSelect }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -233,6 +233,7 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                                         onChange={(e) => onToggleNanoGoal && onToggleNanoGoal(note.nano_goal_id, e.target.checked)}
                                         className={styles.nanoCheckbox}
                                         onClick={(e) => e.stopPropagation()}
+                                        disabled={nanoToggleDisabled}
                                         title={note.nano_goal_completed ? "Mark incomplete" : "Mark complete"}
                                     />
                                 )}
