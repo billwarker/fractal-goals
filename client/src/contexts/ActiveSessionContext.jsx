@@ -49,7 +49,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const [showActivitySelector, setShowActivitySelector] = useState({});
     const [autoSaveStatus, setAutoSaveStatus] = useState('');
     const [sidePaneMode, setSidePaneMode] = useState('details');
-    const [notifiedTargetIds, setNotifiedTargetIds] = useState(new Set());
     const [localSessionData, setLocalSessionData] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
     const [isDeletingSession, setIsDeletingSession] = useState(false);
@@ -125,7 +124,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         enabled: !!rootId
     });
 
-    const { data: sessionGoalsView = null } = useQuery({
+    const { data: sessionGoalsView = null, isLoading: sessionGoalsViewLoading } = useQuery({
         queryKey: ['session-goals-view', rootId, sessionId],
         queryFn: async () => {
             const res = await fractalApi.getSessionGoalsView(rootId, sessionId);
@@ -738,7 +737,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             setAutoSaveStatus('');
             setShowActivitySelector({});
             setDraggedItem(null);
-            setNotifiedTargetIds(new Set());
             setSidePaneMode('details');
             targetNotificationsInitializedRef.current = false;
             goalNotificationsInitializedRef.current = false;
@@ -855,16 +853,16 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const prevAchievedTargetIdsRef = useRef(new Set());
     useEffect(() => {
         if (!achievedTargetIds || !targetAchievements) return;
+        if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
         if (!targetNotificationsInitializedRef.current) {
             prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-            setNotifiedTargetIds(new Set(achievedTargetIds));
             targetNotificationsInitializedRef.current = true;
             return;
         }
         const prevAchieved = prevAchievedTargetIdsRef.current;
         const newlyAchieved = [];
         for (const targetId of achievedTargetIds) {
-            if (!notifiedTargetIds.has(targetId)) {
+            if (!prevAchieved.has(targetId)) {
                 const status = targetAchievements.get(targetId);
                 if (status && !status.wasAlreadyCompleted) newlyAchieved.push(status);
             }
@@ -872,11 +870,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         if (newlyAchieved.length > 0) {
             const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
             notify.success(`Target achieved: ${names}`, { duration: 5000 });
-            setNotifiedTargetIds(prev => {
-                const newSet = new Set(prev);
-                newlyAchieved.forEach(s => newSet.add(s.target.id));
-                return newSet;
-            });
         }
         const newlyReverted = [];
         for (const targetId of prevAchieved) {
@@ -888,18 +881,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         if (newlyReverted.length > 0) {
             const names = newlyReverted.map(s => s.target.name || 'Target').join(', ');
             notify.success(`Target reverted: ${names}`, { duration: 5000 });
-            setNotifiedTargetIds(prev => {
-                const newSet = new Set(prev);
-                newlyReverted.forEach(s => newSet.delete(s.target.id));
-                return newSet;
-            });
         }
         prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-    }, [achievedTargetIds, targetAchievements, notifiedTargetIds]);
+    }, [achievedTargetIds, targetAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);
 
     const prevCompletedIdsRef = useRef(new Set());
     useEffect(() => {
         if (!goalAchievements) return;
+        if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
         const currentCompleteds = new Set();
         goalAchievements.forEach((status, goalId) => {
             if (status.allAchieved) currentCompleteds.add(goalId);
@@ -933,7 +922,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             notify.success(`Goal uncompleted: ${names}`, { duration: 6000 });
         }
         prevCompletedIdsRef.current = currentCompleteds;
-    }, [goalAchievements]);
+    }, [goalAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);
 
     useEffect(() => {
         return () => {
