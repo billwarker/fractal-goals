@@ -561,11 +561,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-
-            const newGoal = res.data;
-            if (newGoal) {
-                notify.success(`Goal created: ${newGoal.name}`);
-            }
+            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
 
             return res.data;
         } catch (err) {

@@ -58,7 +58,9 @@ function GoalDetailModal({
     parentGoal,  // Parent goal for context when creating
     onGoalSelect, // Handler for selecting a goal (e.g. child)
     onAssociationsChanged, // Callback when activity associations change
-    onMobileCollapse
+    onMobileCollapse,
+    initialActivities = [], // Initial associated activities for create mode
+    initialActivityGroups = [] // Initial associated groups for create mode
 }) {
     const { getGoalColor, getGoalTextColor, getLevelByName } = useGoalLevels();
     const navigate = useNavigate();
@@ -176,13 +178,25 @@ function GoalDetailModal({
     const depGoalCompleted = goal?.attributes?.completed;
     const depGoalCompletedAt = goal?.attributes?.completed_at;
 
-    // Reset local completion state when goal changes
+    // Reset local completion state and handle initial associations when goal or mode changes
     useEffect(() => {
         if (mode === 'create') {
             setLocalCompleted(false);
             setLocalCompletedAt(null);
             setIsEditing(true);  // Start in edit mode for creation
             setViewState('goal');
+
+            // Handle pre-selected associations for creation flow
+            if (initialActivities.length > 0 || initialActivityGroups.length > 0) {
+                setAssociatedActivities(initialActivities);
+                setAssociatedActivityGroups(initialActivityGroups);
+                // Also update the refs immediately so handleSave can see them
+                associatedActivitiesRef.current = initialActivities;
+                associatedGroupsRef.current = initialActivityGroups;
+                // Update mutation snapshots so they aren't marked as "changed" if identical
+                initialActivitiesRef.current = initialActivities.map(a => a.id);
+                initialGroupsRef.current = initialActivityGroups.map(g => g.id);
+            }
         } else if (goal) {
             setLocalCompleted(goal.attributes?.completed || false);
             setLocalCompletedAt(goal.attributes?.completed_at || null);
@@ -333,18 +347,30 @@ function GoalDetailModal({
         };
 
         if (mode === 'create') {
-            const newGoal = await onCreate(payload);
+            try {
+                const newGoal = await onCreate(payload);
 
-            // Persist any pending activity/group associations using the new goal's ID
-            const newGoalId = newGoal?.id || newGoal?.attributes?.id;
-            const hasPendingActivities = associatedActivities.length > 0;
-            const hasPendingGroups = associatedActivityGroups.length > 0;
+                // Persist any pending activity/group associations using the new goal's ID
+                const newGoalId = newGoal?.id || newGoal?.attributes?.id;
+                const hasPendingActivities = associatedActivities.length > 0;
+                const hasPendingGroups = associatedActivityGroups.length > 0;
 
-            if (newGoalId && (hasPendingActivities || hasPendingGroups)) {
-                const ok = await persistAssociations(null, null, newGoalId);
-                if (ok) {
-                    notify.success(`Goal created with ${hasPendingActivities ? associatedActivities.length + ' activities' : ''}${hasPendingActivities && hasPendingGroups ? ' and ' : ''}${hasPendingGroups ? associatedActivityGroups.length + ' groups' : ''} associated`);
+                if (newGoalId && (hasPendingActivities || hasPendingGroups)) {
+                    const ok = await persistAssociations(null, null, newGoalId);
+                    if (ok) {
+                        notify.success(`Goal created with ${hasPendingActivities ? associatedActivities.length + ' activities' : ''}${hasPendingActivities && hasPendingGroups ? ' and ' : ''}${hasPendingGroups ? associatedActivityGroups.length + ' groups' : ''} associated`);
+                    } else {
+                        notify.error('Goal created, but failed to associate activities');
+                    }
+                } else if (newGoalId) {
+                    notify.success(`Goal created: ${newGoal?.name || newGoal?.attributes?.name || name}`);
                 }
+            } catch (err) {
+                console.error('Goal creation failed EXCEPTION:', err);
+                if (err.response) {
+                    console.error('Goal creation error response:', err.response.data);
+                }
+                notify.error('Failed to create goal: ' + (err.response?.data?.error || err.message));
             }
         } else {
             onUpdate(goalId, payload);

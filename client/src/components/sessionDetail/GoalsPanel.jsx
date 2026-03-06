@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import notify from '../../utils/notify';
 import GoalIcon from '../atoms/GoalIcon';
 import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
@@ -173,6 +174,7 @@ function GoalsPanel({
             setIGParentId('');
             setShowIGCreator(false);
             refreshSession(); // Invalidate session to show new IG
+            notify.success(`Goal created: ${newGoal.name}`);
             if (onGoalCreated) onGoalCreated(newGoal.name);
         } catch (err) {
             console.error("Failed to create Immediate Goal", err);
@@ -198,6 +200,7 @@ function GoalsPanel({
             // Refetch is handled by createGoal invalidation in context
             setPendingMicroGoal(newGoalData);
             setShowMicroTargetBuilder(true);
+            notify.success(`Micro goal created: ${newGoalData.name}`);
             if (onGoalCreated) onGoalCreated(newGoalData.name);
         } catch (err) {
             console.error("Failed to create micro goal", err);
@@ -303,6 +306,8 @@ function GoalsPanel({
                 }
             }
             fetchFractalTree(rootId);
+            refreshSession?.();
+            notify.success(`Micro goal created: ${goalName}`);
             if (onGoalCreated) onGoalCreated(goalName);
         } catch (err) {
             console.error('Failed to create MicroGoal', err);
@@ -319,23 +324,29 @@ function GoalsPanel({
         setCreateSubGoalParent(node);
     };
 
-    const handleSubGoalCreated = useCallback(async (newGoalData) => {
-        // newGoalData is the saved goal returned by GoalDetailModal's onCreate
-        if (viewMode === 'activity' && activeActivityDef && newGoalData?.id) {
-            try {
-                const currentGoalIds = activeActivityDef.associated_goal_ids || [];
-                await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentGoalIds, newGoalData.id]);
-                const res = await fractalApi.getActivityGoals(rootId, activeActivityDef.id);
-                const ids = (res.data || []).map(g => g.id).filter(Boolean);
-                setResolvedActivityGoalIds(ids);
-            } catch (assocErr) {
-                console.error('Failed to associate new sub-goal with activity', assocErr);
+    const handleSubGoalCreated = useCallback(async (payload) => {
+        try {
+            const newGoalData = await createGoal(payload);
+            if (viewMode === 'activity' && activeActivityDef && newGoalData?.id) {
+                try {
+                    const currentGoalIds = activeActivityDef.associated_goal_ids || [];
+                    await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentGoalIds, newGoalData.id]);
+                    const res = await fractalApi.getActivityGoals(rootId, activeActivityDef.id);
+                    const ids = (res.data || []).map(g => g.id).filter(Boolean);
+                    setResolvedActivityGoalIds(ids);
+                } catch (assocErr) {
+                    console.error('Failed to associate new sub-goal with activity', assocErr);
+                }
             }
+            fetchFractalTree(rootId);
+            setCreateSubGoalParent(null);
+            if (onGoalCreated) onGoalCreated(newGoalData?.name);
+            return newGoalData;
+        } catch (err) {
+            console.error('Failed to create sub goal', err);
+            throw err;
         }
-        fetchFractalTree(rootId);
-        setCreateSubGoalParent(null);
-        if (onGoalCreated) onGoalCreated(newGoalData?.name);
-    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated]);
+    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal]);
 
     // --- Session Activities Derivation ---
     const sessionActivities = useMemo(() => {
@@ -606,6 +617,7 @@ function GoalsPanel({
                     onCreate={handleSubGoalCreated}
                     rootId={rootId}
                     activityDefinitions={activityDefinitions}
+                    initialActivities={viewMode === 'activity' && activeActivityDef ? [activeActivityDef] : []}
                 />,
                 document.body
             )}

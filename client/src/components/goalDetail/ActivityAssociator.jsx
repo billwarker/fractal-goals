@@ -839,7 +839,40 @@ const ActivityAssociator = ({
                             <input
                                 type="checkbox"
                                 checked={inheritFromParent}
-                                onChange={(e) => setInheritFromParent(e.target.checked)}
+                                onChange={async (e) => {
+                                    const checked = e.target.checked;
+                                    setInheritFromParent(checked);
+
+                                    if (checked && parentGoalId && rootId) {
+                                        try {
+                                            const res = await fractalApi.getGoalActivities(rootId, parentGoalId);
+                                            const parentActs = res.data || [];
+
+                                            if (parentActs.length > 0) {
+                                                const existingIds = new Set(associatedActivities.map(a => a.id));
+                                                const newActs = parentActs.filter(a => !existingIds.has(a.id));
+
+                                                if (newActs.length > 0) {
+                                                    const nextActivities = [...associatedActivities, ...newActs];
+                                                    setAssociatedActivities(nextActivities);
+                                                    if (onSave) {
+                                                        await onSave(nextActivities, associatedActivityGroups);
+                                                        notify.success(`Inherited and associated ${newActs.length} activities from parent`);
+                                                    } else {
+                                                        notify.success(`Queued ${newActs.length} inherited activities for association`);
+                                                    }
+                                                } else {
+                                                    notify.info("All parent activities are already associated");
+                                                }
+                                            } else {
+                                                notify.info("Parent goal has no activities to inherit");
+                                            }
+                                        } catch (err) {
+                                            console.error("Failed to inherit parent activities", err);
+                                            notify.error("Failed to inherit parent activities");
+                                        }
+                                    }
+                                }}
                                 style={{ accentColor: headerColor || 'var(--color-brand-primary)' }}
                             />
                             Inherit activities from parent goals
