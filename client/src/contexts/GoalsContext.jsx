@@ -69,6 +69,7 @@ export function GoalsProvider({ children }) {
             queryClient.invalidateQueries({ queryKey: ['session-activities', variables.rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-notes', variables.rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-micro-goals', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', variables.rootId] });
             notify.success('Goal deleted');
         }
     });

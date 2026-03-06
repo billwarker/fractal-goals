@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { isTargetAchieved } from '../utils/targetUtils';
 
 /**
  * Hook for real-time target achievement detection during a session

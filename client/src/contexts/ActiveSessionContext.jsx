@@ -95,14 +95,16 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         enabled: !!rootId
     });
 
-    const { data: microGoals = [] } = useQuery({
-        queryKey: ['session-micro-goals', rootId, sessionId],
+    const { data: sessionGoalsView = null } = useQuery({
+        queryKey: ['session-goals-view', rootId, sessionId],
         queryFn: async () => {
-            const res = await fractalApi.getSessionMicroGoals(rootId, sessionId);
-            return res.data || [];
+            const res = await fractalApi.getSessionGoalsView(rootId, sessionId);
+            return res.data || null;
         },
         enabled: !!rootId && !!sessionId
     });
+
+    const microGoals = useMemo(() => sessionGoalsView?.micro_goals || [], [sessionGoalsView]);
 
     // 2. Mutations
     const updateSessionMutation = useMutation({
@@ -126,6 +128,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
         },
         onError: (err) => {
             const status = err?.response?.status;
@@ -144,6 +147,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
         }
     });
 
@@ -195,6 +199,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
         }
     });
 
@@ -242,7 +248,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
 
             // Toast for manual completion
@@ -560,7 +566,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         try {
             const res = await fractalApi.createGoal(rootId, goalData);
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
 
@@ -803,6 +809,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         parentGoals,
         immediateGoals,
         microGoals,
+        sessionGoalsView,
         loading: sessionLoading || (session && !localSessionData),
         instancesLoading,
         activitiesLoading,
@@ -824,6 +831,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         parentGoals,
         immediateGoals,
         microGoals,
+        sessionGoalsView,
         sessionLoading,
         instancesLoading,
         activitiesLoading,

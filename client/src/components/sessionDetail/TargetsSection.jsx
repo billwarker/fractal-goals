@@ -9,14 +9,16 @@ import { useGoals } from '../../contexts/GoalsContext';
  */
 function TargetsSection({
     rootId, sessionId, hierarchy, activeActivityId, activeActivityInstanceId,
-    allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds
+    allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds,
+    targets = null,
 }) {
     const { useFractalTreeQuery } = useGoals();
     const { data: goalTree } = useFractalTreeQuery(rootId);
 
     // Flatten all goals and extract targets
     const allTargets = useMemo(() => {
-        const targets = [];
+        if (Array.isArray(targets)) return [...targets];
+        const derivedTargets = [];
 
         // Use either the scoped hierarchy provided or the whole tree
         const nodesToProcess = hierarchy || (goalTree ? [goalTree] : []);
@@ -60,7 +62,7 @@ function TargetsSection({
                         || goal.completed
                     );
 
-                    targets.push({
+                    derivedTargets.push({
                         ...target,
                         _goalDepth: goal.depth ?? depth, // Use depth from hierarchy node if available
                         _goalName: goal.name,
@@ -78,8 +80,8 @@ function TargetsSection({
         };
 
         nodesToProcess.forEach(node => processGoal(node, node.depth || 0));
-        return targets;
-    }, [goalTree, hierarchy, targetAchievements, activeActivityId, achievedTargetIds]);
+        return derivedTargets;
+    }, [goalTree, hierarchy, targetAchievements, activeActivityId, achievedTargetIds, targets]);
 
     // 2. Sort by Depth Descending (Deepest first)
     // If depths are equal, maybe sort by creation time or name? stick to depth for now.

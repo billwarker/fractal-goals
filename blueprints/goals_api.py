@@ -5,14 +5,14 @@ import uuid
 import logging
 import models
 from sqlalchemy.orm import selectinload
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select, or_
 
 logger = logging.getLogger(__name__)
 from models import (
     get_session,
     Goal, Session, Target, GoalLevel, TargetMetricCondition,
     get_all_root_goals, get_goal_by_id, get_session_by_id,
-    validate_root_goal, session_goals
+    validate_root_goal, session_goals, ActivityDefinition
 )
 from validators import (
     validate_request,
@@ -39,6 +39,7 @@ from services.serializers import (
 from extensions import limiter
 from services.metrics import GoalMetricsService
 from services.analytics_cache import get_analytics, set_analytics
+from services.session_service import SessionService
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -99,6 +100,36 @@ def _authorize_goal_access(db_session, current_user_id: str, goal, root_id_hint:
         return None
 
     return authorized_root_id
+
+
+def _collect_goal_ids_with_ancestors(goal_ids, goals_by_id):
+    collected = set()
+    for goal_id in goal_ids:
+        current = goals_by_id.get(goal_id)
+        while current:
+            if current.id in collected:
+                break
+            collected.add(current.id)
+            current = goals_by_id.get(current.parent_id)
+    return collected
+
+
+def _prune_tree_to_goal_ids(serialized_node, allowed_ids):
+    if not serialized_node:
+        return None
+
+    kept_children = []
+    for child in serialized_node.get('children', []) or []:
+        pruned_child = _prune_tree_to_goal_ids(child, allowed_ids)
+        if pruned_child:
+            kept_children.append(pruned_child)
+
+    if serialized_node.get('id') in allowed_ids or kept_children:
+        next_node = dict(serialized_node)
+        next_node['children'] = kept_children
+        return next_node
+
+    return None
 
 
 def _sync_targets(db_session, goal, incoming_targets: list):
@@ -432,6 +463,133 @@ def get_session_micro_goals(current_user, root_id, session_id):
         
     except Exception as e:
         logger.exception("Error fetching session micro goals")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/fractal/<root_id>/sessions/<session_id>/goals-view', methods=['GET'])
+@token_required
+def get_session_goals_view(current_user, root_id, session_id):
+    """Return the canonical goals payload used by the session detail sidepane."""
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    service = SessionService(db_session)
+    try:
+        root = db_session.query(Goal).options(
+            selectinload(Goal.children),
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups)
+        ).filter(
+            Goal.id == root_id,
+            Goal.parent_id == None,
+            Goal.owner_id == current_user.id,
+            Goal.deleted_at == None
+        ).first()
+        if not root:
+            root = require_owned_root(db_session, root_id, current_user.id)
+            if not root:
+                return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        session_obj = db_session.query(Session).options(
+            selectinload(Session.goals),
+            selectinload(Session.activity_instances)
+        ).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None
+        ).first()
+        if not session_obj:
+            return jsonify({"error": "Session not found in this fractal"}), 404
+
+        root_tree = serialize_goal(root)
+
+        goals_by_id = {
+            goal.id: goal
+            for goal in db_session.query(Goal).filter(
+                Goal.root_id == root_id,
+                Goal.deleted_at == None
+            ).all()
+        }
+
+        session_goal_select = select(session_goals.c.goal_id)
+        includes_source = _session_goals_supports_source(db_session)
+        if includes_source:
+            session_goal_select = select(session_goals.c.goal_id, session_goals.c.association_source)
+        session_goals_rows = db_session.execute(
+            session_goal_select.where(session_goals.c.session_id == session_id)
+        ).all()
+        session_goal_ids = [row.goal_id for row in session_goals_rows]
+        session_goal_sources = {
+            row.goal_id: (getattr(row, 'association_source', None) if includes_source else None) or 'manual'
+            for row in session_goals_rows
+        }
+
+        if not session_goal_ids:
+            derived_goals = service._derive_session_goals_from_activities(session_obj)
+            session_goal_ids = [goal.id for goal in derived_goals]
+            session_goal_sources = {goal.id: 'activity-derived' for goal in derived_goals}
+
+        session_activity_instances = list(session_obj.activity_instances or [])
+        session_activity_ids = sorted({
+            inst.activity_definition_id
+            for inst in session_activity_instances
+            if inst.activity_definition_id
+        })
+
+        activity_goal_ids_by_activity = {}
+        if session_activity_ids:
+            activity_defs = db_session.query(ActivityDefinition).options(
+                selectinload(ActivityDefinition.associated_goals)
+            ).filter(
+                ActivityDefinition.id.in_(session_activity_ids),
+                ActivityDefinition.root_id == root_id,
+                ActivityDefinition.deleted_at == None
+            ).all()
+            for activity_def in activity_defs:
+                activity_goal_ids_by_activity[activity_def.id] = [
+                    goal.id for goal in (activity_def.associated_goals or [])
+                    if not goal.deleted_at and goal.root_id == root_id
+                ]
+
+        associated_goal_ids = {
+            goal_id
+            for goal_ids in activity_goal_ids_by_activity.values()
+            for goal_id in goal_ids
+        }
+        visible_goal_ids = _collect_goal_ids_with_ancestors(
+            set(session_goal_ids) | associated_goal_ids,
+            goals_by_id
+        )
+        visible_goal_ids.add(root_id)
+        pruned_goal_tree = _prune_tree_to_goal_ids(root_tree, visible_goal_ids) or root_tree
+
+        micro_stmt = (
+            select(Goal)
+            .join(session_goals, Goal.id == session_goals.c.goal_id)
+            .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
+            .where(session_goals.c.session_id == session_id)
+            .where(Goal.root_id == root_id)
+            .where(
+                or_(
+                    models.GoalLevel.name == 'Micro Goal',
+                    session_goals.c.goal_type == 'MicroGoal'
+                )
+            )
+            .options(selectinload(Goal.children))
+        )
+        micro_goals = db_session.execute(micro_stmt).scalars().all()
+
+        return jsonify({
+            "goal_tree": pruned_goal_tree,
+            "session_goal_ids": session_goal_ids,
+            "session_goal_sources": session_goal_sources,
+            "session_activity_ids": session_activity_ids,
+            "activity_goal_ids_by_activity": activity_goal_ids_by_activity,
+            "micro_goals": [serialize_goal(g) for g in micro_goals],
+        })
+    except Exception:
+        logger.exception("Error fetching session goals view")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

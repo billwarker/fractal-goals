@@ -308,6 +308,14 @@ export const fractalApi = {
     getSessionMicroGoals: (rootId, sessionId) =>
         axios.get(`${API_BASE}/fractal/${rootId}/sessions/${sessionId}/micro-goals`),
 
+    /**
+     * Get the canonical goals payload for the session detail sidepane
+     * @param {string} rootId - ID of the fractal
+     * @param {string} sessionId - ID of the session
+     */
+    getSessionGoalsView: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/fractal/${rootId}/sessions/${sessionId}/goals-view`),
+
 
     // ========== Session Activity Instances (Database-Only Architecture) ==========
 

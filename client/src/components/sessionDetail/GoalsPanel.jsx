@@ -1,11 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import notify from '../../utils/notify';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { fractalApi } from '../../utils/api';
-import {
-    buildFlattenedGoalTree,
-} from '../../utils/goalUtils';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import MicroGoalModal from '../MicroGoalModal';
@@ -14,6 +12,7 @@ import { useGoals } from '../../contexts/GoalsContext';
 import styles from './GoalsPanel.module.css';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 
 /**
  * GoalsPanel - Displays goals relevant to the current session scope.
@@ -31,26 +30,20 @@ function GoalsPanel({
         rootId,
         sessionId,
         session,
-        localSessionData,
-        activityInstances,
         activities: activityDefinitions,
         targetAchievements,
         achievedTargetIds,
-        updateGoal,
         createGoal,
         refreshSession,
-        microGoals,
+        sessionGoalsView,
     } = useActiveSession();
+    const queryClient = useQueryClient();
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
-    const { useFractalTreeQuery, fetchFractalTree } = useGoals();
-
-    // Shared query cache for goal tree - ensures sync with SessionDetail
-    const { data: goalTree } = useFractalTreeQuery(rootId);
+    const { fetchFractalTree } = useGoals();
 
     const [allShortTermGoals, setAllShortTermGoals] = useState([]);
 
     // Inline IG creator state
-    const showMicroNanoGoals = true;
     const [showIGCreator, setShowIGCreator] = useState(false);
     const [igName, setIGName] = useState('');
     const [igParentId, setIGParentId] = useState('');
@@ -60,9 +53,6 @@ function GoalsPanel({
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
     const [targetBuilderGoal, setTargetBuilderGoal] = useState(null); // ImmediateGoal node
     const [viewMode, setViewMode] = useState('session');
-    const [resolvedActivityGoalIds, setResolvedActivityGoalIds] = useState([]);
-
-    // microGoals now comes from context (TanStack Query)
 
     useEffect(() => {
         if (!rootId) return;
@@ -78,7 +68,7 @@ function GoalsPanel({
     }, [rootId]);
 
     const goalLookup = useMemo(() => {
-        if (!goalTree) return new Map();
+        if (!sessionGoalsView?.goal_tree) return new Map();
         const map = new Map();
         const walk = (node) => {
             map.set(node.id, {
@@ -93,9 +83,9 @@ function GoalsPanel({
             });
             for (const child of (node.children || [])) { walk(child); }
         };
-        walk(goalTree);
+        walk(sessionGoalsView.goal_tree);
         return map;
-    }, [goalTree]);
+    }, [sessionGoalsView]);
 
     const activeActivityDef = useMemo(() => {
         if (!selectedActivity) return null;
@@ -118,30 +108,17 @@ function GoalsPanel({
         else setViewMode('session');
     }, [selectedActivity]);
 
-    useEffect(() => {
-        const selectedDefId = selectedActivity?.activity_definition_id || selectedActivity?.activity_id;
-        const localIds = activeActivityDef?.associated_goal_ids || [];
-        setResolvedActivityGoalIds(localIds);
-
-        if (!selectedDefId || localIds.length > 0) return;
-
-        let cancelled = false;
-        const loadActivityGoals = async () => {
-            try {
-                const res = await fractalApi.getActivityGoals(rootId, selectedDefId);
-                const ids = (res.data || []).map(g => g.id).filter(Boolean);
-                if (!cancelled) setResolvedActivityGoalIds(ids);
-            } catch (err) {
-                if (!cancelled) setResolvedActivityGoalIds([]);
-                console.error('Failed to load activity goals for selected activity', err);
-            }
-        };
-        loadActivityGoals();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [rootId, selectedActivity, activeActivityDef]);
+    const {
+        sessionHierarchy,
+        activityHierarchy,
+        targetCards,
+    } = useSessionGoalsViewModel({
+        sessionGoalsView,
+        session,
+        selectedActivity: viewMode === 'activity' ? selectedActivity : null,
+        targetAchievements,
+        achievedTargetIds,
+    });
 
     const handleCreateImmediateGoal = async () => {
         if (!igName.trim() || !igParentId) return;
@@ -153,8 +130,12 @@ function GoalsPanel({
                 parent_id: igParentId,
             });
             await fractalApi.addSessionGoal(rootId, sessionId, newGoal.id, 'immediate');
+            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
             if (viewMode === 'activity' && activeActivityDef) {
-                try { await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id); }
+                try {
+                    await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id);
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                }
                 catch (linkErr) { console.error("Failed to link new IG to activity", linkErr); }
             }
             setIGName('');
@@ -180,7 +161,10 @@ function GoalsPanel({
                 session_id: sessionId
             });
             if (viewMode === 'activity' && activeActivityDef) {
-                try { await fractalApi.associateGoalToActivity(rootId, newGoalData.id, activeActivityDef.id); }
+                try {
+                    await fractalApi.associateGoalToActivity(rootId, newGoalData.id, activeActivityDef.id);
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                }
                 catch (linkErr) { console.error("Failed to link new Micro Goal to activity", linkErr); }
             }
 
@@ -280,16 +264,9 @@ function GoalsPanel({
                 try {
                     const currentIds = activeActivityDef.associated_goal_ids || [];
                     await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentIds, newGoal.id]);
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
                 } catch (assocErr) {
                     console.warn('Could not associate micro goal with activity', assocErr);
-                }
-                // 3. Re-fetch the activity's goal IDs so the hierarchy panel updates immediately
-                try {
-                    const res = await fractalApi.getActivityGoals(rootId, activeActivityDef.id);
-                    const ids = (res.data || []).map(g => g.id).filter(Boolean);
-                    setResolvedActivityGoalIds(ids);
-                } catch (fetchErr) {
-                    console.warn('Could not refresh activity goal IDs', fetchErr);
                 }
             }
             fetchFractalTree(rootId);
@@ -302,7 +279,7 @@ function GoalsPanel({
         }
         setShowMicroTargetBuilder(false);
         setTargetBuilderGoal(null);
-    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fetchFractalTree, onGoalCreated]);
+    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fetchFractalTree, onGoalCreated, selectedActivity, refreshSession]);
 
     // --- Sub-goal Creation via GoalDetailModal ---
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null); // goal node
@@ -318,9 +295,7 @@ function GoalsPanel({
                 try {
                     const currentGoalIds = activeActivityDef.associated_goal_ids || [];
                     await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentGoalIds, newGoalData.id]);
-                    const res = await fractalApi.getActivityGoals(rootId, activeActivityDef.id);
-                    const ids = (res.data || []).map(g => g.id).filter(Boolean);
-                    setResolvedActivityGoalIds(ids);
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
                 } catch (assocErr) {
                     console.error('Failed to associate new sub-goal with activity', assocErr);
                 }
@@ -333,158 +308,12 @@ function GoalsPanel({
             console.error('Failed to create sub goal', err);
             throw err;
         }
-    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal]);
-
-    // --- Session Activities Derivation ---
-    const sessionActivities = useMemo(() => {
-        if (!localSessionData?.sections || !activityDefinitions.length || !activityInstances.length) return [];
-
-        const sectionInstanceIds = new Set(
-            localSessionData.sections.flatMap((section) => section.activity_ids || [])
-        );
-
-        const uniqueDefinitionIds = new Set(
-            activityInstances
-                .filter((instance) => sectionInstanceIds.has(instance.id))
-                .map((instance) => instance.activity_definition_id)
-                .filter(Boolean)
-        );
-
-        return Array.from(uniqueDefinitionIds)
-            .map((id) => activityDefinitions.find((def) => def.id === id))
-            .filter(Boolean);
-    }, [localSessionData, activityDefinitions, activityInstances]);
-
-    const sessionCompletedGoalIds = useMemo(() => {
-        if (!goalTree || !session) return new Set();
-
-        const toMillis = (value) => {
-            if (!value) return null;
-            const parsed = Date.parse(value);
-            return Number.isNaN(parsed) ? null : parsed;
-        };
-
-        const sessionStartMs = toMillis(session.session_start || session.created_at);
-        // Use a generous upper bound for ongoing sessions to catch goals completed "now"
-        const sessionEndMs = session.completed
-            ? toMillis(session.session_end || session.completed_at || session.updated_at)
-            : Date.now() + 60000; // Add 1 minute buffer for active sessions
-
-        if (sessionStartMs === null || sessionEndMs === null) return new Set();
-
-        const ids = new Set();
-        const visit = (node) => {
-            if (!node) return;
-            const completedAtRaw = node.attributes?.completed_at || node.completed_at;
-            const completedAtMs = toMillis(completedAtRaw);
-            if (completedAtMs !== null && completedAtMs >= sessionStartMs && completedAtMs <= sessionEndMs) {
-                ids.add(node.id);
-            }
-            for (const child of (node.children || [])) {
-                visit(child);
-            }
-        };
-        visit(goalTree);
-        return ids;
-    }, [goalTree, session]);
-
-    // Unified hierarchy builder
-    const getHierarchy = useCallback((goalIds, mode = 'activity', specificActivityId = null, allowedSessionActivityDefIds = null) => {
-        if (!goalTree) return [];
-        const targetGoalIds = new Set(goalIds || []);
-
-        // 1. Get base hierarchy
-        let hierarchy = buildFlattenedGoalTree(goalTree, targetGoalIds, true, sessionCompletedGoalIds);
-
-        // 2. Filter MicroGoals
-        // If mode is 'session', take ALL session microgoals
-        // If mode is 'activity', take only linked microgoals
-        const relevantMicroGoals = !showMicroNanoGoals ? [] : mode === 'session'
-            ? microGoals.filter((microGoal) => {
-                if (!allowedSessionActivityDefIds) return false;
-                return allowedSessionActivityDefIds.has(microGoal.activity_definition_id);
-            })
-            : microGoals.filter((microGoal) => {
-                const linkedByActivityDefinition = specificActivityId
-                    && microGoal.activity_definition_id === specificActivityId;
-                // Fallback for older micro-goals that don't carry activity_definition_id:
-                // treat them as relevant if either the micro itself or its parent is linked.
-                const linkedByAssociatedHierarchy = targetGoalIds.has(microGoal.id)
-                    || targetGoalIds.has(microGoal.parent_id);
-                return linkedByActivityDefinition || linkedByAssociatedHierarchy;
-            });
-
-        if (relevantMicroGoals.length === 0) {
-            return hierarchy.filter(node => {
-                const id = node.id;
-                if (!node.completed) return true;
-                return sessionCompletedGoalIds && sessionCompletedGoalIds.has(id);
-            });
-        }
-
-        // 3. Inject MicroGoals
-        const microGoalsByParent = {};
-        relevantMicroGoals.forEach(m => {
-            if (!microGoalsByParent[m.parent_id]) microGoalsByParent[m.parent_id] = [];
-            microGoalsByParent[m.parent_id].push(m);
-        });
-
-        const newHierarchy = [];
-        hierarchy.forEach(node => {
-            newHierarchy.push(node);
-            if (microGoalsByParent[node.id]) {
-                const micros = microGoalsByParent[node.id];
-                micros.forEach(micro => {
-                    const microDepth = (node.depth || 0) + 1;
-                    newHierarchy.push({
-                        ...micro,
-                        depth: microDepth,
-                        isLinked: true,
-                        type: 'MicroGoal'
-                    });
-                    if (micro.children && micro.children.length > 0) {
-                        micro.children.forEach(nano => {
-                            newHierarchy.push({
-                                ...nano,
-                                depth: microDepth + 1,
-                                isLinked: true,
-                                type: 'NanoGoal'
-                            });
-                        });
-                    }
-                });
-            }
-        });
-
-        return newHierarchy.filter(node => {
-            const id = node.id;
-            // Keep incomplete goals always; keep completed goals only if completed this session
-            if (!node.completed) return true;
-            return sessionCompletedGoalIds && sessionCompletedGoalIds.has(id);
-        });
-    }, [goalTree, microGoals, sessionCompletedGoalIds, showMicroNanoGoals]);
-
-    const sessionHierarchy = useMemo(() => {
-        if (viewMode !== 'session') return [];
-        const allIds = new Set();
-        const sessionActivityDefIds = new Set();
-        sessionActivities.forEach(def => {
-            sessionActivityDefIds.add(def.id);
-            def.associated_goal_ids?.forEach(id => allIds.add(id));
-        });
-        return getHierarchy(Array.from(allIds), 'session', null, sessionActivityDefIds);
-    }, [viewMode, sessionActivities, getHierarchy]);
-
-    const activeActivityHierarchy = useMemo(() => {
-        if (!activeActivityDef) return [];
-        return getHierarchy(resolvedActivityGoalIds, 'activity', activeActivityDef.id);
-    }, [activeActivityDef, resolvedActivityGoalIds, getHierarchy]);
+    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal, queryClient, sessionId]);
 
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
 
     const isActivityFocused = !!selectedActivity;
-    const sessionActivityIds = useMemo(() => new Set(sessionActivities.map(a => a.id)), [sessionActivities]);
 
     return (
         <>
@@ -510,7 +339,7 @@ function GoalsPanel({
                             <HierarchySection
                                 type="activity"
                                 activityDefinition={activeActivityDef}
-                                flattenedHierarchy={activeActivityHierarchy}
+                                flattenedHierarchy={activityHierarchy}
                                 viewMode={viewMode}
                                 onGoalClick={onGoalClick}
                                 getScopedCharacteristics={getLevelByName}
@@ -524,21 +353,14 @@ function GoalsPanel({
                                 onOpenAssociate={() => onOpenGoals && onOpenGoals(selectedActivity, {
                                     type: 'associate',
                                     activityDefinition: activeActivityDef,
-                                    initialSelectedGoalIds: resolvedActivityGoalIds
+                                    initialSelectedGoalIds: sessionGoalsView?.activity_goal_ids_by_activity?.[activeActivityDef?.id] || []
                                 })}
                                 onAddTargetForGoal={handleAddTargetForGoal}
                             />
 
                             <TargetsSection
-                                rootId={rootId}
-                                sessionId={sessionId}
-                                hierarchy={activeActivityHierarchy}
-                                activeActivityId={activeActivityDef?.id}
-                                activeActivityInstanceId={selectedActivity?.id}
-                                allowedActivityIds={new Set([activeActivityDef?.id])}
+                                targets={targetCards}
                                 activityDefinitions={activityDefinitions}
-                                targetAchievements={targetAchievements}
-                                achievedTargetIds={achievedTargetIds}
                             />
                         </>
                     ) : (
@@ -573,14 +395,8 @@ function GoalsPanel({
                                 </div>
                             )}
                             <TargetsSection
-                                rootId={rootId}
-                                sessionId={sessionId}
-                                hierarchy={sessionHierarchy}
-                                activeActivityId={null}
-                                allowedActivityIds={sessionActivityIds}
+                                targets={targetCards}
                                 activityDefinitions={activityDefinitions}
-                                targetAchievements={targetAchievements}
-                                achievedTargetIds={achievedTargetIds}
                             />
                         </div>
                     )

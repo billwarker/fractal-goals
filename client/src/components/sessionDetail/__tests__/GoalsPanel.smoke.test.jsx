@@ -7,15 +7,13 @@ let activeSessionMock = {
     rootId: 'root-1',
     sessionId: 'session-1',
     session: { immediate_goals: [] },
-    localSessionData: { sections: [] },
-    activityInstances: [],
     activities: [],
     targetAchievements: new Map(),
     achievedTargetIds: new Set(),
-    updateGoal: vi.fn(),
     createGoal: vi.fn(),
     refreshSession: vi.fn(),
-    microGoals: []
+    microGoals: [],
+    sessionGoalsView: null,
 };
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
@@ -96,7 +94,6 @@ describe('GoalsPanel smoke', () => {
             activities: [{ id: 'activity-1', name: 'Pull Up', associated_goal_ids: ['ig-1'] }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
-            updateGoal: vi.fn(),
             createGoal: vi.fn(),
             refreshSession: vi.fn(),
             microGoals: [
@@ -108,7 +105,30 @@ describe('GoalsPanel smoke', () => {
                     completed: false,
                     children: [{ id: 'nano-1', name: 'Nano 1', completed: false }]
                 }
-            ]
+            ],
+            sessionGoalsView: {
+                goal_tree: {
+                    id: 'root-1',
+                    type: 'UltimateGoal',
+                    name: 'Root',
+                    children: [
+                        { id: 'stg-1', type: 'ShortTermGoal', name: 'STG', children: [{ id: 'ig-1', type: 'ImmediateGoal', name: 'IG', children: [] }] }
+                    ]
+                },
+                session_goal_ids: ['ig-1'],
+                activity_goal_ids_by_activity: { 'activity-1': ['ig-1'] },
+                session_activity_ids: ['activity-1'],
+                micro_goals: [
+                    {
+                        id: 'micro-1',
+                        name: 'Micro 1',
+                        parent_id: 'ig-1',
+                        activity_definition_id: 'activity-1',
+                        completed: false,
+                        children: [{ id: 'nano-1', name: 'Nano 1', completed: false }]
+                    }
+                ]
+            }
         };
     });
 
@@ -166,7 +186,19 @@ describe('GoalsPanel smoke', () => {
                     completed: false,
                     children: [{ id: 'nano-new', name: 'Nano New', completed: false }]
                 }
-            ]
+            ],
+            sessionGoalsView: {
+                ...(activeSessionMock.sessionGoalsView || {}),
+                micro_goals: [
+                    {
+                        id: 'micro-legacy',
+                        name: 'Legacy Micro',
+                        parent_id: 'ig-1',
+                        completed: false,
+                        children: [{ id: 'nano-new', name: 'Nano New', completed: false }]
+                    }
+                ]
+            }
         };
 
         renderWithProviders(

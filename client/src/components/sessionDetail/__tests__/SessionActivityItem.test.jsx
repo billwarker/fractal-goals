@@ -171,7 +171,7 @@ describe('SessionActivityItem nano note flow', () => {
         });
     });
 
-    it('rolls back created nano goal if note creation fails', async () => {
+    it('keeps the nano goal when note creation fails', async () => {
         onAddNote.mockImplementationOnce(() => Promise.reject(new Error('note failed')));
 
         renderWithProviders(
@@ -213,8 +213,14 @@ describe('SessionActivityItem nano note flow', () => {
         fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
 
         await waitFor(() => {
-            expect(deleteGoal).toHaveBeenCalledWith('root-1', 'nano-1');
+            expect(createGoal).toHaveBeenCalledWith({
+                name: 'Do one strict rep',
+                type: 'NanoGoal',
+                parent_id: 'micro-1',
+                session_id: 'session-1'
+            });
         });
+        expect(deleteGoal).not.toHaveBeenCalled();
     });
 
     it('buffers single metric edits and commits on blur', async () => {

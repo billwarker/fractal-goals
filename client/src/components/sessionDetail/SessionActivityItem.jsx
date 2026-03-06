@@ -383,89 +383,93 @@ function SessionActivityItem({
                     newNanoGoalId = res.id;
                     newNanoGoal = res;
 
-                    // Optimistically add nano child to the session micro-goals cache
-                    // so it appears in Goals hierarchy immediately.
-                    queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
-                        if (!Array.isArray(old)) return old;
-                        return old.map((micro) => {
-                            if (micro.id !== activeMicroGoal.id) return micro;
-                            return {
-                                ...micro,
-                                children: [...(micro.children || []), {
-                                    id: newNanoGoalId,
-                                    name: res.name || content.trim(),
-                                    type: 'NanoGoal',
-                                    completed: false,
-                                    attributes: res.attributes || {}
-                                }]
-                            };
-                        });
+                    // Optimistically add the nano to the canonical session-goals payload.
+                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                        if (!old || !Array.isArray(old.micro_goals)) return old;
+                        return {
+                            ...old,
+                            micro_goals: old.micro_goals.map((micro) => {
+                                if (micro.id !== activeMicroGoal.id) return micro;
+                                return {
+                                    ...micro,
+                                    children: [...(micro.children || []), {
+                                        id: newNanoGoalId,
+                                        name: res.name || content.trim(),
+                                        type: 'NanoGoal',
+                                        completed: false,
+                                        attributes: res.attributes || {}
+                                    }]
+                                };
+                            })
+                        };
                     });
                     appliedOptimisticNano = true;
                 }
             }
 
             // Replace optimistic children with authoritative parent children payload.
-            // This avoids stale hierarchy states when session-micro-goals refetch lags.
             if (newNanoGoalId && rootId && activeMicroGoal?.id) {
                 try {
                     const parentRes = await fractalApi.getGoal(rootId, activeMicroGoal.id);
                     const parentChildren = parentRes?.data?.children || [];
-                    queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
-                        if (!Array.isArray(old)) return old;
-                        return old.map((micro) => {
-                            if (micro.id !== activeMicroGoal.id) return micro;
-                            return { ...micro, children: parentChildren };
-                        });
+                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                        if (!old || !Array.isArray(old.micro_goals)) return old;
+                        return {
+                            ...old,
+                            micro_goals: old.micro_goals.map((micro) => {
+                                if (micro.id !== activeMicroGoal.id) return micro;
+                                return { ...micro, children: parentChildren };
+                            })
+                        };
                     });
                 } catch (parentRefreshErr) {
                     console.warn("Failed to refresh parent micro goal children", parentRefreshErr);
                 }
             }
 
-            // 2. Create the Note (note timeline)
-            await onAddNote({
-                context_type: 'activity_instance',
-                context_id: exercise.id,
-                session_id: sessionId || exercise.session_id,
-
-                activity_instance_id: exercise.id,
-                activity_definition_id: activityDefinition?.id,
-                set_index: selectedSetIndex,
-                content: content.trim() || (imageData ? '[Nano Image]' : ''),
-                image_data: imageData,
-                nano_goal_id: newNanoGoalId, // Link note to the nano goal
-                is_nano_goal: true
-            });
-
-            if (onNoteCreated) onNoteCreated();
             if (newNanoGoal) notify.success(`Nano goal created: ${newNanoGoal.name || content.trim()}`);
-            // Revalidate caches used by hierarchy + target cards.
-            await queryClient.refetchQueries({ queryKey: ['session-micro-goals', rootId, sessionId], type: 'active' });
+
+            // 2. Create the Note (timeline/log) independently.
+            try {
+                await onAddNote({
+                    context_type: 'activity_instance',
+                    context_id: exercise.id,
+                    session_id: sessionId || exercise.session_id,
+                    activity_instance_id: exercise.id,
+                    activity_definition_id: activityDefinition?.id,
+                    set_index: selectedSetIndex,
+                    content: content.trim() || (imageData ? '[Nano Image]' : ''),
+                    image_data: imageData,
+                    nano_goal_id: newNanoGoalId,
+                    is_nano_goal: true
+                });
+                if (onNoteCreated) onNoteCreated();
+            } catch (noteErr) {
+                console.error("Failed to create nano note entry", noteErr);
+                notify.error(noteErr?.response?.data?.error || "Nano goal created, but note log failed");
+            }
+
+            await queryClient.refetchQueries({ queryKey: ['session-goals-view', rootId, sessionId], type: 'active' });
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
         } catch (err) {
             if (appliedOptimisticNano) {
-                queryClient.setQueryData(['session-micro-goals', rootId, sessionId], (old = []) => {
-                    if (!Array.isArray(old)) return old;
-                    return old.map((micro) => {
-                        if (micro.id !== activeMicroGoal?.id) return micro;
-                        return {
-                            ...micro,
-                            children: (micro.children || []).filter((child) => child.id !== newNanoGoalId)
-                        };
-                    });
+                queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                    if (!old || !Array.isArray(old.micro_goals)) return old;
+                    return {
+                        ...old,
+                        micro_goals: old.micro_goals.map((micro) => {
+                            if (micro.id !== activeMicroGoal?.id) return micro;
+                            return {
+                                ...micro,
+                                children: (micro.children || []).filter((child) => child.id !== newNanoGoalId)
+                            };
+                        })
+                    };
                 });
             }
-            if (newNanoGoalId && rootId) {
-                try {
-                    await fractalApi.deleteGoal(rootId, newNanoGoalId);
-                } catch (rollbackErr) {
-                    console.error("Failed to rollback orphan nano goal", rollbackErr);
-                }
-            }
-            console.error("Failed to create nano note", err);
-            notify.error(err?.response?.data?.error || "Failed to create nano goal note");
+            console.error("Failed to create nano goal", err);
+            notify.error(err?.response?.data?.error || "Failed to create nano goal");
         }
     };
 

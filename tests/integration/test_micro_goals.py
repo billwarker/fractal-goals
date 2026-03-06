@@ -177,3 +177,51 @@ class TestMicroGoals:
 
         response = authed_client.get(f"/api/fractal/{root_one.id}/sessions/{session_two.id}/micro-goals")
         assert response.status_code == 404
+
+    def test_get_session_goals_view_returns_membership_and_associations(self, authed_client, db_session, test_user, sample_goal_hierarchy):
+        """Canonical session goals payload should expose membership, associations, and session micro goals together."""
+        root = sample_goal_hierarchy['ultimate']
+        short_term = sample_goal_hierarchy['short_term']
+
+        immediate = Goal(
+            id=str(uuid.uuid4()),
+            name="Immediate 1",
+            owner_id=test_user.id,
+            parent_id=short_term.id,
+            root_id=root.id
+        )
+        db_session.add(immediate)
+
+        session = Session(
+            id=str(uuid.uuid4()),
+            name="Session View Test",
+            root_id=root.id
+        )
+        db_session.add(session)
+        db_session.commit()
+
+        db_session.execute(session_goals.insert().values(
+            session_id=session.id,
+            goal_id=immediate.id,
+            goal_type='ImmediateGoal',
+            association_source='manual'
+        ))
+        db_session.commit()
+
+        micro_response = authed_client.post(f"/api/{root.id}/goals", data=json.dumps({
+            "name": "Micro 1",
+            "type": "MicroGoal",
+            "parent_id": immediate.id,
+            "session_id": session.id
+        }))
+        assert micro_response.status_code == 201
+        micro_data = json.loads(micro_response.data)
+
+        response = authed_client.get(f"/api/fractal/{root.id}/sessions/{session.id}/goals-view")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert immediate.id in data['session_goal_ids']
+        assert data['session_goal_sources'][immediate.id] == 'manual'
+        assert any(goal['id'] == micro_data['id'] for goal in data['micro_goals'])
+        assert data['goal_tree']['id'] == root.id
