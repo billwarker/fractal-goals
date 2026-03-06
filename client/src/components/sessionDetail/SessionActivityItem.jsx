@@ -271,7 +271,6 @@ function SessionActivityItem({
     const [localStartTime, setLocalStartTime] = useState('');
     const [localStopTime, setLocalStopTime] = useState('');
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
-    const [selectedNoteId, setSelectedNoteId] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
     const [pendingNanoGoalIds, setPendingNanoGoalIds] = useState(() => new Set());
 
@@ -995,8 +994,6 @@ function SessionActivityItem({
                                 onToggleNanoGoal={handleToggleNanoGoal}
                                 pendingNanoGoalIds={pendingNanoGoalIds}
                                 compact={false}
-                                selectedNoteId={selectedNoteId} // Use local state
-                                onNoteSelect={setSelectedNoteId}
                             />
                         </div>
                     )}
