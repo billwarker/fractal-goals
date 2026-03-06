@@ -60,6 +60,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const initTimeoutRef = useRef(null);
     const instanceQueuesRef = useRef(new Map());
     const autoSyncedGoalStatesRef = useRef(new Map());
+    const targetNotificationsInitializedRef = useRef(false);
+    const goalNotificationsInitializedRef = useRef(false);
 
     const scheduleStatusClear = useCallback((delayMs) => {
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
@@ -738,6 +740,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             setDraggedItem(null);
             setNotifiedTargetIds(new Set());
             setSidePaneMode('details');
+            targetNotificationsInitializedRef.current = false;
+            goalNotificationsInitializedRef.current = false;
         }
     }, [rootId, sessionId]);
 
@@ -851,6 +855,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const prevAchievedTargetIdsRef = useRef(new Set());
     useEffect(() => {
         if (!achievedTargetIds || !targetAchievements) return;
+        if (!targetNotificationsInitializedRef.current) {
+            prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
+            setNotifiedTargetIds(new Set(achievedTargetIds));
+            targetNotificationsInitializedRef.current = true;
+            return;
+        }
         const prevAchieved = prevAchievedTargetIdsRef.current;
         const newlyAchieved = [];
         for (const targetId of achievedTargetIds) {
@@ -894,6 +904,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         goalAchievements.forEach((status, goalId) => {
             if (status.allAchieved) currentCompleteds.add(goalId);
         });
+        if (!goalNotificationsInitializedRef.current) {
+            prevCompletedIdsRef.current = currentCompleteds;
+            goalNotificationsInitializedRef.current = true;
+            return;
+        }
         const prevCompleted = prevCompletedIdsRef.current;
         const newlyCompleted = [];
         for (const goalId of currentCompleteds) {

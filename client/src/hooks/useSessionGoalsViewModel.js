@@ -195,7 +195,6 @@ export function useSessionGoalsViewModel({
             goalTargets.forEach((target) => {
                 if (activeActivityDefId && target.activity_id !== activeActivityDefId) return;
                 if (target.activity_instance_id && selectedActivity?.id && target.activity_instance_id !== selectedActivity.id) return;
-                if (target.activity_instance_id && !selectedActivity?.id) return;
 
                 const status = getTargetStatus(target, goal, targetAchievements, achievedTargetIds);
                 cards.push({
