@@ -13,7 +13,7 @@ vi.mock('../../TargetCard', () => ({
 }));
 
 describe('TargetsSection', () => {
-    it('marks target complete when owning goal is completed', () => {
+    it('does not mark target complete from owning goal completion alone', () => {
         render(
             <TargetsSection
                 rootId="root-1"
@@ -42,6 +42,6 @@ describe('TargetsSection', () => {
             />
         );
 
-        expect(screen.getByText('card-complete')).toBeInTheDocument();
+        expect(screen.getByText('card-incomplete')).toBeInTheDocument();
     });
 });

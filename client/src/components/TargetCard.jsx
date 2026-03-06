@@ -1,6 +1,5 @@
 import React from 'react';
 import GoalIcon from './atoms/GoalIcon';
-import { useTheme } from '../contexts/ThemeContext'
 import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 
 /**
@@ -11,19 +10,22 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
-    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
+    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon, getCompletionColor } = useGoalLevels();;
 
     // Use the owning goal's icon, falling back to Target icon if unavailable
     const resolvedType = goalType || target._goalType || 'Target';
     const iconShape = getGoalIcon ? getGoalIcon(resolvedType) : (getLevelByName(resolvedType)?.icon || 'twelve-point-star');
     const iconColor = getGoalColor(resolvedType);
     const iconSecondaryColor = getGoalSecondaryColor(resolvedType);
+    const completionColor = getCompletionColor ? getCompletionColor() : '#4caf50';
+    const accentColor = isCompleted ? completionColor : iconColor;
+    const accentSecondaryColor = isCompleted ? getGoalSecondaryColor('Completed') : iconSecondaryColor;
 
     const statusObj = isCompleted ? {
-        color: iconColor,
-        icon: <GoalIcon shape={iconShape} color={iconColor} secondaryColor={iconSecondaryColor} size={20} />
+        color: accentColor,
+        icon: <GoalIcon shape={iconShape} color={accentColor} secondaryColor={accentSecondaryColor} size={20} />
     } : {
-        color: iconColor,
+        color: accentColor,
         icon: <GoalIcon shape={iconShape} color={iconColor} secondaryColor={iconSecondaryColor} size={20} style={{ opacity: 0.55 }} />
     };
 
@@ -69,15 +71,16 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             onClick={onClick}
             style={{
                 padding: '12px',
-                background: 'var(--color-bg-card-alt)',
-                border: `1px solid ${isCompleted ? iconColor : 'var(--color-border)'}`,
-                borderLeft: `4px solid ${iconColor}`,
+                background: isCompleted ? 'rgba(76, 175, 80, 0.08)' : 'var(--color-bg-card-alt)',
+                border: `1px solid ${isCompleted ? accentColor : 'var(--color-border)'}`,
+                borderLeft: `4px solid ${accentColor}`,
                 borderRadius: '6px',
                 marginBottom: '10px',
                 cursor: onClick ? 'pointer' : 'default',
-                transition: 'background-color 0.2s',
+                transition: 'background-color 0.2s, border-color 0.2s',
                 color: 'var(--color-text-primary)',
-                position: 'relative'
+                position: 'relative',
+                boxShadow: isCompleted ? `0 0 0 1px ${accentColor}22 inset` : 'none'
             }}
             onMouseEnter={(e) => {
                 if (onClick) e.currentTarget.style.backgroundColor = 'var(--color-bg-card-hover)';
@@ -154,6 +157,22 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                     </div>
                 </div>
 
+                {isCompleted && (
+                    <div style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: accentColor,
+                        padding: '3px 6px',
+                        border: `1px solid ${accentColor}`,
+                        borderRadius: '999px',
+                        lineHeight: 1.1
+                    }}>
+                        Complete
+                    </div>
+                )}
+
                 {isEditMode && onEdit && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: onDelete ? '20px' : 0 }}>
                         <button
@@ -182,7 +201,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                 <div style={{
                     paddingLeft: '28px',
                     fontSize: '12px',
-                    color: isCompleted ? iconColor : 'var(--color-text-muted)',
+                    color: isCompleted ? accentColor : 'var(--color-text-muted)',
                     fontStyle: 'italic',
                 }}>
                     {isCompleted ? '✓ Completed' : 'Completion target'}
@@ -202,7 +221,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         <div style={{
                             height: '100%',
                             width: `${Math.min(100, target.progress || 0)}%`,
-                            background: isCompleted ? iconColor : 'var(--color-primary)',
+                            background: isCompleted ? accentColor : 'var(--color-primary)',
                             borderRadius: '3px',
                             transition: 'width 0.5s ease-out'
                         }} />
@@ -244,7 +263,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 {' '}
                                 <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', margin: '0 2px' }}>{operator}</span>
                                 {' '}
-                                <span style={{ fontWeight: 'bold', color: isCompleted ? iconColor : 'var(--color-text-primary)' }}>
+                                <span style={{ fontWeight: 'bold', color: isCompleted ? accentColor : 'var(--color-text-primary)' }}>
                                     {metric.value} {metricDef.unit}
                                 </span>
                             </div>

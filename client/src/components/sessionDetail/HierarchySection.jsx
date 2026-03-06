@@ -41,6 +41,9 @@ function HierarchySection({
             </div>
             <div className={styles.hierarchyList}>
                 {flattenedHierarchy.map((node, index) => {
+                    const isCompleted = node.status
+                        ? Boolean(node.status.completed)
+                        : Boolean(node.completed);
 
                     return (
                         <div key={node.id || `node-${index}`}>
@@ -51,8 +54,8 @@ function HierarchySection({
                                 <div style={{ display: 'flex', alignItems: 'center', height: '16px', minWidth: '16px' }}>
                                     <GoalIcon
                                         shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
-                                        color={node.completed ? completedColor : getGoalColor(node.type)}
-                                        secondaryColor={node.completed ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
+                                        color={isCompleted ? completedColor : getGoalColor(node.type)}
+                                        secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
                                         isSmart={node.is_smart}
                                         size={16}
                                     />

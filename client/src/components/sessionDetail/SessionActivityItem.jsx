@@ -53,6 +53,7 @@ function SessionActivityItem({
         activities,
         microGoals,
         session,
+        goalAchievements,
     } = useActiveSessionData();
 
     const {
@@ -237,6 +238,13 @@ function SessionActivityItem({
         (mg.attributes?.session_id === sessionId || mg.session_id === sessionId) &&
         (activityDefinition?.associated_goal_ids?.includes(mg.parent_id) || activityDefinition?.associated_goal_ids?.includes(mg.id))
     );
+    const activeMicroGoalCompleted = activeMicroGoal
+        ? Boolean(
+            goalAchievements?.get(activeMicroGoal.id)?.allAchieved
+            ?? activeMicroGoal.completed
+            ?? activeMicroGoal.attributes?.completed
+        )
+        : false;
 
     const onCreateNanoGoal = async (parentId, name) => {
         return await createGoal({
@@ -639,8 +647,8 @@ function SessionActivityItem({
                                 <div title={`Micro Goal: ${activeMicroGoal.name}`}>
                                     <GoalIcon
                                         shape={activeMicroGoal.shape || microChars?.icon || 'target'}
-                                        color={activeMicroGoal.completed ? getGoalColor('Completed') : getGoalColor(activeMicroGoal)}
-                                        secondaryColor={activeMicroGoal.completed ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor(activeMicroGoal)}
+                                        color={activeMicroGoalCompleted ? getGoalColor('Completed') : getGoalColor(activeMicroGoal)}
+                                        secondaryColor={activeMicroGoalCompleted ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor(activeMicroGoal)}
                                         size={14}
                                     />
                                 </div>

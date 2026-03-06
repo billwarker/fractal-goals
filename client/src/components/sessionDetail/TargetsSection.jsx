@@ -59,7 +59,6 @@ function TargetsSection({
                     const isCompleted = Boolean(
                         (achievement ? achievement.achieved : target.completed)
                         || achievedTargetIds?.has(target.id)
-                        || goal.completed
                     );
 
                     derivedTargets.push({

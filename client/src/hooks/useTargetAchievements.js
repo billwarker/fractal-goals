@@ -9,9 +9,10 @@ import { useMemo } from 'react';
  * 
  * @param {Array} activityInstances - Current activity instances with their metrics
  * @param {Array} parentGoals - Goals associated with the session (with targets)
+ * @param {string|null} sessionId - Current session id
  * @returns {Object} Achievement status for real-time UI feedback
  */
-export function useTargetAchievements(activityInstances, parentGoals) {
+export function useTargetAchievements(activityInstances, parentGoals, sessionId = null) {
     // Build achievement status
     const achievementStatus = useMemo(() => {
         // Map of target_id -> achievement status
@@ -53,24 +54,12 @@ export function useTargetAchievements(activityInstances, parentGoals) {
             for (const target of targets) {
                 totalTargets++;
 
-                // Check if target was already marked as completed (from backend)
-                if (target.completed) {
-                    achievedTargetIds.add(target.id);
-                    achievedForGoal.push(target.id);
-                    totalAchieved++;
-                    targetAchievements.set(target.id, {
-                        achieved: true,
-                        wasAlreadyCompleted: true,
-                        target,
-                        goalId: goal.id,
-                        goalName: goal.attributes?.name || goal.name
-                    });
-                    continue;
-                }
-
                 // Check if any activity instance in this session achieves this target
                 const activityId = target.activity_id;
-                const instances = instancesByActivity[activityId] || [];
+                const instances = (instancesByActivity[activityId] || []).filter((instance) => {
+                    if (target.activity_instance_id && target.activity_instance_id !== instance.id) return false;
+                    return true;
+                });
 
                 let achieved = false;
                 for (const inst of instances) {
@@ -78,6 +67,16 @@ export function useTargetAchievements(activityInstances, parentGoals) {
                         achieved = true;
                         break;
                     }
+                }
+
+                const shouldRespectPersistedCompletion = Boolean(
+                    target.completed
+                    && instances.length === 0
+                    && (!sessionId || !target.completed_session_id || target.completed_session_id !== sessionId)
+                );
+
+                if (shouldRespectPersistedCompletion) {
+                    achieved = true;
                 }
 
                 if (achieved) {
@@ -88,7 +87,7 @@ export function useTargetAchievements(activityInstances, parentGoals) {
 
                 targetAchievements.set(target.id, {
                     achieved,
-                    wasAlreadyCompleted: false,
+                    wasAlreadyCompleted: shouldRespectPersistedCompletion,
                     target,
                     goalId: goal.id,
                     goalName: goal.attributes?.name || goal.name
@@ -113,7 +112,7 @@ export function useTargetAchievements(activityInstances, parentGoals) {
             totalAchieved,
             allTargetsAchieved: totalTargets > 0 && totalAchieved === totalTargets
         };
-    }, [activityInstances, parentGoals]);
+    }, [activityInstances, parentGoals, sessionId]);
 
     return achievementStatus;
 }

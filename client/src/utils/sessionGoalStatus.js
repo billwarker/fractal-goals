@@ -2,16 +2,18 @@ import { parseTargets } from './goalUtils';
 
 export function getTargetStatus(target, goal, targetAchievements, achievedTargetIds) {
     const achievement = targetAchievements?.get(target.id);
-    const goalCompleted = Boolean(goal?.status?.completed || goal?.completed || goal?.attributes?.completed);
+    const hasLiveTargetState = Boolean(targetAchievements);
+    const shouldUsePersistedCompletion = Boolean(
+        target.completed
+        && (!hasLiveTargetState || !target.completed_session_id)
+    );
     const isCompleted = Boolean(
-        (achievement ? achievement.achieved : target.completed)
+        (achievement ? achievement.achieved : shouldUsePersistedCompletion)
         || achievedTargetIds?.has(target.id)
-        || goalCompleted
     );
 
     let reason = 'pending';
-    if (goalCompleted) reason = 'goal_completed';
-    else if (target.completed) reason = 'persisted_target';
+    if (shouldUsePersistedCompletion) reason = 'persisted_target';
     else if (achievement?.achieved) reason = 'realtime_target';
 
     return {
@@ -25,11 +27,16 @@ export function getGoalStatus(goal, targetAchievements, achievedTargetIds) {
     const targets = parseTargets(goal);
     const targetStatuses = targets.map((target) => getTargetStatus(target, goal, targetAchievements, achievedTargetIds));
     const allTargetsCompleted = targetStatuses.length > 0 && targetStatuses.every((status) => status.isCompleted);
-    const completed = Boolean(goal.completed || goal.attributes?.completed || allTargetsCompleted);
+    const hasTargets = targets.length > 0;
+    const persistedCompleted = Boolean(goal.completed || goal.attributes?.completed);
+    const completed = hasTargets ? allTargetsCompleted : persistedCompleted;
 
     let reason = 'pending';
-    if (goal.completed || goal.attributes?.completed) reason = 'goal_completed';
-    else if (allTargetsCompleted) reason = 'targets_completed';
+    if (hasTargets) {
+        if (allTargetsCompleted) reason = 'targets_completed';
+    } else if (persistedCompleted) {
+        reason = 'goal_completed';
+    }
 
     return {
         completed,

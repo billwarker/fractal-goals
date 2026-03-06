@@ -6,12 +6,39 @@ import { useGoals } from './GoalsContext';
 import { useTimezone } from './TimezoneContext';
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
+import { parseTargets } from '../utils/goalUtils';
 
 const SessionDataContext = createContext(null);
 const SessionUiContext = createContext(null);
 const SessionActionsContext = createContext(null);
 
 const ActiveSessionContext = createContext(null);
+
+function patchGoalCompletion(goal, goalId, completed, completedAt) {
+    if (!goal || goal.id !== goalId) return goal;
+    return {
+        ...goal,
+        completed,
+        completed_at: completedAt,
+        attributes: {
+            ...(goal.attributes || {}),
+            completed,
+            completed_at: completedAt
+        }
+    };
+}
+
+function patchGoalTreeCompletion(node, goalId, completed, completedAt) {
+    if (!node) return node;
+
+    const patchedNode = patchGoalCompletion(node, goalId, completed, completedAt);
+    if (!patchedNode.children || !Array.isArray(patchedNode.children)) return patchedNode;
+
+    return {
+        ...patchedNode,
+        children: patchedNode.children.map((child) => patchGoalTreeCompletion(child, goalId, completed, completedAt))
+    };
+}
 
 export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const queryClient = useQueryClient();
@@ -32,6 +59,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const statusTimeoutRef = useRef(null);
     const initTimeoutRef = useRef(null);
     const instanceQueuesRef = useRef(new Map());
+    const autoSyncedGoalStatesRef = useRef(new Map());
 
     const scheduleStatusClear = useCallback((delayMs) => {
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
@@ -398,7 +426,109 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         targetAchievements,
         achievedTargetIds,
         goalAchievements,
-    } = useTargetAchievements(activityInstances, allGoalsForTargets);
+    } = useTargetAchievements(activityInstances, allGoalsForTargets, sessionId);
+
+    useEffect(() => {
+        if (!rootId || !sessionId || !goalAchievements) return;
+
+        const targetDrivenGoals = allGoalsForTargets.filter((goal) => parseTargets(goal).length > 0);
+        targetDrivenGoals.forEach((goal) => {
+            const goalId = goal?.id;
+            const achievement = goalAchievements.get(goalId);
+            if (!goalId || !achievement) return;
+
+            const desiredCompleted = achievement.allAchieved;
+            const persistedCompleted = Boolean(goal.completed || goal.attributes?.completed);
+            const inflightDesired = autoSyncedGoalStatesRef.current.get(goalId);
+
+            if (persistedCompleted === desiredCompleted || inflightDesired === desiredCompleted) {
+                return;
+            }
+
+            const optimisticCompletedAt = desiredCompleted ? new Date().toISOString() : null;
+            autoSyncedGoalStatesRef.current.set(goalId, desiredCompleted);
+
+            queryClient.setQueryData(['session-goals-view', rootId, sessionId], (prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    goal_tree: patchGoalTreeCompletion(prev.goal_tree, goalId, desiredCompleted, optimisticCompletedAt),
+                    micro_goals: Array.isArray(prev.micro_goals)
+                        ? prev.micro_goals.map((microGoal) => patchGoalCompletion(microGoal, goalId, desiredCompleted, optimisticCompletedAt))
+                        : prev.micro_goals
+                };
+            });
+
+            queryClient.setQueryData(['session', rootId, sessionId], (prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    short_term_goals: Array.isArray(prev.short_term_goals)
+                        ? prev.short_term_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, desiredCompleted, optimisticCompletedAt))
+                        : prev.short_term_goals,
+                    immediate_goals: Array.isArray(prev.immediate_goals)
+                        ? prev.immediate_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, desiredCompleted, optimisticCompletedAt))
+                        : prev.immediate_goals
+                };
+            });
+
+            queryClient.setQueryData(['fractalTree', rootId], (prev) => (
+                prev ? patchGoalTreeCompletion(prev, goalId, desiredCompleted, optimisticCompletedAt) : prev
+            ));
+
+            fractalApi.toggleGoalCompletion(rootId, goalId, desiredCompleted)
+                .then((res) => {
+                    const syncedGoal = res?.data || {};
+                    const syncedCompleted = Boolean(syncedGoal.completed);
+                    const syncedCompletedAt = syncedGoal.completed_at || null;
+
+                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (prev) => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            goal_tree: patchGoalTreeCompletion(prev.goal_tree, goalId, syncedCompleted, syncedCompletedAt),
+                            micro_goals: Array.isArray(prev.micro_goals)
+                                ? prev.micro_goals.map((microGoal) => patchGoalCompletion(microGoal, goalId, syncedCompleted, syncedCompletedAt))
+                                : prev.micro_goals
+                        };
+                    });
+
+                    queryClient.setQueryData(['session', rootId, sessionId], (prev) => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            short_term_goals: Array.isArray(prev.short_term_goals)
+                                ? prev.short_term_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, syncedCompleted, syncedCompletedAt))
+                                : prev.short_term_goals,
+                            immediate_goals: Array.isArray(prev.immediate_goals)
+                                ? prev.immediate_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, syncedCompleted, syncedCompletedAt))
+                                : prev.immediate_goals
+                        };
+                    });
+
+                    queryClient.setQueryData(['fractalTree', rootId], (prev) => (
+                        prev ? patchGoalTreeCompletion(prev, goalId, syncedCompleted, syncedCompletedAt) : prev
+                    ));
+                })
+                .catch((error) => {
+                    console.error('[autoSyncGoalCompletion] failed', {
+                        goalId,
+                        desiredCompleted,
+                        message: error?.message,
+                        status: error?.response?.status,
+                        data: error?.response?.data
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+                })
+                .finally(() => {
+                    if (autoSyncedGoalStatesRef.current.get(goalId) === desiredCompleted) {
+                        autoSyncedGoalStatesRef.current.delete(goalId);
+                    }
+                });
+        });
+    }, [rootId, sessionId, goalAchievements, allGoalsForTargets, queryClient]);
 
     // 4. Handlers
     const handleUpdateTimer = useCallback(async (instanceId, action) => {

@@ -102,7 +102,7 @@ describe('useSessionGoalsViewModel', () => {
 
         expect(result.current.goalStatusById.get('micro')?.completed).toBe(true);
         expect(result.current.targetCards[0]?.is_completed_realtime).toBe(true);
-        expect(result.current.targetCards[0]?.completion_reason).toBe('goal_completed');
+        expect(result.current.targetCards[0]?.completion_reason).toBe('realtime_target');
     });
 
     it('scopes instance-bound micro goals to the focused activity instance', () => {
@@ -238,5 +238,53 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).toContain('IG A');
         expect(names).not.toContain('IG B');
         expect(names).not.toContain('STG B');
+    });
+
+    it('reverts target card and micro goal completion when target achievement is lost', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: []
+            },
+            session_goal_ids: ['micro'],
+            activity_goal_ids_by_activity: {},
+            micro_goals: [
+                {
+                    id: 'micro',
+                    type: 'MicroGoal',
+                    name: 'Micro',
+                    parent_id: 'root',
+                    completed: true,
+                    attributes: {
+                        completed: true,
+                        targets: [
+                            {
+                                id: 'target-1',
+                                activity_id: 'activity-1',
+                                completed: true,
+                                completed_session_id: 'session-1',
+                                type: 'threshold',
+                                metrics: [{ metric_id: 'm1', value: 10 }]
+                            }
+                        ]
+                    },
+                    children: []
+                }
+            ],
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            session: { session_start: '2026-03-06T08:00:00Z', created_at: '2026-03-06T08:00:00Z', completed: false },
+            selectedActivity: null,
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.goalStatusById.get('micro')?.completed).toBe(false);
+        expect(result.current.targetCards[0]?.is_completed_realtime).toBe(false);
     });
 });

@@ -71,4 +71,38 @@ describe('useTargetAchievements', () => {
         expect(result.current.targetAchievements.get('target-gt')?.achieved).toBe(true);
         expect(result.current.targetAchievements.get('target-lt')?.achieved).toBe(false);
     });
+
+    it('reverts a persisted session target when the current activity instance is reset', () => {
+        const activityInstances = [
+            {
+                id: 'inst-3',
+                activity_definition_id: 'activity-3',
+                completed: false,
+                metrics: [{ metric_id: 'm-1', value: 10 }]
+            }
+        ];
+        const parentGoals = [
+            {
+                id: 'micro-3',
+                completed: false,
+                attributes: {
+                    targets: [
+                        {
+                            id: 'target-3',
+                            type: 'threshold',
+                            activity_id: 'activity-3',
+                            activity_instance_id: 'inst-3',
+                            completed: true,
+                            completed_session_id: 'session-1',
+                            metrics: [{ metric_id: 'm-1', value: 10 }]
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-1'));
+        expect(result.current.achievedTargetIds.has('target-3')).toBe(false);
+        expect(result.current.targetAchievements.get('target-3')?.achieved).toBe(false);
+    });
 });
