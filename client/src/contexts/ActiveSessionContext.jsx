@@ -198,6 +198,61 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
     });
 
+    const toggleGoalCompletionMutation = useMutation({
+        mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
+        onMutate: async ({ goalId, completed }) => {
+            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+            await queryClient.cancelQueries({ queryKey: ['session-notes', rootId, sessionId] });
+            await queryClient.cancelQueries({ queryKey: ['session', rootId, sessionId] });
+
+            // Snapshot the previous value
+            const previousNotes = queryClient.getQueryData(['session-notes', rootId, sessionId]);
+            const previousSession = queryClient.getQueryData(['session', rootId, sessionId]);
+
+            // Optimistically update notes
+            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
+                old.map(n => n.nano_goal_id === goalId ? { ...n, nano_goal_completed: completed } : n)
+            );
+
+            // Optimistically update session data if goal is in immediate_goals etc.
+            queryClient.setQueryData(['session', rootId, sessionId], (old) => {
+                if (!old) return old;
+                // Deep clone and update
+                const next = JSON.parse(JSON.stringify(old));
+                if (next.immediate_goals) {
+                    next.immediate_goals = next.immediate_goals.map(g =>
+                        g.id === goalId ? { ...g, completed } : g
+                    );
+                }
+                return next;
+            });
+
+            return { previousNotes, previousSession };
+        },
+        onError: (err, variables, context) => {
+            // Rollback
+            if (context?.previousNotes) {
+                queryClient.setQueryData(['session-notes', rootId, sessionId], context.previousNotes);
+            }
+            if (context?.previousSession) {
+                queryClient.setQueryData(['session', rootId, sessionId], context.previousSession);
+            }
+        },
+        onSuccess: (res, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+
+            // Toast for manual completion
+            const goalResponse = res?.data;
+            if (goalResponse && variables.completed) {
+                notify.success(`Goal completed: ${goalResponse.name}`, { duration: 5000 });
+            }
+        }
+    });
+
     const applyInstanceOptimisticUpdate = useCallback((instanceId, updates) => {
         queryClient.setQueryData(['session-activities', rootId, sessionId], (prev = []) => {
             if (!Array.isArray(prev)) return prev;
@@ -506,6 +561,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-micro-goals', rootId, sessionId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+
+            const newGoal = res.data;
+            if (newGoal) {
+                notify.success(`Goal created: ${newGoal.name}`);
+            }
+
             return res.data;
         } catch (err) {
             console.error("Failed to create goal", err);
@@ -513,16 +574,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
     }, [rootId, sessionId, queryClient]);
 
-    const toggleGoalCompletion = useCallback(async (goalId, completed) => {
-        try {
-            const res = await fractalApi.toggleGoalCompletion(rootId, goalId, completed);
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
-            return res.data;
-        } catch (err) {
-            console.error("Failed to toggle goal completion", err);
-            throw err;
-        }
-    }, [rootId, queryClient]);
+
 
     const autoSaveQueue = useMemo(() => createAutoSaveQueue({
         save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
@@ -676,7 +728,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
         if (newlyAchieved.length > 0) {
             const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
-            notify.success(`🎯 Target achieved: ${names}`, { duration: 5000 });
+            notify.success(`Target achieved: ${names}`, { duration: 5000 });
             setNotifiedTargetIds(prev => {
                 const newSet = new Set(prev);
                 newlyAchieved.forEach(s => newSet.add(s.target.id));
@@ -692,7 +744,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
         if (newlyReverted.length > 0) {
             const names = newlyReverted.map(s => s.target.name || 'Target').join(', ');
-            notify.error(`🔙 Target reverted: ${names}`, { duration: 5000 });
+            notify.success(`Target reverted: ${names}`, { duration: 5000 });
             setNotifiedTargetIds(prev => {
                 const newSet = new Set(prev);
                 newlyReverted.forEach(s => newSet.delete(s.target.id));
@@ -719,7 +771,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
         if (newlyCompleted.length > 0) {
             const names = newlyCompleted.map(s => s.goalName).join(', ');
-            notify.success(`🏆 Goal completed: ${names}`, { duration: 6000 });
+            notify.success(`Goal completed: ${names}`, { duration: 6000 });
         }
         const newlyUncompleted = [];
         for (const goalId of prevCompleted) {
@@ -730,7 +782,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
         if (newlyUncompleted.length > 0) {
             const names = newlyUncompleted.map(s => s.goalName).join(', ');
-            notify.error(`⚠️ Goal uncompleted: ${names}`, { duration: 6000 });
+            notify.success(`Goal uncompleted: ${names}`, { duration: 6000 });
         }
         prevCompletedIdsRef.current = currentCompleteds;
     }, [goalAchievements]);
@@ -812,7 +864,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         updateTimer: handleUpdateTimer,
         createGoal,
         updateGoal: updateGoalMutation.mutate,
-        toggleGoalCompletion,
+        toggleGoalCompletion: toggleGoalCompletionMutation.mutate,
         reorderActivity: handleReorderActivity,
         moveActivity: handleMoveActivity,
         deleteSession: deleteSessionMutation.mutateAsync,
@@ -831,7 +883,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         handleUpdateTimer,
         createGoal,
         updateGoalMutation.mutate,
-        toggleGoalCompletion,
+        toggleGoalCompletionMutation.mutate,
         handleReorderActivity,
         handleMoveActivity,
         deleteSessionMutation.mutateAsync,

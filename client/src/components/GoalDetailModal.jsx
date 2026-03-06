@@ -609,6 +609,7 @@ function GoalDetailModal({
                                     completedViaChildren={completedViaChildren}
                                     isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
                                     headerColor={goalColor}
+                                    goalType={goalType}
                                     onRefreshAssociations={refreshAssociations}
                                 />
                             </Suspense>
@@ -1010,6 +1011,7 @@ function GoalDetailModal({
                     targets={targets}
                     viewMode="selector"
                     onCloseSelector={() => setViewState('goal')}
+                    goalType={goalType}
                     headerColor={goalColor}
                     onClose={onClose}
                     onSave={!isEditing ? persistAssociations : undefined}

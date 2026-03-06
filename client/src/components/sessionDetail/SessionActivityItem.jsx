@@ -60,6 +60,7 @@ function SessionActivityItem({
         removeActivity,
         createGoal,
         updateGoal,
+        toggleGoalCompletion,
     } = useActiveSessionActions();
 
     const activityDefinition = activityDefinitionProp
@@ -230,9 +231,9 @@ function SessionActivityItem({
     }, [singleMetricDraftKey]);
 
     // Find active micro goal for this activity in the current session
+    // Include completed ones so they show as green icons rather than disappearing
     const activeMicroGoal = microGoals.find(mg =>
-        !mg.completed &&
-        mg.attributes?.session_id === sessionId &&
+        (mg.attributes?.session_id === sessionId || mg.session_id === sessionId) &&
         (activityDefinition?.associated_goal_ids?.includes(mg.parent_id) || activityDefinition?.associated_goal_ids?.includes(mg.id))
     );
 
@@ -375,7 +376,7 @@ function SessionActivityItem({
             let newNanoGoalId = null;
             if (onCreateNanoGoal && content.trim()) {
                 // Expect onCreateNanoGoal to return the created goal object
-                const res = await onCreateNanoGoal(activeMicroGoal.id, content.trim());
+                const res = await onCreateNanoGoal(activeMicroGoal.id, content.trim(), activityDefinition?.id);
                 if (res && res.id) newNanoGoalId = res.id;
             }
 
@@ -401,9 +402,9 @@ function SessionActivityItem({
     };
 
     const handleToggleNanoGoal = useCallback((nanoGoalId, completed) => {
-        if (!updateGoal || !nanoGoalId) return;
-        updateGoal({ goalId: nanoGoalId, updates: { completed } });
-    }, [updateGoal]);
+        if (!toggleGoalCompletion || !nanoGoalId) return;
+        toggleGoalCompletion({ goalId: nanoGoalId, completed });
+    }, [toggleGoalCompletion]);
 
     // Sync local state when exercise times change
     useEffect(() => {
@@ -549,9 +550,9 @@ function SessionActivityItem({
                             {activeMicroGoal && (
                                 <div title={`Micro Goal: ${activeMicroGoal.name}`}>
                                     <GoalIcon
-                                        shape={microChars?.icon || 'target'}
-                                        color={getGoalColor('MicroGoal')}
-                                        secondaryColor={getGoalSecondaryColor('MicroGoal')}
+                                        shape={activeMicroGoal.shape || microChars?.icon || 'target'}
+                                        color={activeMicroGoal.completed ? getGoalColor('Completed') : getGoalColor(activeMicroGoal)}
+                                        secondaryColor={activeMicroGoal.completed ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor(activeMicroGoal)}
                                         size={14}
                                     />
                                 </div>

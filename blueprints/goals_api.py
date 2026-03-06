@@ -332,6 +332,12 @@ def create_goal(current_user, validated_data):
         if not parent:
             new_goal.root_id = new_goal.id
 
+        # Nano Goal Activity Inheritance
+        if getattr(new_goal, 'level', None) and new_goal.level.name == 'Nano Goal' and new_goal.parent_id:
+            if parent and parent.associated_activities:
+                for activity in parent.associated_activities:
+                    new_goal.associated_activities.append(activity)
+
         # Handle targets if provided
         if validated_data.get('targets'):
             # Source of truth: relational Target rows.
@@ -438,6 +444,21 @@ def delete_goal_endpoint(current_user, goal_id: str):
             is_root = goal.parent_id is None
             goal_name = goal.name
             root_id = goal.root_id
+            
+            # Cascading deletion for Notes associated with Nano Goals
+            from models import Note
+            def get_nano_goal_ids(g):
+                ids = []
+                if g.level and g.level.name == 'Nano Goal':
+                    ids.append(g.id)
+                for child in (g.children or []):
+                    ids.extend(get_nano_goal_ids(child))
+                return ids
+            
+            nano_ids = get_nano_goal_ids(goal)
+            if nano_ids:
+                db_session.query(Note).filter(Note.nano_goal_id.in_(nano_ids)).delete(synchronize_session=False)
+
             db_session.delete(goal)
             db_session.commit()
             logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")

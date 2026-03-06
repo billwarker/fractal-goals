@@ -64,7 +64,7 @@ export function useTargetAchievements(activityInstances, parentGoals) {
                         wasAlreadyCompleted: true,
                         target,
                         goalId: goal.id,
-                        goalName: goal.name
+                        goalName: goal.attributes?.name || goal.name
                     });
                     continue;
                 }
@@ -92,12 +92,12 @@ export function useTargetAchievements(activityInstances, parentGoals) {
                     wasAlreadyCompleted: false,
                     target,
                     goalId: goal.id,
-                    goalName: goal.name
+                    goalName: goal.attributes?.name || goal.name
                 });
             }
 
             goalAchievements.set(goal.id, {
-                goalName: goal.name,
+                goalName: goal.attributes?.name || goal.name,
                 totalTargets: targets.length,
                 achievedTargets: achievedForGoal.length,
                 achievedTargetIds: achievedForGoal,

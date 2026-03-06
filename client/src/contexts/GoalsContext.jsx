@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi, globalApi } from '../utils/api';
+import notify from '../utils/notify';
 
 const GoalsContext = createContext();
 
@@ -64,6 +65,11 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session-activities', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session-notes', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', variables.rootId] });
+            notify.success('Goal deleted');
         }
     });
 

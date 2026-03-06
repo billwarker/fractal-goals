@@ -40,6 +40,7 @@ const ActivityAssociator = ({
     completedViaChildren = false,
     isAboveShortTermGoal = false,
     headerColor,
+    goalType,
     onClose,
     onSave,
     onRefreshAssociations
@@ -59,7 +60,7 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
-    const [inheritFromParent, setInheritFromParent] = useState(false);
+    const [inheritFromParent, setInheritFromParent] = useState(goalType === 'NanoGoal');
     const [parentActivities, setParentActivities] = useState([]);
     const linkedGroupIds = useMemo(
         () => new Set((associatedActivityGroups || []).map(g => g.id)),

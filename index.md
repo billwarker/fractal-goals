@@ -18,12 +18,12 @@
 
 ## Status & Recent Changes
 
-- **Goal Architecture & UI Refinements (2026-03-04):** 
+- **Goal Architecture & UI Refinements (2026-03-05):** 
   - **Deadlines**: Enforced parent-child deadline constraints (backend validation + UI max attribute) and implemented auto-cascading. Child goals now default to parent's deadline.
-  - **Transient Goals**: Hidden deadlines for Micro/Nano goals. Added simplified UI for Nano goals (name-only, hidden targets/activities).
+  - **Transient Goals**: Hidden deadlines for Micro/Nano goals. Added simplified UI for Nano goals (name-only, hidden targets/activities). Added automatic activity inheritance for newly created Nano Goals and explicit toast notifications for goal lifecycle events without emojis.
   - **Icon Aesthetics**: Refined triangle geometry for even SMART ring line thickness and fixed ripple animation transform origin to the centroid.
   - **Settings**: Hidden deadline range and offset options for transient goals in Characteristics settings.
-- **Backend Stability:** Fixed critical recursion/serialization bugs, improved error logging, and resolved session retrieval API gaps.
+- **Backend Stability:** Fixed critical recursion/serialization bugs, improved error logging, resolved session retrieval API gaps, and added strict cascading deletes from Nano Goals down to Session Notes.
 - **Legacy Cleanup:** Removed deprecated `PracticeSession` aliases and unused fields.
 
 ### Key Features Added (v1.x)
@@ -733,8 +733,7 @@ When making changes, update these files as needed:
 
 ---
 
-**Last Updated:** 2026-02-24
-**Version:** 2.0.0 (Refactored Architecture)
+**Last Updated:** 2026-03-05
 **Maintained By:** Project AI Agents
 
 ---

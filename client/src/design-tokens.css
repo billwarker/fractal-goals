@@ -45,6 +45,7 @@
   --color-success: var(--color-brand-success);
   --color-error: var(--color-brand-danger);
   --color-focus-ring: rgba(79, 156, 249, 0.45);
+  --color-checkbox-accent: #2baa68;
 
   /* Spacing */
   --spacing-2xs: 2px;
@@ -128,4 +129,5 @@
   --color-success: var(--color-brand-success);
   --color-error: var(--color-brand-danger);
   --color-focus-ring: rgba(61, 130, 219, 0.32);
+  --color-checkbox-accent: #3bc57c;
 }

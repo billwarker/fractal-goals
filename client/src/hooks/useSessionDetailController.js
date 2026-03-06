@@ -107,6 +107,68 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         });
     };
 
+    const handleDeleteNote = async (noteOrId) => {
+        // Support both old (ID only) and new (note object) formats
+        const note = typeof noteOrId === 'object' ? noteOrId : sessionNotes.find(n => n.id === noteOrId);
+        if (!note) return;
+
+        try {
+            // If it's a nano goal, delete the goal row as well
+            if (note.is_nano_goal && note.nano_goal_id) {
+                await updateGoal({ goalId: note.nano_goal_id, updates: { isDeleting: true } }); // Optional: help UI show transition
+                await fractalApi.deleteGoal(rootId, note.nano_goal_id);
+            }
+
+            await deleteNote(note.id);
+        } catch (err) {
+            console.error("Failed to delete note/goal", err);
+            notify.error("Failed to delete");
+        }
+    };
+
+    const handleCreateNanoGoal = async (parent_id, content, activity_id) => {
+        try {
+            const goalData = {
+                name: content,
+                type: 'NanoGoal',
+                parent_id: parent_id,
+            };
+            const newGoal = await createGoal(goalData);
+
+            // Auto-associate the new Nano Goal with the current activity context
+            if (newGoal && newGoal.id && activity_id) {
+                try {
+                    // Get parent's activities for inheritance
+                    let parentActivityIds = [];
+                    try {
+                        const parentRes = await fractalApi.getGoalActivities(rootId, parent_id);
+                        if (parentRes.data) {
+                            parentActivityIds = parentRes.data.map(a => a.id);
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch parent activities for Nano Goal inheritance", e);
+                    }
+
+                    // Combine inherited activities with the current activity context, avoiding duplicates
+                    const activitiesToAssociate = [...new Set([...parentActivityIds, activity_id])];
+
+                    await fractalApi.setGoalAssociationsBatch(rootId, newGoal.id, {
+                        activity_ids: activitiesToAssociate,
+                        group_ids: []
+                    });
+                } catch (assocErr) {
+                    console.error("Failed to auto-associate activity to Nano Goal", assocErr);
+                }
+            }
+
+            return newGoal;
+        } catch (err) {
+            console.error("Failed to create Nano Goal", err);
+            notify.error("Failed to create Nano Goal");
+            throw err;
+        }
+    };
+
     const handleSaveSession = () => {
         notify.success('Session saved successfully');
         navigate(`/${rootId}/sessions`);
@@ -146,7 +208,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         previousSessionNotes,
         addNote,
         updateNote,
-        deleteNote,
+        deleteNote: handleDeleteNote,
         refreshNotes,
         handleActivityFocus,
         handleOpenGoals,

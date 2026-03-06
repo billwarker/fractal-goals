@@ -11,7 +11,8 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './NoteQuickAdd.module.css';
 
 function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false, hasMicroGoal = false, onToggleNanoMode }) {
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
+    const nanoColor = getGoalColor('NanoGoal');
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [pastedImage, setPastedImage] = useState(null);
@@ -119,7 +120,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
                         title={isNanoMode ? "Switch to regular note" : "Create as Nano Goal"}
                     >
                         <GoalIcon
-                            shape={getLevelByName('NanoGoal')?.icon || 'circle'}
+                            shape={getGoalIcon('NanoGoal')}
                             color={isNanoMode ? getGoalColor('NanoGoal') : 'var(--color-text-muted)'}
                             size={18}
                         />
@@ -135,6 +136,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
                     disabled={isSubmitting}
                     className={`${styles.quickAddTextarea} ${isNanoMode ? styles.nanoModeInput : ''}`}
                     rows={1}
+                    style={isNanoMode ? { '--nano-goal-color': nanoColor, fontStyle: 'italic' } : undefined}
                 />
                 <button
                     type="submit"

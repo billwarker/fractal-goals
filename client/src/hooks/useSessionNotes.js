@@ -5,7 +5,8 @@
  * Fetches both current session notes and previous notes for activity definitions.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
 /**
@@ -14,156 +15,99 @@ import { fractalApi } from '../utils/api';
  * @param {string|null} activityDefinitionId - Optional activity definition ID for fetching previous notes
  */
 export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
-    const [notes, setNotes] = useState([]);
-    const [previousNotes, setPreviousNotes] = useState([]);
-    const [previousSessionNotes, setPreviousSessionNotes] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const queryClient = useQueryClient();
 
-    // Fetch all notes for the session + previous session notes
-    useEffect(() => {
-        if (!rootId || !sessionId) {
-            setLoading(false);
-            return;
-        }
+    // Query for current session notes
+    const {
+        data: notes = [],
+        isLoading: notesLoading,
+        error: notesError,
+        refetch: refreshNotes
+    } = useQuery({
+        queryKey: ['session-notes', rootId, sessionId],
+        queryFn: async () => {
+            const res = await fractalApi.getSessionNotes(rootId, sessionId);
+            return res.data || [];
+        },
+        enabled: !!rootId && !!sessionId,
+        staleTime: 30000, // 30 seconds
+    });
 
-        const fetchNotes = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const [currentRes, previousRes] = await Promise.all([
-                    fractalApi.getSessionNotes(rootId, sessionId),
-                    fractalApi.getPreviousSessionNotes(rootId, sessionId)
-                ]);
-                setNotes(currentRes.data || []);
-                setPreviousSessionNotes(previousRes.data || []);
-            } catch (err) {
-                console.error('Failed to fetch session notes:', err);
-                setError(err.message || 'Failed to fetch notes');
-            } finally {
-                setLoading(false);
-            }
-        };
+    // Query for previous session notes
+    const {
+        data: previousSessionNotes = [],
+        isLoading: prevSessionLoading
+    } = useQuery({
+        queryKey: ['previous-session-notes', rootId, sessionId],
+        queryFn: async () => {
+            const res = await fractalApi.getPreviousSessionNotes(rootId, sessionId);
+            return res.data || [];
+        },
+        enabled: !!rootId && !!sessionId,
+        staleTime: 60000, // 1 minute
+    });
 
-        fetchNotes();
-    }, [rootId, sessionId]);
-
-    // Fetch previous notes for the selected activity definition
-    useEffect(() => {
-        if (!rootId || !activityDefinitionId) {
-            setPreviousNotes([]);
-            return;
-        }
-
-        const fetchPreviousNotes = async () => {
-            try {
-                const response = await fractalApi.getActivityDefinitionNotes(
-                    rootId,
-                    activityDefinitionId,
-                    { limit: 10, excludeSession: sessionId }
-                );
-                setPreviousNotes(response.data || []);
-            } catch (err) {
-                console.error('Failed to fetch previous notes:', err);
-                // Don't set error for previous notes - it's supplementary
-            }
-        };
-
-        fetchPreviousNotes();
-    }, [rootId, activityDefinitionId, sessionId]);
-
-    /**
-     * Add a new note
-     * @param {Object} noteData - {context_type, context_id, session_id, activity_instance_id, activity_definition_id, set_index, content}
-     */
-    const addNote = useCallback(async (noteData) => {
-        if (!rootId) {
-            throw new Error('Root ID is required');
-        }
-
-        try {
-            const response = await fractalApi.createNote(rootId, noteData);
-            const newNote = response.data;
-
-            // Optimistically update local state
-            setNotes(prev => [newNote, ...prev]);
-
-            return newNote;
-        } catch (err) {
-            console.error('Failed to add note:', err);
-            throw err;
-        }
-    }, [rootId]);
-
-    /**
-     * Update a note's content
-     * @param {string} noteId - ID of the note to update
-     * @param {string} content - New content
-     */
-    const updateNote = useCallback(async (noteId, content) => {
-        if (!rootId) {
-            throw new Error('Root ID is required');
-        }
-
-        try {
-            const response = await fractalApi.updateNote(rootId, noteId, { content });
-            const updatedNote = response.data;
-
-            // Update local state
-            setNotes(prev =>
-                prev.map(n => n.id === noteId ? updatedNote : n)
+    // Query for previous notes for the selected activity definition
+    const {
+        data: previousNotes = [],
+        isLoading: prevActivityLoading
+    } = useQuery({
+        queryKey: ['activity-definition-notes', rootId, activityDefinitionId],
+        queryFn: async () => {
+            const res = await fractalApi.getActivityDefinitionNotes(
+                rootId,
+                activityDefinitionId,
+                { limit: 10, excludeSession: sessionId }
             );
+            return res.data || [];
+        },
+        enabled: !!rootId && !!activityDefinitionId,
+        staleTime: 60000,
+    });
 
-            return updatedNote;
-        } catch (err) {
-            console.error('Failed to update note:', err);
-            throw err;
+    const addNoteMutation = useMutation({
+        mutationFn: (noteData) => fractalApi.createNote(rootId, noteData),
+        onSuccess: (response) => {
+            const newNote = response.data;
+            // Optimistically update current session notes if applicable
+            if (newNote.session_id === sessionId) {
+                queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) => [newNote, ...old]);
+            }
+            // Also invalidate to be sure
+            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
         }
-    }, [rootId]);
+    });
 
-    /**
-     * Delete a note
-     * @param {string} noteId - ID of the note to delete
-     */
-    const deleteNote = useCallback(async (noteId) => {
-        if (!rootId) {
-            throw new Error('Root ID is required');
+    const updateNoteMutation = useMutation({
+        mutationFn: ({ noteId, content }) => fractalApi.updateNote(rootId, noteId, { content }),
+        onSuccess: (response) => {
+            const updatedNote = response.data;
+            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
+                old.map(n => n.id === updatedNote.id ? updatedNote : n)
+            );
+            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
         }
+    });
 
-        try {
-            await fractalApi.deleteNote(rootId, noteId);
-
-            // Remove from local state
-            setNotes(prev => prev.filter(n => n.id !== noteId));
-        } catch (err) {
-            console.error('Failed to delete note:', err);
-            throw err;
+    const deleteNoteMutation = useMutation({
+        mutationFn: (noteId) => fractalApi.deleteNote(rootId, noteId),
+        onSuccess: (_, noteId) => {
+            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
+                old.filter(n => n.id !== noteId)
+            );
+            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
         }
-    }, [rootId]);
-
-    /**
-     * Refresh notes from the server
-     */
-    const refreshNotes = useCallback(async () => {
-        if (!rootId || !sessionId) return;
-
-        try {
-            const response = await fractalApi.getSessionNotes(rootId, sessionId);
-            setNotes(response.data || []);
-        } catch (err) {
-            console.error('Failed to refresh notes:', err);
-        }
-    }, [rootId, sessionId]);
+    });
 
     return {
         notes,
         previousNotes,
         previousSessionNotes,
-        loading,
-        error,
-        addNote,
-        updateNote,
-        deleteNote,
+        loading: notesLoading || prevSessionLoading,
+        error: notesError,
+        addNote: (data) => addNoteMutation.mutateAsync(data),
+        updateNote: (id, content) => updateNoteMutation.mutateAsync({ noteId: id, content }),
+        deleteNote: (id) => deleteNoteMutation.mutateAsync(id),
         refreshNotes
     };
 }

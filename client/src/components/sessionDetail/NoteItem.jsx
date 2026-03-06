@@ -16,7 +16,7 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
     const [isDeleting, setIsDeleting] = useState(false);
     const [showImageViewer, setShowImageViewer] = useState(false);
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
+    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
     const textareaRef = useRef(null);
 
     const adjustHeight = (el) => {
@@ -92,7 +92,7 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
         e.stopPropagation(); // Prevent selection when deleting
         setIsDeleting(true);
         try {
-            await onDelete(note.id);
+            await onDelete(note);
         } catch (err) {
             setIsDeleting(false);
         }
@@ -152,15 +152,6 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                     </div>
                 )}
 
-                {/* Nano Goal Badge */}
-                {note.is_nano_goal && (
-                    <div className={styles.nanoBadgeContainer}>
-                        <span className={styles.nanoBadge}>
-                            Nano Goal
-                        </span>
-                    </div>
-                )}
-
                 <div className={styles.noteItemTime}>
                     {note.set_index !== null && note.set_index !== undefined && (
                         <>
@@ -176,6 +167,9 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                             </span>
                         )}
                     </span>
+                    {note.is_nano_goal && (
+                        <span className={styles.nanoInlineBadge}>— Nano Goal</span>
+                    )}
                 </div>
 
                 {/* Image display */}
@@ -214,20 +208,24 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                     <>
                         {/* Only show text content if it's not just the placeholder */}
                         {!isImageOnly && (
-                            <div className={`${styles.noteItemContent} ${note.is_nano_goal ? styles.nanoGoalContent : ''}`}>
+                            <div className={`${styles.noteItemContent} ${note.is_nano_goal ? styles.nanoGoalContent : ''} ${note.nano_goal_completed ? styles.noteCompleted : ''}`}>
                                 {note.is_nano_goal && (
                                     <div className={styles.nanoBadgeIcon}>
                                         <GoalIcon
-                                            shape={getLevelByName('NanoGoal')?.icon || 'circle'}
+                                            shape={getGoalIcon('NanoGoal')}
                                             color={note.nano_goal_completed ? getGoalColor('Completed') : getGoalColor('NanoGoal')}
                                             secondaryColor={note.nano_goal_completed ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor('NanoGoal')}
                                             size={14}
                                         />
                                     </div>
                                 )}
-                                <div style={{ textDecoration: note.nano_goal_completed ? 'line-through' : 'none', opacity: note.nano_goal_completed ? 0.7 : 1, flex: 1, paddingRight: note.is_nano_goal ? '8px' : '0' }}>
+                                <div style={{ flex: 1, fontStyle: note.is_nano_goal ? 'italic' : 'normal' }}>
                                     <Linkify>{note.content}</Linkify>
                                 </div>
+                            </div>
+                        )}
+                        {(onUpdate || onDelete) && !note.isPast && (
+                            <div className={styles.noteItemActions}>
                                 {note.is_nano_goal && (
                                     <input
                                         type="checkbox"
@@ -238,10 +236,6 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                                         title={note.nano_goal_completed ? "Mark incomplete" : "Mark complete"}
                                     />
                                 )}
-                            </div>
-                        )}
-                        {(onUpdate || onDelete) && !note.isPast && (
-                            <div className={styles.noteItemActions}>
                                 {onUpdate && !isImageOnly && (
                                     <button
                                         onClick={() => setIsEditing(true)}
@@ -264,7 +258,7 @@ function NoteItem({ note, onUpdate, onDelete, onToggleNanoGoal, compact = false,
                         )}
                     </>
                 )}
-            </div >
+            </div>
 
             {/* Image Viewer Modal */}
             {

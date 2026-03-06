@@ -36,14 +36,13 @@
 
 /* Nano Mode Styling */
 .nanoModeInput {
-    border-color: var(--color-brand-secondary, #9c27b0);
-    /* Fallback to purple if undefined */
+    border-color: var(--nano-goal-color, #9c27b0);
     background: var(--color-bg-hover);
 }
 
 .nanoModeInput:focus {
-    border-color: var(--color-brand-secondary, #9c27b0);
-    box-shadow: 0 0 0 2px rgba(156, 39, 176, 0.1);
+    border-color: var(--nano-goal-color, #9c27b0);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nano-goal-color, #9c27b0) 20%, transparent);
 }
 
 .quickAddTextarea::placeholder {
