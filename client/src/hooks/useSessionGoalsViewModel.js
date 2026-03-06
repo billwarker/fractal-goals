@@ -29,6 +29,22 @@ function flattenGoalTree(node, goalIds, depth = 0) {
     return [toNodeShape(node, depth, goalIds.has(node.id)), ...flattenedChildren];
 }
 
+function buildRelevantStructuralHierarchy(node, relevantGoalIds, depth = 0) {
+    if (!node) return [];
+
+    const childNodes = (node.children || [])
+        .flatMap((child) => buildRelevantStructuralHierarchy(child, relevantGoalIds, depth + 1));
+    const isRelevant = relevantGoalIds.has(node.id);
+    const isStructuralExecutionGoal = node.type === 'MicroGoal' || node.type === 'NanoGoal' || node.attributes?.type === 'MicroGoal' || node.attributes?.type === 'NanoGoal';
+
+    if (!isRelevant && childNodes.length === 0 && depth !== 0) {
+        return [];
+    }
+
+    const currentNode = toNodeShape(node, depth, isRelevant);
+    return isStructuralExecutionGoal ? childNodes : [currentNode, ...childNodes];
+}
+
 function injectMicroGoals(structuredNodes, microGoals, sessionCompletedGoalIds, targetAchievements, achievedTargetIds) {
     if (!structuredNodes.length || !microGoals.length) return structuredNodes;
 
@@ -42,24 +58,17 @@ function injectMicroGoals(structuredNodes, microGoals, sessionCompletedGoalIds, 
 
     const withMicros = [];
     structuredNodes.forEach((node) => {
-        const goalStatus = node.status;
-        if (!goalStatus?.completed || sessionCompletedGoalIds.has(node.id)) {
-            withMicros.push(node);
-        }
+        withMicros.push(node);
 
         const childMicros = microGoalsByParent[node.id] || [];
         childMicros.forEach((microGoal) => {
             const microNode = toNodeShape(microGoal, (node.depth || 0) + 1, true);
             const microStatus = getGoalStatus(microNode, targetAchievements, achievedTargetIds);
-            if (!microStatus.completed || sessionCompletedGoalIds.has(microNode.id)) {
-                withMicros.push({ ...microNode, status: microStatus });
-            }
+            withMicros.push({ ...microNode, status: microStatus });
             (microGoal.children || []).forEach((nanoGoal) => {
                 const nanoNode = toNodeShape(nanoGoal, (node.depth || 0) + 2, true);
                 const nanoStatus = getGoalStatus(nanoNode, targetAchievements, achievedTargetIds);
-                if (!nanoStatus.completed || sessionCompletedGoalIds.has(nanoNode.id)) {
-                    withMicros.push({ ...nanoNode, status: nanoStatus });
-                }
+                withMicros.push({ ...nanoNode, status: nanoStatus });
             });
         });
     });
@@ -105,6 +114,7 @@ export function useSessionGoalsViewModel({
     }, [sessionGoalsView, session]);
 
     const activeActivityDefId = selectedActivity?.activity_definition_id || selectedActivity?.activity_id || null;
+    const activeActivityInstanceId = selectedActivity?.id || null;
 
     const sessionHierarchy = useMemo(() => {
         if (!sessionGoalsView?.goal_tree) return [];
@@ -112,7 +122,9 @@ export function useSessionGoalsViewModel({
         const baseNodes = flattenGoalTree(
             sessionGoalsView.goal_tree,
             new Set(sessionGoalsView.session_goal_ids || [])
-        ).map((node) => ({
+        )
+            .filter((node) => node.type !== 'MicroGoal' && node.type !== 'NanoGoal')
+            .map((node) => ({
             ...node,
             status: getGoalStatus(node, targetAchievements, achievedTargetIds)
         }));
@@ -131,24 +143,39 @@ export function useSessionGoalsViewModel({
         const associatedGoalIds = new Set(
             sessionGoalsView.activity_goal_ids_by_activity?.[activeActivityDefId] || []
         );
-        const sessionGoalIds = new Set(sessionGoalsView.session_goal_ids || []);
-        const relevantGoalIds = new Set([...associatedGoalIds, ...sessionGoalIds]);
 
-        const baseNodes = flattenGoalTree(sessionGoalsView.goal_tree, relevantGoalIds)
-            .filter((node) => {
-                if (node.type === 'MicroGoal' || node.type === 'NanoGoal') return true;
-                return associatedGoalIds.has(node.id) || sessionGoalIds.has(node.id) || node.depth === 0;
-            })
+        const relevantMicroGoals = (sessionGoalsView.micro_goals || []).filter((microGoal) => {
+            const microTargets = parseTargets(microGoal);
+            const instanceBoundTargetIds = microTargets
+                .map((target) => target.activity_instance_id)
+                .filter(Boolean);
+            const isInstanceBound = instanceBoundTargetIds.length > 0;
+            const hasInstanceBoundTargetForFocusedActivity = Boolean(
+                activeActivityInstanceId && microTargets.some((target) => target.activity_instance_id === activeActivityInstanceId)
+            );
+            const hasDefinitionScopedTargetForFocusedActivity = microTargets.some((target) => (
+                target.activity_id === activeActivityDefId && !target.activity_instance_id
+            ));
+
+            if (hasInstanceBoundTargetForFocusedActivity) return true;
+            if (isInstanceBound) return false;
+            if (microGoal.activity_definition_id === activeActivityDefId && !microTargets.some((target) => target.activity_instance_id)) return true;
+            if (hasDefinitionScopedTargetForFocusedActivity) return true;
+            const parentId = microGoal.parent_id || microGoal.attributes?.parent_id;
+            return associatedGoalIds.has(microGoal.id) || associatedGoalIds.has(parentId);
+        });
+
+        const relevantStructuralGoalIds = new Set([...associatedGoalIds]);
+        relevantMicroGoals.forEach((microGoal) => {
+            const parentId = microGoal.parent_id || microGoal.attributes?.parent_id;
+            if (parentId) relevantStructuralGoalIds.add(parentId);
+        });
+
+        const baseNodes = buildRelevantStructuralHierarchy(sessionGoalsView.goal_tree, relevantStructuralGoalIds)
             .map((node) => ({
                 ...node,
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
-
-        const relevantMicroGoals = (sessionGoalsView.micro_goals || []).filter((microGoal) => {
-            if (microGoal.activity_definition_id === activeActivityDefId) return true;
-            const parentId = microGoal.parent_id || microGoal.attributes?.parent_id;
-            return associatedGoalIds.has(microGoal.id) || associatedGoalIds.has(parentId) || sessionGoalIds.has(parentId);
-        });
 
         return injectMicroGoals(
             baseNodes,
@@ -157,7 +184,7 @@ export function useSessionGoalsViewModel({
             targetAchievements,
             achievedTargetIds
         );
-    }, [activeActivityDefId, sessionGoalsView, targetAchievements, achievedTargetIds, sessionCompletedGoalIds]);
+    }, [activeActivityDefId, activeActivityInstanceId, sessionGoalsView, targetAchievements, achievedTargetIds, sessionCompletedGoalIds]);
 
     const targetCards = useMemo(() => {
         const sourceHierarchy = activeActivityDefId ? activityHierarchy : sessionHierarchy;
@@ -207,6 +234,7 @@ export function useSessionGoalsViewModel({
 
     return {
         activeActivityDefId,
+        activeActivityInstanceId,
         sessionHierarchy,
         activityHierarchy,
         targetCards,

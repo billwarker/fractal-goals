@@ -2,14 +2,15 @@ import { parseTargets } from './goalUtils';
 
 export function getTargetStatus(target, goal, targetAchievements, achievedTargetIds) {
     const achievement = targetAchievements?.get(target.id);
+    const goalCompleted = Boolean(goal?.status?.completed || goal?.completed || goal?.attributes?.completed);
     const isCompleted = Boolean(
         (achievement ? achievement.achieved : target.completed)
         || achievedTargetIds?.has(target.id)
-        || goal?.completed
+        || goalCompleted
     );
 
     let reason = 'pending';
-    if (goal?.completed) reason = 'goal_completed';
+    if (goalCompleted) reason = 'goal_completed';
     else if (target.completed) reason = 'persisted_target';
     else if (achievement?.achieved) reason = 'realtime_target';
 

@@ -40,6 +40,7 @@ from extensions import limiter
 from services.metrics import GoalMetricsService
 from services.analytics_cache import get_analytics, set_analytics
 from services.session_service import SessionService
+from services.goal_type_utils import get_canonical_goal_type
 
 # Create blueprint
 goals_bp = Blueprint('goals', __name__, url_prefix='/api')
@@ -557,10 +558,21 @@ def get_session_goals_view(current_user, root_id, session_id):
             for goal_ids in activity_goal_ids_by_activity.values()
             for goal_id in goal_ids
         }
+        structural_goal_ids = {
+            goal_id for goal_id in (set(session_goal_ids) | associated_goal_ids)
+            if goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
+        }
         visible_goal_ids = _collect_goal_ids_with_ancestors(
             set(session_goal_ids) | associated_goal_ids,
             goals_by_id
         )
+        visible_goal_ids = {
+            goal_id for goal_id in visible_goal_ids
+            if goal_id == root_id or (
+                goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
+            )
+        }
+        visible_goal_ids |= _collect_goal_ids_with_ancestors(structural_goal_ids, goals_by_id)
         visible_goal_ids.add(root_id)
         pruned_goal_tree = _prune_tree_to_goal_ids(root_tree, visible_goal_ids) or root_tree
 
