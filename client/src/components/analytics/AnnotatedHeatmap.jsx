@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { fractalApi } from '../../utils/api';
 import AnnotationModal from './AnnotationModal';
 import useIsMobile from '../../hooks/useIsMobile';
+import styles from './AnnotatedHeatmap.module.css';
 
 /**
  * AnnotatedHeatmap - ActivityHeatmap with annotation support.
@@ -256,22 +257,7 @@ function AnnotatedHeatmap({
         }
     }, [isSelecting, handleMouseUp]);
 
-    // Selection box style
-    const getSelectionBoxStyle = () => {
-        if (!selectionStart || !selectionEnd) return null;
-        return {
-            position: 'absolute',
-            left: Math.min(selectionStart.x, selectionEnd.x),
-            top: Math.min(selectionStart.y, selectionEnd.y),
-            width: Math.abs(selectionEnd.x - selectionStart.x),
-            height: Math.abs(selectionEnd.y - selectionStart.y),
-            border: '2px dashed var(--color-brand-primary)',
-            backgroundColor: 'rgba(33, 150, 243, 0.15)',
-            pointerEvents: 'none',
-            zIndex: 100,
-            borderRadius: '4px'
-        };
-    };
+    // Removed getSelectionBoxStyle as it's handled by inline overrides + module.css
 
     const totalSessions = dailyData.reduce((sum, d) => sum + d.count, 0);
     const activeDays = dailyData.filter(d => d.count > 0).length;
@@ -279,32 +265,19 @@ function AnnotatedHeatmap({
     return (
         <div
             ref={containerRef}
-            style={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                padding: '20px',
-                position: 'relative',
-                cursor: annotationMode ? 'crosshair' : 'default',
-                userSelect: 'none'
-            }}
+            className={`${styles.container} ${annotationMode ? styles.annotationMode : styles.defaultMode}`}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
         >
             {/* Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-            }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <div className={styles.header}>
+                <h3 className={styles.title}>
                     📅 Activity Heatmap
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        <span><strong style={{ color: 'var(--color-success)' }}>{totalSessions}</strong> sessions</span>
-                        <span><strong style={{ color: 'var(--color-brand-primary)' }}>{activeDays}</strong> active days</span>
+                <div className={styles.statsContainer}>
+                    <div className={styles.statsText}>
+                        <span><strong className={styles.statsSuccess}>{totalSessions}</strong> sessions</span>
+                        <span><strong className={styles.statsPrimary}>{activeDays}</strong> active days</span>
                     </div>
 
                     {/* Annotation toggle */}
@@ -313,19 +286,7 @@ function AnnotatedHeatmap({
                             setAnnotationMode(!annotationMode);
                             setSelectedDates([]);
                         }}
-                        style={{
-                            padding: '6px 12px',
-                            background: annotationMode ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
-                            border: annotationMode ? '2px solid var(--color-brand-primary)' : '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: annotationMode ? 'white' : 'var(--color-text-muted)',
-                            fontSize: '11px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
+                        className={`${styles.toggleButton} ${annotationMode ? styles.toggleActive : styles.toggleInactive}`}
                     >
                         <span>✏️</span>
                         <span>{annotationMode ? 'Done' : 'Annotate'}</span>
@@ -335,30 +296,19 @@ function AnnotatedHeatmap({
 
             {/* Annotation mode instructions */}
             {annotationMode && (
-                <div style={{
-                    background: 'rgba(33, 150, 243, 0.1)',
-                    border: '1px solid rgba(33, 150, 243, 0.3)',
-                    borderRadius: '6px',
-                    padding: '10px 14px',
-                    marginBottom: '16px',
-                    fontSize: '12px',
-                    color: 'var(--color-brand-primary)'
-                }}>
+                <div className={styles.instructions}>
                     🎯 Drag to select cells, then add your note about the selected data.
                 </div>
             )}
 
             {/* Month labels */}
-            <div style={{ display: 'flex', marginLeft: '32px', marginBottom: '4px' }}>
+            <div className={styles.monthLabelsContainer}>
                 {monthLabels.map((label, i) => (
                     <span
                         key={i}
+                        className={styles.monthLabel}
                         style={{
-                            position: 'relative',
                             left: `${label.weekIndex * (cellSize + cellGap)}px`,
-                            fontSize: '10px',
-                            color: 'var(--color-text-muted)',
-                            marginRight: '-20px'
                         }}
                     >
                         {label.label}
@@ -367,21 +317,14 @@ function AnnotatedHeatmap({
             </div>
 
             {/* Grid */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className={styles.gridContainer}>
                 {/* Day labels */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellGap}px`, marginRight: '4px' }}>
+                <div className={styles.dayLabelsColumn} style={{ gap: `${cellGap}px` }}>
                     {dayLabels.map((label, i) => (
                         <div
                             key={i}
-                            style={{
-                                height: `${cellSize}px`,
-                                fontSize: '9px',
-                                color: 'var(--color-text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'flex-end',
-                                width: '24px'
-                            }}
+                            className={styles.dayLabel}
+                            style={{ height: `${cellSize}px` }}
                         >
                             {label}
                         </div>
@@ -389,9 +332,9 @@ function AnnotatedHeatmap({
                 </div>
 
                 {/* Heatmap grid */}
-                <div style={{ display: 'flex', gap: `${cellGap}px`, overflowX: 'auto', paddingBottom: '4px' }}>
+                <div className={styles.heatmapGrid} style={{ gap: `${cellGap}px` }}>
                     {weeks.map((week, weekIndex) => (
-                        <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', gap: `${cellGap}px` }}>
+                        <div key={weekIndex} className={styles.weekColumn} style={{ gap: `${cellGap}px` }}>
                             {week.map((day, dayIndex) => {
                                 const isSelected = day && selectedDates.includes(day.dateKey);
                                 const isAnnotated = day && isDateAnnotated(day.dateKey);
@@ -401,20 +344,12 @@ function AnnotatedHeatmap({
                                     <div
                                         key={dayIndex}
                                         ref={day ? (el) => { cellRefs.current[day.dateKey] = el; } : null}
+                                        className={`${styles.dayCell} ${hoveredCell === `${weekIndex}-${dayIndex}` ? styles.dayCellHovered : ''} ${isHighlighted ? styles.dayCellHighlighted : ''} ${isAnnotated && !isSelected && !isHighlighted ? styles.dayCellAnnotated : ''}`}
                                         style={{
                                             width: `${cellSize}px`,
                                             height: `${cellSize}px`,
                                             backgroundColor: day ? getColor(day.count, isSelected, isAnnotated || isHighlighted) : 'transparent',
-                                            borderRadius: '2px',
                                             cursor: day ? 'pointer' : 'default',
-                                            transition: 'all 0.1s ease',
-                                            transform: (hoveredCell === `${weekIndex}-${dayIndex}` || isHighlighted) ? 'scale(1.2)' : 'scale(1)',
-                                            border: (isAnnotated || isHighlighted) && !isSelected
-                                                ? `1px solid ${isHighlighted ? '#ffeb3b' : '#ff9800'}`
-                                                : 'none',
-                                            boxShadow: isHighlighted ? '0 0 8px rgba(255, 235, 59, 0.6)' : 'none',
-                                            zIndex: isHighlighted ? 1 : 0,
-                                            boxSizing: 'border-box'
                                         }}
                                         onMouseEnter={() => day && setHoveredCell(`${weekIndex}-${dayIndex}`)}
                                         onMouseLeave={() => setHoveredCell(null)}
@@ -428,73 +363,50 @@ function AnnotatedHeatmap({
             </div>
 
             {/* Legend */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: '4px',
-                marginTop: '12px',
-                fontSize: '10px',
-                color: 'var(--color-text-muted)'
-            }}>
+            <div className={styles.legendContainer}>
                 <span>Less</span>
-                <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-bg-input)', borderRadius: '2px' }} />
+                <div className={styles.legendBox} style={{ backgroundColor: 'var(--color-bg-input)' }} />
                 {['#0e4429', '#006d32', '#26a641', '#39d353'].map((color, i) => (
-                    <div key={i} style={{ width: '10px', height: '10px', backgroundColor: color, borderRadius: '2px' }} />
+                    <div key={i} className={styles.legendBox} style={{ backgroundColor: color }} />
                 ))}
                 <span>More</span>
             </div>
 
             {/* Selection box */}
             {isSelecting && selectionStart && selectionEnd && (
-                <div style={getSelectionBoxStyle()} />
+                <div
+                    className={styles.selectionBox}
+                    style={{
+                        left: Math.min(selectionStart.x, selectionEnd.x),
+                        top: Math.min(selectionStart.y, selectionEnd.y),
+                        width: Math.abs(selectionEnd.x - selectionStart.x),
+                        height: Math.abs(selectionEnd.y - selectionStart.y),
+                    }}
+                />
             )}
 
             {/* Selection count indicator */}
             {isSelecting && selectedDates.length > 0 && (
-                <div style={{
-                    position: 'absolute',
-                    left: Math.max(selectionStart?.x || 0, selectionEnd?.x || 0) + 8,
-                    top: Math.min(selectionStart?.y || 0, selectionEnd?.y || 0),
-                    background: 'var(--color-brand-primary)',
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    pointerEvents: 'none',
-                    zIndex: 101
-                }}>
+                <div
+                    className={styles.selectionCount}
+                    style={{
+                        left: Math.max(selectionStart?.x || 0, selectionEnd?.x || 0) + 8,
+                        top: Math.min(selectionStart?.y || 0, selectionEnd?.y || 0),
+                    }}
+                >
                     {selectedDates.length} day{selectedDates.length !== 1 ? 's' : ''}
                 </div>
             )}
 
             {/* Saved annotations indicator */}
             {annotations.length > 0 && !annotationMode && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '12px',
-                    left: '20px',
-                    display: 'flex',
-                    gap: '6px',
-                    alignItems: 'center'
-                }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>📝 {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
+                <div className={styles.annotationsIndicatorContainer}>
+                    <span className={styles.annotationsText}>📝 {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
                     {annotations.slice(0, 3).map((a, i) => (
                         <button
                             key={a.id}
                             onClick={() => setViewingAnnotation(a)}
-                            style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '50%',
-                                background: '#ff9800',
-                                border: '2px solid #f57c00',
-                                color: 'white',
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                            }}
+                            className={styles.annotationDot}
                             title={a.content}
                         >
                             {i + 1}
@@ -518,56 +430,29 @@ function AnnotatedHeatmap({
             {/* Viewing annotation modal */}
             {viewingAnnotation && (
                 <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                        display: 'flex',
-                        alignItems: isMobile ? 'flex-end' : 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000,
-                        padding: isMobile ? 0 : '16px'
-                    }}
+                    className={`${styles.viewingOverlay} ${isMobile ? styles.viewingOverlayMobile : styles.viewingOverlayDesktop}`}
                     onClick={() => setViewingAnnotation(null)}
                 >
                     <div
-                        style={{
-                            background: 'var(--color-bg-card)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: isMobile ? '16px 16px 0 0' : '12px',
-                            padding: isMobile ? '16px' : '24px',
-                            width: isMobile ? '100vw' : 'min(450px, 90vw)',
-                            maxHeight: isMobile ? '80vh' : '90vh',
-                            overflowY: 'auto'
-                        }}
+                        className={`${styles.viewingModal} ${isMobile ? styles.viewingModalMobile : styles.viewingModalDesktop}`}
                         onClick={e => e.stopPropagation()}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: '16px' }}>📝 Annotation</h3>
+                        <div className={styles.viewingHeader}>
+                            <h3 className={styles.viewingTitle}>📝 Annotation</h3>
                             <button
                                 onClick={() => setViewingAnnotation(null)}
-                                style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: '18px', cursor: 'pointer' }}
+                                className={styles.viewingCloseBtn}
                             >
                                 ✕
                             </button>
                         </div>
-                        <div style={{
-                            background: 'var(--color-bg-surface)',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            marginBottom: '12px',
-                            fontSize: '12px',
-                            color: 'var(--color-brand-primary)'
-                        }}>
+                        <div className={styles.viewingStats}>
                             {viewingAnnotation.selected_points?.length || 0} days selected
                         </div>
-                        <div style={{ color: 'var(--color-text-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+                        <div className={styles.viewingContent}>
                             {viewingAnnotation.content}
                         </div>
-                        <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                        <div className={styles.viewingDate}>
                             Created: {new Date(viewingAnnotation.created_at).toLocaleString()}
                         </div>
                     </div>

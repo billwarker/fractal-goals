@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
+import styles from './ScatterPlot.module.css';
 
 /**
  * Scatter Plot component for visualizing activity metrics
@@ -55,14 +56,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
     if (!selectedActivity) {
         return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: 'var(--color-text-muted)',
-                fontSize: '14px'
-            }}>
+            <div className={styles.emptyStateContainer}>
                 Select an activity to view analytics
             </div>
         );
@@ -72,14 +66,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
     if (!activityDef || instances.length === 0) {
         return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: 'var(--color-text-muted)',
-                fontSize: '14px'
-            }}>
+            <div className={styles.emptyStateContainer}>
                 No data available for this activity
             </div>
         );
@@ -88,30 +75,16 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     // Scatter plot requires at least 2 metrics
     if (metrics.length < 2) {
         return (
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                gap: '16px',
-                color: 'var(--color-text-muted)',
-                textAlign: 'center',
-                padding: '20px'
-            }}>
-                <div style={{ fontSize: '48px' }}>📊</div>
-                <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+            <div className={styles.unavailableContainer}>
+                <div className={styles.unavailableIcon}>📊</div>
+                <div className={styles.unavailableTitle}>
                     Scatter Plot Unavailable
                 </div>
-                <div style={{ fontSize: '14px', maxWidth: '400px' }}>
+                <div className={styles.unavailableDescription}>
                     Scatter plots require at least 2 metrics to compare.
                     This activity only has {metrics.length === 0 ? 'no metrics' : '1 metric'}.
                 </div>
-                <div style={{
-                    fontSize: '13px',
-                    color: 'var(--color-brand-primary)',
-                    marginTop: '8px'
-                }}>
+                <div className={styles.unavailableSuggestion}>
                     Try the Line Graph view instead to see metric progression over time.
                 </div>
             </div>
@@ -211,36 +184,21 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
     if (dataPoints.length === 0) {
         return (
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                gap: '20px'
-            }}>
-                <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
+            <div className={styles.noDataContainer}>
+                <div className={styles.noDataText}>
                     No metric data available for the selected metrics
                 </div>
                 {/* Metric Selectors */}
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>X-Axis:</span>
+                <div className={styles.selectorsWrapper}>
+                    <div className={styles.selectorGroup}>
+                        <span className={styles.selectorLabel}>X-Axis:</span>
                         <select
                             value={xMetricToPlot.id}
                             onChange={(e) => {
                                 const metric = metrics.find(m => m.id === e.target.value);
                                 setXMetric(metric);
                             }}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'var(--color-bg-input)',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '4px',
-                                color: 'var(--color-text-primary)',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
+                            className={styles.metricSelect}
                         >
                             {metrics.map(metric => (
                                 <option key={metric.id} value={metric.id}>
@@ -249,23 +207,15 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                             ))}
                         </select>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis:</span>
+                    <div className={styles.selectorGroup}>
+                        <span className={styles.selectorLabel}>Y-Axis:</span>
                         <select
                             value={yMetricToPlot.id}
                             onChange={(e) => {
                                 const metric = metrics.find(m => m.id === e.target.value);
                                 setYMetric(metric);
                             }}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'var(--color-bg-input)',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '4px',
-                                color: 'var(--color-text-primary)',
-                                fontSize: '12px',
-                                cursor: 'pointer'
-                            }}
+                            className={styles.metricSelect}
                         >
                             {metrics.map(metric => (
                                 <option key={metric.id} value={metric.id}>
@@ -337,32 +287,18 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     };
 
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className={styles.mainContainer}>
             {/* Metric Selectors */}
-            <div style={{
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'center',
-                padding: '0 20px',
-                flexWrap: 'wrap'
-            }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>X-Axis:</span>
+            <div className={styles.headerSelectors}>
+                <div className={styles.selectorGroup}>
+                    <span className={styles.selectorLabel}>X-Axis:</span>
                     <select
                         value={xMetricToPlot.id}
                         onChange={(e) => {
                             const metric = metrics.find(m => m.id === e.target.value);
                             setXMetric(metric);
                         }}
-                        style={{
-                            padding: '6px 12px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: 'var(--color-text-primary)',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
+                        className={styles.metricSelect}
                     >
                         {metrics.map(metric => (
                             <option key={metric.id} value={metric.id}>
@@ -371,23 +307,15 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         ))}
                     </select>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Y-Axis:</span>
+                <div className={styles.selectorGroup}>
+                    <span className={styles.selectorLabel}>Y-Axis:</span>
                     <select
                         value={yMetricToPlot.id}
                         onChange={(e) => {
                             const metric = metrics.find(m => m.id === e.target.value);
                             setYMetric(metric);
                         }}
-                        style={{
-                            padding: '6px 12px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: 'var(--color-text-primary)',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
+                        className={styles.metricSelect}
                     >
                         {metrics.map(metric => (
                             <option key={metric.id} value={metric.id}>
@@ -399,7 +327,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
             </div>
 
             {/* Chart */}
-            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <div className={styles.chartContainer}>
                 <Scatter ref={chartRef} data={chartData} options={options} />
             </div>
         </div>

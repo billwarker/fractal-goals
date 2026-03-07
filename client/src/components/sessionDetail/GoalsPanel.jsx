@@ -7,8 +7,9 @@ import { fractalApi } from '../../utils/api';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import MicroGoalModal from '../MicroGoalModal';
-import GoalDetailModal from '../GoalDetailModal';
 import { useGoals } from '../../contexts/GoalsContext';
+const GoalDetailModal = React.lazy(() => import('../GoalDetailModal'));
+import { useGoalsForSelection } from '../../hooks/useGoalQueries';
 import styles from './GoalsPanel.module.css';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
@@ -41,7 +42,7 @@ function GoalsPanel({
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
     const { fetchFractalTree } = useGoals();
 
-    const [allShortTermGoals, setAllShortTermGoals] = useState([]);
+    const { goals: allShortTermGoals, isLoading: isLoadingShortTermGoals } = useGoalsForSelection(rootId);
 
     // Inline IG creator state
     const [showIGCreator, setShowIGCreator] = useState(false);
@@ -53,19 +54,6 @@ function GoalsPanel({
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
     const [targetBuilderGoal, setTargetBuilderGoal] = useState(null); // ImmediateGoal node
     const [viewMode, setViewMode] = useState('session');
-
-    useEffect(() => {
-        if (!rootId) return;
-        const fetchSelectionGoals = async () => {
-            try {
-                const res = await fractalApi.getGoalsForSelection(rootId);
-                setAllShortTermGoals(res.data || []);
-            } catch (err) {
-                console.error("Failed to fetch selection goals", err);
-            }
-        };
-        fetchSelectionGoals();
-    }, [rootId]);
 
     const goalLookup = useMemo(() => {
         if (!sessionGoalsView?.goal_tree) return new Map();
@@ -417,17 +405,19 @@ function GoalsPanel({
             />
             {/* GoalDetailModal — create mode, portalled to body to escape sidepanel stacking context */}
             {createSubGoalParent && createPortal(
-                <GoalDetailModal
-                    isOpen={!!createSubGoalParent}
-                    onClose={() => setCreateSubGoalParent(null)}
-                    goal={null}
-                    mode="create"
-                    parentGoal={createSubGoalParent}
-                    onCreate={handleSubGoalCreated}
-                    rootId={rootId}
-                    activityDefinitions={activityDefinitions}
-                    initialActivities={viewMode === 'activity' && activeActivityDef ? [activeActivityDef] : []}
-                />,
+                <React.Suspense fallback={<div>Loading Details...</div>}>
+                    <GoalDetailModal
+                        isOpen={!!createSubGoalParent}
+                        onClose={() => setCreateSubGoalParent(null)}
+                        goal={null}
+                        mode="create"
+                        parentGoal={createSubGoalParent}
+                        onCreate={handleSubGoalCreated}
+                        rootId={rootId}
+                        activityDefinitions={activityDefinitions}
+                        initialActivities={viewMode === 'activity' && activeActivityDef ? [activeActivityDef] : []}
+                    />
+                </React.Suspense>,
                 document.body
             )}
         </>

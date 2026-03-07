@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getISOYMDInTimezone, getDatePart, formatLiteralDate } from '../../utils/dateUtils';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
+import Button from '../atoms/Button';
 import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
@@ -156,40 +160,46 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
     const formatSessionCount = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`;
 
     return (
-        <div className={styles.modalOverlay} onClick={handleClose}>
-            <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className={styles.header}>
-                    <div>
-                        <h2 className={styles.headerTitle}>
-                            {formatDate(date)}
-                        </h2>
-                        <div className={styles.headerMeta}>
-                            {formatSessionCount(scheduledSessionCount, 'scheduled session')} • {formatSessionCount(completedSessionCount, 'completed session')} • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
-                        </div>
-                        {blocksContainingDate.length > 0 && (
-                            <div className={styles.headerTags}>
-                                {blocksContainingDate.map(block => (
-                                    <span key={block.id} className={styles.tag} style={{
-                                        background: block.color + '33', // 20% opacity
-                                        color: block.color || '#3A86FF',
-                                        borderColor: block.color || '#3A86FF'
-                                    }}>
-                                        {block.name}
-                                    </span>
-                                ))}
+        <Modal
+            isOpen={isOpen}
+            onClose={handleClose}
+            title={formatDate(date)}
+            size="lg"
+            customHeader={
+                <div className={styles.modalHeaderContent}>
+                    <div className={styles.modalHeaderFlex}>
+                        <div>
+                            <h2 className={styles.modalTitle}>
+                                {formatDate(date)}
+                            </h2>
+                            <div className={styles.modalHeaderStats}>
+                                {formatSessionCount(scheduledSessionCount, 'scheduled session')} • {formatSessionCount(completedSessionCount, 'completed session')} • {goalsDueOnDate.length} goals due {goalsCompletedOnDate.length > 0 && `• ${goalsCompletedOnDate.length} completed`}
                             </div>
-                        )}
+                            {blocksContainingDate.length > 0 && (
+                                <div className={styles.blockBadgesContainer}>
+                                    {blocksContainingDate.map(block => (
+                                        <span key={block.id} className={styles.blockBadge} style={{
+                                            background: block.color + '33', // 20% opacity
+                                            color: block.color || '#3A86FF',
+                                            borderColor: block.color || '#3A86FF'
+                                        }}>
+                                            {block.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleClose}
+                            className={styles.closeButton}
+                        >
+                            ×
+                        </button>
                     </div>
-                    <button
-                        onClick={handleClose}
-                        className={styles.closeButton}
-                    >
-                        ×
-                    </button>
                 </div>
-
-                {/* Content */}
+            }
+        >
+            <ModalBody>
                 <div className={styles.contentArea}>
 
                     {/* Program Days */}
@@ -288,7 +298,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         {unlinkedDaySessions.length > 0 && (
                                             <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
-                                                    <div key={s.id} style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                                    <div key={s.id} className={styles.dayOptionNotes}>
                                                         ✓ {s.name} ({s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'})
                                                     </div>
                                                 ))}
@@ -354,7 +364,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         <div className={styles.cardTitle}>
                                             {moment.utc(session.session_end || session.session_start).local().format('h:mm A')} - {session.name || 'Untitled Session'}
                                         </div>
-                                        <div className={styles.headerMeta} style={{ fontSize: '12px' }}>
+                                        <div className={styles.sessionDuration}>
                                             Duration: {session.total_duration_seconds ? moment.duration(session.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
                                         </div>
                                     </div>
@@ -373,9 +383,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                 {/* Completed Goals */}
                                 {goalsCompletedOnDate.map(goal => (
                                     <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
-                                        <div>
-                                            <div style={{ color: 'var(--color-text-primary)', fontSize: '14px' }}>✅ {goal.name}</div>
-                                            <div className={styles.goalMeta} style={{ color: 'var(--color-brand-success)' }}>
+                                        <div className={styles.goalCardFlex}>
+                                            <div className={styles.goalCardName}>✅ {goal.name}</div>
+                                            <div className={`${styles.goalMeta} ${styles.goalCardMetaCompleted}`}>
                                                 {goal.type || 'Goal'} • Met on this date
                                             </div>
                                         </div>
@@ -393,7 +403,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                 background: isCompleted ? 'var(--color-bg-success-subtle, rgba(16, 185, 129, 0.1))' : 'var(--color-bg-card-hover)',
                                                 borderLeftColor: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type)
                                             }}>
-                                            <div style={{ color: 'var(--color-text-primary)', fontSize: '14px' }}>
+                                            <div className={styles.goalCardName}>
                                                 {isCompleted ? '✅' : '🎯'} {goal.name}
                                             </div>
                                             <div className={styles.goalMeta} style={{ color: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type) }}>
@@ -527,7 +537,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                 <div className={styles.label}>
                                                     Select a Day to Schedule:
                                                 </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
+                                                <div className={styles.dayListContainer}>
                                                     {(() => {
                                                         const blockId = effectiveBlockId || null;
                                                         const block = blocks?.find(b => b.id === blockId);
@@ -553,7 +563,7 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
 
                                                         if (uniqueDays.length === 0) {
                                                             return (
-                                                                <div style={{ padding: '8px', color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '13px' }}>
+                                                                <div className={styles.emptyDaysHint}>
                                                                     No days defined in this block.
                                                                 </div>
                                                             );
@@ -572,8 +582,8 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                                 className={styles.optionButton}
                                                             >
                                                                 <div>
-                                                                    <div style={{ fontWeight: 600 }}>{day.name || `Day ${day.day_number}`}</div>
-                                                                    {day.notes && <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{day.notes}</div>}
+                                                                    <div className={styles.dayOptionTitle}>{day.name || `Day ${day.day_number}`}</div>
+                                                                    {day.notes && <div className={styles.dayOptionNotes}>{day.notes}</div>}
                                                                 </div>
                                                             </button>
                                                         ));
@@ -600,18 +610,14 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                         )}
                     </div>
                 </div>
+            </ModalBody>
 
-                {/* Footer */}
-                <div className={styles.footer}>
-                    <button
-                        onClick={handleClose}
-                        className={styles.closeFooterButton}
-                    >
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
+            <ModalFooter>
+                <Button variant="secondary" onClick={handleClose}>
+                    Close
+                </Button>
+            </ModalFooter>
+        </Modal>
     );
 };
 

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import { Heading, Text } from '../atoms/Typography';
@@ -115,24 +118,14 @@ function AuthModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className={styles.modalOverlay}>
-            <div className={styles.modalContent}>
-                {/* Header - Reference GoalDetailModal */}
-                <div className={styles.header} style={{ borderBottomColor: themeColor }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <Heading level={3} className={styles.title} style={{ color: themeColor }}>
-                            {isLogin ? 'WELCOME BACK' : 'CREATE AN ACCOUNT'}
-                        </Heading>
-                        <button
-                            onClick={onClose}
-                            className={styles.closeButton}
-                        >
-                            &times;
-                        </button>
-                    </div>
-                </div>
-
-                <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isLogin ? 'WELCOME BACK' : 'CREATE AN ACCOUNT'}
+            size="md"
+        >
+            <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+                <ModalBody>
                     {isLogin ? (
                         <div className={styles.formGroup}>
                             <Input
@@ -206,44 +199,48 @@ function AuthModal({ isOpen, onClose }) {
                             {generalError}
                         </div>
                     )}
+                </ModalBody>
 
-                    <div className={styles.actions}>
-                        <Button
-                            type="submit"
-                            disabled={isSubmitting}
-                            fullWidth
-                            variant="primary"
-                            style={{ fontWeight: 'bold' }}
-                        >
-                            {isSubmitting ? 'PROCESSING...' : (isLogin ? 'LOG IN' : 'CREATE')}
-                        </Button>
+                <ModalFooter>
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className={styles.actions}>
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                fullWidth
+                                variant="primary"
+                                style={{ fontWeight: 'bold' }}
+                            >
+                                {isSubmitting ? 'PROCESSING...' : (isLogin ? 'LOG IN' : 'CREATE')}
+                            </Button>
 
-                        <Button
-                            type="button"
-                            onClick={onClose}
-                            fullWidth
-                            variant="secondary"
-                        >
-                            Cancel
-                        </Button>
+                            <Button
+                                type="button"
+                                onClick={onClose}
+                                fullWidth
+                                variant="secondary"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+
+                        <div className={styles.toggleContainer}>
+                            <Text size="sm" as="span" style={{ marginRight: '8px' }}>
+                                {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
+                            </Text>
+                            <button
+                                type="button"
+                                onClick={handleToggleMode}
+                                className={styles.toggleButton}
+                                style={{ color: themeColor }}
+                            >
+                                {isLogin ? 'SIGN UP' : 'LOGIN'}
+                            </button>
+                        </div>
                     </div>
-
-                    <div className={styles.toggleContainer}>
-                        <Text size="sm" as="span" style={{ marginRight: '8px' }}>
-                            {isLogin ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"}
-                        </Text>
-                        <button
-                            type="button"
-                            onClick={handleToggleMode}
-                            className={styles.toggleButton}
-                            style={{ color: themeColor }}
-                        >
-                            {isLogin ? 'SIGN UP' : 'LOGIN'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                </ModalFooter>
+            </form>
+        </Modal>
     );
 }
 

@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
+import Button from '../atoms/Button';
 
 const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
     const [selectedShortTermGoals, setSelectedShortTermGoals] = useState([]);
@@ -38,11 +42,14 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal session-modal" onClick={(e) => e.stopPropagation()}>
-                <h2>Create Session</h2>
-
-                <div className="modal-content-scroll">
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Create Session"
+            size="md"
+        >
+            <ModalBody>
+                <div>
                     {/* Auto-generated name preview */}
                     <div className="session-name-preview">
                         <strong>Session Name:</strong>
@@ -145,24 +152,19 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
                         </button>
                     </div>
                 </div>
+            </ModalBody>
 
-                <div className="modal-actions">
-                    <button
-                        type="button"
-                        className="action-btn primary"
-                        onClick={handleCreate}
-                    >
-                        Create Session
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                    >
+            <ModalFooter>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', width: '100%' }}>
+                    <Button variant="secondary" onClick={onClose}>
                         Cancel
-                    </button>
+                    </Button>
+                    <Button variant="primary" onClick={handleCreate}>
+                        Create Session
+                    </Button>
                 </div>
-            </div>
-        </div>
+            </ModalFooter>
+        </Modal>
     );
 };
 

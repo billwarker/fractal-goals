@@ -102,6 +102,33 @@ def _validate_and_normalize_metrics(metrics_data):
         normalized.append({**metric, 'name': name, 'unit': unit})
     return normalized, None
 
+
+def _validate_activity_update_payload(data):
+    """Preserve the stricter pre-refactor validation contract for updates."""
+    if 'name' in data:
+        next_name = (data.get('name') or '').strip()
+        if not next_name:
+            return None, "Name is required"
+        data['name'] = next_name
+
+    if 'metrics' in data:
+        metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics'))
+        if metrics_err:
+            return None, metrics_err
+        if len(metrics_data) > 3:
+            return None, "Maximum of 3 metrics allowed per activity."
+        data['metrics'] = metrics_data
+
+    if 'splits' in data:
+        splits_data = data.get('splits') or []
+        if not isinstance(splits_data, list):
+            return None, "Splits must be an array"
+        if len(splits_data) > 5:
+            return None, "Maximum of 5 splits allowed per activity."
+        data['splits'] = splits_data
+
+    return data, None
+
 # ============================================================================
 # ============================================================================
 # ACTIVITY GROUP ENDPOINTS
@@ -434,77 +461,11 @@ def create_activity(current_user, root_id):
         if len(splits_data) > 5:
              return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
         
-        # Create Activity
-        new_activity = ActivityDefinition(
-            root_id=root_id,
-            name=activity_name,
-            description=data.get('description', ''),
-            has_sets=data.get('has_sets', False),
-            has_metrics=data.get('has_metrics', True),
-            metrics_multiplicative=data.get('metrics_multiplicative', False),
-            has_splits=data.get('has_splits', False),
-            group_id=group_id
-        )
-        session.add(new_activity)
-        session.flush() # Get ID
-
-        # Create Metrics
-
-        for m in metrics_data:
-            if m.get('name') and m.get('unit'):
-                new_metric = MetricDefinition(
-                    activity_id=new_activity.id,
-                    root_id=root_id,  # Add root_id for performance
-                    name=m['name'],
-                    unit=m['unit'],
-                    is_top_set_metric=m.get('is_top_set_metric', False),
-                    is_multiplicative=m.get('is_multiplicative', True)
-                )
-                session.add(new_metric)
+        from services.activity_service import ActivityService
         
-        # Create Splits
-
-        for idx, s in enumerate(splits_data):
-            if s.get('name'):
-                new_split = SplitDefinition(
-                    activity_id=new_activity.id,
-                    root_id=root_id,  # Add root_id for performance
-                    name=s['name'],
-                    order=idx
-                )
-                session.add(new_split)
-        
-        # Handle Goal Associations
-        goal_ids = data.get('goal_ids', [])
-        if goal_ids:
-            # from models import Goal, activity_goal_associations # No longer needed
-            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
-            new_activity.associated_goals.extend(
-                [g for g in goals if g not in new_activity.associated_goals]
-            )
-            # for goal_id in goal_ids: # No longer needed with explicit relationship
-            #     goal = session.query(Goal).filter(
-            #         Goal.id == goal_id,
-            #         Goal.root_id == root_id,
-            #         Goal.deleted_at == None
-            #     ).first()
-            #     if goal:
-            #         session.execute(
-            #             activity_goal_associations.insert().values(
-            #                 activity_id=new_activity.id,
-            #                 goal_id=goal_id
-            #             )
-            #         )
-
-        session.commit()
-        session.refresh(new_activity) # refresh to load metrics, splits, AND goals
-        
-        # Emit activity created event
-        event_bus.emit(Event(Events.ACTIVITY_CREATED, {
-            'activity_id': new_activity.id,
-            'activity_name': new_activity.name,
-            'root_id': root_id
-        }, source='activities_api.create_activity'))
+        # Create Activity via service
+        service = ActivityService(session)
+        new_activity = service.create_activity(root_id, activity_name, data)
         
         return jsonify(serialize_activity_definition(new_activity)), 201
 
@@ -538,159 +499,15 @@ def update_activity(current_user, root_id, activity_id):
             if group_err:
                 return jsonify({"error": group_err}), 400
             data['group_id'] = normalized_group_id
-        
-        # Update activity fields
-        if 'name' in data:
-            next_name = (data['name'] or '').strip()
-            if not next_name:
-                return jsonify({"error": "Name is required"}), 400
-            activity.name = next_name
-        if 'description' in data:
-            activity.description = data['description']
-        if 'has_sets' in data:
-            activity.has_sets = data['has_sets']
-        if 'has_metrics' in data:
-            activity.has_metrics = data['has_metrics']
-        if 'metrics_multiplicative' in data:
-            activity.metrics_multiplicative = data['metrics_multiplicative']
-        if 'has_splits' in data:
-            activity.has_splits = data['has_splits']
-        if 'group_id' in data:
-            activity.group_id = data['group_id']
-        
-        # Update metrics if provided
-        if 'metrics' in data:
-            metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics'))
-            if metrics_err:
-                return jsonify({"error": metrics_err}), 400
-            if len(metrics_data) > 3:
-                return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
-            
-            # Get existing active metrics only
-            existing_metrics = session.query(MetricDefinition).filter(
-                MetricDefinition.activity_id == activity_id,
-                MetricDefinition.deleted_at.is_(None)
-            ).all()
-            existing_metrics_dict = {m.id: m for m in existing_metrics}
-            
-            # Track which existing metrics were updated
-            updated_metric_ids = set()
-            
-            # Update or create metrics
-            for m in metrics_data:
-                if m.get('name') and m.get('unit'):
-                    metric_id = m.get('id')
-                    
-                    if metric_id and metric_id in existing_metrics_dict:
-                        # Update existing metric
-                        existing_metric = existing_metrics_dict[metric_id]
-                        existing_metric.name = m['name']
-                        existing_metric.unit = m['unit']
-                        existing_metric.is_top_set_metric = m.get('is_top_set_metric', False)
-                        existing_metric.is_multiplicative = m.get('is_multiplicative', True)
-                        updated_metric_ids.add(metric_id)
-                    else:
-                        # Try to match by name and unit (for backwards compatibility)
-                        matched_metric = None
-                        for existing_metric in existing_metrics:
-                            if (existing_metric.name == m['name'] and 
-                                existing_metric.unit == m['unit'] and 
-                                existing_metric.id not in updated_metric_ids):
-                                matched_metric = existing_metric
-                                break
-                        
-                        if matched_metric:
-                            # Update matched metric
-                            matched_metric.is_top_set_metric = m.get('is_top_set_metric', False)
-                            matched_metric.is_multiplicative = m.get('is_multiplicative', True)
-                            updated_metric_ids.add(matched_metric.id)
-                        else:
-                            # Create new metric
-                            new_metric = MetricDefinition(
-                                activity_id=activity.id,
-                                root_id=root_id,  # Add root_id for performance
-                                name=m['name'],
-                                unit=m['unit'],
-                                is_top_set_metric=m.get('is_top_set_metric', False),
-                                is_multiplicative=m.get('is_multiplicative', True)
-                            )
-                            session.add(new_metric)
-            
-            # Soft-delete metrics that were not in the update
-            for existing_metric in existing_metrics:
-                if existing_metric.id not in updated_metric_ids:
-                    from models import utc_now
-                    existing_metric.deleted_at = utc_now()
-                    existing_metric.is_active = False
-        
-        # Update splits if provided
-        if 'splits' in data:
-            splits_data = data.get('splits', [])
-            if len(splits_data) > 5:
-                return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
-            
-            # Get existing splits
-            existing_splits = session.query(SplitDefinition).filter_by(activity_id=activity_id).all()
-            existing_splits_dict = {s.id: s for s in existing_splits}
-            
-            # Track which existing splits were updated
-            updated_split_ids = set()
-            
-            # Update or create splits
-            for idx, s in enumerate(splits_data):
-                if s.get('name'):
-                    split_id = s.get('id')
-                    
-                    if split_id and split_id in existing_splits_dict:
-                        # Update existing split
-                        existing_split = existing_splits_dict[split_id]
-                        existing_split.name = s['name']
-                        existing_split.order = idx
-                        updated_split_ids.add(split_id)
-                    else:
-                        # Create new split
-                        new_split = SplitDefinition(
-                            activity_id=activity.id,
-                            root_id=root_id,  # Add root_id for performance
-                            name=s['name'],
-                            order=idx
-                        )
-                        session.add(new_split)
-            
-            # Delete splits that were not in the update
-            for existing_split in existing_splits:
-                if existing_split.id not in updated_split_ids:
-                    session.delete(existing_split)
 
-        # Update goal associations if provided
-        if 'goal_ids' in data:
-            # from models import Goal, activity_goal_associations # No longer needed
-            goal_ids = data.get('goal_ids', [])
-            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
-            
-            # Clear existing associations
-            # session.execute( # No longer needed with explicit relationship
-            #     activity_goal_associations.delete().where(
-            #         activity_goal_associations.c.activity_id == activity_id
-            #     )
-            # )
-            activity.associated_goals.clear() # Clear all existing associations
-            
-            # Add new associations
-            for goal in goals:
-                if goal not in activity.associated_goals:
-                    activity.associated_goals.append(goal)
+        data, payload_err = _validate_activity_update_payload(data)
+        if payload_err:
+            return jsonify({"error": payload_err}), 400
         
-        session.commit()
-        session.refresh(activity)  # Refresh to load updated metrics and goals
+        from services.activity_service import ActivityService
         
-        # Emit activity updated event
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
-            'activity_id': activity_id,
-            'activity_name': activity.name,
-            'root_id': root_id,
-            'updated_fields': list(data.keys())
-        }, source='activities_api.update_activity'))
+        service = ActivityService(session)
+        activity = service.update_activity(root_id, activity, data)
         
         return jsonify(serialize_activity_definition(activity)), 200
     
@@ -716,21 +533,10 @@ def delete_activity(current_user, root_id, activity_id):
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
             
-        # Capture data before delete
-        act_id = activity.id
-        act_name = activity.name
+        from services.activity_service import ActivityService
         
-        # Soft delete
-        activity.deleted_at = models.utc_now()
-        # session.delete(activity)
-        session.commit()
-        
-        # Emit activity deleted event
-        event_bus.emit(Event(Events.ACTIVITY_DELETED, {
-            'activity_id': act_id,
-            'activity_name': act_name,
-            'root_id': root_id
-        }, source='activities_api.delete_activity'))
+        service = ActivityService(session)
+        service.delete_activity(root_id, activity)
         
         return jsonify({"message": "Activity deleted"})
     except Exception as e:

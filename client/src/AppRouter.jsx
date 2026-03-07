@@ -21,6 +21,7 @@ const CreateSessionTemplate = lazy(() => import('./pages/CreateSessionTemplate')
 const ManageActivities = lazy(() => import('./pages/ManageActivities'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Logs = lazy(() => import('./pages/Logs'));
+import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
 
@@ -251,48 +252,64 @@ function App() {
                         <Routes>
                             <Route
                                 path="/:rootId/goals"
-                                element={<FractalGoals />}
+                                element={<ComponentErrorBoundary><FractalGoals /></ComponentErrorBoundary>}
                             />
                             <Route path="/:rootId/programs" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <Programs />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Programs />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/programs/:programId" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <ProgramDetail />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <ProgramDetail />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/sessions" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <Sessions />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Sessions />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/analytics" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <Analytics />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Analytics />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/logs" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <Logs />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Logs />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/session/:sessionId" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <SessionDetail />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <SessionDetail />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
-                            <Route path="/:rootId/create-session" element={<CreateSession />} />
+                            <Route path="/:rootId/create-session" element={<ComponentErrorBoundary><CreateSession /></ComponentErrorBoundary>} />
                             <Route path="/:rootId/manage-session-templates" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <CreateSessionTemplate />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <CreateSessionTemplate />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/manage-activities" element={
-                                <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                    <ManageActivities />
-                                </Suspense>
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <ManageActivities />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
                             } />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>

@@ -1,0 +1,158 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.errorBanner {
+    padding: 10px;
+    background: rgba(255, 0, 0, 0.1);
+    color: var(--color-brand-danger, #f44336);
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.existingListContainer {
+    margin-bottom: 30px;
+}
+
+.sectionTitle {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    margin-top: 0;
+}
+
+.createTitle {
+    color: var(--color-text-primary);
+}
+
+.emptyState {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.activitiesList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.activityCard {
+    background: var(--color-bg-card-alt);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.activityName {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.activityDescription {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.tagsContainer {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: center;
+}
+
+.tag {
+    font-size: 11px;
+    background: var(--color-bg-input);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+}
+
+.tagSets {
+    color: var(--color-warning);
+}
+
+.tagNoMetrics {
+    color: var(--color-text-muted);
+}
+
+.tagMultiplicative {
+    color: #e91e63;
+}
+
+.tagMetric {
+    color: var(--color-success);
+}
+
+.actionButtons {
+    display: flex;
+    gap: 8px;
+}
+
+.deleteButton {
+    color: var(--color-brand-danger);
+}
+
+.createContainer {
+    background: var(--color-bg-card-alt);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+}
+
+.formGrid {
+    display: grid;
+    gap: 15px;
+}
+
+.flagsContainer {
+    display: flex;
+    gap: 20px;
+}
+
+.metricsLabel {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 5px;
+}
+
+.metricsList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.metricRow {
+    display: flex;
+    gap: 8px;
+}
+
+.metricNameInput {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.metricUnitInput {
+    margin-bottom: 0;
+    width: 80px;
+}
+
+.metricRemoveButton {
+    color: var(--color-brand-danger);
+    padding: 0 8px;
+}
+
+.addMetricButton {
+    align-self: flex-start;
+}
+
+.multiplicativeContainer {
+    margin-top: 10px;
+}

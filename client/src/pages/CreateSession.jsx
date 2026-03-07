@@ -146,22 +146,6 @@ function CreateSession() {
     };
 
     // Handler functions
-    const handleToggleGoal = (goalId) => {
-        setSelectedGoalIds(prev =>
-            prev.includes(goalId)
-                ? prev.filter(id => id !== goalId)
-                : [...prev, goalId]
-        );
-    };
-
-    const handleToggleImmediateGoal = (goalId) => {
-        setSelectedImmediateGoalIds(prev =>
-            prev.includes(goalId)
-                ? prev.filter(id => id !== goalId)
-                : [...prev, goalId]
-        );
-    };
-
     const handleSelectProgramDay = (programDay) => {
         setSelectedProgramDay(programDay);
         setSelectedProgramSession(null);

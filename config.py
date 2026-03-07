@@ -43,9 +43,8 @@ class Config:
     PORT = int(os.getenv('FLASK_PORT', '8001'))
     
     # Database Configuration
-    # Priority: DATABASE_URL (full connection string) > DATABASE_PATH (SQLite file)
+    # Strictly requires DATABASE_URL (full connection string)
     DATABASE_URL = os.getenv('DATABASE_URL', None)
-    DATABASE_PATH = os.getenv('DATABASE_PATH', 'goals.db')
     
     # CORS
     # Support comma or semicolon or space as delimiters for flexibility

@@ -1,0 +1,203 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.description {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.levelCard {
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background-color: var(--color-bg-card-alt);
+}
+
+.levelHeaderRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.levelHeaderTitle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: bold;
+    color: var(--color-text-primary);
+}
+
+.customizedBadge {
+    font-size: 10px;
+    background: var(--color-bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 8px;
+}
+
+.restoreButton {
+    font-size: 12px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.saveButton {
+    font-size: 12px;
+    background: var(--color-brand-primary);
+    border: none;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.settingsGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.inputLabel {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: var(--color-text-secondary);
+}
+
+.inputLabelSecondary {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: var(--color-text-secondary);
+}
+
+.inputLabelMuted {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: var(--color-text-muted);
+}
+
+.subText {
+    font-size: 10px;
+    color: var(--color-text-muted);
+}
+
+.shapeList {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shapeButton {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flexRowWrap {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.colorInput {
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.behaviorControls {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.valueUnitControls {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.flexAlignCenter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.numberInput {
+    padding: 4px 8px;
+    font-size: 13px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+}
+
+.smallNumberInput {
+    width: 55px;
+}
+
+.mediumNumberInput {
+    width: 70px;
+}
+
+.selectInput {
+    padding: 4px 8px;
+    font-size: 13px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.selectInputSmall {
+    padding: 4px 4px;
+    font-size: 12px;
+}
+
+.emptyDeadlineMeta {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+.pointer {
+    cursor: pointer;
+}

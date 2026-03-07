@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import TargetCard from '../TargetCard';
 import notify from '../../utils/notify';
-import { fractalApi } from '../../utils/api';
+import { usePrograms } from '../../hooks/useProgramQueries';
+import styles from './TargetManager.module.css';
 
 /**
  * TargetManager Component
@@ -49,16 +50,8 @@ const TargetManager = ({
     const [linkedBlockId, setLinkedBlockId] = useState(initialTarget?.linked_block_id || '');
     const [frequencyCount, setFrequencyCount] = useState(initialTarget?.frequency_count || 1);
 
-    const [programs, setPrograms] = useState([]);
-
     // Fetch Programs for Block Selection
-    useEffect(() => {
-        if (timeScope === 'program_block' && rootId && programs.length === 0) {
-            fractalApi.getPrograms(rootId).then(res => {
-                setPrograms(res.data || []);
-            }).catch(err => console.error("Failed to fetch programs", err));
-        }
-    }, [timeScope, rootId, programs.length]);
+    const { programs = [] } = usePrograms(timeScope === 'program_block' ? rootId : null);
 
     // Initialize metrics with operators
     const [metricValues, setMetricValues] = useState(() => {
@@ -238,34 +231,19 @@ const TargetManager = ({
     if (shouldRenderBuilder) {
         // When viewMode='builder' (rendered as full modal view), skip the container styling
         // When triggered by internal state (add/edit), we're embedded so keep container styling
-        const containerStyle = viewMode === 'builder'
-            ? { display: 'flex', flexDirection: 'column', gap: '14px' }  // Full view - no container box
-            : { display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--color-bg-card-alt)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-border)' };  // Embedded - has container
+        const containerClass = viewMode === 'builder' ? styles.containerFull : styles.containerEmbedded;
 
         return (
-            <div style={containerStyle}>
+            <div className={containerClass}>
                 {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    paddingBottom: '12px',
-                    borderBottom: '1px solid var(--color-border)'
-                }}>
+                <div className={styles.header}>
                     <button
                         onClick={handleCancel}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--color-text-muted)',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '0 4px'
-                        }}
+                        className={styles.backButton}
                     >
                         ←
                     </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)' }}>
+                    <h3 className={styles.title}>
                         {getBuilderTitle()}
                     </h3>
                 </div>
@@ -315,7 +293,7 @@ const TargetManager = ({
 
                 {/* Target Name */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <label className={styles.inputLabelSmallMargin}>
                         Target Name
                     </label>
                     <input
@@ -323,21 +301,13 @@ const TargetManager = ({
                         value={targetName}
                         onChange={(e) => setTargetName(e.target.value)}
                         placeholder={selectedActivity?.name || 'Enter target name...'}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: 'var(--color-text-primary)',
-                            fontSize: '13px'
-                        }}
+                        className={styles.textInput}
                     />
                 </div>
 
                 {/* Target Description */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <label className={styles.inputLabelSmallMargin}>
                         Description
                     </label>
                     <textarea
@@ -345,41 +315,21 @@ const TargetManager = ({
                         onChange={(e) => setTargetDescription(e.target.value)}
                         placeholder="Optional description..."
                         rows={2}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: 'var(--color-text-primary)',
-                            fontSize: '13px',
-                            resize: 'vertical'
-                        }}
+                        className={`${styles.textInput} ${styles.textArea}`}
                     />
                 </div>
 
                 {/* Target Type Selector */}
                 <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <label className={styles.inputLabel}>
                         Target Type
                     </label>
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--color-bg-input)', padding: '2px', borderRadius: '6px' }}>
+                    <div className={styles.targetTypeContainer}>
                         {['threshold', 'sum', 'frequency'].map(type => (
                             <button
                                 key={type}
                                 onClick={() => setTargetType(type)}
-                                style={{
-                                    flex: 1,
-                                    padding: '6px',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    background: targetType === type ? 'var(--color-bg-card-alt)' : 'transparent',
-                                    color: targetType === type ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                                    fontSize: '12px',
-                                    cursor: 'pointer',
-                                    fontWeight: targetType === type ? 600 : 400,
-                                    boxShadow: targetType === type ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                                }}
+                                className={`${styles.targetTypeButton} ${targetType === type ? styles.targetTypeButtonSelected : ''}`}
                             >
                                 {type === 'threshold' ? 'Single Session' : type === 'sum' ? 'Accumulate' : 'Consistency'}
                             </button>
@@ -389,31 +339,31 @@ const TargetManager = ({
 
                 {/* Time Scope & Frequency */}
                 {(targetType === 'sum' || targetType === 'frequency') && (
-                    <div style={{ background: 'var(--color-bg-card-hover)', padding: '12px', borderRadius: '6px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <div className={styles.timeScopeContainer}>
+                        <label className={styles.inputLabel}>
                             Time Scope
                         </label>
-                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                        <div className={styles.radioGroup}>
+                            <label className={styles.radioLabel}>
                                 <input type="radio" checked={timeScope === 'all_time'} onChange={() => setTimeScope('all_time')} />
                                 All Time
                             </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                            <label className={styles.radioLabel}>
                                 <input type="radio" checked={timeScope === 'program_block'} onChange={() => setTimeScope('program_block')} />
                                 Program Block
                             </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                            <label className={styles.radioLabel}>
                                 <input type="radio" checked={timeScope === 'custom'} onChange={() => setTimeScope('custom')} />
                                 Custom Dates
                             </label>
                         </div>
 
                         {timeScope === 'program_block' && (
-                            <div style={{ marginBottom: '10px' }}>
+                            <div className={styles.marginBottom10}>
                                 <select
                                     value={linkedBlockId}
                                     onChange={(e) => setLinkedBlockId(e.target.value)}
-                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                    className={styles.textInput}
                                 >
                                     <option value="">Select a Block...</option>
                                     {programs.map(prog => (
@@ -428,26 +378,26 @@ const TargetManager = ({
                         )}
 
                         {timeScope === 'custom' && (
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ fontSize: '11px', color: '#aaa', display: 'block' }}>Start Date</label>
-                                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }} />
+                            <div className={styles.flexGap8}>
+                                <div className={styles.flex1}>
+                                    <label className={styles.smallLabel}>Start Date</label>
+                                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={styles.dateInput} />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ fontSize: '11px', color: '#aaa', display: 'block' }}>End Date</label>
-                                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }} />
+                                <div className={styles.flex1}>
+                                    <label className={styles.smallLabel}>End Date</label>
+                                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={styles.dateInput} />
                                 </div>
                             </div>
                         )}
 
                         {targetType === 'frequency' && (
-                            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
-                                <label style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Required Sessions Count</label>
+                            <div className={styles.frequencyContainer}>
+                                <label className={styles.inputLabel} style={{ marginBottom: 0, display: 'inline' }}>Required Sessions Count</label>
                                 <input
                                     type="number"
                                     value={frequencyCount}
                                     onChange={e => setFrequencyCount(e.target.value)}
-                                    style={{ marginLeft: '10px', width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)' }}
+                                    className={styles.frequencyInput}
                                 />
                             </div>
                         )}
@@ -457,44 +407,28 @@ const TargetManager = ({
                 {/* Metric Values */}
                 {selectedActivity && selectedActivity.metric_definitions?.length > 0 && (
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        <label className={styles.inputLabel}>
                             Target Metrics
                         </label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div className={styles.metricsList}>
                             {selectedActivity.metric_definitions.map(metric => (
-                                <div key={metric.id} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    padding: '10px',
-                                    background: 'var(--color-bg-input)',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--color-border)'
-                                }}>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                                <div key={metric.id} className={styles.metricItem}>
+                                    <div className={styles.flex1}>
+                                        <div className={styles.metricName}>
                                             {metric.name}
                                         </div>
                                         {metric.description && (
-                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                                            <div className={styles.metricDesc}>
                                                 {metric.description}
                                             </div>
                                         )}
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div className={styles.metricControls}>
                                         {/* Operator Selector */}
                                         <select
                                             value={metricValues[metric.id]?.operator || '>='}
                                             onChange={(e) => handleMetricChange(metric.id, 'operator', e.target.value)}
-                                            style={{
-                                                padding: '6px',
-                                                background: 'var(--color-bg-card)',
-                                                border: '1px solid var(--color-border)',
-                                                borderRadius: '4px',
-                                                color: 'var(--color-text-primary)',
-                                                fontSize: '13px',
-                                                cursor: 'pointer'
-                                            }}
+                                            className={styles.operatorSelect}
                                         >
                                             <option value=">=">≥</option>
                                             <option value=">">&gt;</option>
@@ -507,18 +441,9 @@ const TargetManager = ({
                                             value={metricValues[metric.id]?.value || ''}
                                             onChange={(e) => handleMetricChange(metric.id, 'value', e.target.value)}
                                             placeholder="0"
-                                            style={{
-                                                width: '70px',
-                                                padding: '6px',
-                                                background: 'var(--color-bg-input)',
-                                                border: '1px solid var(--color-border)',
-                                                borderRadius: '4px',
-                                                color: 'var(--color-text-primary)',
-                                                fontSize: '13px',
-                                                textAlign: 'right'
-                                            }}
+                                            className={styles.metricValueInput}
                                         />
-                                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', minWidth: '40px' }}>
+                                        <span className={styles.metricUnit}>
                                             {metric.unit}
                                         </span>
                                     </div>
@@ -529,52 +454,27 @@ const TargetManager = ({
                 )}
 
                 {/* Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+                <div className={styles.actionFooter}>
                     {(viewState === 'edit' || initialTarget) && editingTarget ? (
                         <button
                             onClick={() => confirmAndDeleteTarget(editingTarget.id)}
-                            style={{
-                                padding: '8px 14px',
-                                background: 'transparent',
-                                border: '1px solid #f44336',
-                                borderRadius: '4px',
-                                color: '#f44336',
-                                cursor: 'pointer',
-                                fontSize: '13px'
-                            }}
+                            className={styles.deleteButton}
                         >
                             Delete Target
                         </button>
                     ) : <div />}
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className={styles.flexGap8}>
                         <button
                             onClick={handleCancel}
-                            style={{
-                                padding: '8px 14px',
-                                background: 'transparent',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '4px',
-                                color: 'var(--color-text-secondary)',
-                                cursor: 'pointer',
-                                fontSize: '13px'
-                            }}
+                            className={styles.cancelButton}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleSaveTarget}
                             disabled={!selectedActivityId}
-                            style={{
-                                padding: '8px 14px',
-                                background: selectedActivityId ? 'var(--color-success)' : 'var(--color-bg-input)',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: selectedActivityId ? 'white' : 'var(--color-text-muted)',
-                                cursor: selectedActivityId ? 'pointer' : 'not-allowed',
-                                fontSize: '13px',
-                                fontWeight: 600
-                            }}
+                            className={`${styles.saveButton} ${!selectedActivityId ? styles.saveButtonDisabled : ''}`}
                         >
                             {(viewState === 'edit' || initialTarget) ? 'Update Target' : 'Add Target'}
                         </button>
@@ -588,41 +488,25 @@ const TargetManager = ({
     const renderDeleteConfirm = () => {
         if (!showDeleteConfirm) return null;
         return (
-            <div style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.7)', zIndex: 1002,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-                <div style={{
-                    background: 'var(--color-bg-card)', padding: '24px', borderRadius: '12px',
-                    width: '90%', maxWidth: '400px', border: '1px solid var(--color-border)',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-                }}>
-                    <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--color-text-primary)' }}>Delete Target?</h3>
-                    <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+            <div className={styles.modalOverlay}>
+                <div className={styles.modalContent}>
+                    <h3 className={styles.modalTitle}>Delete Target?</h3>
+                    <p className={styles.modalText}>
                         Are you sure you want to delete this target? This action cannot be undone.
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <div className={styles.modalActions}>
                         <button
                             onClick={() => {
                                 setShowDeleteConfirm(false);
                                 setTargetToDelete(null);
                             }}
-                            style={{
-                                padding: '8px 16px', background: 'transparent',
-                                border: '1px solid var(--color-border)', borderRadius: '6px',
-                                color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '13px'
-                            }}
+                            className={styles.modalCancelButton}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={executeDeleteTarget}
-                            style={{
-                                padding: '8px 16px', background: '#d32f2f',
-                                border: 'none', borderRadius: '6px',
-                                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '600'
-                            }}
+                            className={styles.modalDeleteButton}
                         >
                             Delete
                         </button>
@@ -636,22 +520,15 @@ const TargetManager = ({
     const canAddTargets = activitiesForTargets.length > 0;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className={styles.listContainer}>
             {renderDeleteConfirm()}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label style={{ display: 'block', margin: 0, fontSize: 'var(--font-size-xs)', color: headerColor || 'var(--color-text-muted)', fontWeight: 'bold' }}>
+            <div className={styles.listHeader}>
+                <div className={styles.listTitleGroup}>
+                    <label className={styles.listTitle} style={{ color: headerColor || 'var(--color-text-muted)' }}>
                         Targets
                     </label>
                     {targets.length > 0 && (
-                        <span style={{
-                            fontSize: '11px',
-                            background: 'var(--color-bg-input)',
-                            color: 'var(--color-text-muted)',
-                            padding: '1px 7px',
-                            borderRadius: '10px',
-                            fontWeight: 500
-                        }}>
+                        <span className={styles.targetCount}>
                             {targets.length}
                         </span>
                     )}
@@ -660,17 +537,7 @@ const TargetManager = ({
                     <button
                         onClick={canAddTargets ? handleOpenAddTarget : undefined}
                         disabled={!canAddTargets}
-                        style={{
-                            background: 'transparent',
-                            border: `1.5px solid ${canAddTargets ? '#4caf50' : 'var(--color-border)'}`,
-                            borderRadius: '4px',
-                            color: canAddTargets ? '#4caf50' : 'var(--color-text-muted)',
-                            cursor: canAddTargets ? 'pointer' : 'not-allowed',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            padding: '2px 8px',
-                            transition: 'all 0.2s'
-                        }}
+                        className={`${styles.addTargetButton} ${!canAddTargets ? styles.addTargetButtonDisabled : ''}`}
                     >
                         + Add Target
                     </button>
@@ -678,15 +545,15 @@ const TargetManager = ({
             </div>
 
             {targets.length === 0 ? (
-                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                <div className={styles.emptyState}>
                     {canAddTargets
                         ? 'No targets set.'
                         : 'Associate an activity with metrics to create a target.'}
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className={styles.targetsWrap}>
                     {targets.map((target, index) => (
-                        <div key={target.id || index} style={{ position: 'relative' }}>
+                        <div key={target.id || index} className={styles.targetWrapper}>
                             <div onClick={() => isEditing && handleOpenEditTarget(target)} style={{ cursor: isEditing ? 'pointer' : 'default' }}>
                                 <TargetCard
                                     target={target}

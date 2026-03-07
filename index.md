@@ -12,12 +12,17 @@
 **Fractal Goals** is a hierarchical goal tracking system that connects ultimate life goals down to granular practice sessions.
 
 **Core Tech Stack:**
-- **Backend:** Flask (Port 8001) with SQLAlchemy (PostgreSQL/SQLite) & JWT Auth.
+- **Backend:** Flask (Port 8001) with SQLAlchemy (PostgreSQL) & JWT Auth.
 - **Frontend:** React 19 + Vite (Port 5173) with ReactFlow for visualization.
 - **Infrastructure:** Docker for database, Alembic for migrations.
 
 ## Status & Recent Changes
 
+- **Codebase Refactoring & Simplification (2026-03-06):**
+  - **Architecture:** Eliminated SQLite, formalized Pydantic backend validation, and extracted logic into \`GoalTreeService\` and \`SessionService\`. Added nested DB transactions.
+  - **State Management:** Fully migrated to TanStack Query (React Query) for data fetching, removing manual context patching. Centralized notifications.
+  - **Component Deconstruction:** Refactored "God Components" (like \`GoalDetailModal.jsx\`), extracted UI primitives, and implemented React \`lazy()\`/\`Suspense\` for heavy modals.
+  - **Optimization & Polish:** Unified CSS Modules across major components, created a custom strict form validation hook (\`useFormValidation\`), and introduced granular \`ComponentErrorBoundary\` wrappers to prevent app-wide crashes.
 - **Goal Architecture & UI Refinements (2026-03-05):** 
   - **Deadlines**: Enforced parent-child deadline constraints (backend validation + UI max attribute) and implemented auto-cascading. Child goals now default to parent's deadline.
   - **Transient Goals**: Hidden deadlines for Micro/Nano goals. Added simplified UI for Nano goals (name-only, hidden targets/activities). Added automatic activity inheritance for newly created Nano Goals and explicit toast notifications for goal lifecycle events without emojis.
@@ -58,8 +63,7 @@
 ### 9. Database & Migrations
 
 **Database Support:**
-- **Development:** PostgreSQL via Docker (preferred) or SQLite
-- **Production:** PostgreSQL (Cloud instance like Supabase, Neon, or RDS)
+- **Development & Production:** PostgreSQL (Docker locally, Cloud instance in prod)
 
 **Local PostgreSQL Setup:**
 1. Ensure Docker Desktop is running.
@@ -84,16 +88,9 @@ python db_migrate.py upgrade
 python db_migrate.py create "Add feature"
 ```
 
-**Data Migration (SQLite -> PostgreSQL):**
-Use the custom migration script to transfer existing SQLite data to a new PostgreSQL instance:
-```bash
-python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
-```
-
 **Key Files:**
 - `docker-compose.yml` - Local database infrastructure
 - `db_migrate.py` - Migration helper
-- `migrate_sqlite_to_postgres.py` - Data transfer tool
 - `alembic.ini` & `migrations/` - Schema versioning
 
 **Performance Optimizations:**
@@ -123,7 +120,7 @@ python migrate_sqlite_to_postgres.py --source goals_dev.db --clean
   - Automatic cache invalidation on mutations (create/update/delete).
   - Background revalidation prevents stale data while maintaining "instant" UI feel.
   - **Mutation Return Values:** Mutations consistently return `response.data` rather than the full Axios response object, preventing stale UI states and empty modals when updating entities.
-- **Robust JSON Handling:** Standardized backend JSON parsing across all blueprints using `models._safe_load_json`. This ensures compatibility between SQLite (which returns JSON as strings) and PostgreSQL (which returns `JSONB` as native Python dictionaries), preventing `TypeError` during deserialization in production.
+- **Robust JSON Handling:** Standardized backend JSON parsing across all blueprints using `models._safe_load_json`. This prevents `TypeError` during deserialization.
 - **Server-Side Compression:** `flask-compress` enabled on backend. Reduces large JSON payloads (fractal tree) by up to 90%.
 - **Native JSONB Storage:** Optimized metadata storage using PostgreSQL `JSONB` for targets, attributes, and templates. Enables binary indexing and removes serialization overhead in Python.
 - **Pagination:** Sessions list API returns paginated results (default: 10 per page, max: 50)

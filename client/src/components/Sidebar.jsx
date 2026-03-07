@@ -1,5 +1,5 @@
-import React from 'react';
-import GoalDetailModal from './GoalDetailModal';
+import React, { Suspense } from 'react';
+const GoalDetailModal = React.lazy(() => import('./GoalDetailModal'));
 import './Sidebar.css';
 
 /**
@@ -57,24 +57,26 @@ const Sidebar = ({
 
     // Goal View - Use GoalDetailModal in Panel Mode
     return (
-        <GoalDetailModal
-            isOpen={true}
-            onClose={onClose}
-            goal={selectedNode}
-            onUpdate={handleGoalUpdate}
-            activityDefinitions={activityDefinitions}
-            onToggleCompletion={onToggleCompletion}
-            onAddChild={onAddChild}
-            onDelete={onDelete}
-            sessions={sessions}
-            rootId={selectedRootId}
-            treeData={treeData}
-            displayMode="panel"
-            programs={programs}
-            activityGroups={activityGroups}
-            onGoalSelect={onGoalSelect}
-            onMobileCollapse={onMobileCollapse}
-        />
+        <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
+            <GoalDetailModal
+                isOpen={true}
+                onClose={onClose}
+                goal={selectedNode}
+                onUpdate={handleGoalUpdate}
+                activityDefinitions={activityDefinitions}
+                onToggleCompletion={onToggleCompletion}
+                onAddChild={onAddChild}
+                onDelete={onDelete}
+                sessions={sessions}
+                rootId={selectedRootId}
+                treeData={treeData}
+                displayMode="panel"
+                programs={programs}
+                activityGroups={activityGroups}
+                onGoalSelect={onGoalSelect}
+                onMobileCollapse={onMobileCollapse}
+            />
+        </Suspense>
     );
 };
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import GoalIcon from './atoms/GoalIcon';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';;
+import { DeletedEntityCard } from './ui/DeletedEntityFallback';
 import styles from './TargetCard.module.css';
 
 /**
@@ -13,8 +14,14 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
 
     const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
 
+    // Normalize backend types like 'short_term_goal' -> 'Short Term Goal'
+    const normalizeType = (str) => {
+        if (!str) return 'Target';
+        return str.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
     // Use the owning goal's icon, falling back to Target icon if unavailable
-    const resolvedType = goalType || target._goalType || 'Target';
+    const resolvedType = normalizeType(goalType || target._goalType);
     const iconShape = getGoalIcon ? getGoalIcon(resolvedType) : (getLevelByName(resolvedType)?.icon || 'twelve-point-star');
     const iconColor = getGoalColor(resolvedType);
     const iconSecondaryColor = getGoalSecondaryColor(resolvedType);
@@ -50,19 +57,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             return null;
         }
         // In edit mode, show a warning so user can delete it
-        return (
-            <div className={styles.missingActivityCard}>
-                <span className={styles.missingActivityText}>
-                    Activity not found (may have been deleted)
-                </span>
-                <button
-                    onClick={onDelete}
-                    className={styles.missingActivityButton}
-                >
-                    Delete
-                </button>
-            </div>
-        );
+        return <DeletedEntityCard entityName="Activity" onDelete={onDelete} />;
     }
 
     return (
@@ -86,34 +81,34 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
 
             <div className={styles.header}>
                 <div className={styles.titleRow}>
+                    <div className={styles.title}>
+                        {activityDef.name}
+                    </div>
+                    {isEditMode && onEdit && (
+                        <div className={styles.editActions}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit();
+                                }}
+                                className={styles.editButton}
+                            >
+                                Edit
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className={styles.iconRow}>
                     <span className={styles.iconWrap}>
                         {statusObj.icon}
                     </span>
-                    <div>
-                        <div className={styles.title}>
-                            {activityDef.name}
+                    {target.description && (
+                        <div className={styles.description}>
+                            {target.description}
                         </div>
-                        {target.description && (
-                            <div className={styles.description}>
-                                {target.description}
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
-
-                {isEditMode && onEdit && (
-                    <div className={styles.editActions} style={{ paddingRight: onDelete ? '20px' : 0 }}>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onEdit();
-                            }}
-                            className={styles.editButton}
-                        >
-                            Edit
-                        </button>
-                    </div>
-                )}
             </div>
 
             {target.type === 'completion' && (

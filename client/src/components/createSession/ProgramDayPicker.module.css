@@ -1,0 +1,181 @@
+.container {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.emptyStateContent {
+    text-align: center;
+    padding: 20px;
+}
+
+.emptyStateText {
+    color: var(--color-text-muted);
+    margin-bottom: 16px;
+}
+
+.activeButton {
+    padding: 10px 20px;
+    background: #2196f3;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.blockGroupList {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.blockGroupContainer {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.blockHeader {
+    padding: 12px 16px;
+    background: var(--color-bg-card-alt);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.blockColorIndicator {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+}
+
+.blockTitle {
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.programDaysList {
+    display: flex;
+    flex-direction: column;
+}
+
+.programDayRow {
+    padding: 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.programDayRowSelected {
+    background: var(--color-bg-card-hover);
+    border-left-color: #4caf50;
+}
+
+.programDayRowBorderBottom {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.programDayContent {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.programDayInfo {
+    flex: 1;
+}
+
+.programDayName {
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.programDayMeta {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.sessionCountBadge {
+    margin-left: 8px;
+    color: #2196f3;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.templateNameBadge {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-card-alt);
+    padding: 4px 10px;
+    border-radius: 4px;
+    max-width: 50%;
+}
+
+.checkIcon {
+    color: #4caf50;
+    font-size: 20px;
+}
+
+.sessionListContainer {
+    padding: 12px 16px 20px 20px;
+    background: var(--color-bg-card-hover);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sessionListTitle {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--color-text-muted);
+    margin-left: 4px;
+}
+
+.sessionsWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sessionRow {
+    padding: 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sessionRowSelected {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: #4caf50;
+}
+
+.sessionRowTitle {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--color-text-primary);
+}
+
+.sessionRowTitleSelected {
+    color: #4caf50;
+}
+
+.sessionRowDescription {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.sessionRowCheck {
+    color: #4caf50;
+    font-size: 14px;
+    font-weight: bold;
+}

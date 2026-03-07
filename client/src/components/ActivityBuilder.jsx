@@ -6,7 +6,6 @@ import Button from './atoms/Button';
 import Checkbox from './atoms/Checkbox';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoals } from '../contexts/GoalsContext';
-import { fractalApi } from '../utils/api';
 import { useTheme } from '../contexts/ThemeContext'
 import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import DeleteConfirmModal from './modals/DeleteConfirmModal';

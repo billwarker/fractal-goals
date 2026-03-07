@@ -55,6 +55,46 @@ describe('useSessionGoalsViewModel', () => {
         expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG', 'IG', 'Micro', 'Nano']);
     });
 
+    it('preserves structural descendants when an ancestor goal is associated to the activity', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'stg',
+                        type: 'ShortTermGoal',
+                        name: 'STG',
+                        children: [
+                            {
+                                id: 'ig',
+                                type: 'ImmediateGoal',
+                                name: 'IG',
+                                children: []
+                            }
+                        ]
+                    }
+                ]
+            },
+            session_goal_ids: ['stg', 'ig'],
+            activity_goal_ids_by_activity: {
+                'activity-1': ['stg']
+            },
+            micro_goals: [],
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG', 'IG']);
+    });
+
     it('marks target cards complete when owning goal is completed via computed status', () => {
         const sessionGoalsView = {
             goal_tree: {

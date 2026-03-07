@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Heading } from '../atoms/Typography';
@@ -66,71 +68,73 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
             onClose={onClose}
             title={initialData?.id ? 'Edit Program Block' : 'Add Program Block'}
         >
-            <div className={styles.formContainer}>
-                <Input
-                    label="Block Name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Base Build Phase 1"
-                    autoFocus
-                    fullWidth
-                    error={errors.name}
-                    required
-                />
-
-                <div className={styles.dateRow}>
+            <ModalBody>
+                <div className={styles.formContainer}>
                     <Input
-                        type="date"
-                        label="Start Date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        min={programDates.start}
-                        max={programDates.end}
+                        label="Block Name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g., Base Build Phase 1"
+                        autoFocus
                         fullWidth
-                        error={errors.startDate}
+                        error={errors.name}
                         required
                     />
-                    <Input
-                        type="date"
-                        label="End Date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                        min={formData.startDate || programDates.start}
-                        max={programDates.end}
-                        fullWidth
-                        error={errors.endDate}
-                        required
-                    />
-                </div>
 
-                {errors.dateRange && (
-                    <div className={styles.error}>{errors.dateRange}</div>
-                )}
-
-                <div className={styles.field}>
-                    <label className={styles.colorLabel}>
-                        Color Code
-                    </label>
-                    <div className={styles.colorRow}>
-                        <input
-                            type="color"
-                            value={formData.color}
-                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                            className={styles.colorInput}
+                    <div className={styles.dateRow}>
+                        <Input
+                            type="date"
+                            label="Start Date"
+                            value={formData.startDate}
+                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                            min={programDates.start}
+                            max={programDates.end}
+                            fullWidth
+                            error={errors.startDate}
+                            required
                         />
-                        <span className={styles.colorValue}>{formData.color}</span>
+                        <Input
+                            type="date"
+                            label="End Date"
+                            value={formData.endDate}
+                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                            min={formData.startDate || programDates.start}
+                            max={programDates.end}
+                            fullWidth
+                            error={errors.endDate}
+                            required
+                        />
+                    </div>
+
+                    {errors.dateRange && (
+                        <div className={styles.error}>{errors.dateRange}</div>
+                    )}
+
+                    <div className={styles.field}>
+                        <label className={styles.colorLabel}>
+                            Color Code
+                        </label>
+                        <div className={styles.colorRow}>
+                            <input
+                                type="color"
+                                value={formData.color}
+                                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                className={styles.colorInput}
+                            />
+                            <span className={styles.colorValue}>{formData.color}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </ModalBody>
 
-            <div className={styles.footerActions}>
+            <ModalFooter>
                 <Button variant="secondary" onClick={onClose}>
                     Cancel
                 </Button>
                 <Button variant="primary" onClick={handleSave}>
                     Save Block
                 </Button>
-            </div>
+            </ModalFooter>
         </Modal>
     );
 };

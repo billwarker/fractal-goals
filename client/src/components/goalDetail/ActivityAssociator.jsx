@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
+import { useGoalAssociations } from '../../hooks/useGoalQueries';
 import { fractalApi } from '../../utils/api';
 import { sortGroupsTreeOrder, getGroupBreadcrumb as sharedGetGroupBreadcrumb } from '../../utils/manageActivities';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
+import ActivitySearchWidget from '../common/ActivitySearchWidget';
 import notify from '../../utils/notify';
 import styles from './ActivityAssociator.module.css';
 
@@ -77,7 +79,6 @@ const ActivityAssociator = ({
         associatedGroupsRef.current = associatedActivityGroups;
     }, [associatedActivityGroups]);
 
-    // Reset selection when closing discovery; collapse all groups by default
     useEffect(() => {
         if (!isDiscoveryActive) {
             setTempSelectedActivities([]);
@@ -85,10 +86,6 @@ const ActivityAssociator = ({
             setShowGroupCreator(false);
             setNewGroupName('');
             setNewGroupParentId('');
-        } else {
-            // Start with all groups collapsed in discovery mode
-            const allGroupIds = new Set(activityGroups.map(g => g.id));
-            setCollapsedDiscoveryGroups(allGroupIds);
         }
     }, [isDiscoveryActive, activityGroups]);
 
@@ -148,8 +145,12 @@ const ActivityAssociator = ({
         }
     };
 
-    const handleConfirmActivitySelection = async () => {
-        const newActivities = tempSelectedActivities.map(id =>
+    const handleConfirmActivitySelection = async (selectedActivitiesArg, selectedGroupsArg) => {
+        // Fallback to state if arguments are not provided (though ActivitySearchWidget should provide them)
+        const finalSelectedActivities = selectedActivitiesArg || tempSelectedActivities;
+        const finalSelectedGroups = selectedGroupsArg || tempSelectedGroups;
+
+        const newActivities = finalSelectedActivities.map(id =>
             activityDefinitions.find(d => d.id === id)
         ).filter(Boolean);
 
@@ -160,8 +161,8 @@ const ActivityAssociator = ({
 
         // Also associate selected groups
         let finalGroups = latestGroups;
-        if (tempSelectedGroups.length > 0 && setAssociatedActivityGroups) {
-            const newGroups = tempSelectedGroups
+        if (finalSelectedGroups.length > 0 && setAssociatedActivityGroups) {
+            const newGroups = finalSelectedGroups
                 .map(id => activityGroups.find(g => g.id === id))
                 .filter(Boolean);
             const updatedGroups = [...latestGroups, ...newGroups];
@@ -184,7 +185,7 @@ const ActivityAssociator = ({
 
         const parts = [];
         if (newActivities.length > 0) parts.push(`${newActivities.length} activit${newActivities.length === 1 ? 'y' : 'ies'}`);
-        if (tempSelectedGroups.length > 0) parts.push(`${tempSelectedGroups.length} group${tempSelectedGroups.length === 1 ? '' : 's'}`);
+        if (finalSelectedGroups.length > 0) parts.push(`${finalSelectedGroups.length} group${finalSelectedGroups.length === 1 ? '' : 's'}`);
         if (parts.length > 0) notify.success(`Added ${parts.join(' and ')}`);
     };
 
@@ -360,16 +361,20 @@ const ActivityAssociator = ({
         return sortGroupsTreeOrder((activityGroups || []).filter(g => getGroupDepth(g.id) < 2));
     }, [activityGroups]);
 
-    // Fetch parent activities when inherit checkbox changes
+    // Fetch parent activities via React Query hook when inherit checkbox is checked
+    const { activities: fetchedParentActivities } = useGoalAssociations(
+        inheritFromParent ? rootId : null,
+        inheritFromParent ? parentGoalId : null
+    );
+
+    // Sync fetched activities to the local state
     useEffect(() => {
-        if (inheritFromParent && parentGoalId && rootId) {
-            fractalApi.getGoalActivities(rootId, parentGoalId)
-                .then(res => setParentActivities(res.data || []))
-                .catch(() => setParentActivities([]));
+        if (inheritFromParent) {
+            setParentActivities(fetchedParentActivities);
         } else {
             setParentActivities([]);
         }
-    }, [inheritFromParent, parentGoalId, rootId]);
+    }, [inheritFromParent, fetchedParentActivities]);
 
     const groupsById = useMemo(() => {
         const map = new Map();
@@ -536,35 +541,6 @@ const ActivityAssociator = ({
         return { direct, inherited };
     }, [roots, ungrouped]);
 
-    // Build hierarchical discovery tree
-    const discoveryTree = useMemo(() => {
-        const { roots: allRoots, map } = buildGroupTree(activityGroups);
-
-        // Attach activities to groups, filtering out already associated ones
-        const attachActivities = (node) => {
-            node.activities = activityDefinitions.filter(a =>
-                a.group_id === node.id &&
-                !associatedActivities.some(aa => aa.id === a.id)
-            );
-            node.children.forEach(child => attachActivities(child));
-            // Count total available (activities + children's activities)
-            node.totalCount = node.activities.length +
-                node.children.reduce((sum, c) => sum + (c.totalCount || 0), 0);
-        };
-
-        allRoots.forEach(root => attachActivities(root));
-
-        // Filter out groups with nothing available
-        const filterEmpty = (nodes) => {
-            return nodes.filter(n => {
-                n.children = filterEmpty(n.children);
-                return n.totalCount > 0;
-            });
-        };
-
-        return filterEmpty(allRoots);
-    }, [activityGroups, activityDefinitions, associatedActivities]);
-
     // RENDERERS
 
     const renderMetricIndicators = (activity) => {
@@ -587,15 +563,12 @@ const ActivityAssociator = ({
         );
     };
 
-    const renderMiniCard = (activity, { isDiscovery = false } = {}) => {
-        const isSelected = isDiscovery && tempSelectedActivities.includes(activity.id);
+    const renderMiniCard = (activity) => {
         const isInherited = activity.is_inherited;
-        const isProtectedByGroup = !isDiscovery && !isInherited && isActivityProtectedByLinkedGroup(activity);
+        const isProtectedByGroup = !isInherited && isActivityProtectedByLinkedGroup(activity);
 
         const cardClasses = [
             styles.miniCard,
-            isDiscovery && styles.miniCardSelectable,
-            isSelected && styles.miniCardSelected,
             isInherited && styles.miniCardInherited,
         ].filter(Boolean).join(' ');
 
@@ -603,15 +576,9 @@ const ActivityAssociator = ({
             <div
                 key={activity.id}
                 className={cardClasses}
-                onClick={isDiscovery ? () => toggleActivitySelection(activity.id) : undefined}
                 title={isInherited ? `Inherited from ${activity.source_goal_name}` : activity.name}
             >
                 <div className={styles.miniCardHeader}>
-                    {isDiscovery && (
-                        <div className={styles.selectIndicator}>
-                            {isSelected && '✓'}
-                        </div>
-                    )}
                     <h4 className={styles.miniCardName}>
                         {isInherited && (
                             <span className={styles.inheritedIcon} title={`Inherited from ${activity.source_goal_name}`}>
@@ -623,7 +590,7 @@ const ActivityAssociator = ({
                         )}
                         {activity.name}
                     </h4>
-                    {!isDiscovery && !isInherited && !isProtectedByGroup && (
+                    {!isInherited && !isProtectedByGroup && (
                         <button
                             className={styles.removeBtn}
                             onClick={(e) => {
@@ -653,23 +620,21 @@ const ActivityAssociator = ({
         );
     };
 
-    const renderGroupContainer = (group, { isDiscovery = false, isNested = false } = {}) => {
+    const renderGroupContainer = (group, { isNested = false } = {}) => {
         const children = group.children || [];
         const groupActivities = group.activities || [];
-        const isCollapsed = isDiscovery
-            ? collapsedDiscoveryGroups.has(group.id)
-            : collapsedGroups.has(group.id);
-        const toggleFn = isDiscovery ? toggleDiscoveryGroupCollapse : toggleGroupCollapse;
+        const isCollapsed = collapsedGroups.has(group.id);
+
         const isLinked = associatedActivityGroups.some(g => g.id === group.id);
-        const isGroupSelected = isDiscovery && tempSelectedGroups.includes(group.id);
+
         const activityCount = group.totalCount !== undefined ? group.totalCount : groupActivities.length;
 
         return (
             <div
                 key={group.id}
-                className={`${styles.groupContainer} ${isNested ? styles.groupContainerNested : ''} ${isGroupSelected ? styles.groupContainerSelected : ''}`}
+                className={`${styles.groupContainer} ${isNested ? styles.groupContainerNested : ''}`}
             >
-                <div className={styles.groupHeader} onClick={() => toggleFn(group.id)}>
+                <div className={styles.groupHeader} onClick={() => toggleGroupCollapse(group.id)}>
                     <div className={styles.groupHeaderLeft}>
                         <button className={styles.collapseBtn} tabIndex={-1}>
                             {isCollapsed ? '+' : '−'}
@@ -680,19 +645,7 @@ const ActivityAssociator = ({
                         </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {isDiscovery && (
-                            <button
-                                className={`${styles.groupSelectBtn} ${isGroupSelected ? styles.groupSelectBtnActive : ''}`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleGroupSelection(group.id);
-                                }}
-                                title={isGroupSelected ? 'Unlink Activity Group' : 'Link Activity Group'}
-                            >
-                                {isGroupSelected ? '✓ Linked' : 'Link Activity Group'}
-                            </button>
-                        )}
-                        {isLinked && !isDiscovery && (
+                        {isLinked && (
                             <>
                                 <span className={styles.groupBadge}>Linked</span>
                                 <button
@@ -715,12 +668,12 @@ const ActivityAssociator = ({
                     <>
                         {children.length > 0 && (
                             <div style={{ paddingLeft: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {children.map(child => renderGroupContainer(child, { isDiscovery, isNested: true }))}
+                                {children.map(child => renderGroupContainer(child, { isNested: true }))}
                             </div>
                         )}
                         {groupActivities.length > 0 && (
                             <div className={styles.activityGrid}>
-                                {groupActivities.map(a => renderMiniCard(a, { isDiscovery }))}
+                                {groupActivities.map(a => renderMiniCard(a))}
                             </div>
                         )}
                     </>
@@ -922,76 +875,36 @@ const ActivityAssociator = ({
 
             {/* ============ DISCOVERY AREA (selector mode only) ============ */}
             {isSelectorMode && isDiscoveryActive && (
-                <div className={styles.discoveryContainer}>
-                    <h4 className={styles.discoverySectionTitle}>
-                        Available Activities & Groups
-                    </h4>
+                <div style={{ marginTop: '16px', flex: 1, minHeight: 0 }}>
+                    <ActivitySearchWidget
+                        activities={activityDefinitions.filter(a => !associatedActivities.some(aa => aa.id === a.id))}
+                        activityGroups={activityGroups}
+                        preSelectedActivityIds={tempSelectedActivities}
+                        allowGroupSelection={true}
+                        title="Available Activities & Groups"
+                        onConfirm={handleConfirmActivitySelection}
+                        onCancel={() => setIsDiscoveryActive(false)}
+                        extraActions={
+                            <>
+                                <button
+                                    onClick={() => onCreateActivity && onCreateActivity()}
+                                    className={styles.createLink}
+                                >
+                                    + Create New Activity
+                                </button>
+                                <button
+                                    onClick={() => setShowGroupCreator(!showGroupCreator)}
+                                    className={styles.createLink}
+                                >
+                                    + Create New Group
+                                </button>
+                            </>
+                        }
+                    />
 
-                    {/* Hierarchical groups in discovery mode */}
-                    {discoveryTree.map(group => renderGroupContainer(group, { isDiscovery: true }))}
-
-                    {/* Ungrouped activities in discovery mode */}
-                    {(() => {
-                        const ungroupedDiscovery = activityDefinitions.filter(a =>
-                            !a.group_id &&
-                            !associatedActivities.some(aa => aa.id === a.id)
-                        );
-
-                        if (ungroupedDiscovery.length === 0) return null;
-
-                        return (
-                            <div className={styles.ungroupedContainer}>
-                                <h4 className={styles.ungroupedTitle}>Ungrouped</h4>
-                                <div className={styles.activityGrid}>
-                                    {ungroupedDiscovery.map(a => renderMiniCard(a, { isDiscovery: true }))}
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* No available activities message */}
-                    {discoveryTree.length === 0 && activityDefinitions.filter(a => !a.group_id && !associatedActivities.some(aa => aa.id === a.id)).length === 0 && (
-                        <div className={styles.emptyState}>
-                            All activities are already associated with this goal.
-                        </div>
-                    )}
-
-                    {/* Action Bar */}
-                    <div className={styles.actionBar}>
-                        <button
-                            onClick={handleConfirmActivitySelection}
-                            disabled={tempSelectedActivities.length === 0 && tempSelectedGroups.length === 0}
-                            className={styles.addSelectedBtn}
-                        >
-                            Add Selected ({tempSelectedActivities.length})
-                        </button>
-                        <button
-                            onClick={() => setIsDiscoveryActive(false)}
-                            className={styles.cancelBtn}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-
-                    {/* Create links */}
-                    <div className={styles.createLinkRow}>
-                        <button
-                            onClick={() => onCreateActivity && onCreateActivity()}
-                            className={styles.createLink}
-                        >
-                            + Create New Activity
-                        </button>
-                        <button
-                            onClick={() => setShowGroupCreator(!showGroupCreator)}
-                            className={styles.createLink}
-                        >
-                            + Create New Group
-                        </button>
-                    </div>
-
-                    {/* Inline Group Creator */}
+                    {/* Inline Group Creator overlay over search widget */}
                     {showGroupCreator && (
-                        <div className={styles.groupCreatorContainer}>
+                        <div className={styles.groupCreatorContainer} style={{ position: 'relative', marginTop: '-12px', background: 'var(--color-bg-primary)', zIndex: 10 }}>
                             <h5 className={styles.groupCreatorTitle}>New Activity Group</h5>
                             <div className={styles.groupCreatorFields}>
                                 <input

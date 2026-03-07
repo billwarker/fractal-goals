@@ -1,0 +1,427 @@
+.containerFull {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.containerEmbedded {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--color-bg-card-alt);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.backButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.title {
+    margin: 0;
+    font-size: 16px;
+    color: var(--color-text-primary);
+}
+
+.inputLabel {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.inputLabelSmallMargin {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.errorText {
+    font-size: 11px;
+    color: var(--color-error);
+    margin-top: 4px;
+}
+
+.activityList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.activityButton {
+    padding: 6px 12px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.activityButtonSelected {
+    background: var(--color-bg-card-hover);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+}
+
+.textInput {
+    width: 100%;
+    padding: 8px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.textArea {
+    resize: vertical;
+}
+
+.targetTypeContainer {
+    display: flex;
+    gap: 4px;
+    background: var(--color-bg-input);
+    padding: 2px;
+    border-radius: 6px;
+}
+
+.targetTypeButton {
+    flex: 1;
+    padding: 6px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 400;
+    box-shadow: none;
+}
+
+.targetTypeButtonSelected {
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.timeScopeContainer {
+    background: var(--color-bg-card-hover);
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.radioGroup {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.radioLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.marginBottom10 {
+    margin-bottom: 10px;
+}
+
+.flexGap8 {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.flex1 {
+    flex: 1;
+}
+
+.smallLabel {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    display: block;
+}
+
+.dateInput {
+    width: 100%;
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.frequencyContainer {
+    border-top: 1px solid var(--color-border);
+    padding-top: 10px;
+}
+
+.frequencyInput {
+    margin-left: 10px;
+    width: 60px;
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.metricsList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.metricItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--color-bg-input);
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+}
+
+.metricName {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+.metricDesc {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.metricControls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.operatorSelect {
+    padding: 6px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.metricValueInput {
+    width: 70px;
+    padding: 6px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    text-align: right;
+}
+
+.metricUnit {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    min-width: 40px;
+}
+
+.actionFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.deleteButton {
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--color-error);
+    border-radius: 4px;
+    color: var(--color-error);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.cancelButton {
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.saveButton {
+    padding: 8px 14px;
+    background: var(--color-success);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.saveButtonDisabled {
+    background: var(--color-bg-input);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modalContent {
+    background: var(--color-bg-card);
+    padding: 24px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modalTitle {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    color: var(--color-text-primary);
+}
+
+.modalText {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modalCancelButton {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.modalDeleteButton {
+    padding: 8px 16px;
+    background: var(--color-error);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.listContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.listHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.listTitleGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.listTitle {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    font-weight: bold;
+}
+
+.targetCount {
+    font-size: 11px;
+    background: var(--color-bg-input);
+    color: var(--color-text-muted);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.addTargetButton {
+    background: transparent;
+    border: 1.5px solid var(--color-success);
+    border-radius: 4px;
+    color: var(--color-success);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 8px;
+    transition: all 0.2s;
+}
+
+.addTargetButtonDisabled {
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+.emptyState {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.targetsWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.targetWrapper {
+    position: relative;
+}

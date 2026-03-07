@@ -1,28 +1,22 @@
 import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import notify from '../utils/notify';
-import Input from './atoms/Input';
-import TextArea from './atoms/TextArea';
-import Select from './atoms/Select';
-import Checkbox from './atoms/Checkbox';
-import Button from './atoms/Button';
-import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext'
-import { useGoalLevels } from '../contexts/GoalLevelsContext';;
-import { getChildType, getTypeDisplayName, calculateGoalAge, isAboveShortTermGoal, findGoalById } from '../utils/goalHelpers';
-import { formatDurationSeconds as formatDuration } from '../utils/formatters';
-import SMARTIndicator from './SMARTIndicator';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { getChildType } from '../utils/goalHelpers';
 import { fractalApi } from '../utils/api';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
-import GoalSmartSection from './goals/GoalSmartSection';
-import GoalChildrenList from './goals/GoalChildrenList';
+import GoalViewMode from './goals/GoalViewMode';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
+import GoalEditForm from './goals/GoalEditForm';
 import { useGoalForm } from '../hooks/useGoalForm';
+import { useGoalAssociations, useGoalMetrics, useGoalDailyDurations } from '../hooks/useGoalQueries';
 import styles from './GoalDetailModal.module.css';
 
 const TargetManager = lazy(() => import('./goalDetail/TargetManager'));
 const ActivityAssociator = lazy(() => import('./goalDetail/ActivityAssociator'));
+const InlineActivityBuilder = lazy(() => import('./goalDetail/InlineActivityBuilder'));
 const GenericGraphModal = lazy(() => import('./analytics/GenericGraphModal'));
 
 /**
@@ -46,7 +40,6 @@ function GoalDetailModal({
     onToggleCompletion,
     onDelete,
     onAddChild,  // Handler for adding child goals
-    sessions: sessionsRaw = [],
     rootId,
     treeData,
     displayMode = 'modal',  // 'modal' or 'panel'
@@ -63,11 +56,9 @@ function GoalDetailModal({
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
     const { getGoalColor, getGoalTextColor, getLevelByName } = useGoalLevels();
-    const navigate = useNavigate();
+    const queryClient = useQueryClient();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
-    // Normalize sessions to always be an array (handles null case)
-    const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : [];
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
     const [activityGroups, setActivityGroups] = useState(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
@@ -83,7 +74,8 @@ function GoalDetailModal({
         trackActivities, setTrackActivities,
         allowManualCompletion, setAllowManualCompletion,
         targets, setTargets,
-        resetForm
+        resetForm,
+        errors, validateForm
     } = useGoalForm(goal, mode, isOpen);
 
     // Local completion state for optimistic UI
@@ -100,39 +92,35 @@ function GoalDetailModal({
     // Associated activities state
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [associatedActivityGroups, setAssociatedActivityGroups] = useState([]); // Array of {id, name}
-    const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-
     // Snapshots of initial associations for diffing on save
     const initialActivitiesRef = useRef([]);
     const initialGroupsRef = useRef([]);
     const associatedActivitiesRef = useRef([]);
     const associatedGroupsRef = useRef([]);
 
-    // Inline activity builder form state
-    const [newActivityName, setNewActivityName] = useState('');
-    const [newActivityDescription, setNewActivityDescription] = useState('');
-    const [newActivityHasMetrics, setNewActivityHasMetrics] = useState(true);
-    const [newActivityMetrics, setNewActivityMetrics] = useState([{ name: '', unit: '' }]);
-    const [newActivityHasSets, setNewActivityHasSets] = useState(false);
-    const [newActivityGroupId, setNewActivityGroupId] = useState('');
-    const [isCreatingActivity, setIsCreatingActivity] = useState(false);
-    const [newActivityError, setNewActivityError] = useState('');
-
     // Metrics state
     const [metrics, setMetrics] = useState(null);
-    const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
 
     // Graph Modal State
     const [graphModalConfig, setGraphModalConfig] = useState(null);
+    const [shouldFetchDurations, setShouldFetchDurations] = useState(false);
 
-    const handleTimeSpentClick = async () => {
-        try {
-            const response = await fractalApi.getGoalDailyDurations(depGoalId);
-            const points = response.data.points || [];
+    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
+    const goalType = mode === 'create'
+        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
+        : (goal?.attributes?.type || goal?.type);
+    const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
+    const goalColor = getGoalColor(goalType);
+
+    const depGoalId = goal?.attributes?.id || goal?.id;
+    const { data: durationsData, isSuccess: isDurationsSuccess } = useGoalDailyDurations(depGoalId, shouldFetchDurations);
+
+    useEffect(() => {
+        if (shouldFetchDurations && isDurationsSuccess && durationsData) {
+            const points = durationsData.points || [];
 
             // Transform to Chart.js data
             const labels = points.map(p => new Date(p.date)); // X-axis dates
-            const sessionData = points.map(p => Math.round(p.session_duration / 60)); // Minutes
             const activityData = points.map(p => Math.round(p.activity_duration / 60)); // Minutes
 
             setGraphModalConfig({
@@ -157,10 +145,12 @@ function GoalDetailModal({
                     }
                 }
             });
-        } catch (error) {
-            console.error("Error fetching daily durations:", error);
-            notify.error("Failed to load time data");
+            setShouldFetchDurations(false); // Reset trigger
         }
+    }, [shouldFetchDurations, isDurationsSuccess, durationsData, goal?.name, name, goalType, goalColor]);
+
+    const handleTimeSpentClick = () => {
+        setShouldFetchDurations(true);
     };
 
 
@@ -174,7 +164,6 @@ function GoalDetailModal({
 
     // Initialize form state from goal - use specific dependencies for completion state
 
-    const depGoalId = goal?.attributes?.id || goal?.id;
     const depGoalCompleted = goal?.attributes?.completed;
     const depGoalCompletedAt = goal?.attributes?.completed_at;
 
@@ -203,7 +192,7 @@ function GoalDetailModal({
             setIsEditing(mode === 'edit');
             setViewState('goal');
         }
-    }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
+    }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen, initialActivities, initialActivityGroups]);
 
     // Sync activityGroups when prop changes (only if valid array provided)
     useEffect(() => {
@@ -220,71 +209,49 @@ function GoalDetailModal({
         associatedGroupsRef.current = associatedActivityGroups;
     }, [associatedActivityGroups]);
 
-    const refreshAssociations = async () => {
-        if (mode === 'create' || !rootId || !depGoalId) {
-            setAssociatedActivities([]);
-            setAssociatedActivityGroups([]);
-            return;
-        }
+    // Use centralized React Query hooks for fetches
+    const {
+        activities: fetchedActivities,
+        groups: fetchedGroups,
+    } = useGoalAssociations(rootId, mode === 'create' ? null : depGoalId);
 
-        setIsLoadingActivities(true);
-        try {
-            const [activitiesResponse, groupsResponse] = await Promise.all([
-                fractalApi.getGoalActivities(rootId, depGoalId),
-                fractalApi.getGoalActivityGroups(rootId, depGoalId)
-            ]);
+    const {
+        metrics: fetchedMetrics,
+    } = useGoalMetrics(mode === 'create' ? null : depGoalId);
 
-            const loadedActivities = activitiesResponse.data || [];
-            const loadedGroups = groupsResponse.data || [];
-            setAssociatedActivities(loadedActivities);
-            setAssociatedActivityGroups(loadedGroups);
-            // Snapshot for diffing on save
-            initialActivitiesRef.current = loadedActivities.map(a => a.id);
-            initialGroupsRef.current = loadedGroups.map(g => g.id);
-        } catch (error) {
-            console.error('Error fetching associations:', error);
-            setAssociatedActivities([]);
-            setAssociatedActivityGroups([]);
-        } finally {
-            setIsLoadingActivities(false);
-        }
-    };
-
-    // Fetch associated activities when goal changes
+    // Sync metrics from Query to internal state
     useEffect(() => {
-        const fetchAssociatedActivities = refreshAssociations;
+        setMetrics(fetchedMetrics);
+    }, [fetchedMetrics]);
 
-        const fetchMetrics = async () => {
-            if (mode === 'create' || !depGoalId) {
-                setMetrics(null);
-                return;
-            }
-            setIsLoadingMetrics(true);
-            try {
-                const response = await fractalApi.getGoalMetrics(depGoalId);
-                setMetrics(response.data);
-            } catch (error) {
-                console.error("Error fetching metrics:", error);
-                setMetrics(null);
-            } finally {
-                setIsLoadingMetrics(false);
-            }
-        };
+    // Sync associations from Query to internal state for editing
+    useEffect(() => {
+        if (mode !== 'create' && depGoalId) {
+            setAssociatedActivities(fetchedActivities);
+            setAssociatedActivityGroups(fetchedGroups);
 
-        fetchAssociatedActivities();
-        fetchMetrics();
-    }, [rootId, depGoalId, mode]);
+            initialActivitiesRef.current = fetchedActivities.map(a => a.id);
+            initialGroupsRef.current = fetchedGroups.map(g => g.id);
+        }
+    }, [fetchedActivities, fetchedGroups, mode, depGoalId]);
+
+    const refreshAssociations = () => {
+        if (!rootId || !depGoalId || mode === 'create') {
+            return Promise.resolve();
+        }
+
+        return Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['goalActivities', rootId, depGoalId] }),
+            queryClient.invalidateQueries({ queryKey: ['goalActivityGroups', rootId, depGoalId] }),
+            queryClient.invalidateQueries({ queryKey: ['goalMetrics', depGoalId] }),
+            queryClient.invalidateQueries({ queryKey: ['activities', rootId] }),
+        ]);
+    };
 
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
     // Allow rendering without goal in create mode
     if (!goal && mode !== 'create') return null;
-
-    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
-    const goalType = mode === 'create'
-        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
-        : (goal.attributes?.type || goal.type);
-    const goalId = mode === 'create' ? null : (goal.attributes?.id || goal.id);
 
     const persistAssociations = async (updatedActivities, updatedGroups, overrideGoalId) => {
         // Use provided values or fall back to state
@@ -305,6 +272,13 @@ function GoalDetailModal({
                 group_ids: currentGroupIds
             });
 
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['goalActivities', rootId, targetGoalId] }),
+                queryClient.invalidateQueries({ queryKey: ['goalActivityGroups', rootId, targetGoalId] }),
+                queryClient.invalidateQueries({ queryKey: ['goalMetrics', targetGoalId] }),
+                queryClient.invalidateQueries({ queryKey: ['activities', rootId] }),
+            ]);
+
             // Update snapshots to reflect persisted state
             initialActivitiesRef.current = currentActivityIds;
             initialGroupsRef.current = currentGroupIds;
@@ -324,6 +298,11 @@ function GoalDetailModal({
     };
 
     const handleSave = async () => {
+        if (!validateForm()) {
+            notify.error('Please fix the errors before saving.');
+            return;
+        }
+
         const payload = mode === 'create' ? {
             name,
             description,
@@ -397,25 +376,9 @@ function GoalDetailModal({
         setIsEditing(false);
     };
 
-    const goalColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
     const childType = getChildType(goalType);
     const levelConfig = getLevelByName(goalType) || {};
-
-    // Session relationships
-    const isShortTermGoal = goalType === 'ShortTermGoal';
-    const isImmediateGoal = goalType === 'ImmediateGoal';
-
-    // Get activities with metrics for target builder
-    // First, filter by associated activities, then by having metrics
-    const associatedActivityIds = associatedActivities.map(a => a.id);
-    const activitiesWithMetrics = activityDefinitions.filter(a =>
-        a.has_metrics && a.metric_definitions && a.metric_definitions.length > 0
-    );
-    // For targets: only activities that are BOTH associated AND have metrics
-    const activitiesForTargets = activitiesWithMetrics.filter(a =>
-        associatedActivityIds.includes(a.id)
-    );
 
     const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
@@ -494,465 +457,79 @@ function GoalDetailModal({
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
-                    <div className={styles.editContainer}>
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.label} style={{ color: goalColor }}>
-                                Name
-                            </label>
-                            <Input
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-
-                        {goalType !== 'NanoGoal' && (
-                            <div className={styles.fieldGroup}>
-                                <label className={styles.label} style={{ color: goalColor }}>
-                                    Description
-                                </label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={3}
-                                    className={styles.textarea}
-                                />
-                            </div>
-                        )}
-
-                        {/* Relevance Statement - SMART "R" Criterion */}
-                        {goalType !== 'NanoGoal' && ((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
-                            <div className={styles.fieldGroup}>
-                                <label className={styles.label} style={{ color: goalColor }}>
-                                    Relevance (SMART)
-                                </label>
-                                <div className={styles.relevanceInfo}>
-                                    {goalType === 'UltimateGoal'
-                                        ? "Why does this Ultimate Goal matter to you?"
-                                        : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
-                                    }
-                                </div>
-                                <textarea
-                                    value={relevanceStatement}
-                                    onChange={(e) => setRelevanceStatement(e.target.value)}
-                                    rows={2}
-                                    placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
-                                    className={styles.textarea}
-                                    style={{
-                                        border: relevanceStatement?.trim() ? '1px solid #4caf50' : null
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
-                            <div className={styles.fieldGroup}>
-                                <label className={styles.label} style={{ color: goalColor }}>
-                                    Deadline
-                                </label>
-                                <Input
-                                    type="date"
-                                    value={deadline}
-                                    onChange={(e) => setDeadline(e.target.value)}
-                                    max={parentGoal?.attributes?.deadline?.split('T')[0] || parentGoal?.deadline?.split('T')[0]}
-                                />
-                            </div>
-                        )}
-
-                        {/* How is progress measured? */}
-                        {goalType !== 'NanoGoal' && (
-                            <div className={styles.progressBox}>
-                                <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
-                                    How is progress measured? (Select all that apply)
-                                </label>
-                                <div className={styles.checkboxGroup}>
-                                    <Checkbox
-                                        label="Activities & Targets"
-                                        checked={trackActivities}
-                                        onChange={(e) => setTrackActivities(e.target.checked)}
-                                        className={styles.checkboxLabel}
-                                    />
-                                    {isAboveShortTermGoal(goalType) && (
-                                        <Checkbox
-                                            label="Completed via Children"
-                                            checked={completedViaChildren}
-                                            onChange={(e) => setCompletedViaChildren(e.target.checked)}
-                                            className={styles.checkboxLabel}
-                                        />
-                                    )}
-                                    <Checkbox
-                                        label="Manual Completion"
-                                        checked={allowManualCompletion}
-                                        onChange={(e) => setAllowManualCompletion(e.target.checked)}
-                                        className={styles.checkboxLabel}
-                                    />
-                                </div>
-
-                                <div className={styles.infoList}>
-                                    {trackActivities && (
-                                        <div className={styles.infoItem}>
-                                            <span style={{ fontSize: '13px' }}>✓</span>
-                                            <span>Goal is complete when target(s) are achieved.</span>
-                                        </div>
-                                    )}
-
-                                    {completedViaChildren && (
-                                        <div className={styles.infoItem}>
-                                            <span style={{ fontSize: '13px' }}>✓</span>
-                                            <span>Goal is complete when all child goals are done (Delegated).</span>
-                                        </div>
-                                    )}
-
-                                    {allowManualCompletion && (
-                                        <div className={styles.infoItem}>
-                                            <span style={{ fontSize: '13px' }}>✓</span>
-                                            <span>Goal can be marked as complete by the user.</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Associated Activities Section - Edit/Create Mode */}
-                        {trackActivities && goalType !== 'NanoGoal' && (
-                            <Suspense fallback={null}>
-                                <ActivityAssociator
-                                    associatedActivities={associatedActivities}
-                                    setAssociatedActivities={setAssociatedActivities}
-                                    associatedActivityGroups={associatedActivityGroups}
-                                    setAssociatedActivityGroups={setAssociatedActivityGroups}
-                                    activityDefinitions={activityDefinitions}
-                                    activityGroups={activityGroups}
-                                    setActivityGroups={setActivityGroups}
-                                    rootId={rootId}
-                                    goalId={goalId}
-                                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                                    setTargets={setTargets}
-                                    isEditing={true}
-                                    targets={targets}
-                                    goalName={name}
-                                    viewMode="list"
-                                    onOpenSelector={() => setViewState('activity-associator')}
-                                    completedViaChildren={completedViaChildren}
-                                    isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
-                                    headerColor={goalColor}
-                                    goalType={goalType}
-                                    onRefreshAssociations={refreshAssociations}
-                                />
-                            </Suspense>
-                        )}
-
-                        {/* Targets Section - Edit/Create Mode */}
-                        {trackActivities && goalType !== 'NanoGoal' && (
-                            <Suspense fallback={null}>
-                                <TargetManager
-                                    targets={targets}
-                                    setTargets={setTargets}
-                                    activityDefinitions={activityDefinitions}
-                                    associatedActivities={associatedActivities}
-                                    goalId={goalId}
-                                    rootId={rootId}
-                                    isEditing={true}
-                                    viewMode="list"
-                                    onOpenBuilder={(target) => {
-                                        setTargetToEdit(target || null);
-                                        setViewState('target-manager');
-                                    }}
-                                    headerColor={goalColor}
-                                    goalType={goalType}
-                                    goalCompleted={isCompleted}
-                                />
-                            </Suspense>
-                        )}
-
-                        {/* Edit Actions */}
-                        <div className={styles.editActions}>
-                            <button
-                                onClick={handleCancel}
-                                className={styles.btnCancel}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                className={styles.btnSave}
-                                style={{
-                                    background: goalColor,
-                                    color: textColor,
-                                }}
-                            >
-                                {mode === 'create' ? 'Create' : 'Save'}
-                            </button>
-                        </div>
-                    </div >
+                    <GoalEditForm
+                        mode={mode}
+                        goal={goal}
+                        goalId={goalId}
+                        rootId={rootId}
+                        goalType={goalType}
+                        goalColor={goalColor}
+                        textColor={textColor}
+                        parentGoal={parentGoal}
+                        parentGoalName={parentGoalName}
+                        parentGoalColor={parentGoalColor}
+                        isCompleted={isCompleted}
+                        name={name} setName={setName}
+                        description={description} setDescription={setDescription}
+                        deadline={deadline} setDeadline={setDeadline}
+                        relevanceStatement={relevanceStatement} setRelevanceStatement={setRelevanceStatement}
+                        trackActivities={trackActivities} setTrackActivities={setTrackActivities}
+                        completedViaChildren={completedViaChildren} setCompletedViaChildren={setCompletedViaChildren}
+                        allowManualCompletion={allowManualCompletion} setAllowManualCompletion={setAllowManualCompletion}
+                        targets={targets} setTargets={setTargets}
+                        associatedActivities={associatedActivities} setAssociatedActivities={setAssociatedActivities}
+                        associatedActivityGroups={associatedActivityGroups} setAssociatedActivityGroups={setAssociatedActivityGroups}
+                        activityDefinitions={activityDefinitions}
+                        activityGroups={activityGroups} setActivityGroups={setActivityGroups}
+                        setViewState={(view, target) => {
+                            if (target) setTargetToEdit(target);
+                            setViewState(view);
+                        }}
+                        refreshAssociations={refreshAssociations}
+                        handleCancel={handleCancel}
+                        handleSave={handleSave}
+                        errors={errors}
+                    />
                 ) : (
                     /* ============ VIEW MODE ============ */
-                    <div className={styles.viewContainer}>
-
-                        {/* Action Buttons - 2x2 Grid */}
-                        <div className={styles.actionGrid}>
-                            {onToggleCompletion && (() => {
-                                const isManualAllowed = levelConfig.allow_manual_completion !== false;
-                                const canShowManual = allowManualCompletion && isManualAllowed;
-                                const isTargetsAllowed = levelConfig.track_activities !== false && goalType !== 'NanoGoal';
-                                const isChildrenAllowed = goalType !== 'MicroGoal' && goalType !== 'NanoGoal';
-
-                                return (
-                                    <button
-                                        onClick={() => {
-                                            if (isCompleted) {
-                                                setViewState('uncomplete-confirm');
-                                            } else if (canShowManual) {
-                                                setViewState('complete-confirm');
-                                            }
-                                        }}
-                                        disabled={!isCompleted && !canShowManual}
-                                        className={styles.btnAction}
-                                        style={{
-                                            background: isCompleted ? '#4caf50' : 'transparent',
-                                            border: `1px solid ${isCompleted ? '#4caf50' : (canShowManual ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
-                                            color: isCompleted ? 'white' : (canShowManual ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
-                                            cursor: (isCompleted || canShowManual) ? 'pointer' : 'default',
-                                            fontWeight: isCompleted ? 'bold' : 'normal',
-                                            opacity: (!isCompleted && !canShowManual) ? 0.8 : 1
-                                        }}
-                                    >
-                                        {isCompleted ? '✓ Completed' : (
-                                            canShowManual ? 'Mark Complete' : (
-                                                trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed ? 'Complete via Children & Targets' :
-                                                    trackActivities && isTargetsAllowed ? 'Complete via Target(s)' :
-                                                        completedViaChildren && isChildrenAllowed ? 'Complete via Children' :
-                                                            'Auto-completing...'
-                                            )
-                                        )}
-                                    </button>
-                                );
-                            })()}
-
-                            {onAddChild && childType && (
-                                <button
-                                    onClick={() => {
-                                        if (goalType === 'ImmediateGoal') return;
-                                        if (displayMode === 'modal' && onClose) onClose();
-                                        onAddChild(goal);
-                                    }}
-                                    className={styles.btnAction}
-                                    disabled={goalType === 'ImmediateGoal'}
-                                    title={goalType === 'ImmediateGoal' ? "MicroGoals can only be created from the Session Detail page" : ""}
-                                    style={{
-                                        background: 'transparent',
-                                        border: `1px solid ${getGoalColor(childType)}`,
-                                        color: getGoalColor(childType),
-                                        fontWeight: 'bold',
-                                        opacity: goalType === 'ImmediateGoal' ? 0.5 : 1,
-                                        cursor: goalType === 'ImmediateGoal' ? 'not-allowed' : 'pointer'
-                                    }}
-                                >
-                                    + Add {childType}
-                                </button>
-                            )}
-
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className={styles.btnAction}
-                                style={{
-                                    background: goalColor,
-                                    border: 'none',
-                                    color: textColor,
-                                    fontWeight: 600
-                                }}
-                            >
-                                Edit Goal
-                            </button>
-
-                            {onDelete && (
-                                <button
-                                    onClick={() => {
-                                        if (displayMode === 'modal' && onClose) onClose();
-                                        onDelete(goal);
-                                    }}
-                                    className={`${styles.btnAction} ${styles.btnDelete}`}
-                                    style={{
-                                        background: 'transparent',
-                                        border: '1px solid #d32f2f',
-                                        color: '#d32f2f',
-                                    }}
-                                >
-                                    Delete Goal
-                                </button>
-                            )}
-                        </div>
-
-                        <GoalSmartSection
-                            goal={goal}
-                            goalColor={goalColor}
-                            parentGoalName={parentGoalName}
-                            parentGoalColor={parentGoalColor}
-                            mode={mode}
-                            goalType={goalType}
-                            relevanceStatement={relevanceStatement}
-                        />
-
-                        {/* Associated Programs */}
-                        {programs && (() => {
-                            const associatedPrograms = programs.filter(p => {
-                                // Check directly on program
-                                const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
-                                // Check on blocks
-                                const blockLevel = p.blocks && p.blocks.some(b => b.goal_ids && b.goal_ids.includes(goalId));
-                                return programLevel || blockLevel;
-                            });
-
-                            if (associatedPrograms.length === 0) return null;
-
-                            return (
-                                <div>
-                                    <label className={styles.label} style={{ marginBottom: '6px', color: goalColor, fontSize: 'var(--font-size-xs)' }}>
-                                        Associated Programs
-                                    </label>
-                                    <div className={styles.associatedPrograms}>
-                                        {associatedPrograms.map(prog => (
-                                            <div
-                                                key={prog.id}
-                                                onClick={() => {
-                                                    if (displayMode === 'modal' && onClose) onClose();
-                                                    navigate(`/${rootId}/programs/${prog.id}`);
-                                                }}
-                                                className={styles.programLink}
-                                            >
-                                                <span style={{ fontSize: '14px' }}>📁</span>
-                                                <span style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{prog.name}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-
-                        {/* Updated Metrics Section - Centered between other sections */}
-                        {metrics && (
-                            <div className={styles.metricsContainer}>
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr 1fr',
-                                    columnGap: '24px',
-                                    rowGap: '12px'
-                                }}>
-                                    {/* Metric Item: Time */}
-                                    <div
-                                        onClick={handleTimeSpentClick}
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            cursor: 'pointer',
-                                            padding: '4px 0',
-                                            gap: '6px'
-                                        }}
-                                    >
-                                        <span style={{
-                                            fontSize: '12px',
-                                            fontWeight: 'bold',
-                                            color: goalColor,
-                                            textDecoration: 'underline'
-                                        }}>
-                                            Time Spent:
-                                        </span>
-                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                            {formatDuration(metrics.recursive.activities_duration_seconds)}
-                                        </span>
-                                    </div>
-
-                                    {/* Metric Item: Sessions */}
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        padding: '4px 0',
-                                        gap: '6px'
-                                    }}>
-                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: goalColor }}>
-                                            Sessions:
-                                        </span>
-                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                            {metrics.recursive.sessions_count}
-                                        </span>
-                                    </div>
-
-                                    {/* Metric Item: Activities */}
-                                    <div
-                                        onClick={() => setViewState('activity-associator')}
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            cursor: 'pointer',
-                                            padding: '4px 0',
-                                            gap: '6px'
-                                        }}
-                                    >
-                                        <span style={{
-                                            fontSize: '12px',
-                                            fontWeight: 'bold',
-                                            color: goalColor,
-                                            textDecoration: 'underline'
-                                        }}>
-                                            Activities:
-                                        </span>
-                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                            {associatedActivities ? associatedActivities.length : metrics.recursive.activities_count}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Targets Section - View Mode (Read-only) */}
-                        {trackActivities && levelConfig.track_activities !== false && goalType !== 'NanoGoal' && (
-                            <Suspense fallback={null}>
-                                <TargetManager
-                                    targets={targets}
-                                    setTargets={setTargets}
-                                    activityDefinitions={activityDefinitions}
-                                    associatedActivities={associatedActivities}
-                                    goalId={goalId}
-                                    rootId={rootId}
-                                    isEditing={false}
-                                    viewMode="list"
-                                    onSave={(newTargets) => {
-                                        if (onUpdate && goalId) {
-                                            onUpdate(goalId, {
-                                                name,
-                                                description,
-                                                deadline,
-                                                relevance_statement: relevanceStatement,
-                                                targets: newTargets
-                                            });
-                                        }
-                                    }}
-                                    headerColor={goalColor}
-                                    goalType={goalType}
-                                    goalCompleted={isCompleted}
-                                />
-                            </Suspense>
-                        )}
-
-                        {/* Associated Children Section */}
-                        {goalType !== 'NanoGoal' && (
-                            <GoalChildrenList
-                                treeData={treeData}
-                                goalId={goalId}
-                                goalColor={goalColor}
-                                childType={childType}
-                                onGoalSelect={onGoalSelect}
-                            />
-                        )}
-
-
-
-                        {/* Sessions List - Removed as per request */}
-
-                    </div>
+                    <GoalViewMode
+                        mode={mode}
+                        goal={goal}
+                        goalId={goalId}
+                        rootId={rootId}
+                        goalType={goalType}
+                        goalColor={goalColor}
+                        textColor={textColor}
+                        parentGoalName={parentGoalName}
+                        parentGoalColor={parentGoalColor}
+                        isCompleted={isCompleted}
+                        levelConfig={levelConfig}
+                        allowManualCompletion={allowManualCompletion}
+                        trackActivities={trackActivities}
+                        completedViaChildren={completedViaChildren}
+                        childType={childType}
+                        displayMode={displayMode}
+                        programs={programs}
+                        metrics={metrics}
+                        targets={targets}
+                        associatedActivities={associatedActivities}
+                        activityDefinitions={activityDefinitions}
+                        treeData={treeData}
+                        name={name}
+                        description={description}
+                        deadline={deadline}
+                        relevanceStatement={relevanceStatement}
+                        setViewState={setViewState}
+                        setIsEditing={setIsEditing}
+                        onClose={onClose}
+                        onToggleCompletion={onToggleCompletion}
+                        onAddChild={onAddChild}
+                        onDelete={onDelete}
+                        onGoalSelect={onGoalSelect}
+                        onUpdate={onUpdate}
+                        setTargets={setTargets}
+                        handleTimeSpentClick={handleTimeSpentClick}
+                    />
                 )
                 }
             </>
@@ -1049,254 +626,42 @@ function GoalDetailModal({
                     onSave={!isEditing ? persistAssociations : undefined}
                     onRefreshAssociations={refreshAssociations}
                     onCreateActivity={() => {
-                        // Reset form state and switch to activity builder view
-                        setNewActivityName('');
-                        setNewActivityDescription('');
-                        setNewActivityHasMetrics(true);
-                        setNewActivityMetrics([{ name: '', unit: '' }]);
-                        setNewActivityHasSets(false);
-                        setNewActivityGroupId('');
-                        setNewActivityError('');
+                        // Switch to activity builder view
                         setViewState('activity-builder');
                     }}
                 />
             </Suspense>
         );
     } else if (viewState === 'activity-builder') {
-        // Inline activity creation form
-        const handleCreateActivity = async () => {
-            setNewActivityError('');
-            if (!newActivityName.trim()) {
-                notify.error('Please enter an activity name');
-                return;
-            }
-
-            let validMetrics = [];
-            if (newActivityHasMetrics) {
-                for (let i = 0; i < newActivityMetrics.length; i++) {
-                    const metric = newActivityMetrics[i] || {};
-                    const metricName = (metric.name || '').trim();
-                    const metricUnit = (metric.unit || '').trim();
-
-                    if (!metricName && !metricUnit) continue;
-
-                    if (!metricName || !metricUnit) {
-                        setNewActivityError(
-                            `Malformed activity data: metric row ${i + 1} is incomplete. ` +
-                            'Each metric must include both a name and a unit.'
-                        );
-                        return;
-                    }
-
-                    validMetrics.push({ ...metric, name: metricName, unit: metricUnit });
-                }
-            }
-
-            setIsCreatingActivity(true);
-            try {
-                const activityData = {
-                    name: newActivityName,
-                    description: newActivityDescription,
-                    has_sets: newActivityHasSets,
-                    has_metrics: newActivityHasMetrics,
-                    metrics: validMetrics,
-                    group_id: newActivityGroupId || null
-                };
-
-                // Create the activity - axios returns response object, so extract .data
-                const response = await fractalApi.createActivity(rootId, activityData);
-                const newActivity = response.data;
-
-                // Automatically associate with this goal
-                if (newActivity && newActivity.id) {
-                    if (goalId) {
-                        // Goal already exists: persist association immediately
-                        await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
-                        await refreshAssociations();
-                    } else {
-                        // Create mode: buffer the association in local state for deferred persistence
-                        setAssociatedActivities(prev => {
-                            const updated = [...prev, newActivity];
-                            return Array.from(new Map(updated.map(item => [item.id, item])).values());
-                        });
-                    }
-                    notify.success(`Created activity "${newActivity.name || newActivityName}"${goalId ? ' and associated with goal' : ''}`);
-                }
-
-                // Go back to activity-associator view
-                setNewActivityError('');
-                setViewState('activity-associator');
-            } catch (error) {
-                console.error('Error creating activity:', error);
-                const serverMessage = error?.response?.data?.error;
-                setNewActivityError(
-                    serverMessage
-                        ? `Malformed activity cannot be created: ${serverMessage}`
-                        : `Failed to create activity: ${error?.message || 'Unknown error'}`
-                );
-            } finally {
-                setIsCreatingActivity(false);
-            }
-        };
-
         content = (
-            <div className={styles.editContainer}>
-                {/* Header */}
-                <div className={styles.activityBuilderHeader}>
-                    <button
-                        onClick={() => setViewState('activity-associator')}
-                        className={styles.backButton}
-                    >
-                        ←
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)', flex: 1 }}>
-                        Create New Activity
-                    </h3>
-                </div>
-                {newActivityError && (
-                    <div className={styles.activityBuilderError}>
-                        {newActivityError}
-                    </div>
-                )}
+            <Suspense fallback={null}>
+                <InlineActivityBuilder
+                    rootId={rootId}
+                    goalId={goalId}
+                    activityGroups={activityGroups}
+                    onSuccess={async (newActivity, newActivityName) => {
+                        // Automatically associate with this goal
+                        if (newActivity && newActivity.id) {
+                            if (goalId) {
+                                // Goal already exists: persist association immediately
+                                await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
+                                await refreshAssociations();
+                            } else {
+                                // Create mode: buffer the association in local state for deferred persistence
+                                setAssociatedActivities(prev => {
+                                    const updated = [...prev, newActivity];
+                                    return Array.from(new Map(updated.map(item => [item.id, item])).values());
+                                });
+                            }
+                            notify.success(`Created activity "${newActivity.name || newActivityName}"${goalId ? ' and associated with goal' : ''}`);
+                        }
 
-                {/* Activity Name */}
-                <Input
-                    label="Activity Name *"
-                    value={newActivityName}
-                    onChange={(e) => setNewActivityName(e.target.value)}
-                    placeholder="e.g. Scale Practice"
-                    fullWidth
-                    className={styles.inputWrapper}
+                        // Go back to activity-associator view
+                        setViewState('activity-associator');
+                    }}
+                    onCancel={() => setViewState('activity-associator')}
                 />
-
-                {/* Description */}
-                <TextArea
-                    label="Description"
-                    value={newActivityDescription}
-                    onChange={(e) => setNewActivityDescription(e.target.value)}
-                    placeholder="Optional description..."
-                    rows={2}
-                    fullWidth
-                    className={styles.inputWrapper}
-                />
-
-                {/* Group Selection */}
-                <Select
-                    label="Activity Group"
-                    value={newActivityGroupId}
-                    onChange={(e) => setNewActivityGroupId(e.target.value)}
-                    fullWidth
-                    className={styles.inputWrapper}
-                >
-                    <option value="">(No Group)</option>
-                    {activityGroups && activityGroups.map(group => (
-                        <option key={group.id} value={group.id}>
-                            {group.name}
-                        </option>
-                    ))}
-                </Select>
-
-                {/* Flags */}
-                <div className={styles.checkboxGroup}>
-                    <Checkbox
-                        label="Track Sets"
-                        checked={newActivityHasSets}
-                        onChange={(e) => setNewActivityHasSets(e.target.checked)}
-                    />
-                    <Checkbox
-                        label="Enable Metrics"
-                        checked={newActivityHasMetrics}
-                        onChange={(e) => setNewActivityHasMetrics(e.target.checked)}
-                    />
-                </div>
-
-                {/* Metrics Section */}
-                {newActivityHasMetrics && (
-                    <div style={{ marginTop: '16px' }}>
-                        <div className={styles.label} style={{ color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-                            Metrics (needed for targets)
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {newActivityMetrics.map((metric, idx) => (
-                                <div key={idx} className={styles.metricRow}>
-                                    <Input
-                                        value={metric.name}
-                                        onChange={(e) => {
-                                            const updated = [...newActivityMetrics];
-                                            updated[idx] = { ...updated[idx], name: e.target.value };
-                                            setNewActivityMetrics(updated);
-                                        }}
-                                        placeholder="Metric name (e.g. Speed)"
-                                        className={styles.metricInput}
-                                        style={{ marginBottom: 0 }}
-                                    />
-                                    <Input
-                                        value={metric.unit}
-                                        onChange={(e) => {
-                                            const updated = [...newActivityMetrics];
-                                            updated[idx] = { ...updated[idx], unit: e.target.value };
-                                            setNewActivityMetrics(updated);
-                                        }}
-                                        placeholder="Unit (e.g. bpm)"
-                                        className={styles.unitInput}
-                                        style={{ marginBottom: 0 }}
-                                    />
-                                    {newActivityMetrics.length > 1 && (
-                                        <Button
-                                            onClick={() => {
-                                                const updated = newActivityMetrics.filter((_, i) => i !== idx);
-                                                setNewActivityMetrics(updated);
-                                            }}
-                                            variant="ghost"
-                                            className={styles.removeMetricBtn}
-                                            style={{ padding: '0 8px', color: 'var(--color-brand-danger)' }}
-                                            title="Remove metric"
-                                        >
-                                            ✕
-                                        </Button>
-                                    )}
-                                </div>
-                            ))}
-                            {newActivityMetrics.length < 3 && (
-                                <Button
-                                    onClick={() => setNewActivityMetrics([...newActivityMetrics, { name: '', unit: '' }])}
-                                    variant="secondary"
-                                    size="sm"
-                                    style={{
-                                        alignSelf: 'flex-start',
-                                        marginTop: '8px'
-                                    }}
-                                >
-                                    + Add Metric
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Info about auto-association */}
-                <div className={styles.autoAssociationInfo}>
-                    This activity will be automatically associated with this goal.
-                </div>
-
-                {/* Actions */}
-                <div className={styles.editActions}>
-                    <Button
-                        onClick={() => setViewState('activity-associator')}
-                        variant="secondary"
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleCreateActivity}
-                        disabled={isCreatingActivity || !newActivityName.trim()}
-                        isLoading={isCreatingActivity}
-                        variant="success"
-                    >
-                        Create Activity
-                    </Button>
-                </div>
-            </div>
+            </Suspense>
         );
     } else {
         content = renderGoalContent();

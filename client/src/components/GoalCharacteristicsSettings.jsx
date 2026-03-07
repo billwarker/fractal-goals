@@ -8,6 +8,7 @@ import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
 import useIsMobile from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
+import styles from './GoalCharacteristicsSettings.module.css';
 
 const GoalCharacteristicsSettings = () => {
     const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
@@ -68,8 +69,8 @@ const GoalCharacteristicsSettings = () => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+        <div className={styles.container}>
+            <p className={styles.description}>
                 Customize the shape, colors, and behaviors of your goal hierarchy.
                 Any modifications you make here will be saved as personal overrides specifically for your account.
             </p>
@@ -84,25 +85,10 @@ const GoalCharacteristicsSettings = () => {
                 const isCustomized = level.owner_id !== null;
 
                 return (
-                    <div
-                        key={level.id}
-                        style={{
-                            padding: '16px',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '8px',
-                            backgroundColor: 'var(--color-bg-card-alt)'
-                        }}
-                    >
+                    <div key={level.id} className={styles.levelCard}>
                         {/* Header Row */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '16px',
-                            flexWrap: 'wrap',
-                            gap: '12px'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                        <div className={styles.levelHeaderRow}>
+                            <div className={styles.levelHeaderTitle}>
                                 {animatedIcons ? (
                                     <AnimatedGoalIcon
                                         shape={current.icon || 'circle'}
@@ -123,25 +109,17 @@ const GoalCharacteristicsSettings = () => {
                                 {current.name}
 
                                 {isCustomized && (
-                                    <span style={{ fontSize: '10px', background: 'var(--color-bg-primary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                                    <span className={styles.customizedBadge}>
                                         Customized
                                     </span>
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className={styles.buttonGroup}>
                                 {isCustomized && (
                                     <button
                                         onClick={() => handleReset(level.id)}
-                                        style={{
-                                            fontSize: '12px',
-                                            background: 'transparent',
-                                            border: '1px solid var(--color-border)',
-                                            color: 'var(--color-text-secondary)',
-                                            padding: '4px 8px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer'
-                                        }}
+                                        className={styles.restoreButton}
                                     >
                                         Restore Default
                                     </button>
@@ -149,16 +127,7 @@ const GoalCharacteristicsSettings = () => {
                                 {hasUnsavedChanges && (
                                     <button
                                         onClick={() => handleSave(level.id)}
-                                        style={{
-                                            fontSize: '12px',
-                                            background: 'var(--color-brand-primary)',
-                                            border: 'none',
-                                            color: '#fff',
-                                            padding: '4px 12px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
+                                        className={styles.saveButton}
                                     >
                                         Save Changes
                                     </button>
@@ -166,29 +135,23 @@ const GoalCharacteristicsSettings = () => {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className={styles.settingsGroup}>
                             {/* Icon Selection */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                <label className={styles.inputLabel}>
                                     Shape
                                 </label>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <div className={styles.shapeList}>
                                     {ICON_SHAPES.map(s => {
                                         const isSelected = current.icon === s.value;
                                         return (
                                             <button
                                                 key={s.value}
                                                 onClick={() => handleChange(level.id, 'icon', s.value)}
+                                                className={styles.shapeButton}
                                                 style={{
-                                                    padding: '8px',
-                                                    borderRadius: '4px',
-                                                    border: '1px solid',
                                                     borderColor: isSelected ? (current.color || 'var(--color-brand-primary)') : 'var(--color-border)',
                                                     backgroundColor: isSelected ? 'rgba(0,0,0,0.1)' : 'transparent',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
                                                 }}
                                                 title={s.label}
                                             >
@@ -204,131 +167,131 @@ const GoalCharacteristicsSettings = () => {
                             </div>
 
                             {/* Color Selection */}
-                            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                            <div className={styles.flexRowWrap}>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                                    <label className={styles.inputLabel}>
                                         Primary Color
                                     </label>
                                     <input
                                         type="color"
                                         value={current.color || '#000000'}
                                         onChange={(e) => handleChange(level.id, 'color', e.target.value)}
-                                        style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                                        className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                                        Secondary Color <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(SMART ring fill)</span>
+                                    <label className={styles.inputLabel}>
+                                        Secondary Color <span className={styles.subText}>(SMART ring fill)</span>
                                     </label>
                                     <input
                                         type="color"
                                         value={current.secondary_color || current.color || '#000000'}
                                         onChange={(e) => handleChange(level.id, 'secondary_color', e.target.value)}
-                                        style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                                        className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
                                     />
                                 </div>
                             </div>
 
                             {/* Behavior Toggles */}
-                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                            <div className={styles.behaviorControls}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.allow_manual_completion ?? true}
                                         onChange={(e) => handleChange(level.id, 'allow_manual_completion', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Allow Manual Completion
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.track_activities ?? true}
                                         onChange={(e) => handleChange(level.id, 'track_activities', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Support Activity Tracking
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.requires_smart ?? false}
                                         onChange={(e) => handleChange(level.id, 'requires_smart', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Requires SMART Metrics
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.auto_complete_when_children_done ?? false}
                                         onChange={(e) => handleChange(level.id, 'auto_complete_when_children_done', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Auto-Complete When Children Done
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.can_have_targets ?? true}
                                         onChange={(e) => handleChange(level.id, 'can_have_targets', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Can Have Targets
                                 </label>
 
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                <label className={styles.checkboxLabel}>
                                     <input
                                         type="checkbox"
                                         checked={current.description_required ?? false}
                                         onChange={(e) => handleChange(level.id, 'description_required', e.target.checked)}
-                                        style={{ cursor: 'pointer' }}
+                                        className={styles.pointer}
                                     />
                                     Description Required
                                 </label>
                             </div>
 
                             {/* Value + Unit Controls */}
-                            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '12px' }}>
+                            <div className={styles.valueUnitControls}>
                                 {(current.name !== 'MicroGoal' && current.name !== 'NanoGoal') ? (
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        <label className={styles.inputLabelSecondary}>
                                             Deadline Range
                                         </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div className={styles.flexAlignCenter}>
                                             <input
                                                 type="number"
                                                 placeholder="Min"
                                                 min="0"
                                                 value={current.deadline_min_value ?? ''}
                                                 onChange={(e) => handleChange(level.id, 'deadline_min_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
                                             />
                                             <select
                                                 value={current.deadline_min_unit ?? 'days'}
                                                 onChange={(e) => handleChange(level.id, 'deadline_min_unit', e.target.value)}
-                                                style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
                                             >
                                                 {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                                             </select>
-                                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>to</span>
+                                            <span className={styles.inputLabelMuted} style={{ marginBottom: 0 }}>to</span>
                                             <input
                                                 type="number"
                                                 placeholder="Max"
                                                 min="0"
                                                 value={current.deadline_max_value ?? ''}
                                                 onChange={(e) => handleChange(level.id, 'deadline_max_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
                                             />
                                             <select
                                                 value={current.deadline_max_unit ?? 'days'}
                                                 onChange={(e) => handleChange(level.id, 'deadline_max_unit', e.target.value)}
-                                                style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
                                             >
                                                 {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                                             </select>
@@ -336,17 +299,17 @@ const GoalCharacteristicsSettings = () => {
                                     </div>
                                 ) : (
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-muted)' }}>
+                                        <label className={styles.inputLabelMuted}>
                                             Deadline Range
                                         </label>
-                                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
+                                        <div className={styles.emptyDeadlineMeta}>
                                             Deadlines not supported for transient goals
                                         </div>
                                     </div>
                                 )}
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
-                                        Max Children <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(blank = unlimited)</span>
+                                    <label className={styles.inputLabelSecondary}>
+                                        Max Children <span className={styles.subText}>(blank = unlimited)</span>
                                     </label>
                                     <input
                                         type="number"
@@ -354,27 +317,27 @@ const GoalCharacteristicsSettings = () => {
                                         min="0"
                                         value={current.max_children ?? ''}
                                         onChange={(e) => handleChange(level.id, 'max_children', e.target.value ? parseInt(e.target.value) : null)}
-                                        style={{ width: '70px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                        className={`${styles.numberInput} ${styles.mediumNumberInput}`}
                                     />
                                 </div>
                                 {(current.name !== 'MicroGoal' && current.name !== 'NanoGoal') && (
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                        <label className={styles.inputLabelSecondary}>
                                             Default Deadline Offset
                                         </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div className={styles.flexAlignCenter}>
                                             <input
                                                 type="number"
                                                 placeholder="—"
                                                 min="0"
                                                 value={current.default_deadline_offset_value ?? ''}
                                                 onChange={(e) => handleChange(level.id, 'default_deadline_offset_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                style={{ width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
+                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
                                             />
                                             <select
                                                 value={current.default_deadline_offset_unit ?? 'days'}
                                                 onChange={(e) => handleChange(level.id, 'default_deadline_offset_unit', e.target.value)}
-                                                style={{ padding: '4px 4px', fontSize: '12px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
                                             >
                                                 {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                                             </select>
@@ -382,13 +345,13 @@ const GoalCharacteristicsSettings = () => {
                                     </div>
                                 )}
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', marginBottom: '6px', color: 'var(--color-text-secondary)' }}>
+                                    <label className={styles.inputLabelSecondary}>
                                         Sort Children By
                                     </label>
                                     <select
                                         value={current.sort_children_by ?? ''}
                                         onChange={(e) => handleChange(level.id, 'sort_children_by', e.target.value || null)}
-                                        style={{ padding: '4px 8px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                                        className={styles.selectInput}
                                     >
                                         <option value="">Manual (default)</option>
                                         <option value="deadline">Deadline</option>
@@ -442,23 +405,9 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
     };
 
     return (
-        <div
-            style={{
-                padding: '16px',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-bg-card-alt)'
-            }}
-        >
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px',
-                flexWrap: 'wrap',
-                gap: '12px'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+        <div className={styles.levelCard}>
+            <div className={styles.levelHeaderRow}>
+                <div className={styles.levelHeaderTitle}>
                     {animatedIcons ? (
                         <AnimatedGoalIcon
                             shape="check"
@@ -478,25 +427,17 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
                     )}
                     Completed Goals
                     {isCustomized && (
-                        <span style={{ fontSize: '10px', background: 'var(--color-bg-primary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                        <span className={styles.customizedBadge}>
                             Customized
                         </span>
                     )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className={styles.buttonGroup}>
                     {isCustomized && (
                         <button
                             onClick={handleReset}
-                            style={{
-                                fontSize: '12px',
-                                background: 'transparent',
-                                border: '1px solid var(--color-border)',
-                                color: 'var(--color-text-secondary)',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
+                            className={styles.restoreButton}
                         >
                             Restore Default
                         </button>
@@ -504,16 +445,7 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
                     {hasUnsavedChanges && (
                         <button
                             onClick={handleSave}
-                            style={{
-                                fontSize: '12px',
-                                background: 'var(--color-brand-primary)',
-                                border: 'none',
-                                color: '#fff',
-                                padding: '4px 12px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontWeight: 'bold'
-                            }}
+                            className={styles.saveButton}
                         >
                             Save Changes
                         </button>
@@ -521,31 +453,31 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+            <div className={styles.settingsGroup}>
+                <p className={styles.inputLabelSecondary}>
                     Select the colors used for all completed goals and their connections in the FlowTree.
                 </p>
-                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                <div className={styles.flexRowWrap}>
                     <div>
-                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
+                        <label className={styles.inputLabel}>
                             Primary Color
                         </label>
                         <input
                             type="color"
                             value={currentPrimary}
                             onChange={(e) => setEdits(prev => ({ ...prev, completed_primary_color: e.target.value }))}
-                            style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                            className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '8px', color: 'var(--color-text-secondary)' }}>
-                            Secondary Color <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>(SMART ring fill)</span>
+                        <label className={styles.inputLabel}>
+                            Secondary Color <span className={styles.subText}>(SMART ring fill)</span>
                         </label>
                         <input
                             type="color"
                             value={currentSecondary}
                             onChange={(e) => setEdits(prev => ({ ...prev, completed_secondary_color: e.target.value }))}
-                            style={{ width: isMobile ? '100%' : '120px', height: '32px', padding: 0, border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                            className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
                         />
                     </div>
                 </div>

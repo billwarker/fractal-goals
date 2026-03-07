@@ -102,37 +102,6 @@ def _authorize_goal_access(db_session, current_user_id: str, goal, root_id_hint:
 
     return authorized_root_id
 
-
-def _collect_goal_ids_with_ancestors(goal_ids, goals_by_id):
-    collected = set()
-    for goal_id in goal_ids:
-        current = goals_by_id.get(goal_id)
-        while current:
-            if current.id in collected:
-                break
-            collected.add(current.id)
-            current = goals_by_id.get(current.parent_id)
-    return collected
-
-
-def _prune_tree_to_goal_ids(serialized_node, allowed_ids):
-    if not serialized_node:
-        return None
-
-    kept_children = []
-    for child in serialized_node.get('children', []) or []:
-        pruned_child = _prune_tree_to_goal_ids(child, allowed_ids)
-        if pruned_child:
-            kept_children.append(pruned_child)
-
-    if serialized_node.get('id') in allowed_ids or kept_children:
-        next_node = dict(serialized_node)
-        next_node['children'] = kept_children
-        return next_node
-
-    return None
-
-
 def _sync_targets(db_session, goal, incoming_targets: list):
     """
     Sync relational Target records with incoming target data.
@@ -338,60 +307,61 @@ def create_goal(current_user, validated_data):
 
         level_id = _resolve_level_id(db_session, validated_data.get('type'))
         
-        # Create the goal (type already validated by schema)
-        new_goal = Goal(
-            level_id=level_id,
-            name=validated_data['name'],  # Already sanitized
-            description=validated_data.get('description', ''),
-            deadline=deadline,
-            completed=False,
-            completed_via_children=validated_data.get('completed_via_children', False),
-            relevance_statement=validated_data.get('relevance_statement'),
-            parent_id=parent_id,
-            owner_id=parent.owner_id if parent else current_user.id
-        )
-        
-        # Set root_id
-        if parent:
-            # Traverse up to find root
-            current = parent
-            while current.parent_id:
-                current = get_goal_by_id(db_session, current.parent_id)
-            new_goal.root_id = current.id
-        
-        db_session.add(new_goal)
-        db_session.flush()
-        if not parent:
-            new_goal.root_id = new_goal.id
-
-        # Nano Goal Activity Inheritance
-        if getattr(new_goal, 'level', None) and new_goal.level.name == 'Nano Goal' and new_goal.parent_id:
-            if parent and parent.associated_activities:
-                for activity in parent.associated_activities:
-                    new_goal.associated_activities.append(activity)
-
-        # Handle targets if provided
-        if validated_data.get('targets'):
-            # Source of truth: relational Target rows.
-            _sync_targets(db_session, new_goal, validated_data['targets'])
-            new_goal.targets = None
-        
-        # Link to session if session_id provided and it's a Micro Goal
-        # We need to check the level name
-        is_micro = False
-        if getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal':
-            is_micro = True
+        with db_session.begin_nested():
+            # Create the goal (type already validated by schema)
+            new_goal = Goal(
+                level_id=level_id,
+                name=validated_data['name'],  # Already sanitized
+                description=validated_data.get('description', ''),
+                deadline=deadline,
+                completed=False,
+                completed_via_children=validated_data.get('completed_via_children', False),
+                relevance_statement=validated_data.get('relevance_statement'),
+                parent_id=parent_id,
+                owner_id=parent.owner_id if parent else current_user.id
+            )
             
-        if validated_data.get('session_id') and (validated_data.get('type') == 'MicroGoal' or is_micro):
-            db_session.execute(session_goals.insert().values(
-                **_session_goal_insert_values(
-                    db_session,
-                    validated_data['session_id'],
-                    new_goal.id,
-                    'MicroGoal', # Legacy string for the junction table if it still expects it
-                    'micro_goal'
-                )
-            ))
+            # Set root_id
+            if parent:
+                # Traverse up to find root
+                current = parent
+                while current.parent_id:
+                    current = get_goal_by_id(db_session, current.parent_id)
+                new_goal.root_id = current.id
+            
+            db_session.add(new_goal)
+            db_session.flush()
+            if not parent:
+                new_goal.root_id = new_goal.id
+
+            # Nano Goal Activity Inheritance
+            if getattr(new_goal, 'level', None) and new_goal.level.name == 'Nano Goal' and new_goal.parent_id:
+                if parent and parent.associated_activities:
+                    for activity in parent.associated_activities:
+                        new_goal.associated_activities.append(activity)
+
+            # Handle targets if provided
+            if validated_data.get('targets'):
+                # Source of truth: relational Target rows.
+                _sync_targets(db_session, new_goal, validated_data['targets'])
+                new_goal.targets = None
+            
+            # Link to session if session_id provided and it's a Micro Goal
+            # We need to check the level name
+            is_micro = False
+            if getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal':
+                is_micro = True
+                
+            if validated_data.get('session_id') and (validated_data.get('type') == 'MicroGoal' or is_micro):
+                db_session.execute(session_goals.insert().values(
+                    **_session_goal_insert_values(
+                        db_session,
+                        validated_data['session_id'],
+                        new_goal.id,
+                        'MicroGoal', # Legacy string for the junction table if it still expects it
+                        'micro_goal'
+                    )
+                ))
         
         db_session.commit()
         db_session.refresh(new_goal)
@@ -473,133 +443,16 @@ def get_session_micro_goals(current_user, root_id, session_id):
 @token_required
 def get_session_goals_view(current_user, root_id, session_id):
     """Return the canonical goals payload used by the session detail sidepane."""
+    from services.goal_tree_service import GoalTreeService
+
     engine = models.get_engine()
     db_session = get_session(engine)
-    service = SessionService(db_session)
     try:
-        root = db_session.query(Goal).options(
-            selectinload(Goal.children),
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups)
-        ).filter(
-            Goal.id == root_id,
-            Goal.parent_id == None,
-            Goal.owner_id == current_user.id,
-            Goal.deleted_at == None
-        ).first()
-        if not root:
-            root = require_owned_root(db_session, root_id, current_user.id)
-            if not root:
-                return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        session_obj = db_session.query(Session).options(
-            selectinload(Session.goals),
-            selectinload(Session.activity_instances)
-        ).filter(
-            Session.id == session_id,
-            Session.root_id == root_id,
-            Session.deleted_at == None
-        ).first()
-        if not session_obj:
-            return jsonify({"error": "Session not found in this fractal"}), 404
-
-        root_tree = serialize_goal(root)
-
-        goals_by_id = {
-            goal.id: goal
-            for goal in db_session.query(Goal).filter(
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).all()
-        }
-
-        session_goal_select = select(session_goals.c.goal_id)
-        includes_source = _session_goals_supports_source(db_session)
-        if includes_source:
-            session_goal_select = select(session_goals.c.goal_id, session_goals.c.association_source)
-        session_goals_rows = db_session.execute(
-            session_goal_select.where(session_goals.c.session_id == session_id)
-        ).all()
-        session_goal_ids = [row.goal_id for row in session_goals_rows]
-        session_goal_sources = {
-            row.goal_id: (getattr(row, 'association_source', None) if includes_source else None) or 'manual'
-            for row in session_goals_rows
-        }
-
-        if not session_goal_ids:
-            derived_goals = service._derive_session_goals_from_activities(session_obj)
-            session_goal_ids = [goal.id for goal in derived_goals]
-            session_goal_sources = {goal.id: 'activity-derived' for goal in derived_goals}
-
-        session_activity_instances = list(session_obj.activity_instances or [])
-        session_activity_ids = sorted({
-            inst.activity_definition_id
-            for inst in session_activity_instances
-            if inst.activity_definition_id
-        })
-
-        activity_goal_ids_by_activity = {}
-        if session_activity_ids:
-            activity_defs = db_session.query(ActivityDefinition).options(
-                selectinload(ActivityDefinition.associated_goals)
-            ).filter(
-                ActivityDefinition.id.in_(session_activity_ids),
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.deleted_at == None
-            ).all()
-            for activity_def in activity_defs:
-                activity_goal_ids_by_activity[activity_def.id] = [
-                    goal.id for goal in (activity_def.associated_goals or [])
-                    if not goal.deleted_at and goal.root_id == root_id
-                ]
-
-        associated_goal_ids = {
-            goal_id
-            for goal_ids in activity_goal_ids_by_activity.values()
-            for goal_id in goal_ids
-        }
-        structural_goal_ids = {
-            goal_id for goal_id in (set(session_goal_ids) | associated_goal_ids)
-            if goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
-        }
-        visible_goal_ids = _collect_goal_ids_with_ancestors(
-            set(session_goal_ids) | associated_goal_ids,
-            goals_by_id
-        )
-        visible_goal_ids = {
-            goal_id for goal_id in visible_goal_ids
-            if goal_id == root_id or (
-                goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
-            )
-        }
-        visible_goal_ids |= _collect_goal_ids_with_ancestors(structural_goal_ids, goals_by_id)
-        visible_goal_ids.add(root_id)
-        pruned_goal_tree = _prune_tree_to_goal_ids(root_tree, visible_goal_ids) or root_tree
-
-        micro_stmt = (
-            select(Goal)
-            .join(session_goals, Goal.id == session_goals.c.goal_id)
-            .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
-            .where(session_goals.c.session_id == session_id)
-            .where(Goal.root_id == root_id)
-            .where(
-                or_(
-                    models.GoalLevel.name == 'Micro Goal',
-                    session_goals.c.goal_type == 'MicroGoal'
-                )
-            )
-            .options(selectinload(Goal.children))
-        )
-        micro_goals = db_session.execute(micro_stmt).scalars().all()
-
-        return jsonify({
-            "goal_tree": pruned_goal_tree,
-            "session_goal_ids": session_goal_ids,
-            "session_goal_sources": session_goal_sources,
-            "session_activity_ids": session_activity_ids,
-            "activity_goal_ids_by_activity": activity_goal_ids_by_activity,
-            "micro_goals": [serialize_goal(g) for g in micro_goals],
-        })
+        service = GoalTreeService(db_session)
+        payload, error_dict, status_code = service.get_session_goals_view_payload(current_user, root_id, session_id)
+        if error_dict:
+            return jsonify(error_dict), status_code
+        return jsonify(payload)
     except Exception:
         logger.exception("Error fetching session goals view")
         return internal_error(logger, "Goals API request failed")
@@ -1309,46 +1162,47 @@ def create_fractal_goal(current_user, root_id, validated_data):
         if not completed_via_children and level_obj and getattr(level_obj, 'auto_complete_when_children_done', False):
             completed_via_children = True
         
-        # Create new goal
-        new_goal = Goal(
-            id=str(uuid.uuid4()),
-            name=validated_data['name'],  # Already sanitized
-            description=validated_data.get('description', ''),
-            level_id=level_id,
-            parent_id=validated_data.get('parent_id'),
-            deadline=deadline,
-            completed=False,
-            completed_via_children=completed_via_children,
-            allow_manual_completion=validated_data.get('allow_manual_completion', True),
-            track_activities=validated_data.get('track_activities', True),
-            relevance_statement=validated_data.get('relevance_statement'),
-            root_id=root_id,  # Set root_id for performance
-            owner_id=current_user.id
-        )
-        
-        db_session.add(new_goal)
-        db_session.flush()
+        with db_session.begin_nested():
+            # Create new goal
+            new_goal = Goal(
+                id=str(uuid.uuid4()),
+                name=validated_data['name'],  # Already sanitized
+                description=validated_data.get('description', ''),
+                level_id=level_id,
+                parent_id=validated_data.get('parent_id'),
+                deadline=deadline,
+                completed=False,
+                completed_via_children=completed_via_children,
+                allow_manual_completion=validated_data.get('allow_manual_completion', True),
+                track_activities=validated_data.get('track_activities', True),
+                relevance_statement=validated_data.get('relevance_statement'),
+                root_id=root_id,  # Set root_id for performance
+                owner_id=current_user.id
+            )
+            
+            db_session.add(new_goal)
+            db_session.flush()
 
-        # Handle targets if provided
-        if validated_data.get('targets'):
-            # Source of truth: relational Target rows.
-            _sync_targets(db_session, new_goal, validated_data['targets'])
-            new_goal.targets = None
-        
-        # Link to session if session_id provided and it's a MicroGoal
-        # Use the type string directly (not new_goal.level.name which may not be lazy-loaded yet)
-        is_micro = validated_data.get('type') == 'MicroGoal'
-        if validated_data.get('session_id') and is_micro:
-            db_session.execute(session_goals.insert().values(
-                **_session_goal_insert_values(
-                    db_session,
-                    validated_data['session_id'],
-                    new_goal.id,
-                    'MicroGoal',
-                    'micro_goal'
-                )
-            ))
-        
+            # Handle targets if provided
+            if validated_data.get('targets'):
+                # Source of truth: relational Target rows.
+                _sync_targets(db_session, new_goal, validated_data['targets'])
+                new_goal.targets = None
+            
+            # Link to session if session_id provided and it's a MicroGoal
+            # Use the type string directly (not new_goal.level.name which may not be lazy-loaded yet)
+            is_micro = validated_data.get('type') == 'MicroGoal'
+            if validated_data.get('session_id') and is_micro:
+                db_session.execute(session_goals.insert().values(
+                    **_session_goal_insert_values(
+                        db_session,
+                        validated_data['session_id'],
+                        new_goal.id,
+                        'MicroGoal',
+                        'micro_goal'
+                    )
+                ))
+            
         db_session.commit()
         db_session.refresh(new_goal)
         

@@ -9,6 +9,7 @@ import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import notify from '../../utils/notify';
 import { fractalApi } from '../../utils/api';
+import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import styles from './SessionActivityItem.module.css';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
@@ -641,7 +642,7 @@ function SessionActivityItem({
                         }}
                         className={styles.activityNameContainer}
                     >
-                        <div className={styles.activityName} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
                             {activeMicroGoal && (
                                 <div title={`Micro Goal: ${activeMicroGoal.name}`}>
                                     <GoalIcon
@@ -652,7 +653,10 @@ function SessionActivityItem({
                                     />
                                 </div>
                             )}
-                            <span>{def.name}</span>
+                            <span className={styles.activityNameFlex}>
+                                {def.name}
+                                {!activityDefinition && <DeletedBadge />}
+                            </span>
                         </div>
                         {exercise.group_name && (
                             <div className={styles.activityGroupLabel}>{exercise.group_name}</div>

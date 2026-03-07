@@ -6,6 +6,10 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
 import { sortGroupsTreeOrder, getGroupBreadcrumb } from '../../utils/manageActivities';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
+import Button from '../atoms/Button';
 
 export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
@@ -149,148 +153,142 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
     if (!isOpen) return null;
 
     return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'var(--color-overlay)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 1000,
-            padding: isMobile ? 0 : '16px'
-        }} onClick={onClose}>
-            <div style={{
-                background: 'var(--color-bg-card)',
-                padding: isMobile ? '16px' : '24px',
-                borderRadius: isMobile ? '16px 16px 0 0' : '8px',
-                width: isMobile ? '100vw' : 'min(500px, 95vw)',
-                maxHeight: isMobile ? '85vh' : '90vh',
-                overflowY: 'auto',
-                border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: '20px',
-                boxShadow: 'var(--shadow-md)'
-            }} onClick={e => e.stopPropagation()}>
-                <h2 style={{ fontSize: '20px', fontWeight: 300, margin: 0 }}>
-                    {editingGroup ? 'Edit Group' : 'Create Group'}
-                </h2>
-                {error && (
-                    <div style={{ fontSize: '13px', color: 'var(--color-brand-danger)', marginTop: '-8px' }}>
-                        {error}
-                    </div>
-                )}
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-
-                    {/* Name */}
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Name</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', boxSizing: 'border-box' }}
-                            required
-                            autoFocus
-                        />
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Description</label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                        />
-                    </div>
-
-                    {/* Parent Group */}
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Parent Group (Optional)</label>
-                        <select
-                            value={parentId}
-                            onChange={e => setParentId(e.target.value)}
-                            style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', boxSizing: 'border-box' }}
-                        >
-                            <option value="">(No Parent - Root Level)</option>
-                            {availableParentGroups.map(group => (
-                                <option key={group.id} value={group.id}>
-                                    {groupBreadcrumb(group.id)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Associated Goals */}
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Associated Goals</label>
-                            <button
-                                type="button"
-                                onClick={() => setShowGoalSelector(!showGoalSelector)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', fontSize: '12px' }}
-                            >
-                                {showGoalSelector ? 'Hide Goals' : 'Select Goals'}
-                            </button>
-                        </div>
-
-                        {/* Selected Goals Tags */}
-                        {selectedGoalIds.length > 0 && !showGoalSelector && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '5px' }}>
-                                {selectedGoalIds.map(id => {
-                                    const goal = allGoals.find(g => g.id === id);
-                                    if (!goal) return null;
-                                    const color = getGoalColor(goal.type);
-                                    return (
-                                        <span key={id} style={{
-                                            fontSize: '11px', padding: '2px 6px', borderRadius: '4px',
-                                            background: `${color}30`, border: `1px solid ${color}`, color: color
-                                        }}>
-                                            {goal.name}
-                                        </span>
-                                    );
-                                })}
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={editingGroup ? 'Edit Group' : 'Create Group'}
+            size="md"
+        >
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <ModalBody>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {error && (
+                            <div style={{ fontSize: '13px', color: 'var(--color-brand-danger)' }}>
+                                {error}
                             </div>
                         )}
 
-                        {/* Goal Selector Area */}
-                        {showGoalSelector && (
-                            <div style={{
-                                background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px',
-                                padding: '10px', maxHeight: '200px', overflowY: 'auto'
-                            }}>
-                                {allGoals.length === 0 ? (
-                                    <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '12px' }}>No goals found.</div>
-                                ) : (
-                                    allGoals.map(goal => {
-                                        const isSelected = selectedGoalIds.includes(goal.id);
+                        {/* Name */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Name</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', boxSizing: 'border-box' }}
+                                required
+                                autoFocus
+                            />
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Description</label>
+                            <textarea
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                            />
+                        </div>
+
+                        {/* Parent Group */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Parent Group (Optional)</label>
+                            <select
+                                value={parentId}
+                                onChange={e => setParentId(e.target.value)}
+                                style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', boxSizing: 'border-box' }}
+                            >
+                                <option value="">(No Parent - Root Level)</option>
+                                {availableParentGroups.map(group => (
+                                    <option key={group.id} value={group.id}>
+                                        {groupBreadcrumb(group.id)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Associated Goals */}
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Associated Goals</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGoalSelector(!showGoalSelector)}
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', fontSize: '12px' }}
+                                >
+                                    {showGoalSelector ? 'Hide Goals' : 'Select Goals'}
+                                </button>
+                            </div>
+
+                            {/* Selected Goals Tags */}
+                            {selectedGoalIds.length > 0 && !showGoalSelector && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '5px' }}>
+                                    {selectedGoalIds.map(id => {
+                                        const goal = allGoals.find(g => g.id === id);
+                                        if (!goal) return null;
                                         const color = getGoalColor(goal.type);
                                         return (
-                                            <div key={goal.id} style={{ marginBottom: '4px' }}>
-                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setSelectedGoalIds([...selectedGoalIds, goal.id]);
-                                                            else setSelectedGoalIds(selectedGoalIds.filter(id => id !== goal.id));
-                                                        }}
-                                                    />
-                                                    <span style={{ color: isSelected ? color : 'var(--color-text-secondary)', fontSize: '13px' }}>{goal.name}</span>
-                                                </label>
-                                            </div>
+                                            <span key={id} style={{
+                                                fontSize: '11px', padding: '2px 6px', borderRadius: '4px',
+                                                background: `${color}30`, border: `1px solid ${color}`, color: color
+                                            }}>
+                                                {goal.name}
+                                            </span>
                                         );
-                                    })
-                                )}
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Goal Selector Area */}
+                            {showGoalSelector && (
+                                <div style={{
+                                    background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px',
+                                    padding: '10px', maxHeight: '200px', overflowY: 'auto'
+                                }}>
+                                    {allGoals.length === 0 ? (
+                                        <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '12px' }}>No goals found.</div>
+                                    ) : (
+                                        allGoals.map(goal => {
+                                            const isSelected = selectedGoalIds.includes(goal.id);
+                                            const color = getGoalColor(goal.type);
+                                            return (
+                                                <div key={goal.id} style={{ marginBottom: '4px' }}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedGoalIds([...selectedGoalIds, goal.id]);
+                                                                else setSelectedGoalIds(selectedGoalIds.filter(id => id !== goal.id));
+                                                            }}
+                                                        />
+                                                        <span style={{ color: isSelected ? color : 'var(--color-text-secondary)', fontSize: '13px' }}>{goal.name}</span>
+                                                    </label>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                All activities in this group will be associated with these goals.
                             </div>
-                        )}
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                            All activities in this group will be associated with these goals.
                         </div>
                     </div>
+                </ModalBody>
 
-                    {/* Footer Actions */}
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px', flexDirection: isMobile ? 'column-reverse' : 'row' }}>
-                        <button type="button" onClick={onClose} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>Cancel</button>
-                        <button type="submit" disabled={loading} style={{ padding: '10px 24px', background: 'var(--color-brand-primary)', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', opacity: loading ? 0.7 : 1, fontWeight: 'bold' }}>
+                <ModalFooter>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexDirection: isMobile ? 'column-reverse' : 'row', width: '100%' }}>
+                        <Button variant="secondary" onClick={onClose} fullWidth={isMobile}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" variant="primary" disabled={loading} fullWidth={isMobile}>
                             {loading ? 'Saving...' : 'Save'}
-                        </button>
+                        </Button>
                     </div>
-                </form>
-            </div>
-        </div>
+                </ModalFooter>
+            </form>
+        </Modal>
     );
 }

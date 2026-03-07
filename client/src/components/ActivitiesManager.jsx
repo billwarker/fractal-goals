@@ -1,19 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { fractalApi } from '../utils/api';
+import React, { useState } from 'react';
+import { useActivities, useCreateActivity, useDeleteActivity } from '../hooks/useActivityQueries';
 import Modal from './atoms/Modal';
+import ModalBody from './atoms/ModalBody';
 import Button from './atoms/Button';
 import Input from './atoms/Input';
 import Checkbox from './atoms/Checkbox';
+import styles from './ActivitiesManager.module.css';
 
 /**
  * ActivitiesManager - Modal component to manage Activity Definitions and Metrics
  */
 function ActivitiesManager({ rootId, onClose }) {
-    const [activities, setActivities] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [creating, setCreating] = useState(false);
+    const { activities, isLoading: loading, error } = useActivities(rootId);
+    const createMutation = useCreateActivity(rootId);
+    const deleteMutation = useDeleteActivity(rootId);
+
+    // UI State
     const [deletingId, setDeletingId] = useState(null);
+    const [createError, setCreateError] = useState(null);
 
     // Form State
     const [name, setName] = useState('');
@@ -23,22 +27,7 @@ function ActivitiesManager({ rootId, onClose }) {
     const [hasMetrics, setHasMetrics] = useState(true);
     const [metricsMultiplicative, setMetricsMultiplicative] = useState(false);
 
-    useEffect(() => {
-        fetchActivities();
-    }, [rootId]);
-
-    const fetchActivities = async () => {
-        try {
-            setLoading(true);
-            const res = await fractalApi.getActivities(rootId);
-            setActivities(res.data);
-            setLoading(false);
-        } catch (err) {
-            console.error("Failed to fetch activities", err);
-            setError("Failed to load activities");
-            setLoading(false);
-        }
-    };
+    // Removing explicit fetchActivities() since React Query handles it automatically
 
     const handleAddMetric = () => {
         if (metrics.length < 3) {
@@ -61,12 +50,10 @@ function ActivitiesManager({ rootId, onClose }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            setCreating(true);
-
-            // Filter out empty metrics
+            setCreateError(null);
             const validMetrics = metrics.filter(m => m.name.trim() !== '');
 
-            await fractalApi.createActivity(rootId, {
+            await createMutation.mutateAsync({
                 name,
                 description,
                 metrics: hasMetrics ? validMetrics : [],
@@ -82,14 +69,9 @@ function ActivitiesManager({ rootId, onClose }) {
             setHasSets(false);
             setHasMetrics(true);
             setMetricsMultiplicative(false);
-
-            // Refresh list
-            fetchActivities();
-            setCreating(false);
         } catch (err) {
             console.error("Failed to create activity", err);
-            setError("Failed to create activity");
-            setCreating(false);
+            setCreateError("Failed to create activity");
         }
     };
 
@@ -99,12 +81,11 @@ function ActivitiesManager({ rootId, onClose }) {
 
     const handleConfirmDelete = async (activityId) => {
         try {
-            await fractalApi.deleteActivity(rootId, activityId);
+            await deleteMutation.mutateAsync(activityId);
             setDeletingId(null);
-            fetchActivities();
         } catch (err) {
             console.error("Failed to delete activity", err);
-            setError("Failed to delete activity");
+            setCreateError("Failed to delete activity");
             setDeletingId(null);
         }
     };
@@ -116,215 +97,197 @@ function ActivitiesManager({ rootId, onClose }) {
             title="Manage Activities"
             size="lg"
         >
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                {error && (
-                    <div style={{ padding: '10px', background: 'rgba(255,0,0,0.1)', color: '#f44336', marginBottom: '20px', borderRadius: '4px' }}>
-                        {error}
-                    </div>
-                )}
-
-                {/* List Existing */}
-                <div style={{ marginBottom: '30px' }}>
-                    <h3 style={{ fontSize: '14px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '15px' }}>Existing Activities</h3>
-                    {loading ? (
-                        <div>Loading...</div>
-                    ) : activities.length === 0 ? (
-                        <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No activities defined yet.</div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {activities.map(activity => (
-                                <div key={activity.id} style={{
-                                    background: 'var(--color-bg-card-alt)',
-                                    padding: '12px',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--color-border)',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{activity.name}</div>
-                                        {activity.description && <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{activity.description}</div>}
-                                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
-                                            {/* Indicators */}
-                                            {activity.has_sets && (
-                                                <span style={{ fontSize: '11px', background: 'var(--color-bg-input)', color: 'var(--color-warning)', padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--color-border)' }}>
-                                                    Sets
-                                                </span>
-                                            )}
-                                            {!activity.has_metrics && (
-                                                <span style={{ fontSize: '11px', background: 'var(--color-bg-input)', color: 'var(--color-text-muted)', padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--color-border)' }}>
-                                                    No Metrics
-                                                </span>
-                                            )}
-                                            {activity.metrics_multiplicative && (
-                                                <span style={{ fontSize: '11px', background: 'var(--color-bg-input)', color: '#e91e63', padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--color-border)' }}>
-                                                    A × B × C
-                                                </span>
-                                            )}
-
-                                            {activity.metric_definitions?.map(m => (
-                                                <span key={m.id} style={{
-                                                    fontSize: '11px',
-                                                    background: 'var(--color-bg-input)',
-                                                    padding: '2px 6px',
-                                                    borderRadius: '3px',
-                                                    color: 'var(--color-success)',
-                                                    border: '1px solid var(--color-border)'
-                                                }}>
-                                                    {m.name} ({m.unit})
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {deletingId === activity.id ? (
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <Button
-                                                onClick={() => handleConfirmDelete(activity.id)}
-                                                variant="danger"
-                                                size="sm"
-                                            >
-                                                Confirm
-                                            </Button>
-                                            <Button
-                                                onClick={() => setDeletingId(null)}
-                                                variant="secondary"
-                                                size="sm"
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button
-                                            onClick={() => handleDeleteClick(activity.id)}
-                                            variant="ghost"
-                                            size="sm"
-                                            style={{ color: 'var(--color-brand-danger)' }}
-                                        >
-                                            Delete
-                                        </Button>
-                                    )}
-                                </div>
-                            ))}
+            <ModalBody>
+                <div className={styles.container}>
+                    {(error || createError) && (
+                        <div className={styles.errorBanner}>
+                            {error ? "Failed to load activities" : createError}
                         </div>
                     )}
-                </div>
 
-                {/* Create New Form */}
-                <div style={{
-                    background: 'var(--color-bg-card-alt)',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--color-border)'
-                }}>
-                    <h3 style={{ fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '15px', marginTop: 0 }}>Create New Activity</h3>
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gap: '15px' }}>
-                            <div>
-                                <Input
-                                    label="Activity Name"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    placeholder="e.g. Scale Practice"
-                                    fullWidth
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <Input
-                                    label="Description"
-                                    value={description}
-                                    onChange={e => setDescription(e.target.value)}
-                                    placeholder="Optional description"
-                                    fullWidth
-                                />
-                            </div>
-
-                            {/* Flags */}
-                            <div style={{ display: 'flex', gap: '20px' }}>
-                                <Checkbox
-                                    label="Track Sets"
-                                    checked={hasSets}
-                                    onChange={e => setHasSets(e.target.checked)}
-                                />
-                                <Checkbox
-                                    label="Enable Metrics"
-                                    checked={hasMetrics}
-                                    onChange={e => setHasMetrics(e.target.checked)}
-                                />
-                            </div>
-
-                            {/* Metrics Section - Conditional */}
-                            {hasMetrics && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>Metrics (Max 3)</label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {metrics.map((metric, idx) => (
-                                            <div key={idx} style={{ display: 'flex', gap: '8px' }}>
-                                                <Input
-                                                    value={metric.name}
-                                                    onChange={e => handleMetricChange(idx, 'name', e.target.value)}
-                                                    placeholder="Metric Name (e.g. Speed)"
-                                                    style={{ marginBottom: 0, flex: 1 }}
-                                                />
-                                                <Input
-                                                    value={metric.unit}
-                                                    onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
-                                                    placeholder="Unit"
-                                                    style={{ marginBottom: 0, width: '80px' }}
-                                                />
-                                                {metrics.length > 1 && (
-                                                    <Button
-                                                        type="button"
-                                                        onClick={() => handleRemoveMetric(idx)}
-                                                        variant="ghost"
-                                                        style={{ color: 'var(--color-brand-danger)', padding: '0 8px' }}
-                                                    >
-                                                        ×
-                                                    </Button>
+                    {/* List Existing */}
+                    <div className={styles.existingListContainer}>
+                        <h3 className={styles.sectionTitle}>Existing Activities</h3>
+                        {loading ? (
+                            <div>Loading...</div>
+                        ) : activities.length === 0 ? (
+                            <div className={styles.emptyState}>No activities defined yet.</div>
+                        ) : (
+                            <div className={styles.activitiesList}>
+                                {activities.map(activity => (
+                                    <div key={activity.id} className={styles.activityCard}>
+                                        <div>
+                                            <div className={styles.activityName}>{activity.name}</div>
+                                            {activity.description && <div className={styles.activityDescription}>{activity.description}</div>}
+                                            <div className={styles.tagsContainer}>
+                                                {/* Indicators */}
+                                                {activity.has_sets && (
+                                                    <span className={`${styles.tag} ${styles.tagSets}`}>
+                                                        Sets
+                                                    </span>
                                                 )}
+                                                {!activity.has_metrics && (
+                                                    <span className={`${styles.tag} ${styles.tagNoMetrics}`}>
+                                                        No Metrics
+                                                    </span>
+                                                )}
+                                                {activity.metrics_multiplicative && (
+                                                    <span className={`${styles.tag} ${styles.tagMultiplicative}`}>
+                                                        A × B × C
+                                                    </span>
+                                                )}
+
+                                                {activity.metric_definitions?.map(m => (
+                                                    <span key={m.id} className={`${styles.tag} ${styles.tagMetric}`}>
+                                                        {m.name} ({m.unit})
+                                                    </span>
+                                                ))}
                                             </div>
-                                        ))}
-                                        {metrics.length < 3 && (
+                                        </div>
+                                        {deletingId === activity.id ? (
+                                            <div className={styles.actionButtons}>
+                                                <Button
+                                                    onClick={() => handleConfirmDelete(activity.id)}
+                                                    variant="danger"
+                                                    size="sm"
+                                                >
+                                                    Confirm
+                                                </Button>
+                                                <Button
+                                                    onClick={() => setDeletingId(null)}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        ) : (
                                             <Button
-                                                type="button"
-                                                onClick={handleAddMetric}
-                                                variant="secondary"
+                                                onClick={() => handleDeleteClick(activity.id)}
+                                                variant="ghost"
                                                 size="sm"
-                                                style={{ alignSelf: 'flex-start' }}
+                                                className={styles.deleteButton}
                                             >
-                                                + Add Metric
+                                                Delete
                                             </Button>
                                         )}
                                     </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                                    {/* Multiplicative Metrics Checkbox - only show when 2+ metrics */}
-                                    {metrics.filter(m => m.name.trim() !== '').length > 1 && (
-                                        <div style={{ marginTop: '10px' }}>
-                                            <Checkbox
-                                                label="Metrics are multiplicative (enables A × B × C derived metric)"
-                                                checked={metricsMultiplicative}
-                                                onChange={e => setMetricsMultiplicative(e.target.checked)}
-                                            />
-                                        </div>
-                                    )}
+                    {/* Create New Form */}
+                    <div className={styles.createContainer}>
+                        <h3 className={`${styles.sectionTitle} ${styles.createTitle}`}>Create New Activity</h3>
+                        <form onSubmit={handleSubmit}>
+                            <div className={styles.formGrid}>
+                                <div>
+                                    <Input
+                                        label="Activity Name"
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                        placeholder="e.g. Scale Practice"
+                                        fullWidth
+                                        required
+                                    />
                                 </div>
-                            )}
+                                <div>
+                                    <Input
+                                        label="Description"
+                                        value={description}
+                                        onChange={e => setDescription(e.target.value)}
+                                        placeholder="Optional description"
+                                        fullWidth
+                                    />
+                                </div>
 
-                            <Button
-                                type="submit"
-                                disabled={creating}
-                                isLoading={creating}
-                                variant="success"
-                                fullWidth
-                            >
-                                {creating ? 'Creating...' : 'Create Activity'}
-                            </Button>
-                        </div>
-                    </form>
+                                {/* Flags */}
+                                <div className={styles.flagsContainer}>
+                                    <Checkbox
+                                        label="Track Sets"
+                                        checked={hasSets}
+                                        onChange={e => setHasSets(e.target.checked)}
+                                    />
+                                    <Checkbox
+                                        label="Enable Metrics"
+                                        checked={hasMetrics}
+                                        onChange={e => setHasMetrics(e.target.checked)}
+                                    />
+                                </div>
+
+                                {/* Metrics Section - Conditional */}
+                                {hasMetrics && (
+                                    <div>
+                                        <label className={styles.metricsLabel}>Metrics (Max 3)</label>
+                                        <div className={styles.metricsList}>
+                                            {metrics.map((metric, idx) => (
+                                                <div key={idx} className={styles.metricRow}>
+                                                    <Input
+                                                        value={metric.name}
+                                                        onChange={e => handleMetricChange(idx, 'name', e.target.value)}
+                                                        placeholder="Metric Name (e.g. Speed)"
+                                                        className={styles.metricNameInput}
+                                                    />
+                                                    <Input
+                                                        value={metric.unit}
+                                                        onChange={e => handleMetricChange(idx, 'unit', e.target.value)}
+                                                        placeholder="Unit"
+                                                        className={styles.metricUnitInput}
+                                                    />
+                                                    {metrics.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            onClick={() => handleRemoveMetric(idx)}
+                                                            variant="ghost"
+                                                            className={styles.metricRemoveButton}
+                                                        >
+                                                            ×
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {metrics.length < 3 && (
+                                                <Button
+                                                    type="button"
+                                                    onClick={handleAddMetric}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    className={styles.addMetricButton}
+                                                >
+                                                    + Add Metric
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Multiplicative Metrics Checkbox - only show when 2+ metrics */}
+                                        {metrics.filter(m => m.name.trim() !== '').length > 1 && (
+                                            <div className={styles.multiplicativeContainer}>
+                                                <Checkbox
+                                                    label="Metrics are multiplicative (enables A × B × C derived metric)"
+                                                    checked={metricsMultiplicative}
+                                                    onChange={e => setMetricsMultiplicative(e.target.checked)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <Button
+                                    type="submit"
+                                    disabled={createMutation.isPending}
+                                    isLoading={createMutation.isPending}
+                                    variant="success"
+                                    fullWidth
+                                >
+                                    {createMutation.isPending ? 'Creating...' : 'Create Activity'}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
-        </Modal>
+            </ModalBody>
+        </Modal >
     );
 }
 

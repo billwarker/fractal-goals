@@ -240,44 +240,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const toggleGoalCompletionMutation = useMutation({
         mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
-        onMutate: async ({ goalId, completed }) => {
-            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            await queryClient.cancelQueries({ queryKey: ['session-notes', rootId, sessionId] });
-            await queryClient.cancelQueries({ queryKey: ['session', rootId, sessionId] });
-
-            // Snapshot the previous value
-            const previousNotes = queryClient.getQueryData(['session-notes', rootId, sessionId]);
-            const previousSession = queryClient.getQueryData(['session', rootId, sessionId]);
-
-            // Optimistically update notes
-            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
-                old.map(n => n.nano_goal_id === goalId ? { ...n, nano_goal_completed: completed } : n)
-            );
-
-            // Optimistically update session data if goal is in immediate_goals etc.
-            queryClient.setQueryData(['session', rootId, sessionId], (old) => {
-                if (!old) return old;
-                // Deep clone and update
-                const next = JSON.parse(JSON.stringify(old));
-                if (next.immediate_goals) {
-                    next.immediate_goals = next.immediate_goals.map(g =>
-                        g.id === goalId ? { ...g, completed } : g
-                    );
-                }
-                return next;
-            });
-
-            return { previousNotes, previousSession };
-        },
-        onError: (err, variables, context) => {
-            // Rollback
-            if (context?.previousNotes) {
-                queryClient.setQueryData(['session-notes', rootId, sessionId], context.previousNotes);
-            }
-            if (context?.previousSession) {
-                queryClient.setQueryData(['session', rootId, sessionId], context.previousSession);
-            }
-        },
         onSuccess: (res, variables) => {
             queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
             queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
@@ -453,70 +415,13 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 return;
             }
 
-            const optimisticCompletedAt = desiredCompleted ? new Date().toISOString() : null;
             autoSyncedGoalStatesRef.current.set(goalId, desiredCompleted);
 
-            queryClient.setQueryData(['session-goals-view', rootId, sessionId], (prev) => {
-                if (!prev) return prev;
-                return {
-                    ...prev,
-                    goal_tree: patchGoalTreeCompletion(prev.goal_tree, goalId, desiredCompleted, optimisticCompletedAt),
-                    micro_goals: Array.isArray(prev.micro_goals)
-                        ? prev.micro_goals.map((microGoal) => patchGoalCompletion(microGoal, goalId, desiredCompleted, optimisticCompletedAt))
-                        : prev.micro_goals
-                };
-            });
-
-            queryClient.setQueryData(['session', rootId, sessionId], (prev) => {
-                if (!prev) return prev;
-                return {
-                    ...prev,
-                    short_term_goals: Array.isArray(prev.short_term_goals)
-                        ? prev.short_term_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, desiredCompleted, optimisticCompletedAt))
-                        : prev.short_term_goals,
-                    immediate_goals: Array.isArray(prev.immediate_goals)
-                        ? prev.immediate_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, desiredCompleted, optimisticCompletedAt))
-                        : prev.immediate_goals
-                };
-            });
-
-            queryClient.setQueryData(['fractalTree', rootId], (prev) => (
-                prev ? patchGoalTreeCompletion(prev, goalId, desiredCompleted, optimisticCompletedAt) : prev
-            ));
-
             fractalApi.toggleGoalCompletion(rootId, goalId, desiredCompleted)
-                .then((res) => {
-                    const syncedGoal = res?.data || {};
-                    const syncedCompleted = Boolean(syncedGoal.completed);
-                    const syncedCompletedAt = syncedGoal.completed_at || null;
-
-                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (prev) => {
-                        if (!prev) return prev;
-                        return {
-                            ...prev,
-                            goal_tree: patchGoalTreeCompletion(prev.goal_tree, goalId, syncedCompleted, syncedCompletedAt),
-                            micro_goals: Array.isArray(prev.micro_goals)
-                                ? prev.micro_goals.map((microGoal) => patchGoalCompletion(microGoal, goalId, syncedCompleted, syncedCompletedAt))
-                                : prev.micro_goals
-                        };
-                    });
-
-                    queryClient.setQueryData(['session', rootId, sessionId], (prev) => {
-                        if (!prev) return prev;
-                        return {
-                            ...prev,
-                            short_term_goals: Array.isArray(prev.short_term_goals)
-                                ? prev.short_term_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, syncedCompleted, syncedCompletedAt))
-                                : prev.short_term_goals,
-                            immediate_goals: Array.isArray(prev.immediate_goals)
-                                ? prev.immediate_goals.map((sessionGoal) => patchGoalCompletion(sessionGoal, goalId, syncedCompleted, syncedCompletedAt))
-                                : prev.immediate_goals
-                        };
-                    });
-
-                    queryClient.setQueryData(['fractalTree', rootId], (prev) => (
-                        prev ? patchGoalTreeCompletion(prev, goalId, syncedCompleted, syncedCompletedAt) : prev
-                    ));
+                .then(() => {
+                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
                 })
                 .catch((error) => {
                     console.error('[autoSyncGoalCompletion] failed', {
@@ -716,7 +621,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [rootId, sessionId, queryClient]);
 
 
-
+    // eslint-disable-next-line react-hooks/refs
     const autoSaveQueue = useMemo(() => createAutoSaveQueue({
         save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
         onError: () => {

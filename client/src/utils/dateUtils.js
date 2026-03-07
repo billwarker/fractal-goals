@@ -206,7 +206,6 @@ export const formatForInput = (dateValue, timezone) => {
 
     // Handle date-only strings (YYYY-MM-DD) - treat as local date at midnight
     if (typeof dateValue === 'string' && dateValue.length === 10 && dateValue.includes('-') && !dateValue.includes('T')) {
-        const [year, month, day] = dateValue.split('-').map(Number);
         // Create a local date, then format it without timezone conversion
         return `${dateValue} 00:00:00`;
     }
@@ -257,7 +256,6 @@ export const localToISO = (localDateStr, timezone) => {
     const dateStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 
     // Use Intl to get the UTC offset for this timezone at this date
-    const date = new Date(dateStr);
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: timezone,
         year: 'numeric',

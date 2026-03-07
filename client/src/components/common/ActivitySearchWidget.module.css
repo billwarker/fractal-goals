@@ -1,0 +1,260 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 400px;
+}
+
+.header {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.backButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    margin-left: -8px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.backButton:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Group Mode */
+.groupsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.groupCard {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.groupCardClickableArea {
+    padding: 12px;
+    cursor: pointer;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.groupCardClickableArea:hover {
+    background: var(--color-bg-hover);
+}
+
+.groupCard:hover {
+    border-color: var(--color-border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.groupSelectBtn {
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--color-border);
+    padding: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.groupSelectBtn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-brand-primary);
+}
+
+.groupSelectBtnActive {
+    color: white;
+    background: var(--color-brand-primary);
+    border-top-color: var(--color-brand-primary);
+}
+
+.groupSelectBtnActive:hover {
+    background: var(--color-brand-dark);
+    color: white;
+}
+
+.groupCard:hover {
+    border-color: var(--color-border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.ungroupedCard {
+    border-style: dashed;
+}
+
+.groupCardHasSelection {
+    border-color: var(--color-brand-primary);
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.groupName {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.groupMeta {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+}
+
+.groupSelectedText {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--color-brand-primary);
+    background: rgba(76, 175, 80, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+/* Activity List Mode */
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.activeGroupName {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: var(--color-text-primary);
+}
+
+.activityRow {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.activityRow:hover {
+    border-color: var(--color-border-hover);
+}
+
+.activityRowSelected {
+    background: rgba(76, 175, 80, 0.05);
+    border-color: var(--color-brand-primary);
+}
+
+.checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-text-muted);
+    border-radius: 4px;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: var(--color-brand-primary);
+    background: white;
+}
+
+.activityRowSelected .checkbox {
+    border-color: var(--color-brand-primary);
+}
+
+.activityInfo {
+    flex: 1;
+}
+
+.activityRowName {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 2px;
+}
+
+.activityRowType {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+}
+
+/* Actions */
+.actionsBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.extraActions {
+    display: flex;
+    gap: 12px;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btnCancel {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.btnConfirm {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-brand-primary);
+    border: none;
+    color: white;
+}
+
+.btnConfirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

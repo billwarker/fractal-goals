@@ -6,9 +6,8 @@ from datetime import datetime, timezone
 import uuid
 import json
 
-# Fallback for SQLite/other engines
 # JSONB gives us indexing and faster processing in Postgres
-JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
+JSON_TYPE = JSONB()
 
 Base = declarative_base()
 
@@ -43,21 +42,18 @@ def get_engine(db_url=None):
         db_url = config.get_database_url()
     
     from config import config
-    from sqlalchemy.pool import QueuePool, NullPool
+    from sqlalchemy.pool import QueuePool
     
-    if config.is_postgres():
-        engine = create_engine(
-            db_url,
-            echo=False,
-            poolclass=QueuePool,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-            pool_timeout=30,
-        )
-    else:
-        engine = create_engine(db_url, echo=False, poolclass=NullPool)
+    engine = create_engine(
+        db_url,
+        echo=False,
+        poolclass=QueuePool,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_timeout=30,
+    )
     
     if db_url == config.get_database_url():
         _cached_engine = engine

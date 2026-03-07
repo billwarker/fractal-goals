@@ -340,21 +340,23 @@ def create_note(current_user, root_id, validated_data):
                         "error": "nano_goal_id is not linked to the provided session"
                     }), 400
         
-        note = Note(
-            id=str(uuid.uuid4()),
-            root_id=root_id,
-            context_type=validated_data['context_type'],  # Already validated by schema
-            context_id=validated_data['context_id'],
-            session_id=session_id,
-            activity_instance_id=validated_data.get('activity_instance_id'),
-            activity_definition_id=validated_data.get('activity_definition_id'),
-            set_index=validated_data.get('set_index'),
-            content=content,
-            image_data=image_data,
-            nano_goal_id=nano_goal_id
-        )
-        
-        db.add(note)
+        with db.begin_nested():
+            note = Note(
+                id=str(uuid.uuid4()),
+                root_id=root_id,
+                context_type=validated_data['context_type'],
+                context_id=validated_data['context_id'],
+                session_id=session_id,
+                activity_instance_id=validated_data.get('activity_instance_id'),
+                activity_definition_id=validated_data.get('activity_definition_id'),
+                set_index=validated_data.get('set_index'),
+                content=content,
+                image_data=image_data,
+                nano_goal_id=nano_goal_id
+            )
+            
+            db.add(note)
+            
         db.commit()
         
         logger.info(f"Created note {note.id} for {validated_data['context_type']} {note.context_id}")

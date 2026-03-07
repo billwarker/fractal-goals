@@ -83,6 +83,12 @@
     overflow-wrap: anywhere;
 }
 
+.activityNameFlex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .activityLabel {
     font-size: 11px;
     color: var(--color-text-muted);

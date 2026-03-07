@@ -258,7 +258,7 @@ const ProgramDetail = () => {
                         try {
                             const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
                             pDayId = attr?.program_context?.day_id;
-                        } catch (e) { }
+                        } catch (e) { /* ignore */ }
                     }
 
                     if (pDayId !== itemToUnschedule.id) return false;
@@ -486,7 +486,7 @@ const ProgramDetail = () => {
             try {
                 const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
                 pDayId = attr?.program_context?.day_id;
-            } catch (e) { }
+            } catch (e) { /* ignore */ }
         }
 
         const pDayTemplate = pDayId ? programDaysMap.get(pDayId) : null;
@@ -702,7 +702,7 @@ const ProgramDetail = () => {
                 try {
                     const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
                     pDayId = attr?.program_context?.day_id;
-                } catch (e) { }
+                } catch (e) { /* ignore */ }
             }
             return pDayId && programDaysMap.has(pDayId);
         });
@@ -733,7 +733,7 @@ const ProgramDetail = () => {
                 try {
                     const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
                     pDayId = attr?.program_context?.day_id;
-                } catch (e) { }
+                } catch (e) { /* ignore */ }
             }
 
             // Strictly only count sessions linked to a day within this block

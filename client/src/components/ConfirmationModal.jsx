@@ -1,6 +1,7 @@
-
 import React from 'react';
 import Modal from './atoms/Modal';
+import ModalBody from './atoms/ModalBody';
+import ModalFooter from './atoms/ModalFooter';
 import Button from './atoms/Button';
 import { Text } from './atoms/Typography';
 
@@ -22,24 +23,20 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, confirm
             size="sm"
             showCloseButton={false}
         >
-            <Text className="mb-6" style={{ marginBottom: '24px', color: '#ccc' }}>
-                {message}
-            </Text>
+            <ModalBody>
+                <Text style={{ color: 'var(--color-text-secondary)' }}>
+                    {message}
+                </Text>
+            </ModalBody>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <Button
-                    variant="secondary"
-                    onClick={onClose}
-                >
+            <ModalFooter>
+                <Button variant="secondary" onClick={onClose}>
                     {cancelText}
                 </Button>
-                <Button
-                    variant="danger"
-                    onClick={handleConfirm}
-                >
+                <Button variant="danger" onClick={handleConfirm}>
                     {confirmText}
                 </Button>
-            </div>
+            </ModalFooter>
         </Modal>
     );
 }

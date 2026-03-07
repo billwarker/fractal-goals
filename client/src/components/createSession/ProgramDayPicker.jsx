@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import StepHeader from './StepHeader';
+import styles from './ProgramDayPicker.module.css';
 
 /**
  * Step 1 (Program Mode): Select a Day from Your Program
@@ -38,28 +39,14 @@ function ProgramDayPicker({
 
     if (programDays.length === 0) {
         return (
-            <div style={{
-                background: 'var(--color-bg-card)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                padding: '24px',
-                marginBottom: '24px'
-            }}>
+            <div className={styles.container}>
                 <StepHeader stepNumber={1} title="Select a Day from Your Program" />
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '16px' }}>No active program days available for today</p>
+                <div className={styles.emptyStateContent}>
+                    <p className={styles.emptyStateText}>No active program days available for today</p>
                     {hasTemplates && (
                         <button
                             onClick={onSwitchToTemplate}
-                            style={{
-                                padding: '10px 20px',
-                                background: '#2196f3',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontWeight: 'bold'
-                            }}
+                            className={styles.activeButton}
                         >
                             Select Template Instead
                         </button>
@@ -70,13 +57,7 @@ function ProgramDayPicker({
     }
 
     return (
-        <div style={{
-            background: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '24px'
-        }}>
+        <div className={styles.container}>
             <StepHeader
                 stepNumber={1}
                 title={groupedDays.length === 1
@@ -85,7 +66,7 @@ function ProgramDayPicker({
                 }
             />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className={styles.blockGroupList}>
                 {groupedDays.map(group => (
                     <BlockGroup
                         key={group.block_id}
@@ -109,33 +90,20 @@ function BlockGroup({
     onSelectProgramSession
 }) {
     return (
-        <div style={{
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            overflow: 'hidden'
-        }}>
+        <div className={styles.blockGroupContainer}>
             {/* Block Header */}
-            <div style={{
-                padding: '12px 16px',
-                background: 'var(--color-bg-card-alt)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-            }}>
-                <div style={{
-                    width: '4px',
-                    height: '24px',
-                    background: group.block_color || '#2196f3',
-                    borderRadius: '2px'
-                }} />
-                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>
+            <div className={styles.blockHeader}>
+                <div
+                    className={styles.blockColorIndicator}
+                    style={{ background: group.block_color || '#2196f3' }}
+                />
+                <div className={styles.blockTitle}>
                     {group.program_name} - {group.block_name}
                 </div>
             </div>
 
             {/* Days List */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className={styles.programDaysList}>
                 {group.days.map((programDay, index) => {
                     const isSelected = selectedProgramDay?.day_id === programDay.day_id;
                     const hasMultipleSessions = programDay.sessions.length > 1;
@@ -172,24 +140,17 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
     return (
         <div
             onClick={onClick}
-            style={{
-                padding: '16px',
-                cursor: 'pointer',
-                background: isSelected ? 'var(--color-bg-card-hover)' : 'transparent',
-                borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
-                transition: 'background 0.2s',
-                borderLeft: isSelected ? '4px solid #4caf50' : '4px solid transparent'
-            }}
+            className={`${styles.programDayRow} ${isSelected ? styles.programDayRowSelected : ''} ${!isLast ? styles.programDayRowBorderBottom : ''}`}
         >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '500', fontSize: '15px' }}>
+            <div className={styles.programDayContent}>
+                <div className={styles.programDayInfo}>
+                    <div className={styles.programDayName}>
                         {programDay.day_name}
                     </div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                    <div className={styles.programDayMeta}>
                         Day {programDay.day_number}
                         {hasMultipleSessions && (
-                            <span style={{ marginLeft: '8px', color: '#2196f3', fontSize: '12px', fontWeight: '500' }}>
+                            <span className={styles.sessionCountBadge}>
                                 • {programDay.sessions.length} sessions
                             </span>
                         )}
@@ -197,23 +158,13 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
                 </div>
 
                 {!hasMultipleSessions && (
-                    <div style={{
-                        fontSize: '14px',
-                        color: 'var(--color-text-secondary)',
-                        background: 'var(--color-bg-card-alt)',
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        maxWidth: '50%'
-                    }}>
+                    <div className={styles.templateNameBadge}>
                         {programDay.sessions[0].template_name}
                     </div>
                 )}
 
                 {isSelected && !hasMultipleSessions && (
-                    <div style={{
-                        color: '#4caf50',
-                        fontSize: '20px',
-                    }}>
+                    <div className={styles.checkIcon}>
                         ✓
                     </div>
                 )}
@@ -224,15 +175,11 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
 
 function SessionList({ sessions, selectedSession, blockColor, onSelectSession }) {
     return (
-        <div style={{
-            padding: '12px 16px 20px 20px', // Extra bottom padding
-            background: 'var(--color-bg-card-hover)',
-            borderBottom: '1px solid var(--color-border)'
-        }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '10px', color: 'var(--color-text-muted)', marginLeft: '4px' }}>
+        <div className={styles.sessionListContainer}>
+            <div className={styles.sessionListTitle}>
                 Select a session:
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className={styles.sessionsWrapper}>
                 {sessions.map((session) => {
                     const isSessionSelected = selectedSession?.template_id === session.template_id;
 
@@ -243,35 +190,21 @@ function SessionList({ sessions, selectedSession, blockColor, onSelectSession })
                                 e.stopPropagation();
                                 onSelectSession(session);
                             }}
-                            style={{
-                                padding: '12px',
-                                background: isSessionSelected ? 'rgba(76, 175, 80, 0.1)' : 'var(--color-bg-card)',
-                                border: `1px solid ${isSessionSelected ? '#4caf50' : 'var(--color-border)'}`,
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                            }}
+                            className={`${styles.sessionRow} ${isSessionSelected ? styles.sessionRowSelected : ''}`}
                         >
                             <div>
-                                <div style={{ fontWeight: '500', fontSize: '14px', color: isSessionSelected ? '#4caf50' : 'var(--color-text-primary)' }}>
+                                <div className={`${styles.sessionRowTitle} ${isSessionSelected ? styles.sessionRowTitleSelected : ''}`}>
                                     {session.template_name}
                                 </div>
                                 {session.template_description && (
-                                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                                    <div className={styles.sessionRowDescription}>
                                         {session.template_description}
                                     </div>
                                 )}
                             </div>
 
                             {isSessionSelected && (
-                                <div style={{
-                                    color: '#4caf50',
-                                    fontSize: '14px',
-                                    fontWeight: 'bold'
-                                }}>
+                                <div className={styles.sessionRowCheck}>
                                     ✓
                                 </div>
                             )}

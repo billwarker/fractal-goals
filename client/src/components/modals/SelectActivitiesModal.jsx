@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
+import Button from '../atoms/Button';
 
 /**
  * Modal for selecting activities to associate with a goal.
@@ -51,58 +55,84 @@ function SelectActivitiesModal({
     });
 
     return (
-        <div className="modal-overlay" onClick={handleClose} style={{ alignItems: isMobile ? 'flex-end' : 'center', padding: isMobile ? 0 : undefined }}>
-            <div
-                className="modal"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    width: isMobile ? '100vw' : 'min(650px, 95vw)',
-                    maxWidth: isMobile ? '100vw' : '650px',
-                    maxHeight: isMobile ? '88vh' : '90vh',
-                    borderRadius: isMobile ? '16px 16px 0 0' : undefined,
-                    marginTop: isMobile ? 'auto' : undefined
-                }}
-            >
-                <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
-                    Associate Activities with Goal
-                </h2>
+        <Modal
+            isOpen={isOpen}
+            onClose={handleClose}
+            title="Associate Activities with Goal"
+            size="md"
+        >
+            <ModalBody>
+                <div style={{ paddingBottom: '16px' }}>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
+                        Select activities that this goal requires. Associated activities help track the "Achievable" criterion in SMART goals.
+                    </p>
 
-                <p style={{ color: '#888', fontSize: '13px', marginBottom: '16px' }}>
-                    Select activities that this goal requires. Associated activities help track the "Achievable" criterion in SMART goals.
-                </p>
+                    {activityDefinitions.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>
+                            <p>No activities found. Create activities in the Manage Activities page.</p>
+                        </div>
+                    ) : (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px',
+                            maxHeight: isMobile ? '50vh' : '400px',
+                            overflowY: 'auto',
+                            paddingRight: '8px'
+                        }}>
+                            {/* Grouped activities */}
+                            {activityGroups.map(group => {
+                                const groupActivities = groupedActivities[group.id] || [];
+                                if (groupActivities.length === 0) return null;
 
-                {activityDefinitions.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        <p>No activities found. Create activities in the Manage Activities page.</p>
-                    </div>
-                ) : (
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '16px',
-                        maxHeight: isMobile ? '50vh' : '400px',
-                        overflowY: 'auto',
-                        marginBottom: '20px',
-                        paddingRight: '8px'
-                    }}>
-                        {/* Grouped activities */}
-                        {activityGroups.map(group => {
-                            const groupActivities = groupedActivities[group.id] || [];
-                            if (groupActivities.length === 0) return null;
+                                return (
+                                    <div key={group.id}>
+                                        <div style={{
+                                            fontSize: '12px',
+                                            color: 'var(--color-text-secondary)',
+                                            marginBottom: '8px',
+                                            paddingBottom: '4px',
+                                            borderBottom: '1px solid var(--color-border)'
+                                        }}>
+                                            {group.name}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {groupActivities.map(activity => (
+                                                <ActivitySelectionCard
+                                                    key={activity.id}
+                                                    activity={activity}
+                                                    isSelected={tempSelectedActivities.includes(activity.id)}
+                                                    isAlreadyAssociated={alreadyAssociatedActivityIds.includes(activity.id)}
+                                                    onToggle={() => {
+                                                        if (!alreadyAssociatedActivityIds.includes(activity.id)) {
+                                                            setTempSelectedActivities(prev =>
+                                                                prev.includes(activity.id)
+                                                                    ? prev.filter(id => id !== activity.id)
+                                                                    : [...prev, activity.id]
+                                                            );
+                                                        }
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
 
-                            return (
-                                <div key={group.id}>
+                            {/* Ungrouped activities */}
+                            {ungroupedActivities.length > 0 && (
+                                <div>
                                     <div style={{
                                         fontSize: '12px',
-                                        color: '#888',
+                                        color: 'var(--color-text-secondary)',
                                         marginBottom: '8px',
                                         paddingBottom: '4px',
-                                        borderBottom: '1px solid #333'
+                                        borderBottom: '1px solid var(--color-border)'
                                     }}>
-                                        {group.name}
+                                        Ungrouped
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        {groupActivities.map(activity => (
+                                        {ungroupedActivities.map(activity => (
                                             <ActivitySelectionCard
                                                 key={activity.id}
                                                 activity={activity}
@@ -121,79 +151,28 @@ function SelectActivitiesModal({
                                         ))}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
+                    )}
+                </div>
+            </ModalBody>
 
-                        {/* Ungrouped activities */}
-                        {ungroupedActivities.length > 0 && (
-                            <div>
-                                <div style={{
-                                    fontSize: '12px',
-                                    color: '#888',
-                                    marginBottom: '8px',
-                                    paddingBottom: '4px',
-                                    borderBottom: '1px solid #333'
-                                }}>
-                                    Ungrouped
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {ungroupedActivities.map(activity => (
-                                        <ActivitySelectionCard
-                                            key={activity.id}
-                                            activity={activity}
-                                            isSelected={tempSelectedActivities.includes(activity.id)}
-                                            isAlreadyAssociated={alreadyAssociatedActivityIds.includes(activity.id)}
-                                            onToggle={() => {
-                                                if (!alreadyAssociatedActivityIds.includes(activity.id)) {
-                                                    setTempSelectedActivities(prev =>
-                                                        prev.includes(activity.id)
-                                                            ? prev.filter(id => id !== activity.id)
-                                                            : [...prev, activity.id]
-                                                    );
-                                                }
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexDirection: isMobile ? 'column-reverse' : 'row' }}>
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            color: '#ccc',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                        }}
-                    >
+            <ModalFooter>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexDirection: isMobile ? 'column-reverse' : 'row', width: '100%' }}>
+                    <Button variant="secondary" onClick={handleClose} fullWidth={isMobile}>
                         Cancel
-                    </button>
-                    <button
-                        type="button"
+                    </Button>
+                    <Button
+                        variant="primary"
                         onClick={handleConfirm}
                         disabled={tempSelectedActivities.length === 0}
-                        style={{
-                            padding: '10px 20px',
-                            background: tempSelectedActivities.length === 0 ? '#444' : '#4caf50',
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: tempSelectedActivities.length === 0 ? '#888' : 'white',
-                            fontWeight: 'bold',
-                            cursor: tempSelectedActivities.length === 0 ? 'not-allowed' : 'pointer'
-                        }}
+                        fullWidth={isMobile}
                     >
                         Add Selected ({tempSelectedActivities.length})
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>
+            </ModalFooter>
+        </Modal>
     );
 }
 

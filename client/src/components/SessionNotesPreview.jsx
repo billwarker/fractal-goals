@@ -5,52 +5,30 @@
  * Shows context indicator for activity notes (activity name).
  */
 
-import React, { useState, useEffect } from 'react';
-import { fractalApi } from '../utils/api';
+import React, { useState } from 'react';
+import { useSessionNotes } from '../hooks/useSessionQueries';
+import { useActivities } from '../hooks/useActivityQueries';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 import './SessionNotesPreview.css';
 
 function SessionNotesPreview({ rootId, sessionId }) {
-    const [notes, setNotes] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [activities, setActivities] = useState([]);
-    const [selectedNoteId, setSelectedNoteId] = useState(null);
+    const { notes: rawNotes, isLoading: isNotesLoading, error: notesError } = useSessionNotes(rootId, sessionId);
+    const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useActivities(rootId);
     const { timezone } = useTimezone();
+    const [selectedNoteId, setSelectedNoteId] = useState(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
+    // Derived state for filtered and sorted notes
+    const notes = React.useMemo(() => {
+        if (!rawNotes) return [];
+        const filtered = rawNotes.filter(n =>
+            n.context_type === 'session' || n.context_type === 'activity_instance'
+        );
+        return filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }, [rawNotes]);
 
-                // Fetch notes and activities in parallel
-                const [notesResponse, activitiesResponse] = await Promise.all([
-                    fractalApi.getSessionNotes(rootId, sessionId),
-                    fractalApi.getActivities(rootId)
-                ]);
-
-                // Include both session-level AND activity instance notes (exclude set-level for now)
-                const allNotes = notesResponse.data.filter(n =>
-                    n.context_type === 'session' || n.context_type === 'activity_instance'
-                );
-
-                // Sort by created_at descending (newest first)
-                allNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-                setNotes(allNotes);
-                setActivities(activitiesResponse.data || []);
-                setError(null);
-            } catch (err) {
-                console.error('Failed to fetch session notes:', err);
-                setError('Failed to load notes');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [rootId, sessionId]);
+    const loading = isNotesLoading || isActivitiesLoading;
+    const error = notesError || activitiesError ? 'Failed to load notes' : null;
 
     const formatNoteTime = (dateString) => {
         if (!dateString) return '';

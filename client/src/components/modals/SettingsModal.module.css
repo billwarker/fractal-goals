@@ -1,0 +1,385 @@
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-overlay);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+
+.overlayMobile {
+    align-items: flex-end;
+    padding: 0;
+}
+
+.overlayDesktop {
+    align-items: center;
+    padding: 16px;
+}
+
+.modal {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modalMobile {
+    width: 100vw;
+    height: min(88vh, 760px);
+    border-radius: 16px 16px 0 0;
+}
+
+.modalDesktop {
+    width: min(800px, calc(100vw - 32px));
+    height: min(600px, calc(100vh - 32px));
+    border-radius: 8px;
+}
+
+.header {
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--color-bg-header);
+}
+
+.headerMobile {
+    padding: 14px 16px;
+}
+
+.headerDesktop {
+    padding: 16px;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.titleMobile {
+    font-size: 22px;
+}
+
+.titleDesktop {
+    font-size: 18px;
+}
+
+.closeButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+
+.closeButtonMobile {
+    font-size: 34px;
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.closeButtonDesktop {
+    font-size: 24px;
+    min-width: auto;
+    min-height: auto;
+}
+
+.body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.bodyMobile {
+    flex-direction: column;
+}
+
+.bodyDesktop {
+    flex-direction: row;
+}
+
+.sidebar {
+    background-color: var(--color-bg-sidebar);
+    display: flex;
+    justify-content: space-between;
+}
+
+.sidebarMobile {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: 8px 0;
+    flex-direction: row;
+    overflow-x: auto;
+}
+
+.sidebarDesktop {
+    width: 200px;
+    border-right: 1px solid var(--color-border);
+    border-bottom: none;
+    padding: 16px 0;
+    flex-direction: column;
+    overflow-x: visible;
+}
+
+.tabMenu {
+    display: flex;
+}
+
+.tabMenuMobile {
+    flex-direction: row;
+    min-width: max-content;
+}
+
+.tabMenuDesktop {
+    flex-direction: column;
+    min-width: auto;
+}
+
+.tab {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tabMobile {
+    padding: 10px 14px;
+    border-left: none;
+}
+
+.tabDesktop {
+    padding: 12px 24px;
+    border-bottom: none;
+}
+
+.tabActive {
+    background-color: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    font-weight: bold;
+}
+
+.tabInactive {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    font-weight: normal;
+}
+
+.tabActiveMobile {
+    border-bottom: 3px solid var(--color-brand-primary, #3b82f6);
+}
+
+.tabInactiveMobile {
+    border-bottom: 3px solid transparent;
+}
+
+.tabActiveDesktop {
+    border-left: 3px solid var(--color-brand-primary, #3b82f6);
+}
+
+.tabInactiveDesktop {
+    border-left: 3px solid transparent;
+}
+
+.legalFooter {
+    padding: 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.legalLink {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-decoration: none;
+}
+
+.legalLinkMargin {
+    margin-bottom: 8px;
+}
+
+.contentArea {
+    flex: 1;
+    overflow-y: auto;
+    background-color: var(--color-bg-card);
+}
+
+.contentAreaMobile {
+    padding: 16px;
+}
+
+.contentAreaDesktop {
+    padding: 24px;
+}
+
+.tabContent {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.sectionTitle {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 8px;
+}
+
+.sectionContentStack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.checkboxRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.checkboxInput {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.checkboxLabel {
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.checkboxDescription {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+}
+
+.selectInput {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-input);
+    background-color: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.themeRow {
+    display: flex;
+    gap: 16px;
+}
+
+.themeRowMobile {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.themeRowDesktop {
+    align-items: center;
+    flex-direction: row;
+}
+
+.themeText {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+.secondaryButton {
+    padding: 8px 16px;
+    background-color: var(--color-bg-input);
+    border: 1px solid var(--color-border-btn);
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.formContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+}
+
+.textInput {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-input);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.textInputFlex {
+    flex: 1;
+}
+
+.primaryButton {
+    padding: 8px 16px;
+    background: var(--color-brand-primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.dangerZone {
+    border: 1px solid var(--color-brand-danger);
+    padding: 16px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.dangerTitle {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: var(--color-brand-danger);
+}
+
+.dangerText {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin-bottom: 16px;
+}
+
+.dangerInputRow {
+    display: flex;
+    gap: 8px;
+}
+
+.dangerInputRowMobile {
+    flex-direction: column;
+}
+
+.dangerInputRowDesktop {
+    flex-direction: row;
+}
+
+.dangerButton {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+}
+
+.dangerButtonActive {
+    background: var(--color-brand-danger);
+    color: white;
+    cursor: pointer;
+}
+
+.dangerButtonInactive {
+    background: var(--color-text-muted);
+    color: white;
+    cursor: not-allowed;
+}
+
+.mobileLegalFooter {
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
