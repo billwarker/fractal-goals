@@ -5,9 +5,9 @@
  * Fetches both current session notes and previous notes for activity definitions.
  */
 
-import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from './queryKeys';
 
 /**
  * @param {string} rootId - ID of the fractal
@@ -16,6 +16,7 @@ import { fractalApi } from '../utils/api';
  */
 export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
     const queryClient = useQueryClient();
+    const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
 
     // Query for current session notes
     const {
@@ -24,7 +25,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         error: notesError,
         refetch: refreshNotes
     } = useQuery({
-        queryKey: ['session-notes', rootId, sessionId],
+        queryKey: sessionNotesKey,
         queryFn: async () => {
             const res = await fractalApi.getSessionNotes(rootId, sessionId);
             return res.data || [];
@@ -38,7 +39,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         data: previousSessionNotes = [],
         isLoading: prevSessionLoading
     } = useQuery({
-        queryKey: ['previous-session-notes', rootId, sessionId],
+        queryKey: queryKeys.previousSessionNotes(rootId, sessionId),
         queryFn: async () => {
             const res = await fractalApi.getPreviousSessionNotes(rootId, sessionId);
             return res.data || [];
@@ -50,9 +51,8 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
     // Query for previous notes for the selected activity definition
     const {
         data: previousNotes = [],
-        isLoading: prevActivityLoading
     } = useQuery({
-        queryKey: ['activity-definition-notes', rootId, activityDefinitionId],
+        queryKey: queryKeys.activityDefinitionNotes(rootId, activityDefinitionId),
         queryFn: async () => {
             const res = await fractalApi.getActivityDefinitionNotes(
                 rootId,
@@ -71,10 +71,10 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
             const newNote = response.data;
             // Optimistically update current session notes if applicable
             if (newNote.session_id === sessionId) {
-                queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) => [newNote, ...old]);
+                queryClient.setQueryData(sessionNotesKey, (old = []) => [newNote, ...old]);
             }
             // Also invalidate to be sure
-            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionNotesKey });
         }
     });
 
@@ -82,20 +82,20 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         mutationFn: ({ noteId, content }) => fractalApi.updateNote(rootId, noteId, { content }),
         onSuccess: (response) => {
             const updatedNote = response.data;
-            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
+            queryClient.setQueryData(sessionNotesKey, (old = []) =>
                 old.map(n => n.id === updatedNote.id ? updatedNote : n)
             );
-            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionNotesKey });
         }
     });
 
     const deleteNoteMutation = useMutation({
         mutationFn: (noteId) => fractalApi.deleteNote(rootId, noteId),
         onSuccess: (_, noteId) => {
-            queryClient.setQueryData(['session-notes', rootId, sessionId], (old = []) =>
+            queryClient.setQueryData(sessionNotesKey, (old = []) =>
                 old.filter(n => n.id !== noteId)
             );
-            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionNotesKey });
         }
     });
 

@@ -9,6 +9,7 @@
     "check:responsive": "node scripts/responsive-audit.mjs",
     "check:maintainability": "node scripts/maintainability-audit.mjs",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",

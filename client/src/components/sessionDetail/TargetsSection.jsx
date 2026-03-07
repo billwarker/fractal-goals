@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
-import TargetCard from '../TargetCard';
-import styles from './GoalsPanel.module.css';
 import { useGoals } from '../../contexts/GoalsContext';
+import TargetCard from '../TargetCard';
+
+import styles from './GoalsPanel.module.css';
 
 /**
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
  * Targets are sorted by goal depth (deepest first, e.g., Nano -> Micro -> Immediate -> ShortTerm).
  */
 function TargetsSection({
-    rootId, sessionId, hierarchy, activeActivityId, activeActivityInstanceId,
+    rootId, hierarchy, activeActivityId, activeActivityInstanceId,
     allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds,
     targets = null,
 }) {
@@ -80,7 +81,7 @@ function TargetsSection({
 
         nodesToProcess.forEach(node => processGoal(node, node.depth || 0));
         return derivedTargets;
-    }, [goalTree, hierarchy, targetAchievements, activeActivityId, achievedTargetIds, targets]);
+    }, [goalTree, hierarchy, targetAchievements, activeActivityId, activeActivityInstanceId, allowedActivityIds, achievedTargetIds, targets]);
 
     // 2. Sort by Depth Descending (Deepest first)
     // If depths are equal, maybe sort by creation time or name? stick to depth for now.

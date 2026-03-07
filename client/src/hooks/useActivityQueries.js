@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from './queryKeys';
 
 export function useActivities(rootId) {
     const isReady = Boolean(rootId);
 
     const { data: activities = [], isLoading, error } = useQuery({
-        queryKey: ['activities', rootId],
+        queryKey: queryKeys.activities(rootId),
         queryFn: async () => {
             const res = await fractalApi.getActivities(rootId);
             return res.data || [];
@@ -22,7 +23,7 @@ export function useCreateActivity(rootId) {
     return useMutation({
         mutationFn: (payload) => fractalApi.createActivity(rootId, payload),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['activities', rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
         }
     });
 }
@@ -32,7 +33,7 @@ export function useDeleteActivity(rootId) {
     return useMutation({
         mutationFn: (activityId) => fractalApi.deleteActivity(rootId, activityId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['activities', rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
         }
     });
 }

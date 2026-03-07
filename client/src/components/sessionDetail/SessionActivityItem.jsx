@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import Linkify from '../atoms/Linkify';
-import { useTimezone } from '../../contexts/TimezoneContext';
-import GoalIcon from '../atoms/GoalIcon';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { formatForInput, localToISO } from '../../utils/dateUtils';
-import NoteQuickAdd from './NoteQuickAdd';
-import NoteTimeline from './NoteTimeline';
-import notify from '../../utils/notify';
-import { fractalApi } from '../../utils/api';
-import { DeletedBadge } from '../ui/DeletedEntityFallback';
-import styles from './SessionActivityItem.module.css';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { queryKeys } from '../../hooks/queryKeys';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatForInput, localToISO } from '../../utils/dateUtils';
+import { fractalApi } from '../../utils/api';
+import notify from '../../utils/notify';
+import Linkify from '../atoms/Linkify';
+import GoalIcon from '../atoms/GoalIcon';
+import { DeletedBadge } from '../ui/DeletedEntityFallback';
+import NoteQuickAdd from './NoteQuickAdd';
+import NoteTimeline from './NoteTimeline';
+import styles from './SessionActivityItem.module.css';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -42,7 +43,6 @@ function SessionActivityItem({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
-    onOpenGoals,
     isDragging,
     activityDefinition: activityDefinitionProp = null,
     activityNotes: activityNotesProp = null,
@@ -79,6 +79,9 @@ function SessionActivityItem({
     // Get timezone from context
     const { timezone } = useTimezone();
     const queryClient = useQueryClient();
+    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const sessionKey = queryKeys.session(rootId, sessionId);
+    const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
 
     const setMetricDraftKey = useCallback((setIndex, metricId, splitId = null) => (
@@ -150,16 +153,6 @@ function SessionActivityItem({
         setSetMetricDrafts({});
         setSingleMetricDrafts({});
     }, [exercise.id]);
-
-    const clearSetMetricDraft = useCallback((setIndex, metricId, splitId = null) => {
-        const key = setMetricDraftKey(setIndex, metricId, splitId);
-        setSetMetricDrafts((prev) => {
-            if (!(key in prev)) return prev;
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    }, [setMetricDraftKey]);
 
     const clearSingleMetricDraft = useCallback((metricId, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
@@ -392,7 +385,7 @@ function SessionActivityItem({
                     newNanoGoal = res;
 
                     // Optimistically add the nano to the canonical session-goals payload.
-                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                    queryClient.setQueryData(sessionGoalsViewKey, (old) => {
                         if (!old || !Array.isArray(old.micro_goals)) return old;
                         return {
                             ...old,
@@ -420,7 +413,7 @@ function SessionActivityItem({
                 try {
                     const parentRes = await fractalApi.getGoal(rootId, activeMicroGoal.id);
                     const parentChildren = parentRes?.data?.children || [];
-                    queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                    queryClient.setQueryData(sessionGoalsViewKey, (old) => {
                         if (!old || !Array.isArray(old.micro_goals)) return old;
                         return {
                             ...old,
@@ -457,12 +450,12 @@ function SessionActivityItem({
                 notify.error(noteErr?.response?.data?.error || "Nano goal created, but note log failed");
             }
 
-            await queryClient.refetchQueries({ queryKey: ['session-goals-view', rootId, sessionId], type: 'active' });
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+            await queryClient.refetchQueries({ queryKey: sessionGoalsViewKey, type: 'active' });
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
         } catch (err) {
             if (appliedOptimisticNano) {
-                queryClient.setQueryData(['session-goals-view', rootId, sessionId], (old) => {
+                queryClient.setQueryData(sessionGoalsViewKey, (old) => {
                     if (!old || !Array.isArray(old.micro_goals)) return old;
                     return {
                         ...old,
@@ -581,18 +574,6 @@ function SessionActivityItem({
         const val = getMetricValue(nextSet.metrics, metricId, splitId);
 
         return val === '' || val === null || val === undefined;
-    };
-
-    // Helper to check if subsequent sets have empty values for a metric
-    const hasSubsequentEmptySets = (metricId, splitId = null) => {
-        if (!exercise.sets || exercise.sets.length <= 1) return false;
-
-        for (let i = 1; i < exercise.sets.length; i++) {
-            const set = exercise.sets[i];
-            const val = getMetricValue(set.metrics, metricId, splitId);
-            if (val === '' || val === null || val === undefined) return true;
-        }
-        return false;
     };
 
     // Handler for clicking on the activity panel (not a specific set)

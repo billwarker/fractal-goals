@@ -1,17 +1,20 @@
-import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
-import notify from '../utils/notify';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
+
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import useGoalAssociationMutations from '../hooks/useGoalAssociationMutations';
+import useGoalDetailController from '../hooks/useGoalDetailController';
+import useGoalDurationModal from '../hooks/useGoalDurationModal';
+import { useGoalForm } from '../hooks/useGoalForm';
+import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getChildType } from '../utils/goalHelpers';
-import { fractalApi } from '../utils/api';
+import notify from '../utils/notify';
+import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
-import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalEditForm from './goals/GoalEditForm';
-import { useGoalForm } from '../hooks/useGoalForm';
-import { useGoalAssociations, useGoalMetrics, useGoalDailyDurations } from '../hooks/useGoalQueries';
+
 import styles from './GoalDetailModal.module.css';
 
 const TargetManager = lazy(() => import('./goalDetail/TargetManager'));
@@ -56,13 +59,10 @@ function GoalDetailModal({
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
     const { getGoalColor, getGoalTextColor, getLevelByName } = useGoalLevels();
-    const queryClient = useQueryClient();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
-    const [activityGroups, setActivityGroups] = useState(Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []);
-    const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
 
     // Use extracted form hook
     const {
@@ -77,33 +77,8 @@ function GoalDetailModal({
         resetForm,
         errors, validateForm
     } = useGoalForm(goal, mode, isOpen);
-
-    // Local completion state for optimistic UI
-    const [localCompleted, setLocalCompleted] = useState(false);
-    const [localCompletedAt, setLocalCompletedAt] = useState(null);
-    const isCompleted = localCompleted || goal?.completed || false;
-
-    // Target editing state
-    const [targetToEdit, setTargetToEdit] = useState(null);
-
-    // View state: 'goal' (main view), 'complete-confirm', 'uncomplete-confirm', 'target-manager', 'activity-associator', 'activity-builder'
-    const [viewState, setViewState] = useState('goal');
-
-    // Associated activities state
-    const [associatedActivities, setAssociatedActivities] = useState([]);
-    const [associatedActivityGroups, setAssociatedActivityGroups] = useState([]); // Array of {id, name}
-    // Snapshots of initial associations for diffing on save
-    const initialActivitiesRef = useRef([]);
-    const initialGroupsRef = useRef([]);
-    const associatedActivitiesRef = useRef([]);
-    const associatedGroupsRef = useRef([]);
-
     // Metrics state
     const [metrics, setMetrics] = useState(null);
-
-    // Graph Modal State
-    const [graphModalConfig, setGraphModalConfig] = useState(null);
-    const [shouldFetchDurations, setShouldFetchDurations] = useState(false);
 
     // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
     const goalType = mode === 'create'
@@ -113,101 +88,42 @@ function GoalDetailModal({
     const goalColor = getGoalColor(goalType);
 
     const depGoalId = goal?.attributes?.id || goal?.id;
-    const { data: durationsData, isSuccess: isDurationsSuccess } = useGoalDailyDurations(depGoalId, shouldFetchDurations);
-
-    useEffect(() => {
-        if (shouldFetchDurations && isDurationsSuccess && durationsData) {
-            const points = durationsData.points || [];
-
-            // Transform to Chart.js data
-            const labels = points.map(p => new Date(p.date)); // X-axis dates
-            const activityData = points.map(p => Math.round(p.activity_duration / 60)); // Minutes
-
-            setGraphModalConfig({
-                title: goal?.name || name,
-                goalType: goalType,
-                goalColor: goalColor,
-                graphData: {
-                    labels,
-                    datasets: [
-                        {
-                            label: 'Activity Duration',
-                            data: activityData
-                        }
-                    ]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            title: { display: true, text: 'Duration (min)' },
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-            setShouldFetchDurations(false); // Reset trigger
-        }
-    }, [shouldFetchDurations, isDurationsSuccess, durationsData, goal?.name, name, goalType, goalColor]);
-
-    const handleTimeSpentClick = () => {
-        setShouldFetchDurations(true);
-    };
+    const {
+        graphModalConfig,
+        openDurationModal,
+        closeDurationModal,
+    } = useGoalDurationModal({
+        goalId: depGoalId,
+        goalName: goal?.name,
+        fallbackName: name,
+        goalType,
+        goalColor,
+    });
 
 
-    // Scroll state for sticky header
-    const [isScrolled, setIsScrolled] = useState(false);
-
-    const handleScroll = (e) => {
-        const scrollTop = e.target.scrollTop;
-        setIsScrolled(scrollTop > 0);
-    };
-
-    // Initialize form state from goal - use specific dependencies for completion state
-
-    const depGoalCompleted = goal?.attributes?.completed;
-    const depGoalCompletedAt = goal?.attributes?.completed_at;
-
-    // Reset local completion state and handle initial associations when goal or mode changes
-    useEffect(() => {
-        if (mode === 'create') {
-            setLocalCompleted(false);
-            setLocalCompletedAt(null);
-            setIsEditing(true);  // Start in edit mode for creation
-            setViewState('goal');
-
-            // Handle pre-selected associations for creation flow
-            if (initialActivities.length > 0 || initialActivityGroups.length > 0) {
-                setAssociatedActivities(initialActivities);
-                setAssociatedActivityGroups(initialActivityGroups);
-                // Also update the refs immediately so handleSave can see them
-                associatedActivitiesRef.current = initialActivities;
-                associatedGroupsRef.current = initialActivityGroups;
-                // Update mutation snapshots so they aren't marked as "changed" if identical
-                initialActivitiesRef.current = initialActivities.map(a => a.id);
-                initialGroupsRef.current = initialActivityGroups.map(g => g.id);
-            }
-        } else if (goal) {
-            setLocalCompleted(goal.attributes?.completed || false);
-            setLocalCompletedAt(goal.attributes?.completed_at || null);
-            setIsEditing(mode === 'edit');
-            setViewState('goal');
-        }
-    }, [goal, depGoalId, depGoalCompleted, depGoalCompletedAt, mode, isOpen, initialActivities, initialActivityGroups]);
-
-    // Sync activityGroups when prop changes (only if valid array provided)
-    useEffect(() => {
-        if (activityGroupsRaw && Array.isArray(activityGroupsRaw)) {
-            setActivityGroups(activityGroupsRaw);
-        }
-    }, [activityGroupsRaw]);
-
-    useEffect(() => {
-        associatedActivitiesRef.current = associatedActivities;
-    }, [associatedActivities]);
-
-    useEffect(() => {
-        associatedGroupsRef.current = associatedActivityGroups;
-    }, [associatedActivityGroups]);
+    const {
+        isEditing,
+        setIsEditing,
+        localCompletedAt,
+        isCompleted,
+        targetToEdit,
+        setTargetToEdit,
+        viewState,
+        setViewState,
+        isScrolled,
+        handleScroll,
+        handleCancel,
+        handleCompletionConfirm,
+        handleUncompletionConfirm,
+    } = useGoalDetailController({
+        goal,
+        goalId,
+        mode,
+        isOpen,
+        onClose,
+        onToggleCompletion,
+        resetForm,
+    });
 
     // Use centralized React Query hooks for fetches
     const {
@@ -223,79 +139,33 @@ function GoalDetailModal({
     useEffect(() => {
         setMetrics(fetchedMetrics);
     }, [fetchedMetrics]);
-
-    // Sync associations from Query to internal state for editing
-    useEffect(() => {
-        if (mode !== 'create' && depGoalId) {
-            setAssociatedActivities(fetchedActivities);
-            setAssociatedActivityGroups(fetchedGroups);
-
-            initialActivitiesRef.current = fetchedActivities.map(a => a.id);
-            initialGroupsRef.current = fetchedGroups.map(g => g.id);
-        }
-    }, [fetchedActivities, fetchedGroups, mode, depGoalId]);
-
-    const refreshAssociations = () => {
-        if (!rootId || !depGoalId || mode === 'create') {
-            return Promise.resolve();
-        }
-
-        return Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['goalActivities', rootId, depGoalId] }),
-            queryClient.invalidateQueries({ queryKey: ['goalActivityGroups', rootId, depGoalId] }),
-            queryClient.invalidateQueries({ queryKey: ['goalMetrics', depGoalId] }),
-            queryClient.invalidateQueries({ queryKey: ['activities', rootId] }),
-        ]);
-    };
+    const {
+        activityGroups,
+        setActivityGroups,
+        associatedActivities,
+        setAssociatedActivities,
+        associatedActivityGroups,
+        setAssociatedActivityGroups,
+        refreshAssociations,
+        persistAssociations,
+        attachInlineCreatedActivity,
+    } = useGoalAssociationMutations({
+        rootId,
+        goalId: depGoalId,
+        mode,
+        isOpen,
+        activityGroupsRaw,
+        initialActivities,
+        initialActivityGroups,
+        fetchedActivities,
+        fetchedGroups,
+        onAssociationsChanged,
+    });
 
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
     // Allow rendering without goal in create mode
     if (!goal && mode !== 'create') return null;
-
-    const persistAssociations = async (updatedActivities, updatedGroups, overrideGoalId) => {
-        // Use provided values or fall back to state
-        const activs = updatedActivities || associatedActivitiesRef.current || associatedActivities;
-        const groups = updatedGroups || associatedGroupsRef.current || associatedActivityGroups;
-        const targetGoalId = overrideGoalId || goalId;
-
-        if (!targetGoalId) {
-            console.warn('persistAssociations: no goalId available, skipping');
-            return false;
-        }
-
-        try {
-            const currentActivityIds = activs.map(a => a.id);
-            const currentGroupIds = groups.map(g => g.id);
-            await fractalApi.setGoalAssociationsBatch(rootId, targetGoalId, {
-                activity_ids: currentActivityIds,
-                group_ids: currentGroupIds
-            });
-
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ['goalActivities', rootId, targetGoalId] }),
-                queryClient.invalidateQueries({ queryKey: ['goalActivityGroups', rootId, targetGoalId] }),
-                queryClient.invalidateQueries({ queryKey: ['goalMetrics', targetGoalId] }),
-                queryClient.invalidateQueries({ queryKey: ['activities', rootId] }),
-            ]);
-
-            // Update snapshots to reflect persisted state
-            initialActivitiesRef.current = currentActivityIds;
-            initialGroupsRef.current = currentGroupIds;
-
-            // Notify parent and fire global events
-            if (onAssociationsChanged) onAssociationsChanged();
-
-            window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
-                detail: { goalId: targetGoalId, rootId: rootId }
-            }));
-
-            return true;
-        } catch (err) {
-            console.error('Error persisting activity associations:', err);
-            return false;
-        }
-    };
 
     const handleSave = async () => {
         if (!validateForm()) {
@@ -361,21 +231,6 @@ function GoalDetailModal({
         }
     };
 
-    const handleCancel = () => {
-        if (mode === 'create') {
-            // In create mode, cancel means close the modal
-            if (onClose) onClose();
-            return;
-        }
-        resetForm();
-        // Also reset local UI state
-        if (goal) {
-            setLocalCompleted(goal.attributes?.completed || false);
-            setLocalCompletedAt(goal.attributes?.completed_at || null);
-        }
-        setIsEditing(false);
-    };
-
     const textColor = getGoalTextColor(goalType);
     const childType = getChildType(goalType);
     const levelConfig = getLevelByName(goalType) || {};
@@ -383,22 +238,6 @@ function GoalDetailModal({
     const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
-
-    // ============ COMPLETION CONFIRMATION VIEW ============
-    // ============ CONFIRMATION HANDLERS ============
-    const handleCompletionConfirm = (completionDate) => {
-        setLocalCompleted(true);
-        setLocalCompletedAt(completionDate.toISOString());
-        onToggleCompletion(goalId, false); // false = currently not completed
-        setViewState('goal');
-    };
-
-    const handleUncompletionConfirm = () => {
-        setLocalCompleted(false);
-        setLocalCompletedAt(null);
-        onToggleCompletion(goalId, true); // true = currently completed
-        setViewState('goal');
-    };
 
     // ============ GOAL CONTENT (VIEW/EDIT) ============
     const renderGoalContent = () => {
@@ -431,7 +270,7 @@ function GoalDetailModal({
                 <Suspense fallback={null}>
                     <GenericGraphModal
                         isOpen={!!graphModalConfig}
-                        onClose={() => setGraphModalConfig(null)}
+                        onClose={closeDurationModal}
                         title={graphModalConfig?.title}
                         goalType={graphModalConfig?.goalType}
                         goalColor={graphModalConfig?.goalColor}
@@ -528,7 +367,7 @@ function GoalDetailModal({
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
-                        handleTimeSpentClick={handleTimeSpentClick}
+                        handleTimeSpentClick={openDurationModal}
                     />
                 )
                 }
@@ -642,17 +481,7 @@ function GoalDetailModal({
                     onSuccess={async (newActivity, newActivityName) => {
                         // Automatically associate with this goal
                         if (newActivity && newActivity.id) {
-                            if (goalId) {
-                                // Goal already exists: persist association immediately
-                                await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
-                                await refreshAssociations();
-                            } else {
-                                // Create mode: buffer the association in local state for deferred persistence
-                                setAssociatedActivities(prev => {
-                                    const updated = [...prev, newActivity];
-                                    return Array.from(new Map(updated.map(item => [item.id, item])).values());
-                                });
-                            }
+                            await attachInlineCreatedActivity(newActivity);
                             notify.success(`Created activity "${newActivity.name || newActivityName}"${goalId ? ' and associated with goal' : ''}`);
                         }
 

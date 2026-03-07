@@ -1,19 +1,22 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import notify from '../../utils/notify';
+
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useGoals } from '../../contexts/GoalsContext';
+import { useGoalsForSelection } from '../../hooks/useGoalQueries';
+import { queryKeys } from '../../hooks/queryKeys';
 import { fractalApi } from '../../utils/api';
+import notify from '../../utils/notify';
+import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
+import MicroGoalModal from '../MicroGoalModal';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
-import MicroGoalModal from '../MicroGoalModal';
-import { useGoals } from '../../contexts/GoalsContext';
+import SessionFocusSection from './SessionFocusSection';
 const GoalDetailModal = React.lazy(() => import('../GoalDetailModal'));
-import { useGoalsForSelection } from '../../hooks/useGoalQueries';
-import styles from './GoalsPanel.module.css';
 
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
-import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
+import styles from './GoalsPanel.module.css';
 
 /**
  * GoalsPanel - Displays goals relevant to the current session scope.
@@ -37,12 +40,16 @@ function GoalsPanel({
         createGoal,
         refreshSession,
         sessionGoalsView,
+        loading,
+        toggleGoalCompletion,
+        microGoals,
     } = useActiveSession();
     const queryClient = useQueryClient();
+    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
     const { fetchFractalTree } = useGoals();
 
-    const { goals: allShortTermGoals, isLoading: isLoadingShortTermGoals } = useGoalsForSelection(rootId);
+    const { goals: allShortTermGoals } = useGoalsForSelection(rootId);
 
     // Inline IG creator state
     const [showIGCreator, setShowIGCreator] = useState(false);
@@ -118,11 +125,11 @@ function GoalsPanel({
                 parent_id: igParentId,
             });
             await fractalApi.addSessionGoal(rootId, sessionId, newGoal.id, 'immediate');
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             if (viewMode === 'activity' && activeActivityDef) {
                 try {
                     await fractalApi.associateGoalToActivity(rootId, newGoal.id, activeActivityDef.id);
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 }
                 catch (linkErr) { console.error("Failed to link new IG to activity", linkErr); }
             }
@@ -140,7 +147,7 @@ function GoalsPanel({
         }
     };
 
-    const handleCreateMicroGoalWithParent = async (name, parentId) => {
+    const handleCreateMicroGoalWithParent = useCallback(async (name, parentId) => {
         try {
             const newGoalData = await createGoal({
                 name,
@@ -151,7 +158,7 @@ function GoalsPanel({
             if (viewMode === 'activity' && activeActivityDef) {
                 try {
                     await fractalApi.associateGoalToActivity(rootId, newGoalData.id, activeActivityDef.id);
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 }
                 catch (linkErr) { console.error("Failed to link new Micro Goal to activity", linkErr); }
             }
@@ -163,7 +170,7 @@ function GoalsPanel({
             console.error("Failed to create micro goal", err);
             notify.error("Failed to create micro goal");
         }
-    };
+    }, [activeActivityDef, createGoal, onGoalCreated, queryClient, rootId, sessionGoalsViewKey, sessionId, viewMode]);
 
     const findParentGoalForActivity = useCallback((activityDef) => {
         if (!activityDef?.associated_goal_ids?.length) return null;
@@ -178,7 +185,7 @@ function GoalsPanel({
         return null;
     }, [session?.immediate_goals, goalLookup]);
 
-    const handleCreateMicroGoalWithTarget = async (name) => {
+    const handleCreateMicroGoalWithTarget = useCallback(async (name) => {
         if (!name.trim()) return;
         const parentId = findParentGoalForActivity(activeActivityDef);
         if (!parentId) {
@@ -186,8 +193,8 @@ function GoalsPanel({
             setIGName(`Goal for ${activeActivityDef?.name || 'Activity'}`);
             return;
         }
-        handleCreateMicroGoalWithParent(name, parentId);
-    };
+        await handleCreateMicroGoalWithParent(name, parentId);
+    }, [activeActivityDef, findParentGoalForActivity, handleCreateMicroGoalWithParent]);
 
     const lastTriggerHandled = React.useRef(0);
     useEffect(() => {
@@ -206,7 +213,7 @@ function GoalsPanel({
                 handleCreateMicroGoalWithTarget("Micro goal for " + activeActivityDef.name);
             }
         }
-    }, [createMicroTrigger, activeActivityDef, goalCreationContext, allShortTermGoals]);
+    }, [createMicroTrigger, activeActivityDef, goalCreationContext, allShortTermGoals, handleCreateMicroGoalWithTarget]);
 
     const handleCreateNanoGoal = async (microGoalId, name) => {
         if (!name.trim()) return;
@@ -252,7 +259,7 @@ function GoalsPanel({
                 try {
                     const currentIds = activeActivityDef.associated_goal_ids || [];
                     await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentIds, newGoal.id]);
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 } catch (assocErr) {
                     console.warn('Could not associate micro goal with activity', assocErr);
                 }
@@ -267,7 +274,7 @@ function GoalsPanel({
         }
         setShowMicroTargetBuilder(false);
         setTargetBuilderGoal(null);
-    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fetchFractalTree, onGoalCreated, selectedActivity, refreshSession]);
+    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fetchFractalTree, onGoalCreated, queryClient, refreshSession, selectedActivity, sessionGoalsViewKey]);
 
     // --- Sub-goal Creation via GoalDetailModal ---
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null); // goal node
@@ -283,7 +290,7 @@ function GoalsPanel({
                 try {
                     const currentGoalIds = activeActivityDef.associated_goal_ids || [];
                     await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentGoalIds, newGoalData.id]);
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 } catch (assocErr) {
                     console.error('Failed to associate new sub-goal with activity', assocErr);
                 }
@@ -296,10 +303,12 @@ function GoalsPanel({
             console.error('Failed to create sub goal', err);
             throw err;
         }
-    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal, queryClient, sessionId]);
+    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal, queryClient, sessionGoalsViewKey]);
 
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
+    const microChars = getLevelByName('MicroGoal');
+    const nanoChars = getLevelByName('NanoGoal');
 
     const isActivityFocused = !!selectedActivity;
 
@@ -363,6 +372,30 @@ function GoalsPanel({
                 {
                     viewMode === 'session' && (
                         <div className={styles.sessionActivitiesList}>
+                            <SessionFocusSection
+                                loading={loading}
+                                microGoals={microGoals}
+                                microChars={microChars}
+                                nanoChars={nanoChars}
+                                completedColor={completedColor}
+                                completedSecondaryColor={completedSecondaryColor}
+                                getGoalColor={getGoalColor}
+                                getGoalSecondaryColor={getGoalSecondaryColor}
+                                handleToggleCompletion={(goalNode, completed) => toggleGoalCompletion(goalNode.id, completed)}
+                                onGoalClick={onGoalClick}
+                                achievedTargetIds={achievedTargetIds}
+                                handleCreateNanoGoal={handleCreateNanoGoal}
+                                handleCreateMicroGoalWithTarget={handleCreateMicroGoalWithTarget}
+                                showIGCreator={showIGCreator}
+                                igName={igName}
+                                setIGName={setIGName}
+                                igParentId={igParentId}
+                                setIGParentId={setIGParentId}
+                                allShortTermGoals={allShortTermGoals}
+                                handleCreateImmediateGoal={handleCreateImmediateGoal}
+                                igCreating={igCreating}
+                                setShowIGCreator={setShowIGCreator}
+                            />
                             <HierarchySection
                                 type="session"
                                 flattenedHierarchy={sessionHierarchy}

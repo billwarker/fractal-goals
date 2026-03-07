@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import notify from '../utils/notify';
 import Modal from './atoms/Modal';
 import ModalBody from './atoms/ModalBody';
 import ModalFooter from './atoms/ModalFooter';
 import Input from './atoms/Input';
 import Button from './atoms/Button';
 import GoalIcon from './atoms/GoalIcon';
-import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import notify from '../utils/notify';
 
 /**
  * MicroGoalModal

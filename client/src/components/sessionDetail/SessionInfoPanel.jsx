@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import Button from '../atoms/Button';
-import Input from '../atoms/Input';
-import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
-import styles from './SessionInfoPanel.module.css';
-import notify from '../../utils/notify';
-import { Heading } from '../atoms/Typography';
-import { formatClockDuration } from '../../utils/sessionTime';
-import { useLiveSessionDuration } from '../../hooks/useSessionDuration';
 
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { useLiveSessionDuration } from '../../hooks/useSessionDuration';
+import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
+import notify from '../../utils/notify';
+import Button from '../atoms/Button';
+import { Heading } from '../atoms/Typography';
+import Input from '../atoms/Input';
+import { formatClockDuration } from '../../utils/sessionTime';
+
+import styles from './SessionInfoPanel.module.css';
 
 function SessionInfoPanel() {
     // Context

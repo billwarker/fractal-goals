@@ -67,6 +67,10 @@ node_modules/
 test_db.py
 .pytest_cache/
 .coverage
+htmlcov/
+client/coverage/
+client/errors.txt
+client/lint-errors.txt
 
 # Temporary Files
 *.tmp

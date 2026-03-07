@@ -214,6 +214,57 @@ class TestActivities:
         assert response.status_code == 400
         assert 'both name and unit' in response.get_json().get('error', '').lower()
 
+    def test_create_activity_rejects_blank_name(self, authed_client, sample_ultimate_goal):
+        """Create requests should reject blank names explicitly."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': '   '}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Name is required'
+
+    def test_create_activity_rejects_too_many_metrics(self, authed_client, sample_ultimate_goal):
+        """Create requests should preserve the max-3-metrics contract."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={
+                'name': 'Over-Instrumented Activity',
+                'metrics': [
+                    {'name': 'Weight', 'unit': 'lbs'},
+                    {'name': 'Reps', 'unit': 'count'},
+                    {'name': 'Duration', 'unit': 'sec'},
+                    {'name': 'Tempo', 'unit': 'bpm'},
+                ]
+            }
+        )
+
+        assert response.status_code == 400
+        assert 'maximum of 3 metrics' in response.get_json()['error'].lower()
+
+    def test_create_activity_rejects_too_many_splits(self, authed_client, sample_ultimate_goal):
+        """Create requests should preserve the max-5-splits contract."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={
+                'name': 'Over-Split Activity',
+                'splits': [
+                    {'name': 'One'},
+                    {'name': 'Two'},
+                    {'name': 'Three'},
+                    {'name': 'Four'},
+                    {'name': 'Five'},
+                    {'name': 'Six'},
+                ]
+            }
+        )
+
+        assert response.status_code == 400
+        assert 'maximum of 5 splits' in response.get_json()['error'].lower()
+
     def test_update_activity_rejects_partial_metric_rows(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Partial metric payloads should fail fast instead of deleting existing metrics."""
         root_id = sample_ultimate_goal.id
@@ -245,6 +296,28 @@ class TestActivities:
 
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Name is required'
+
+    def test_update_activity_rejects_non_array_metrics(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Update requests should reject malformed metric shapes."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}',
+            json={'metrics': {'name': 'Weight', 'unit': 'lbs'}}
+        )
+
+        assert response.status_code == 400
+        assert 'metrics must be an array' in response.get_json()['error'].lower()
+
+    def test_update_activity_rejects_non_array_splits(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Update requests should reject malformed split shapes."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}',
+            json={'splits': {'name': 'Left'}}
+        )
+
+        assert response.status_code == 400
+        assert 'splits must be an array' in response.get_json()['error'].lower()
 
     def test_update_activity_rejects_too_many_metrics(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Updates should preserve the max-3-metrics contract."""

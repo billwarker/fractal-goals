@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from './queryKeys';
 
 export function useGoalAssociations(rootId, goalId) {
     const isReady = Boolean(rootId && goalId);
 
     const { data: activities = [], isLoading: isLoadingActivities } = useQuery({
-        queryKey: ['goalActivities', rootId, goalId],
+        queryKey: queryKeys.goalActivities(rootId, goalId),
         queryFn: async () => {
             const res = await fractalApi.getGoalActivities(rootId, goalId);
             return res.data || [];
@@ -15,7 +16,7 @@ export function useGoalAssociations(rootId, goalId) {
     });
 
     const { data: groups = [], isLoading: isLoadingGroups } = useQuery({
-        queryKey: ['goalActivityGroups', rootId, goalId],
+        queryKey: queryKeys.goalActivityGroups(rootId, goalId),
         queryFn: async () => {
             const res = await fractalApi.getGoalActivityGroups(rootId, goalId);
             return res.data || [];
@@ -35,7 +36,7 @@ export function useGoalMetrics(goalId) {
     const isReady = Boolean(goalId);
 
     const { data: metrics = null, isLoading } = useQuery({
-        queryKey: ['goalMetrics', goalId],
+        queryKey: queryKeys.goalMetrics(goalId),
         queryFn: async () => {
             const res = await fractalApi.getGoalMetrics(goalId);
             return res.data || null;
@@ -49,7 +50,7 @@ export function useGoalMetrics(goalId) {
 
 export function useGoalDailyDurations(goalId, enabled = false) {
     return useQuery({
-        queryKey: ['goalDailyDurations', goalId],
+        queryKey: queryKeys.goalDailyDurations(goalId),
         queryFn: async () => {
             const res = await fractalApi.getGoalDailyDurations(goalId);
             return res.data || { points: [] };
@@ -63,7 +64,7 @@ export function useGoalsForSelection(rootId) {
     const isReady = Boolean(rootId);
 
     const { data: goals = [], isLoading, error } = useQuery({
-        queryKey: ['goalsForSelection', rootId],
+        queryKey: queryKeys.goalsForSelection(rootId),
         queryFn: async () => {
             const res = await fractalApi.getGoalsForSelection(rootId);
             return res.data || [];

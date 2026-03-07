@@ -24,7 +24,16 @@ const checks = [
   },
   {
     file: 'src/FlowTree.jsx',
-    patterns: [/fitViewOptions/, /minZoom=\{isMobile \? 0\.06 : 0\.1\}/, /getLayoutedElements\(nodes, edges, 'TB', isMobile\)/],
+    patterns: [
+      /fitViewOptions/,
+      /minZoom=\{isMobile \? 0\.06 : 0\.1\}/,
+    ],
+  },
+  {
+    file: 'src/components/flowTree/flowTreeGraphUtils.js',
+    patterns: [
+      /getLayoutedElements\([^,]+,\s*[^,]+,\s*'TB',\s*isMobile\)/,
+    ],
   },
 ];
 

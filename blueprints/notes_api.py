@@ -4,432 +4,162 @@ Notes API Blueprint
 Provides endpoints for managing timestamped notes on sessions, activity instances, and sets.
 """
 
-from flask import Blueprint, request, jsonify
-from datetime import datetime, timezone
-import uuid
 import logging
 
-from models import (
-    get_engine,
-    get_session,
-    Note,
-    Session,
-    ActivityInstance,
-    ActivityDefinition,
-    Goal,
-    session_goals,
-    format_utc,
-    validate_root_goal
-)
-from validators import validate_request, NoteCreateSchema, NoteUpdateSchema
-from services.serializers import serialize_note, serialize_activity_instance
-from services.goal_type_utils import get_canonical_goal_type
+from flask import Blueprint, jsonify, request
+
+from blueprints.api_utils import internal_error
 from blueprints.auth_api import token_required
+from models import get_engine, get_session
+from services.note_service import NoteService
+from validators import NoteCreateSchema, NoteUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
 
 notes_bp = Blueprint('notes', __name__, url_prefix='/api')
 
 
+def _with_note_service():
+    db_session = get_session(get_engine())
+    return db_session, NoteService(db_session)
+
+
 @notes_bp.route('/<root_id>/sessions/<session_id>/notes', methods=['GET'])
 @token_required
 def get_session_notes(current_user, root_id, session_id):
-    """
-    Get all notes for a session (includes activity instance and set notes).
-    
-    Returns notes in reverse chronological order.
-    """
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        # Verify ownership
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        notes = db.query(Note).filter(
-            Note.root_id == root_id,
-            Note.session_id == session_id,
-            Note.deleted_at == None
-        ).order_by(Note.created_at.desc()).all()
-        
-        return jsonify([serialize_note(n) for n in notes])
-    except Exception as e:
-        logger.error(f"Error fetching session notes: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.get_session_notes(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        return internal_error(logger, "Error fetching session notes")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/activity-instances/<instance_id>/notes', methods=['GET'])
 @token_required
 def get_activity_instance_notes(current_user, root_id, instance_id):
-    """Get notes for a specific activity instance."""
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        # Verify ownership
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        notes = db.query(Note).filter(
-            Note.root_id == root_id,
-            Note.activity_instance_id == instance_id,
-            Note.deleted_at == None
-        ).order_by(Note.created_at.desc()).all()
-        
-        return jsonify([serialize_note(n) for n in notes])
-    except Exception as e:
-        logger.error(f"Error fetching activity instance notes: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.get_activity_instance_notes(root_id, instance_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        return internal_error(logger, "Error fetching activity instance notes")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/sessions/<session_id>/previous-session-notes', methods=['GET'])
 @token_required
 def get_previous_session_notes(current_user, root_id, session_id):
-    """
-    Get session-level notes from the last 5 sessions (excluding current).
-    
-    Returns notes grouped by session, ordered by session date (most recent first).
-    """
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        # Verify ownership
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        # Get the current session to determine the cutoff date
-        current_session = db.query(Session).filter(Session.id == session_id).first()
-        if not current_session:
-            return jsonify({"error": "Session not found"}), 404
-            
-        current_start = current_session.session_start or current_session.created_at
-        
-        # Subquery to find sessions that actually have notes
-        sessions_with_notes = db.query(Note.session_id).filter(
-            Note.root_id == root_id, 
-            Note.context_type == 'session', 
-            Note.deleted_at == None
-        ).distinct()
-        
-        # Get the 5 most recent sessions BEFORE the current one that have notes
-        previous_sessions = db.query(Session).filter(
-            Session.root_id == root_id,
-            Session.id != session_id,
-            Session.deleted_at == None,
-            Session.id.in_(sessions_with_notes),
-            # Filter specifically for sessions appearing BEFORE the current one
-            (Session.session_start < current_start) | 
-            ((Session.session_start == None) & (Session.created_at < current_start))
-        ).order_by(
-            Session.session_start.desc().nullslast(), 
-            Session.created_at.desc()
-        ).limit(5).all()
-        
-        if not previous_sessions:
-            return jsonify([])
-        
-        session_ids = [s.id for s in previous_sessions]
-        
-        # Fetch session-level notes from these sessions
-        notes = db.query(Note).filter(
-            Note.root_id == root_id,
-            Note.session_id.in_(session_ids),
-            Note.context_type == 'session',
-            Note.deleted_at == None
-        ).order_by(Note.created_at.desc()).all()
-        
-        # Group notes by session
-        results = []
-        for session in previous_sessions:
-            session_notes = [serialize_note(n) for n in notes if n.session_id == session.id]
-            if session_notes:  # Should be always true due to filter, but good safety
-                results.append({
-                    'session_id': session.id,
-                    'session_name': session.name,
-                    'session_date': format_utc(session.session_start or session.created_at),
-                    'notes': session_notes
-                })
-        
-        return jsonify(results)
-    except Exception as e:
-        logger.error(f"Error fetching previous session notes: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.get_previous_session_notes(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        return internal_error(logger, "Error fetching previous session notes")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/activities/<activity_id>/notes', methods=['GET'])
 @token_required
 def get_activity_definition_notes(current_user, root_id, activity_id):
-    """Get recent notes for an activity definition if owned by user."""
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
         limit = request.args.get('limit', 20, type=int)
-        exclude_session_id = request.args.get('exclude_session', None)
-        
-        query = db.query(Note).filter(
-            Note.root_id == root_id,
-            Note.activity_definition_id == activity_id,
-            Note.deleted_at == None
+        exclude_session_id = request.args.get('exclude_session')
+        payload, error, status = note_service.get_activity_definition_notes(
+            root_id,
+            activity_id,
+            current_user.id,
+            limit=limit,
+            exclude_session_id=exclude_session_id,
         )
-        
-        if exclude_session_id:
-            query = query.filter(Note.session_id != exclude_session_id)
-        
-        notes = query.order_by(Note.created_at.desc()).limit(limit).all()
-        
-        # Enrich with session info for context
-        results = []
-        for note in notes:
-            data = serialize_note(note)
-            if note.session:
-                data['session_name'] = note.session.name
-                data['session_date'] = format_utc(note.session.session_start or note.session.created_at)
-            results.append(data)
-        
-        return jsonify(results)
-    except Exception as e:
-        logger.error(f"Error fetching activity definition notes: {e}")
-        return jsonify({"error": str(e)}), 500
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        return internal_error(logger, "Error fetching activity definition notes")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/activities/<activity_id>/history', methods=['GET'])
 @token_required
 def get_activity_history(current_user, root_id, activity_id):
-    """Get previous instances of an activity with their metrics if owned by user."""
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
         limit = request.args.get('limit', 3, type=int)
-        exclude_session_id = request.args.get('exclude_session', None)
-        
-        query = db.query(ActivityInstance).filter(
-            ActivityInstance.root_id == root_id,
-            ActivityInstance.activity_definition_id == activity_id,
-            ActivityInstance.deleted_at == None
+        exclude_session_id = request.args.get('exclude_session')
+        payload, error, status = note_service.get_activity_history(
+            root_id,
+            activity_id,
+            current_user.id,
+            limit=limit,
+            exclude_session_id=exclude_session_id,
         )
-        
-        if exclude_session_id:
-            query = query.filter(ActivityInstance.session_id != exclude_session_id)
-        
-        instances = query.order_by(ActivityInstance.created_at.desc()).limit(limit).all()
-        
-        # Get IDs for fetching notes
-        instance_ids = [inst.id for inst in instances]
-        
-        # Fetch notes for these instances
-        notes_by_instance = {}
-        if instance_ids:
-            notes = db.query(Note).filter(
-                Note.activity_instance_id.in_(instance_ids),
-                Note.deleted_at == None
-            ).order_by(Note.created_at).all()
-            
-            for n in notes:
-                if n.activity_instance_id not in notes_by_instance:
-                    notes_by_instance[n.activity_instance_id] = []
-                notes_by_instance[n.activity_instance_id].append(serialize_note(n))
-        
-        # Include session info and notes
-        results = []
-        for inst in instances:
-            data = serialize_activity_instance(inst)
-            if inst.session:
-                data['session_name'] = inst.session.name
-                data['session_date'] = format_utc(inst.session.session_start or inst.session.created_at)
-            
-            # Attach notes
-            data['notes'] = notes_by_instance.get(inst.id, [])
-            
-            results.append(data)
-        
-        return jsonify(results)
-    except Exception as e:
-        logger.error(f"Error fetching activity history: {e}")
-        return jsonify({"error": str(e)}), 500
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        return internal_error(logger, "Error fetching activity history")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/notes', methods=['POST'])
 @token_required
 @validate_request(NoteCreateSchema)
 def create_note(current_user, root_id, validated_data):
-    """
-    Create a new note if owned by user.
-    """
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        content = validated_data.get('content', '')  # Already sanitized
-        image_data = validated_data.get('image_data')
-        
-        # Either content or image_data is required (content is required by schema)
-        # If only image, set a default content placeholder
-        if not content and image_data:
-            content = "[Image]"
-
-        session_id = validated_data.get('session_id')
-        if session_id:
-            session_obj = db.query(Session).filter(
-                Session.id == session_id,
-                Session.root_id == root_id,
-                Session.deleted_at == None
-            ).first()
-            if not session_obj:
-                return jsonify({"error": "Session not found in this fractal"}), 400
-
-        nano_goal_id = validated_data.get('nano_goal_id')
-        if nano_goal_id:
-            nano_goal = db.query(Goal).filter(
-                Goal.id == nano_goal_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).first()
-            if not nano_goal:
-                return jsonify({"error": "Nano goal not found in this fractal"}), 400
-            if get_canonical_goal_type(nano_goal) != 'NanoGoal':
-                return jsonify({"error": "nano_goal_id must reference a NanoGoal"}), 400
-
-            if session_id:
-                # Validate session coherence:
-                # either note is tied to an instance in this session,
-                # or this nano's ancestry includes a micro goal linked to the session.
-                activity_instance_id = validated_data.get('activity_instance_id')
-                if activity_instance_id:
-                    instance = db.query(ActivityInstance).filter(
-                        ActivityInstance.id == activity_instance_id,
-                        ActivityInstance.root_id == root_id,
-                        ActivityInstance.deleted_at == None
-                    ).first()
-                    if not instance:
-                        return jsonify({"error": "Activity instance not found in this fractal"}), 400
-                    if instance.session_id != session_id:
-                        return jsonify({"error": "Activity instance does not belong to the provided session"}), 400
-
-                ancestor_ids = []
-                current = nano_goal
-                while current and current.parent_id:
-                    ancestor_ids.append(current.parent_id)
-                    current = db.query(Goal).filter(Goal.id == current.parent_id).first()
-
-                has_session_link = False
-                if ancestor_ids:
-                    has_session_link = db.query(session_goals).filter(
-                        session_goals.c.session_id == session_id,
-                        session_goals.c.goal_id.in_(ancestor_ids)
-                    ).first() is not None
-
-                if not has_session_link and not validated_data.get('activity_instance_id'):
-                    return jsonify({
-                        "error": "nano_goal_id is not linked to the provided session"
-                    }), 400
-        
-        with db.begin_nested():
-            note = Note(
-                id=str(uuid.uuid4()),
-                root_id=root_id,
-                context_type=validated_data['context_type'],
-                context_id=validated_data['context_id'],
-                session_id=session_id,
-                activity_instance_id=validated_data.get('activity_instance_id'),
-                activity_definition_id=validated_data.get('activity_definition_id'),
-                set_index=validated_data.get('set_index'),
-                content=content,
-                image_data=image_data,
-                nano_goal_id=nano_goal_id
-            )
-            
-            db.add(note)
-            
-        db.commit()
-        
-        logger.info(f"Created note {note.id} for {validated_data['context_type']} {note.context_id}")
-        return jsonify(serialize_note(note)), 201
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating note: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.create_note(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        db_session.rollback()
+        return internal_error(logger, "Error creating note")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['PUT'])
 @token_required
 @validate_request(NoteUpdateSchema)
 def update_note(current_user, root_id, note_id, validated_data):
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        note = db.query(Note).filter(
-            Note.id == note_id,
-            Note.root_id == root_id,
-            Note.deleted_at == None
-        ).first()
-        
-        if not note:
-            return jsonify({"error": "Note not found"}), 404
-        
-        if 'content' in validated_data:
-            note.content = validated_data['content']
-        
-        db.commit()
-        logger.info(f"Updated note {note_id}")
-        return jsonify(serialize_note(note))
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error updating note: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.update_note(root_id, note_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        db_session.rollback()
+        return internal_error(logger, "Error updating note")
     finally:
-        db.close()
+        db_session.close()
 
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['DELETE'])
 @token_required
 def delete_note(current_user, root_id, note_id):
-    db = get_session(get_engine())
+    db_session, note_service = _with_note_service()
     try:
-        root = validate_root_goal(db, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        note = db.query(Note).filter(
-            Note.id == note_id,
-            Note.root_id == root_id,
-            Note.deleted_at == None
-        ).first()
-        
-        if not note:
-            return jsonify({"error": "Note not found"}), 404
-        
-        note.deleted_at = datetime.now(timezone.utc)
-        db.commit()
-        
-        logger.info(f"Deleted note {note_id}")
-        return jsonify({"success": True})
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting note: {e}")
-        return jsonify({"error": str(e)}), 500
+        payload, error, status = note_service.delete_note(root_id, note_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except Exception:
+        db_session.rollback()
+        return internal_error(logger, "Error deleting note")
     finally:
-        db.close()
+        db_session.close()

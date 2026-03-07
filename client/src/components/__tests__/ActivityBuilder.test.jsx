@@ -1,0 +1,151 @@
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+import ActivityBuilder from '../ActivityBuilder';
+
+const {
+    mockCreateActivity,
+    mockUpdateActivity,
+    mockFetchActivityGroups,
+    mockUseFractalTreeQuery,
+} = vi.hoisted(() => ({
+    mockCreateActivity: vi.fn(),
+    mockUpdateActivity: vi.fn(),
+    mockFetchActivityGroups: vi.fn(),
+    mockUseFractalTreeQuery: vi.fn(),
+}));
+
+vi.mock('../../contexts/ActivitiesContext', () => ({
+    useActivities: () => ({
+        createActivity: mockCreateActivity,
+        updateActivity: mockUpdateActivity,
+        activityGroups: [{ id: 'group-1', name: 'Technique' }],
+        fetchActivityGroups: mockFetchActivityGroups,
+    }),
+}));
+
+vi.mock('../../contexts/GoalsContext', () => ({
+    useGoals: () => ({
+        useFractalTreeQuery: mockUseFractalTreeQuery,
+    }),
+}));
+
+vi.mock('../../contexts/GoalLevelsContext', () => ({
+    useGoalLevels: () => ({
+        getGoalColor: () => '#22d3ee',
+    }),
+}));
+
+vi.mock('../modals/DeleteConfirmModal', () => ({
+    default: ({ isOpen, title, message, confirmText, onConfirm }) => (
+        isOpen ? (
+            <div>
+                <div>{title}</div>
+                <div>{message}</div>
+                <button onClick={onConfirm}>{confirmText}</button>
+            </div>
+        ) : null
+    ),
+}));
+
+vi.mock('../sessionDetail/ActivityAssociationModal', () => ({
+    default: ({ isOpen, onAssociate }) => (
+        isOpen ? <button onClick={() => onAssociate(['goal-1'])}>associate goal</button> : null
+    ),
+}));
+
+describe('ActivityBuilder', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockCreateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
+        mockUpdateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
+        mockUseFractalTreeQuery.mockReturnValue({
+            data: {
+                id: 'goal-root',
+                name: 'Root Goal',
+                type: 'LongTermGoal',
+                children: [
+                    { id: 'goal-1', name: 'Child Goal', type: 'ShortTermGoal', children: [] },
+                ],
+            },
+        });
+    });
+
+    it('creates an activity through the extracted form flow', async () => {
+        const onClose = vi.fn();
+        const onSave = vi.fn();
+
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={onClose}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={onSave}
+            />
+        );
+
+        expect(mockFetchActivityGroups).toHaveBeenCalledWith('root-1');
+
+        fireEvent.change(screen.getByLabelText('Activity Name'), {
+            target: { value: 'Scale Practice' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                name: 'Scale Practice',
+                has_metrics: true,
+            }));
+        });
+
+        expect(onSave).toHaveBeenCalledWith({ id: 'activity-1', name: 'Scale Practice' });
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it('warns before removing existing metrics and updates after confirmation', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={{
+                    id: 'activity-1',
+                    name: 'Scale Practice',
+                    description: '',
+                    has_sets: false,
+                    has_metrics: true,
+                    metrics_multiplicative: false,
+                    has_splits: false,
+                    group_id: null,
+                    associated_goal_ids: [],
+                    metric_definitions: [
+                        { id: 'metric-1', name: 'Speed', unit: 'bpm' },
+                    ],
+                    split_definitions: [],
+                }}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByDisplayValue('Speed'), {
+            target: { value: '' },
+        });
+        fireEvent.change(screen.getByDisplayValue('bpm'), {
+            target: { value: '' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save Activity' }));
+
+        expect(screen.getByText('Removing Metrics')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Save Anyway'));
+
+        await waitFor(() => {
+            expect(mockUpdateActivity).toHaveBeenCalledWith('root-1', 'activity-1', expect.objectContaining({
+                metrics: [],
+            }));
+        });
+    });
+});

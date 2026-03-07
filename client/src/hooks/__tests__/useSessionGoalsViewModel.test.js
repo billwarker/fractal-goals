@@ -383,4 +383,71 @@ describe('useSessionGoalsViewModel', () => {
         expect(result.current.targetCards.map((target) => target.id)).toContain('target-1');
         expect(result.current.targetCards[0]?.metrics?.[0]?.value).toBe(10);
     });
+
+    it('scopes target cards to the focused activity definition and activity instance', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'ig',
+                        type: 'ImmediateGoal',
+                        name: 'Immediate',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['ig', 'micro'],
+            activity_goal_ids_by_activity: {
+                'activity-1': ['ig']
+            },
+            micro_goals: [
+                {
+                    id: 'micro',
+                    type: 'MicroGoal',
+                    name: 'Micro',
+                    parent_id: 'ig',
+                    activity_definition_id: 'activity-1',
+                    attributes: {
+                        targets: [
+                            {
+                                id: 'target-a',
+                                activity_id: 'activity-1',
+                                activity_instance_id: 'inst-a',
+                                type: 'threshold',
+                                metrics: [{ metric_id: 'm1', value: 10 }]
+                            },
+                            {
+                                id: 'target-b',
+                                activity_id: 'activity-1',
+                                activity_instance_id: 'inst-b',
+                                type: 'threshold',
+                                metrics: [{ metric_id: 'm1', value: 20 }]
+                            },
+                            {
+                                id: 'target-c',
+                                activity_id: 'activity-2',
+                                type: 'threshold',
+                                metrics: [{ metric_id: 'm2', value: 30 }]
+                            }
+                        ]
+                    },
+                    children: []
+                }
+            ],
+            session_activity_ids: ['activity-1', 'activity-2']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            session: { session_start: '2026-03-06T08:00:00Z', created_at: '2026-03-06T08:00:00Z', completed: false },
+            selectedActivity: { id: 'inst-a', activity_definition_id: 'activity-1' },
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.targetCards.map((target) => target.id)).toEqual(['target-a']);
+    });
 });

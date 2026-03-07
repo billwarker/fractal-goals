@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fractalApi } from '../utils/api';
-import notify from '../utils/notify';
-import { useGoals } from './GoalsContext';
-import { useTimezone } from './TimezoneContext';
+
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { parseTargets } from '../utils/goalUtils';
+import { queryKeys } from '../hooks/queryKeys';
+import { fractalApi } from '../utils/api';
+import notify from '../utils/notify';
+import { useGoals } from './GoalsContext';
 
 const SessionDataContext = createContext(null);
 const SessionUiContext = createContext(null);
@@ -19,36 +20,18 @@ function formatGoalTypeLabel(type) {
     return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
-function patchGoalCompletion(goal, goalId, completed, completedAt) {
-    if (!goal || goal.id !== goalId) return goal;
-    return {
-        ...goal,
-        completed,
-        completed_at: completedAt,
-        attributes: {
-            ...(goal.attributes || {}),
-            completed,
-            completed_at: completedAt
-        }
-    };
-}
-
-function patchGoalTreeCompletion(node, goalId, completed, completedAt) {
-    if (!node) return node;
-
-    const patchedNode = patchGoalCompletion(node, goalId, completed, completedAt);
-    if (!patchedNode.children || !Array.isArray(patchedNode.children)) return patchedNode;
-
-    return {
-        ...patchedNode,
-        children: patchedNode.children.map((child) => patchGoalTreeCompletion(child, goalId, completed, completedAt))
-    };
-}
-
 export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const queryClient = useQueryClient();
     const { setActiveRootId } = useGoals();
-    const { timezone } = useTimezone();
+    const sessionKey = queryKeys.session(rootId, sessionId);
+    const sessionActivitiesKey = queryKeys.sessionActivities(rootId, sessionId);
+    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
+    const sessionsKey = queryKeys.sessions(rootId);
+    const sessionsAllKey = queryKeys.sessionsAll(rootId);
+    const fractalTreeKey = queryKeys.fractalTree(rootId);
+    const activitiesKey = queryKeys.activities(rootId);
+    const activityGroupsKey = queryKeys.activityGroups(rootId);
 
     // UI state
     const [showActivitySelector, setShowActivitySelector] = useState({});
@@ -77,7 +60,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     // 1. Queries
     const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refreshSession } = useQuery({
-        queryKey: ['session', rootId, sessionId],
+        queryKey: sessionKey,
         queryFn: async () => {
             try {
                 const res = await fractalApi.getSession(rootId, sessionId);
@@ -92,7 +75,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const { data: activityInstances = [], isLoading: instancesLoading, refetch: refreshInstances } = useQuery({
-        queryKey: ['session-activities', rootId, sessionId],
+        queryKey: sessionActivitiesKey,
         queryFn: async () => {
             try {
                 const res = await fractalApi.getSessionActivities(rootId, sessionId);
@@ -106,7 +89,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const { data: activitiesRaw = [], isLoading: activitiesLoading } = useQuery({
-        queryKey: ['activities', rootId],
+        queryKey: activitiesKey,
         queryFn: async () => {
             const res = await fractalApi.getActivities(rootId);
             return res.data;
@@ -121,7 +104,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [activitiesRaw]);
 
     const { data: activityGroups = [] } = useQuery({
-        queryKey: ['activity-groups', rootId],
+        queryKey: activityGroupsKey,
         queryFn: async () => {
             const res = await fractalApi.getActivityGroups(rootId);
             return res.data;
@@ -130,7 +113,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const { data: sessionGoalsView = null, isLoading: sessionGoalsViewLoading } = useQuery({
-        queryKey: ['session-goals-view', rootId, sessionId],
+        queryKey: sessionGoalsViewKey,
         queryFn: async () => {
             const res = await fractalApi.getSessionGoalsView(rootId, sessionId);
             return res.data || null;
@@ -145,9 +128,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         mutationFn: (updates) => fractalApi.updateSession(rootId, sessionId, updates),
         onMutate: () => setAutoSaveStatus('saving'),
         onSuccess: (res) => {
-            queryClient.setQueryData(['session', rootId, sessionId], res.data);
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
+            queryClient.setQueryData(sessionKey, res.data);
+            queryClient.invalidateQueries({ queryKey: sessionsKey });
+            queryClient.invalidateQueries({ queryKey: sessionsAllKey });
             setAutoSaveStatus('saved');
             scheduleStatusClear(2000);
         },
@@ -160,9 +143,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const addActivityMutation = useMutation({
         mutationFn: (data) => fractalApi.addActivityToSession(rootId, sessionId, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
         },
         onError: (err) => {
             const status = err?.response?.status;
@@ -179,9 +162,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const removeActivityMutation = useMutation({
         mutationFn: (instanceId) => fractalApi.removeActivityFromSession(rootId, sessionId, instanceId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
         }
     });
 
@@ -189,14 +172,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         mutationFn: () => fractalApi.deleteSession(rootId, sessionId),
         onMutate: async () => {
             setIsDeletingSession(true);
-            await queryClient.cancelQueries({ queryKey: ['session', rootId, sessionId] });
-            await queryClient.cancelQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            await queryClient.cancelQueries({ queryKey: sessionKey });
+            await queryClient.cancelQueries({ queryKey: sessionActivitiesKey });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'] });
-            queryClient.removeQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.removeQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: sessionsKey });
+            queryClient.invalidateQueries({ queryKey: sessionsAllKey });
+            queryClient.removeQueries({ queryKey: sessionKey });
+            queryClient.removeQueries({ queryKey: sessionActivitiesKey });
             notify.success('Session deleted successfully');
         },
         onError: () => {
@@ -207,8 +190,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const pauseSessionMutation = useMutation({
         mutationFn: () => fractalApi.pauseSession(rootId, sessionId),
         onSuccess: (res) => {
-            queryClient.setQueryData(['session', rootId, sessionId], res.data);
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            queryClient.setQueryData(sessionKey, res.data);
+            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
             notify.success('Session paused');
         },
         onError: (err) => {
@@ -219,8 +202,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const resumeSessionMutation = useMutation({
         mutationFn: () => fractalApi.resumeSession(rootId, sessionId),
         onSuccess: (res) => {
-            queryClient.setQueryData(['session', rootId, sessionId], res.data);
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            queryClient.setQueryData(sessionKey, res.data);
+            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
             notify.success('Session resumed');
         },
         onError: (err) => {
@@ -231,21 +214,21 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const updateGoalMutation = useMutation({
         mutationFn: ({ goalId, updates }) => fractalApi.updateGoal(rootId, goalId, updates),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goals(rootId) });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
         }
     });
 
     const toggleGoalCompletionMutation = useMutation({
         mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
         onSuccess: (res, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['goals', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-notes', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goals(rootId) });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionNotesKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
 
             // Toast for manual completion
             const goalResponse = res?.data;
@@ -258,7 +241,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const applyInstanceOptimisticUpdate = useCallback((instanceId, updates) => {
-        queryClient.setQueryData(['session-activities', rootId, sessionId], (prev = []) => {
+        queryClient.setQueryData(sessionActivitiesKey, (prev = []) => {
             if (!Array.isArray(prev)) return prev;
             return prev.map((inst) => {
                 if (inst.id !== instanceId) return inst;
@@ -268,11 +251,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 };
             });
         });
-    }, [queryClient, rootId, sessionId]);
+    }, [queryClient, sessionActivitiesKey]);
 
     const updateInstanceMutation = useMutation({
         mutationFn: async ({ instanceId, updates }) => {
-            const cachedInstances = queryClient.getQueryData(['session-activities', rootId, sessionId]);
+            const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);
             const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
             const instance = instanceSource.find(inst => inst.id === instanceId);
             if (!instance) throw new Error('Instance not found');
@@ -326,11 +309,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         },
         onSuccess: (res, { instanceId }) => {
             if (res?.data) {
-                queryClient.setQueryData(['session-activities', rootId, sessionId], (prev = []) =>
+                queryClient.setQueryData(sessionActivitiesKey, (prev = []) =>
                     prev.map(inst => inst.id === instanceId ? res.data : inst)
                 );
             } else {
-                queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+                queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
             }
         }
     });
@@ -356,7 +339,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         });
         instanceQueuesRef.current.set(instanceId, queue);
         return queue;
-    }, [updateInstanceMutation.mutateAsync]);
+    }, [updateInstanceMutation]);
 
     const enqueueInstanceUpdate = useCallback((instanceId, updates) => {
         applyInstanceOptimisticUpdate(instanceId, updates);
@@ -419,9 +402,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
             fractalApi.toggleGoalCompletion(rootId, goalId, desiredCompleted)
                 .then(() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
-                    queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-                    queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                    queryClient.invalidateQueries({ queryKey: sessionKey });
+                    queryClient.invalidateQueries({ queryKey: fractalTreeKey });
                 })
                 .catch((error) => {
                     console.error('[autoSyncGoalCompletion] failed', {
@@ -431,9 +414,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                         status: error?.response?.status,
                         data: error?.response?.data
                     });
-                    queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
-                    queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-                    queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                    queryClient.invalidateQueries({ queryKey: sessionKey });
+                    queryClient.invalidateQueries({ queryKey: fractalTreeKey });
                 })
                 .finally(() => {
                     if (autoSyncedGoalStatesRef.current.get(goalId) === desiredCompleted) {
@@ -441,7 +424,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                     }
                 });
         });
-    }, [rootId, sessionId, goalAchievements, allGoalsForTargets, queryClient]);
+    }, [allGoalsForTargets, fractalTreeKey, goalAchievements, queryClient, rootId, sessionGoalsViewKey, sessionId, sessionKey]);
 
     // 4. Handlers
     const handleUpdateTimer = useCallback(async (instanceId, action) => {
@@ -469,16 +452,16 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             }
 
             if (res && res.data) {
-                queryClient.setQueryData(['session-activities', rootId, sessionId], (prev) =>
+                queryClient.setQueryData(sessionActivitiesKey, (prev) =>
                     prev.map(inst => inst.id === instanceId ? res.data : inst)
                 );
-                queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
+                queryClient.invalidateQueries({ queryKey: sessionKey });
             }
         } catch (err) {
             console.error('Timer action failed', err);
             notify.error('Timer action failed: ' + (err.response?.data?.error || err.message));
         }
-    }, [activityInstances, rootId, sessionId, queryClient]);
+    }, [activityInstances, queryClient, rootId, sessionActivitiesKey, sessionId, sessionKey]);
 
     const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
         const updatedData = { ...localSessionData };
@@ -608,27 +591,29 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const createGoal = useCallback(async (goalData) => {
         try {
             const res = await fractalApi.createGoal(rootId, goalData);
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session', rootId, sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['session-activities', rootId, sessionId] });
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
 
             return res.data;
         } catch (err) {
             console.error("Failed to create goal", err);
             throw err;
         }
-    }, [rootId, sessionId, queryClient]);
+    }, [fractalTreeKey, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionKey, queryClient]);
 
-
-    // eslint-disable-next-line react-hooks/refs
+    // The queue is intentionally memoized once per mutation callback identity so it can retain
+    // its dedupe state across renders without re-enqueuing unchanged session payloads.
+    /* eslint-disable react-hooks/refs, react-hooks/exhaustive-deps */
     const autoSaveQueue = useMemo(() => createAutoSaveQueue({
         save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
         onError: () => {
             setAutoSaveStatus('error');
             scheduleStatusClear(3000);
-        }
-    }), [updateSessionMutation.mutateAsync, scheduleStatusClear]);
+        },
+    }), [scheduleStatusClear, updateSessionMutation.mutateAsync]);
+    /* eslint-enable react-hooks/refs, react-hooks/exhaustive-deps */
 
     // 5. Effects
     useEffect(() => {
@@ -653,7 +638,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             targetNotificationsInitializedRef.current = false;
             goalNotificationsInitializedRef.current = false;
         }
-    }, [rootId, sessionId]);
+    }, [rootId, sessionId, autoSaveQueue]);
 
     useEffect(() => {
         if (!session) return;
@@ -837,11 +822,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [goalAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);
 
     useEffect(() => {
+        const instanceQueues = instanceQueuesRef.current;
         return () => {
             if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
             if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
-            instanceQueuesRef.current.forEach((queue) => queue.reset());
-            instanceQueuesRef.current.clear();
+            instanceQueues.forEach((queue) => queue.reset());
+            instanceQueues.clear();
         };
     }, []);
 

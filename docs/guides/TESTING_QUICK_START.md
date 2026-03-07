@@ -19,11 +19,13 @@ pip install -r requirements-test.txt
 ## 2. Run Your First Tests
 
 ```bash
+./run-tests.sh db-up
+
 # Run all tests
 ./run-tests.sh
 
-# Or use pytest directly
-pytest
+# Verify the environment without running the full suite
+./run-tests.sh doctor
 ```
 
 **Expected output:**
@@ -53,15 +55,14 @@ open htmlcov/index.html
 
 ---
 
-## 4. Install Pre-commit Hook (Optional but Recommended)
+## 4. Install Git Hooks (Optional but Recommended)
 
 ```bash
 # One-time setup
-cp shell-scripts/pre-commit-hook.sh .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+./run-tests.sh install-hooks
 ```
 
-Now tests run automatically before every commit!
+Now cheap verification runs automatically before every commit and push.
 
 ---
 
@@ -108,6 +109,9 @@ pytest tests/unit/test_my_feature.py -v
 # Integration tests only
 ./run-tests.sh integration
 
+# Cheap local verification
+./run-tests.sh verify
+
 # With coverage
 ./run-tests.sh coverage
 
@@ -147,6 +151,9 @@ source fractal-goals-venv/bin/activate
 
 ### Tests fail
 ```bash
+# Make sure the local Postgres test DB is running
+./run-tests.sh db-up
+
 # Run with verbose output to see details
 pytest -v
 
@@ -155,7 +162,5 @@ pytest tests/unit/test_models.py::TestGoalHierarchy::test_create_ultimate_goal -
 ```
 
 ---
-
-**You're ready to test! 🚀**
 
 Run `./run-tests.sh` to get started.

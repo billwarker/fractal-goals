@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
+import { queryKeys } from '../hooks/queryKeys';
 
 const ActivitiesContext = createContext();
 
@@ -26,7 +27,7 @@ export function ActivitiesProvider({ children }) {
             setError(null);
             const res = await fractalApi.getActivities(rootId);
             setActivities(res.data);
-            queryClient.setQueryData(['activities', rootId], res.data);
+            queryClient.setQueryData(queryKeys.activities(rootId), res.data);
         } catch (err) {
             console.error('Failed to fetch activities:', err);
             setError('Failed to load activities');
@@ -46,7 +47,7 @@ export function ActivitiesProvider({ children }) {
                 if (!created?.id) return next;
                 if (next.some((item) => item.id === created.id)) return next;
                 next.push(created);
-                queryClient.setQueryData(['activities', rootId], next);
+                queryClient.setQueryData(queryKeys.activities(rootId), next);
                 return next;
             });
             emitActivityEvent('activity.created', { rootId, activity: created });
@@ -69,7 +70,7 @@ export function ActivitiesProvider({ children }) {
             setActivities((prev) => {
                 if (!Array.isArray(prev)) return prev;
                 const next = prev.map((item) => item.id === activityId ? { ...item, ...updated } : item);
-                queryClient.setQueryData(['activities', rootId], next);
+                queryClient.setQueryData(queryKeys.activities(rootId), next);
                 return next;
             });
             emitActivityEvent('activity.updated', { rootId, activityId, activity: updated });
@@ -99,7 +100,7 @@ export function ActivitiesProvider({ children }) {
             setActivities((prev) => {
                 if (!Array.isArray(prev)) return prev;
                 const next = prev.filter((item) => item.id !== activityId);
-                queryClient.setQueryData(['activities', rootId], next);
+                queryClient.setQueryData(queryKeys.activities(rootId), next);
                 return next;
             });
             emitActivityEvent('activity.deleted', { rootId, activityId, activity: deletedActivity || null });
@@ -118,7 +119,7 @@ export function ActivitiesProvider({ children }) {
         try {
             const res = await fractalApi.getActivityGroups(rootId);
             setActivityGroups(res.data);
-            queryClient.setQueryData(['activity-groups', rootId], res.data);
+            queryClient.setQueryData(queryKeys.activityGroups(rootId), res.data);
             return res.data;
         } catch (err) {
             console.error('Failed to fetch activity groups:', err);

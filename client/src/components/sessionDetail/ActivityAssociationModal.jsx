@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import notify from '../../utils/notify';
-import styles from './ActivityAssociationModal.module.css';
 import GoalIcon from '../atoms/GoalIcon';
+
+import styles from './ActivityAssociationModal.module.css';
 
 /**
  * Modal for associating an activity with a goal.
@@ -17,19 +17,22 @@ const ActivityAssociationModal = ({
     initialActivityName = '',
     initialSelectedGoalIds = []
 }) => {
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon, getLevelByName } = useGoalLevels();;
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const [searchTerm, setSearchTerm] = useState('');
 
     // Multi-select state - initialize with passed IDs
     const [selectedGoalIds, setSelectedGoalIds] = useState(() => new Set(initialSelectedGoalIds));
     const [initialGoalIds, setInitialGoalIds] = useState(() => new Set(initialSelectedGoalIds));
 
+    // Reset local selection state whenever the modal opens with a new association set.
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (isOpen) {
             setSelectedGoalIds(new Set(initialSelectedGoalIds));
             setInitialGoalIds(new Set(initialSelectedGoalIds));
         }
     }, [isOpen, initialSelectedGoalIds]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // Collapsible sections state - simplified to track collapsed state (default expanded)
     const [collapsedSections, setCollapsedSections] = useState(new Set());

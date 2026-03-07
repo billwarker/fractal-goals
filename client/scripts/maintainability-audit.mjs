@@ -1,5 +1,19 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import module from 'node:module';
+import { extname, join, relative, resolve } from 'node:path';
+
+const builtins = new Set(module.builtinModules);
+const MAX_SOURCE_LINES = 450;
+const sizeExceptions = new Map([
+  ['src/components/GoalDetailModal.jsx', 750],
+  ['src/components/sessionDetail/GoalsPanel.jsx', 500],
+  ['src/components/sessionDetail/SessionActivityItem.jsx', 1050],
+  ['src/contexts/ActiveSessionContext.jsx', 1000],
+]);
+
+const importOrderExceptions = new Set([
+  'src/main.jsx',
+]);
 
 const checks = [
   {
@@ -47,6 +61,15 @@ const globalNoImportPatterns = [
   /import\s+['"].*Sessions\.css['"]/,
 ];
 
+const importGroupOrder = {
+  builtin: 0,
+  external: 1,
+  parent: 2,
+  sibling: 3,
+  index: 4,
+  style: 5,
+};
+
 let hasFailure = false;
 
 const readFile = (file) => {
@@ -57,6 +80,93 @@ const readFile = (file) => {
     console.error(`[maintainability-audit] Missing file: ${file}`);
     hasFailure = true;
     return '';
+  }
+};
+
+const collectSourceFiles = (directory) => {
+  const entries = readdirSync(directory);
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = join(directory, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      files.push(...collectSourceFiles(fullPath));
+      continue;
+    }
+
+    const extension = extname(fullPath);
+    if (extension === '.js' || extension === '.jsx' || extension === '.ts' || extension === '.tsx') {
+      files.push(fullPath);
+    }
+  }
+  return files;
+};
+
+const classifyImport = (specifier) => {
+  if (specifier.endsWith('.css') || specifier.endsWith('.module.css')) return 'style';
+  if (specifier === '.' || specifier === './' || specifier === './index' || specifier === './index.js' || specifier === './index.jsx') {
+    return 'index';
+  }
+  if (specifier.startsWith('../')) return 'parent';
+  if (specifier.startsWith('./')) return 'sibling';
+  if (specifier.startsWith('node:') || builtins.has(specifier)) return 'builtin';
+  return 'external';
+};
+
+const auditImportOrder = (file, content) => {
+  if (importOrderExceptions.has(file)) return;
+
+  const lines = content.split('\n');
+  const imports = [];
+  let inImportBlock = true;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line) {
+      if (imports.length > 0) continue;
+      continue;
+    }
+    if (!inImportBlock) break;
+    if (!line.startsWith('import ')) {
+      inImportBlock = false;
+      continue;
+    }
+
+    const match = line.match(/from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]/);
+    if (!match) continue;
+
+    const specifier = match[1] || match[2];
+    imports.push({
+      line: index + 1,
+      specifier,
+      group: classifyImport(specifier),
+    });
+  }
+
+  let highestGroupSeen = -1;
+  for (const entry of imports) {
+    const groupIndex = importGroupOrder[entry.group];
+    if (groupIndex < highestGroupSeen) {
+      console.error(
+        `[maintainability-audit] ${file}:${entry.line} import "${entry.specifier}" is out of order. ` +
+        'Expected builtin/external before relative imports, with style imports last.'
+      );
+      hasFailure = true;
+      break;
+    }
+    highestGroupSeen = Math.max(highestGroupSeen, groupIndex);
+  }
+};
+
+const auditFileSize = (file, content) => {
+  const lineCount = content.split('\n').length;
+  const threshold = sizeExceptions.get(file) ?? MAX_SOURCE_LINES;
+  if (lineCount > threshold) {
+    console.error(
+      `[maintainability-audit] ${file} has ${lineCount} lines, exceeding the limit of ${threshold}. ` +
+      'Extract coordinator logic or move helpers into adjacent modules.'
+    );
+    hasFailure = true;
   }
 };
 
@@ -87,27 +197,7 @@ for (const check of checks) {
   }
 }
 
-const collectSourceFiles = (directory) => {
-  const entries = readdirSync(directory);
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = join(directory, entry);
-    const stats = statSync(fullPath);
-    if (stats.isDirectory()) {
-      files.push(...collectSourceFiles(fullPath));
-      continue;
-    }
-
-    const extension = extname(fullPath);
-    if (extension === '.js' || extension === '.jsx' || extension === '.ts' || extension === '.tsx') {
-      files.push(fullPath);
-    }
-  }
-  return files;
-};
-
 const sourceFiles = collectSourceFiles(resolve('src'));
-
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -115,11 +205,15 @@ for (const file of sourceFiles) {
   for (const pattern of globalNoImportPatterns) {
     if (pattern.test(content)) {
       console.error(
-        `[maintainability-audit] ${file} reintroduced a removed legacy CSS import: ${pattern}`
+        `[maintainability-audit] ${relative(resolve(''), file)} reintroduced a removed legacy CSS import: ${pattern}`
       );
       hasFailure = true;
     }
   }
+
+  const relativePath = relative(resolve(''), file);
+  auditImportOrder(relativePath, content);
+  auditFileSize(relativePath, content);
 }
 
 if (hasFailure) {

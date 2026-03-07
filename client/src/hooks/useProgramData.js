@@ -1,15 +1,16 @@
 import { useCallback, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
 import { flattenGoals } from '../utils/goalHelpers';
+import { queryKeys } from './queryKeys';
 
 export function useProgramData(rootId, programId) {
     const queryClient = useQueryClient();
 
     // 1. Program Query
     const programQuery = useQuery({
-        queryKey: ['program', rootId, programId],
+        queryKey: queryKeys.program(rootId, programId),
         queryFn: async () => {
             const res = await fractalApi.getProgram(rootId, programId);
             return res.data;
@@ -19,7 +20,7 @@ export function useProgramData(rootId, programId) {
 
     // 2. Goals (Tree) Query
     const goalsQuery = useQuery({
-        queryKey: ['goals-tree', rootId],
+        queryKey: queryKeys.goalsTree(rootId),
         queryFn: async () => {
             const res = await fractalApi.getGoal(rootId, rootId);
             return res.data;
@@ -29,7 +30,7 @@ export function useProgramData(rootId, programId) {
 
     // 3. Activities Query
     const activitiesQuery = useQuery({
-        queryKey: ['activities', rootId],
+        queryKey: queryKeys.activities(rootId),
         queryFn: async () => {
             const res = await fractalApi.getActivities(rootId);
             return res.data || [];
@@ -39,7 +40,7 @@ export function useProgramData(rootId, programId) {
 
     // 4. Activity Groups Query
     const groupsQuery = useQuery({
-        queryKey: ['activity-groups', rootId],
+        queryKey: queryKeys.activityGroups(rootId),
         queryFn: async () => {
             const res = await fractalApi.getActivityGroups(rootId);
             return res.data || [];
@@ -49,7 +50,7 @@ export function useProgramData(rootId, programId) {
 
     // 5. Sessions Query
     const sessionsQuery = useQuery({
-        queryKey: ['sessions', rootId, 'all'], // 'all' to differentiate from paginated lists if needed
+        queryKey: queryKeys.sessionsAll(rootId),
         queryFn: async () => {
             const res = await fractalApi.getSessions(rootId, { limit: 1000 });
             return res.data.sessions || res.data || [];
@@ -81,11 +82,11 @@ export function useProgramData(rootId, programId) {
     // Refresh Function (invalidates all queries)
     const refreshData = useCallback(async () => {
         await Promise.all([
-            queryClient.invalidateQueries(['program', rootId, programId]),
-            queryClient.invalidateQueries(['goals-tree', rootId]),
-            queryClient.invalidateQueries(['activities', rootId]),
-            queryClient.invalidateQueries(['activity-groups', rootId]),
-            queryClient.invalidateQueries(['sessions', rootId])
+            queryClient.invalidateQueries({ queryKey: queryKeys.program(rootId, programId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalsTree(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.activityGroups(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) })
         ]);
     }, [queryClient, rootId, programId]);
 

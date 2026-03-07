@@ -1,6 +1,6 @@
 import React from 'react';
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import GoalIcon from './atoms/GoalIcon';
-import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 import { DeletedEntityCard } from './ui/DeletedEntityFallback';
 import styles from './TargetCard.module.css';
 
@@ -12,7 +12,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     // Find the activity definition
     const activityDef = activityDefinitions.find(a => a.id === target.activity_id);
 
-    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
+    const { getLevelByName, getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
 
     // Normalize backend types like 'short_term_goal' -> 'Short Term Goal'
     const normalizeType = (str) => {
@@ -28,7 +28,6 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     const completionColor = getGoalColor('Completed');
     const accentColor = isCompleted ? completionColor : iconColor;
     const accentSecondaryColor = isCompleted ? getGoalSecondaryColor('Completed') : iconSecondaryColor;
-    const cardBackground = 'var(--color-bg-card-alt)';
     const cardBorderColor = isCompleted ? accentColor : 'var(--color-border)';
     const metricBorderColor = isCompleted ? `${accentColor}55` : 'var(--color-border)';
     const metricLabelColor = isCompleted ? `${accentColor}cc` : 'var(--color-text-muted)';

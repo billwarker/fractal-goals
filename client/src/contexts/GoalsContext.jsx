@@ -2,6 +2,7 @@ import React, { createContext, useContext, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi, globalApi } from '../utils/api';
 import notify from '../utils/notify';
+import { queryKeys } from '../hooks/queryKeys';
 
 const GoalsContext = createContext();
 
@@ -18,7 +19,7 @@ export function GoalsProvider({ children }) {
     });
 
     const useFractalTreeQuery = (rootId) => useQuery({
-        queryKey: ['fractalTree', rootId],
+        queryKey: queryKeys.fractalTree(rootId),
         queryFn: async () => {
             if (!rootId) return null;
             const res = await fractalApi.getGoals(rootId);
@@ -44,7 +45,7 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
         }
     });
 
@@ -54,7 +55,7 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
         }
     });
 
@@ -64,11 +65,11 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: ['session', variables.rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-activities', variables.rootId] });
             queryClient.invalidateQueries({ queryKey: ['session-notes', variables.rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-micro-goals', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionMicroGoals(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: ['session-goals-view', variables.rootId] });
             notify.success('Goal deleted');
         }
@@ -80,7 +81,7 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['fractalTree', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
         }
     });
 
@@ -96,7 +97,7 @@ export function GoalsProvider({ children }) {
 
     // This is a bridge: it doesn't return data but triggers a fetch/refetch
     const fetchFractalTree = useCallback((rootId) => {
-        queryClient.invalidateQueries({ queryKey: ['fractalTree', rootId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
     }, [queryClient]);
 
     const [activeRootId, setActiveRootId] = React.useState(null);
@@ -124,14 +125,11 @@ export function GoalsProvider({ children }) {
         activeRootId,
         fetchFractals,
         fetchFractalTree,
-        // Mutations are stable, but good practice to include or omit consistently. 
-        // We'll trust react-query stable callbacks, but for safety include them or their stable parts.
-        // Actually, createFractalMutation.mutateAsync is stable.
         createFractalMutation.mutateAsync,
-        createGoalMutation.mutateAsync,
-        updateGoalMutation.mutateAsync,
-        deleteGoalMutation.mutateAsync,
-        toggleGoalCompletionMutation.mutateAsync,
+        createGoalMutation,
+        updateGoalMutation,
+        deleteGoalMutation,
+        toggleGoalCompletionMutation,
     ]);
 
     return (

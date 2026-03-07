@@ -38,4 +38,41 @@ describe('TargetCard', () => {
         expect(screen.getByText('10 %')).toBeInTheDocument();
         expect(screen.queryByText('Complete')).not.toBeInTheDocument();
     });
+
+    it('hides missing-activity targets in view mode', () => {
+        const { container } = render(
+            <TargetCard
+                target={{
+                    id: 'target-missing',
+                    activity_id: 'missing-activity',
+                    type: 'threshold',
+                    metrics: []
+                }}
+                activityDefinitions={[]}
+                isCompleted={false}
+                goalType="MicroGoal"
+            />
+        );
+
+        expect(container.firstChild).toBeNull();
+    });
+
+    it('shows a deleted-activity fallback in edit mode', () => {
+        render(
+            <TargetCard
+                target={{
+                    id: 'target-missing',
+                    activity_id: 'missing-activity',
+                    type: 'threshold',
+                    metrics: []
+                }}
+                activityDefinitions={[]}
+                isCompleted={false}
+                isEditMode={true}
+                goalType="MicroGoal"
+            />
+        );
+
+        expect(screen.getByText(/activity not found \(may have been deleted\)/i)).toBeInTheDocument();
+    });
 });

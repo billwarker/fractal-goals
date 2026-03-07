@@ -14,6 +14,7 @@ pip install -r requirements-test.txt
 ### Run All Tests
 
 ```bash
+./run-tests.sh db-up
 ./run-tests.sh
 ```
 
@@ -22,7 +23,16 @@ pip install -r requirements-test.txt
 ```bash
 ./run-tests.sh unit          # Unit tests only
 ./run-tests.sh integration   # Integration tests only
+./run-tests.sh verify        # Cheap local verification path
 ./run-tests.sh coverage      # With coverage report
+```
+
+### Local Postgres Bootstrap
+
+```bash
+./run-tests.sh db-up         # Start the local dev/test Postgres container
+./run-tests.sh doctor        # Verify venv, node_modules, and DB connectivity
+./run-tests.sh db-down       # Stop the container when you're done
 ```
 
 ---
@@ -231,11 +241,10 @@ def test_create_session(client, sample_goal_hierarchy):
 
 ## Pre-commit Hooks
 
-Install pre-commit hooks to run tests before every commit:
+Install repo-tracked hooks to run verification before commits and pushes:
 
 ```bash
-cp shell-scripts/pre-commit-hook.sh .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+./run-tests.sh install-hooks
 ```
 
 This will run quick unit tests before allowing commits. To skip:

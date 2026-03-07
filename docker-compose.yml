@@ -22,6 +22,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-fractal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fractal_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-fractal_goals}
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:-fractal_goals_test}
     ports:
       - "5432:5432"
     volumes:
