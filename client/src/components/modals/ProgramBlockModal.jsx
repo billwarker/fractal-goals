@@ -1,43 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
-import { Heading } from '../atoms/Typography';
 import styles from './ProgramBlockModal.module.css';
 
-const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        startDate: '',
-        endDate: '',
-        color: '#3A86FF'
-    });
-    const [errors, setErrors] = useState({});
+function buildInitialBlockFormData(initialData) {
+    if (!initialData) {
+        return {
+            name: '',
+            startDate: '',
+            endDate: '',
+            color: 'var(--color-brand-primary)',
+        };
+    }
 
-    useEffect(() => {
-        if (isOpen) {
-            if (initialData) {
-                setFormData({
-                    id: initialData.id, // Preserve id for editing
-                    name: initialData.name || '',
-                    startDate: initialData.startDate || initialData.start_date || '',
-                    endDate: initialData.endDate || initialData.end_date || '',
-                    color: initialData.color || '#3A86FF'
-                });
-            } else {
-                // Reset for new entry
-                setFormData({
-                    name: '',
-                    startDate: '',
-                    endDate: '',
-                    color: 'var(--color-brand-primary)'
-                });
-            }
-            setErrors({});
-        }
-    }, [isOpen, initialData]);
+    return {
+        id: initialData.id,
+        name: initialData.name || '',
+        startDate: initialData.startDate || initialData.start_date || '',
+        endDate: initialData.endDate || initialData.end_date || '',
+        color: initialData.color || '#3A86FF',
+    };
+}
+
+const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDates = {} }) => {
+    const [formData, setFormData] = useState(() => buildInitialBlockFormData(initialData));
+    const [errors, setErrors] = useState({});
 
     const validate = () => {
         const newErrors = {};
@@ -64,7 +54,7 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={onClose}
             title={initialData?.id ? 'Edit Program Block' : 'Add Program Block'}
         >
@@ -136,6 +126,23 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
                 </Button>
             </ModalFooter>
         </Modal>
+    );
+};
+
+const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = initialData?.id || 'new-program-block';
+    return (
+        <ProgramBlockModalInner
+            key={modalKey}
+            onClose={onClose}
+            onSave={onSave}
+            initialData={initialData}
+            programDates={programDates}
+        />
     );
 };
 

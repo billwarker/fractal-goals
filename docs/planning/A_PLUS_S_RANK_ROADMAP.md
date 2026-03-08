@@ -44,7 +44,7 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 ## Phase 4: Frontend Correctness
 
 31. Eliminate stale derived local state where query data can be source of truth.
-32. Remove effects that only mirror props into state.
+32. ~~Remove effects that only mirror props into state.~~
 33. ~~Resolve effect dependency warnings in touched files by restructuring logic.~~
 34. ~~Prefer invalidation-based mutation hooks over local refresh functions.~~
 35. Use optimistic updates only when rollback behavior is explicit.
@@ -112,7 +112,10 @@ Completed in the current workspace:
 - 26: soft-delete behavior is now consistent for the `deleted_at`-backed model surfaces touched by the main app flows; templates, activity groups, activity instances, removed split definitions, goals, and whole fractals now soft-delete through service-backed paths, with fractal deletion also soft-deleting root-scoped sessions, activities, templates, metrics/splits, notes, annotations, and descendant goals instead of leaving active rows behind a deleted root
 - 30: query-budget coverage now guards the session activities, session detail, goal tree, and session goals-view endpoints in `tests/performance/test_query_budgets.py`, with bounded ceilings based on the current eager-loading/query shape so future refactors cannot silently reintroduce N+1 blowups on these read-heavy surfaces
 - 28: legacy payload-shape validation is now enforced across the previously permissive endpoints too; raw activity create/update, program day copy, and manual goal-completion payloads now validate object/array shapes through schema-backed parsing, completing the route inventory so malformed `targets`, `metrics`, `goal_ids`, `activity_ids`, `selected_points`, `sets`, `session_id`, `completed`, and `target_mode` payloads fail fast with regression coverage
-- 31/32 progress: the session-detail surfaces are now shedding prop-mirroring state incrementally; `HistoryPanel`, `NotesPanel`, `ActivityAssociationModal`, `GoalsPanel`, and `SessionActivityItem` no longer depend on sync effects for view-mode/selection defaults, `ActiveSessionContext` now treats `localSessionData` as a draft overlay on top of normalized query data instead of maintaining a permanent mirrored copy, `GoalDetailModal` now reads goal metrics directly from query data, `useGoalDetailController` resets per-goal controller state without an initialization effect, `AnnotationModal` now uses a close-reset draft instead of mirroring `initialContent`, `GoalModal` now mounts with seeded initial state instead of resetting fields in an effect, and `Programs.jsx` now derives the route-selected program instead of syncing it into local state
+- 32: prop-mirroring effects have been removed from the remaining modal, goal-detail, and planning surfaces that were only syncing props into local state; `useGoalForm`, `useGoalDetailController`, `useForm`, `GoalDetailModal`, `AnnotationModal`, `AuthModal`, `GoalModal`, `Programs.jsx`, `ProgramBuilder`, `ProgramDayModal`, `ProgramBlockModal`, `AttachGoalModal`, `MicroGoalModal`, `GroupBuilderModal`, `SettingsModal`, `DeleteConfirmModal`, `DeleteProgramModal`, `SelectActivitiesModal`, and `SessionModal` now reset through mount/unmount or explicit cancel/close paths instead of open-time sync effects
+- 31 progress: `useActivityHistory` now reads prior activity instances through React Query with a canonical `activity-history` key instead of maintaining local fetched state, so `HistoryPanel` consumes a query-backed source of truth rather than a hand-rolled cache
+- 31 progress: `AnnotationsList` now also reads visualization annotations through React Query with canonical `annotations` keys and invalidation on annotation-update events instead of running its own fetched-data cache and reload state machine
+- 31 progress: `Selection.jsx` now reads fractals plus recent/per-root goal levels through React Query with canonical `fractals` and `goalLevels` keys, replacing four local fetch/cache states and moving create/delete flows onto shared query invalidation and cache updates
 
 ## Next Tranche
 

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import React, { useState } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoals } from '../../contexts/GoalsContext';
@@ -10,7 +9,16 @@ import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './SettingsModal.module.css';
 
-const SettingsModal = ({ isOpen, onClose }) => {
+function getAvailableTimezones() {
+    try {
+        return Intl.supportedValuesOf('timeZone');
+    } catch (error) {
+        console.error('Timezone API not supported', error);
+        return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
+    }
+}
+
+const SettingsModalInner = ({ onClose }) => {
     const {
         theme,
         toggleTheme,
@@ -24,22 +32,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const { logout } = useAuth();
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
-    const [availableTimezones, setAvailableTimezones] = useState([]);
+    const [availableTimezones] = useState(getAvailableTimezones);
 
     const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
     const [emailData, setEmailData] = useState({ email: '', password: '' });
     const [deleteData, setDeleteData] = useState({ password: '', confirmation: '' });
-
-    useEffect(() => {
-        if (isOpen) {
-            try {
-                setAvailableTimezones(Intl.supportedValuesOf('timeZone'));
-            } catch (e) {
-                console.error("Timezone API not supported", e);
-                setAvailableTimezones(['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo']);
-            }
-        }
-    }, [isOpen]);
 
     const handlePasswordUpdate = async (e) => {
         e.preventDefault();
@@ -78,8 +75,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
             }
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <div className={`${styles.overlay} ${isMobile ? styles.overlayMobile : styles.overlayDesktop}`}>
@@ -329,6 +324,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
         </div>
     );
+};
+
+const SettingsModal = ({ isOpen, onClose }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    return <SettingsModalInner onClose={onClose} />;
 };
 
 export default SettingsModal;

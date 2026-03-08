@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import notify from '../utils/notify';
 import Modal from './atoms/Modal';
@@ -15,8 +15,7 @@ import GoalIcon from './atoms/GoalIcon';
  * If the activity has no metrics, creates a completion-based target instead.
  * The micro goal name is auto-generated from the metric values or activity name.
  */
-function MicroGoalModal({
-    isOpen,
+function MicroGoalModalInner({
     onClose,
     onSave,
     activityDefinitions = [],
@@ -34,13 +33,6 @@ function MicroGoalModal({
 
     const lockedActivity = activityDefinitions.find(a => a.id === preselectedActivityId);
     const hasMetrics = lockedActivity?.metric_definitions?.length > 0;
-
-    // Reset on open
-    useEffect(() => {
-        if (!isOpen) return;
-        setMetricValues({});
-        setIntentionText('');
-    }, [isOpen]);
 
     const handleMetricChange = (metricId, value) => {
         setMetricValues(prev => ({ ...prev, [metricId]: value }));
@@ -118,8 +110,6 @@ function MicroGoalModal({
         }
     };
 
-    if (!isOpen) return null;
-
     const modalTitle = (
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <GoalIcon
@@ -134,7 +124,7 @@ function MicroGoalModal({
     );
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="md">
+        <Modal isOpen={true} onClose={onClose} title={modalTitle} size="md">
             <ModalBody>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {/* Parent context */}
@@ -299,6 +289,15 @@ function MicroGoalModal({
             </ModalFooter>
         </Modal>
     );
+}
+
+function MicroGoalModal(props) {
+    if (!props.isOpen) {
+        return null;
+    }
+
+    const modalKey = props.preselectedActivityId || 'micro-goal';
+    return <MicroGoalModalInner key={modalKey} {...props} />;
 }
 
 export default MicroGoalModal;

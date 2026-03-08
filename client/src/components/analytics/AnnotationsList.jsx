@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
 
 /**
  * AnnotationsList - Displays all annotations for a given visualization
@@ -10,64 +12,35 @@ import { fractalApi } from '../../utils/api';
  * @param {object} props.context - Additional context (e.g., activity_id)
  */
 function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating, onToggleAnnotationMode, highlightedAnnotationId, onHighlight }) {
-    const [annotations, setAnnotations] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
+    const queryClient = useQueryClient();
     const contextKey = JSON.stringify(context);
-
-    useEffect(() => {
-        const loadAnnotations = async () => {
-            if (!rootId) {
-                console.log('AnnotationsList: No rootId provided');
-                setAnnotations([]);
-                setLoading(false);
-                return;
-            }
-
-            if (!visualizationType) {
-                console.log('AnnotationsList: No visualizationType provided');
-                setAnnotations([]);
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                console.log('AnnotationsList: Loading annotations', { rootId, visualizationType, context });
-
-                // Fetch annotations for this visualization type and context
-                const response = await fractalApi.getAnnotations(
-                    rootId,
-                    visualizationType,
-                    context
-                );
-
-                console.log('AnnotationsList: Loaded', response.data?.data?.length || 0, 'annotations');
-                setAnnotations(response.data?.data || []);
-            } catch (err) {
-                console.error('Failed to load annotations:', err);
-                // Show more informative error
-                const errorMessage = err.response?.data?.error
-                    || err.response?.statusText
-                    || err.message
-                    || 'Failed to load annotations';
-                setError(errorMessage);
-                setAnnotations([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadAnnotations();
-    }, [rootId, visualizationType, contextKey]);
+    const annotationsQuery = useQuery({
+        queryKey: queryKeys.annotations(rootId, visualizationType, contextKey),
+        enabled: Boolean(rootId && visualizationType),
+        retry: false,
+        queryFn: async () => {
+            const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
+            return response.data?.data || [];
+        },
+    });
+    const annotations = annotationsQuery.data || [];
+    const loading = rootId && visualizationType ? annotationsQuery.isLoading : false;
+    const error = annotationsQuery.error
+        ? (
+            annotationsQuery.error.response?.data?.error
+            || annotationsQuery.error.response?.statusText
+            || annotationsQuery.error.message
+            || 'Failed to load annotations'
+        )
+        : null;
 
     const handleDeleteAnnotation = async (annotationId) => {
         try {
             await fractalApi.deleteAnnotation(rootId, annotationId);
-            setAnnotations(prev => prev.filter(a => a.id !== annotationId));
+            queryClient.setQueryData(
+                queryKeys.annotations(rootId, visualizationType, contextKey),
+                (current = []) => current.filter((annotation) => annotation.id !== annotationId)
+            );
 
             // Dispatch event to notify other components
             window.dispatchEvent(new CustomEvent('annotation-update'));
@@ -79,25 +52,15 @@ function AnnotationsList({ rootId, visualizationType, context = {}, isAnnotating
     // Listen for external updates
     useEffect(() => {
         const handleUpdate = () => {
-            // Reload annotations
             if (rootId && visualizationType) {
-                const load = async () => {
-                    try {
-                        setLoading(true);
-                        const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
-                        setAnnotations(response.data?.data || []);
-                    } catch (err) {
-                        console.error(err);
-                    } finally {
-                        setLoading(false);
-                    }
-                };
-                load();
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.annotations(rootId, visualizationType, contextKey),
+                });
             }
         };
         window.addEventListener('annotation-update', handleUpdate);
         return () => window.removeEventListener('annotation-update', handleUpdate);
-    }, [rootId, visualizationType, JSON.stringify(context)]);
+    }, [contextKey, queryClient, rootId, visualizationType]);
 
     // Check if visualization type requires specific context
     const requiresActivityContext = visualizationType === 'scatter' || visualizationType === 'line';

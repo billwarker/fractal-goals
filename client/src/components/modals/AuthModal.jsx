@@ -15,7 +15,7 @@ import notify from '../../utils/notify';
  * AuthModal - Refactored to match exactly the application modal standards
  * (Reference: GoalDetailModal style)
  */
-function AuthModal({ isOpen, onClose }) {
+function AuthModalInner({ onClose }) {
     const { login, signup, isAuthenticated } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [generalError, setGeneralError] = useState(null);
@@ -45,7 +45,8 @@ function AuthModal({ isOpen, onClose }) {
         handleBlur,
         handleSubmit,
         isSubmitting,
-        resetForm
+        resetForm,
+        setFieldValue,
     } = useForm({
         username: '',
         email: '',
@@ -54,12 +55,10 @@ function AuthModal({ isOpen, onClose }) {
     }, validate);
 
     useEffect(() => {
-        if (isOpen && isAuthenticated) {
+        if (isAuthenticated) {
             onClose();
         }
-    }, [isOpen, isAuthenticated, onClose]);
-
-    if (!isOpen) return null;
+    }, [isAuthenticated, onClose]);
 
     const onSubmit = async (formValues) => {
         setGeneralError(null);
@@ -72,12 +71,8 @@ function AuthModal({ isOpen, onClose }) {
                 setIsLogin(true);
                 setGeneralError(null);
                 notify.success("Account created! Please log in.");
-                // Optionally prefill login
-                handleChange({ target: { name: 'usernameOrEmail', value: formValues.username } });
-                resetForm(); // OR just keep values? Let's reset to clean state except usernameOrEmail maybe?
-                // Actually resetForm wipes everything. Let's just manually set.
-                // But useForm doesn't expose manual set well except generic handleChange.
-                // Let's just let the user type it or rely on browser autofill.
+                resetForm();
+                setFieldValue('usernameOrEmail', formValues.username);
             }
         } catch (err) {
             console.error("Auth error:", err);
@@ -119,7 +114,7 @@ function AuthModal({ isOpen, onClose }) {
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={onClose}
             title={isLogin ? 'WELCOME BACK' : 'CREATE AN ACCOUNT'}
             size="md"
@@ -242,6 +237,14 @@ function AuthModal({ isOpen, onClose }) {
             </form>
         </Modal>
     );
+}
+
+function AuthModal({ isOpen, onClose }) {
+    if (!isOpen) {
+        return null;
+    }
+
+    return <AuthModalInner onClose={onClose} />;
 }
 
 export default AuthModal;

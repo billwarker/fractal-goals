@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { globalApi } from '../utils/api';
 import { getTypeDisplayName } from '../utils/goalHelpers';
@@ -7,9 +8,9 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
 import GoalIcon from '../components/atoms/GoalIcon';
 import { useAuth } from '../contexts/AuthContext';
+import { queryKeys } from '../hooks/queryKeys';
 import styles from './Selection.module.css'; // Import CSS Module
-import { useTheme } from '../contexts/ThemeContext'
-import { useGoalLevels } from '../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import useIsMobile from '../hooks/useIsMobile';
 
 /**
@@ -19,11 +20,8 @@ import useIsMobile from '../hooks/useIsMobile';
 function Selection() {
     const RECENT_ROOT_STORAGE_KEY = 'fractal_recent_root_id';
     const navigate = useNavigate();
-    const [fractals, setFractals] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [recentRootId, setRecentRootId] = useState(() => localStorage.getItem(RECENT_ROOT_STORAGE_KEY));
-    const [recentGoalLevels, setRecentGoalLevels] = useState([]);
-    const [goalLevelsByRootId, setGoalLevelsByRootId] = useState({});
 
     // Modal States
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -31,93 +29,84 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
-    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();;
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
 
-    useEffect(() => {
-        if (authLoading) return;
-        if (isAuthenticated) {
-            fetchFractals();
-        } else {
-            setFractals([]);
-            setLoading(false);
-            setRecentGoalLevels([]);
-            setGoalLevelsByRootId({});
-        }
-    }, [isAuthenticated, authLoading]);
-
-    useEffect(() => {
-        setRecentRootId(localStorage.getItem(RECENT_ROOT_STORAGE_KEY));
-    }, [fractals.length]);
-
-    useEffect(() => {
-        if (!isAuthenticated || !recentRootId) {
-            setRecentGoalLevels([]);
-            return;
-        }
-        let cancelled = false;
-        const fetchRecentLevels = async () => {
-            try {
-                const res = await globalApi.getGoalLevels(recentRootId);
-                if (!cancelled) setRecentGoalLevels(Array.isArray(res.data) ? res.data : []);
-            } catch (err) {
-                if (!cancelled) setRecentGoalLevels([]);
-                console.error('Failed to fetch recent fractal goal levels', err);
-            }
-        };
-        fetchRecentLevels();
-        return () => {
-            cancelled = true;
-        };
-    }, [isAuthenticated, recentRootId]);
-
-    useEffect(() => {
-        if (!isAuthenticated || !Array.isArray(fractals) || fractals.length === 0) {
-            setGoalLevelsByRootId({});
-            return;
-        }
-
-        let cancelled = false;
-        const fetchLevelColorsByRoot = async () => {
-            try {
-                const entries = await Promise.all(
-                    fractals.map(async (fractal) => {
-                        const res = await globalApi.getGoalLevels(fractal.id);
-                        return [fractal.id, Array.isArray(res.data) ? res.data : []];
-                    })
-                );
-                if (!cancelled) {
-                    setGoalLevelsByRootId(Object.fromEntries(entries));
-                }
-            } catch (err) {
-                if (!cancelled) setGoalLevelsByRootId({});
-                console.error('Failed to fetch per-fractal goal levels', err);
-            }
-        };
-
-        fetchLevelColorsByRoot();
-        return () => {
-            cancelled = true;
-        };
-    }, [isAuthenticated, fractals]);
-
-    useEffect(() => {
-        if (isAuthenticated && isAuthModalOpen) {
-            setAuthModalOpen(false);
-        }
-    }, [isAuthenticated, isAuthModalOpen]);
-
-    const fetchFractals = async () => {
-        try {
-            setLoading(true);
+    const fractalsQuery = useQuery({
+        queryKey: queryKeys.fractals(),
+        queryFn: async () => {
             const res = await globalApi.getAllFractals();
-            setFractals(res.data || []);
-        } catch (err) {
-            console.error("Failed to fetch fractals", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+            return res.data || [];
+        },
+        enabled: isAuthenticated,
+    });
+
+    const fractals = useMemo(
+        () => (isAuthenticated ? (fractalsQuery.data || []) : []),
+        [fractalsQuery.data, isAuthenticated]
+    );
+
+    const recentGoalLevelsQuery = useQuery({
+        queryKey: queryKeys.goalLevels(recentRootId),
+        queryFn: async () => {
+            const res = await globalApi.getGoalLevels(recentRootId);
+            return Array.isArray(res.data) ? res.data : [];
+        },
+        enabled: isAuthenticated && !!recentRootId,
+    });
+
+    const fractalGoalLevelQueries = useQueries({
+        queries: isAuthenticated
+            ? fractals.map((fractal) => ({
+                queryKey: queryKeys.goalLevels(fractal.id),
+                queryFn: async () => {
+                    const res = await globalApi.getGoalLevels(fractal.id);
+                    return Array.isArray(res.data) ? res.data : [];
+                },
+                enabled: !!fractal.id,
+            }))
+            : [],
+    });
+
+    const goalLevelsByRootId = useMemo(
+        () => Object.fromEntries(
+            fractals.map((fractal, index) => [fractal.id, fractalGoalLevelQueries[index]?.data || []])
+        ),
+        [fractals, fractalGoalLevelQueries]
+    );
+
+    const recentGoalLevels = recentGoalLevelsQuery.data || [];
+
+    const createFractalMutation = useMutation({
+        mutationFn: async (data) => {
+            const res = await globalApi.createFractal(data);
+            return res.data;
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
+            setCreateModalOpen(false);
+        },
+    });
+
+    const deleteFractalMutation = useMutation({
+        mutationFn: async (rootId) => {
+            const res = await globalApi.deleteFractal(rootId);
+            return res.data;
+        },
+        onSuccess: (_, deletedRootId) => {
+            queryClient.setQueryData(queryKeys.fractals(), (current = []) => (
+                current.filter((fractal) => fractal.id !== deletedRootId)
+            ));
+            queryClient.removeQueries({ queryKey: queryKeys.goalLevels(deletedRootId) });
+
+            if (recentRootId === deletedRootId) {
+                localStorage.removeItem(RECENT_ROOT_STORAGE_KEY);
+                setRecentRootId(null);
+            }
+
+            setFractalToDelete(null);
+        },
+    });
 
     const handleSelectRoot = (rootId) => {
         localStorage.setItem(RECENT_ROOT_STORAGE_KEY, rootId);
@@ -131,9 +120,7 @@ function Selection() {
             return;
         }
         try {
-            await globalApi.createFractal(data);
-            await fetchFractals();
-            setCreateModalOpen(false);
+            await createFractalMutation.mutateAsync(data);
         } catch (err) {
             alert('Failed to create fractal: ' + err.message);
         }
@@ -147,9 +134,7 @@ function Selection() {
     const handleConfirmDelete = async () => {
         if (!fractalToDelete) return;
         try {
-            await globalApi.deleteFractal(fractalToDelete.id);
-            setFractals(current => current.filter(f => f.id !== fractalToDelete.id));
-            setFractalToDelete(null);
+            await deleteFractalMutation.mutateAsync(fractalToDelete.id);
         } catch (err) {
             alert('Failed to delete fractal: ' + err.message);
         }
@@ -220,16 +205,7 @@ function Selection() {
         level?.name === normalizedHeaderName || level?.name === headerType
     ));
 
-    console.log('[Selection Logic Debug]', {
-        fractalsCount: fractals ? fractals.length : 0,
-        topRootName: topRoot ? topRoot.name : 'None',
-        topRootType: topRoot ? topRoot.type : 'None',
-        types: fractals ? fractals.map(f => `${f.name} (${f.type})`) : [],
-        isHeaderSmart
-    });
-
     const headerColor = recentLevel?.color || getGoalColor(headerType);
-    console.log('[Selection Logic Debug] headerColor:', headerColor);
 
     const headerSecondaryColor = recentLevel?.secondary_color || getGoalSecondaryColor(headerType);
     const headerShape = recentLevel?.icon || getGoalIcon(headerType) || 'circle';
@@ -247,7 +223,7 @@ function Selection() {
     const isDarkText = headerTextColor === '#1a1a1a';
     const headerLogoSize = isMobile ? 200 : 280;
 
-    if (authLoading || loading) {
+    if (authLoading || fractalsQuery.isLoading) {
         return <div className={styles.loadingContainer}>Loading fractals...</div>;
     }
 

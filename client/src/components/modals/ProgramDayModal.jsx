@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { legacyApi, fractalApi } from '../../utils/api';
+import { fractalApi } from '../../utils/api';
 import moment from 'moment';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
@@ -11,16 +11,62 @@ import styles from './ProgramDayModal.module.css';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 
-const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
-    const [name, setName] = useState('');
-    const [selectedTemplates, setSelectedTemplates] = useState([]);
-    const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState([]);
+function getInitialSelectedDaysOfWeek(initialData) {
+    if (!initialData) {
+        return [];
+    }
+
+    if (initialData.day_of_week) {
+        if (Array.isArray(initialData.day_of_week)) {
+            return initialData.day_of_week;
+        }
+
+        if (typeof initialData.day_of_week === 'string') {
+            if (initialData.day_of_week.trim().startsWith('[')) {
+                try {
+                    const parsed = JSON.parse(initialData.day_of_week);
+                    return Array.isArray(parsed) ? parsed : [initialData.day_of_week];
+                } catch {
+                    return [initialData.day_of_week];
+                }
+            }
+
+            return [initialData.day_of_week];
+        }
+    }
+
+    if (initialData.date) {
+        return [moment(initialData.date).format('dddd')];
+    }
+
+    return [];
+}
+
+function buildInitialProgramDayState(initialData) {
+    const selectedTemplates = initialData?.templates
+        ? initialData.templates.map((template) => template.id)
+        : (initialData?.sessions || []).map((session) => session.session_template_id).filter(Boolean);
+
+    return {
+        name: initialData?.name || '',
+        selectedTemplates,
+        selectedDaysOfWeek: getInitialSelectedDaysOfWeek(initialData),
+        copyStatus: '',
+        copyMode: 'all',
+    };
+}
+
+const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initialData }) => {
+    const initialState = buildInitialProgramDayState(initialData);
+    const [name, setName] = useState(initialState.name);
+    const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
+    const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
 
     const [sessionTemplates, setSessionTemplates] = useState([]);
     const [activities, setActivities] = useState([]);
     const [activityGroups, setActivityGroups] = useState([]);
-    const [copyStatus, setCopyStatus] = useState('');
-    const [copyMode, setCopyMode] = useState('all');
+    const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
+    const [copyMode] = useState(initialState.copyMode);
 
     // Template builder modal state
     const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
@@ -33,7 +79,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         try {
             const res = await fractalApi.getSessionTemplates(rootId);
             setSessionTemplates(res.data);
-        } catch (err) {
+        } catch {
             console.error("Failed to fetch templates");
         }
     };
@@ -50,61 +96,12 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                 setSessionTemplates(templatesRes.data);
                 setActivities(activitiesRes.data);
                 setActivityGroups(groupsRes.data);
-            } catch (err) {
+            } catch {
                 console.error("Failed to fetch data");
             }
         };
-        if (isOpen) fetchData();
-    }, [isOpen, rootId]);
-
-    useEffect(() => {
-        if (isOpen) {
-            if (initialData) {
-                setName(initialData.name || '');
-                // Try to load day_of_week first, then fallback to inferring from date
-                // Try to load day_of_week first, then fallback to inferring from date
-                if (initialData.day_of_week) {
-                    let dows = [];
-                    if (Array.isArray(initialData.day_of_week)) {
-                        dows = initialData.day_of_week;
-                    } else if (typeof initialData.day_of_week === 'string') {
-                        // Attempt to parse if it looks like a JSON array (e.g. from legacy data)
-                        if (initialData.day_of_week.trim().startsWith('[')) {
-                            try {
-                                const parsed = JSON.parse(initialData.day_of_week);
-                                if (Array.isArray(parsed)) dows = parsed;
-                                else dows = [initialData.day_of_week];
-                            } catch (e) {
-                                dows = [initialData.day_of_week];
-                            }
-                        } else {
-                            dows = [initialData.day_of_week];
-                        }
-                    }
-                    setSelectedDaysOfWeek(dows);
-                } else if (initialData.date) {
-                    setSelectedDaysOfWeek([moment(initialData.date).format('dddd')]);
-                } else {
-                    setSelectedDaysOfWeek([]);
-                }
-
-                // Handle new templates structure or fallback to legacy sessions
-                let tids = [];
-                if (initialData.templates) {
-                    tids = initialData.templates.map(t => t.id);
-                } else if (initialData.sessions) {
-                    tids = initialData.sessions.map(s => s.session_template_id).filter(Boolean);
-                }
-                setSelectedTemplates(tids);
-
-            } else {
-                setName('');
-                setSelectedDaysOfWeek([]);
-                setSelectedTemplates([]);
-                setCopyStatus(''); // Reset copy status on new add
-            }
-        }
-    }, [isOpen, initialData]);
+        fetchData();
+    }, [rootId]);
 
     const handleSave = () => {
         onSave({
@@ -126,7 +123,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
         try {
             await onCopy(initialData.id, { target_mode: copyMode });
             setCopyStatus('Copied!');
-        } catch (err) {
+        } catch {
             setCopyStatus('Error');
         }
     };
@@ -171,7 +168,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
     return (
         <>
             <Modal
-                isOpen={isOpen}
+                isOpen={true}
                 onClose={onClose}
                 title={isEdit ? 'Edit Program Day' : 'Add Program Day'}
                 size="md"
@@ -322,6 +319,25 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
                 message={`Are you sure you want to delete "${name}"? This will remove all scheduled sessions for this day.`}
             />
         </>
+    );
+};
+
+const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = initialData?.id || `new-day:${blockId || 'no-block'}`;
+    return (
+        <ProgramDayModalInner
+            key={modalKey}
+            onClose={onClose}
+            onSave={onSave}
+            onCopy={onCopy}
+            onDelete={onDelete}
+            rootId={rootId}
+            initialData={initialData}
+        />
     );
 };
 

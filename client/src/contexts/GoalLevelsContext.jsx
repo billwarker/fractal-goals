@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { globalApi } from '../utils/api';
+import { queryKeys } from '../hooks/queryKeys';
 import { useAuth } from './AuthContext';
 
 const GoalLevelsContext = createContext();
@@ -47,7 +48,7 @@ export function GoalLevelsProvider({ children }) {
         isLoading,
         error
     } = useQuery({
-        queryKey: ['goalLevels', currentRootId],
+        queryKey: queryKeys.goalLevels(currentRootId),
         queryFn: async () => {
             const res = await globalApi.getGoalLevels(currentRootId);
             return res.data;
@@ -62,8 +63,8 @@ export function GoalLevelsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['goalLevels', currentRootId] });
-            queryClient.invalidateQueries({ queryKey: ['fractals'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
         }
     });
 
@@ -73,8 +74,8 @@ export function GoalLevelsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['goalLevels', currentRootId] });
-            queryClient.invalidateQueries({ queryKey: ['fractals'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
         }
     });
 

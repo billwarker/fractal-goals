@@ -1,12 +1,13 @@
 /**
  * useActivityHistory - Hook for fetching previous instances of an activity
- * 
+ *
  * Shows metrics and data from past sessions for a given activity definition.
  * Useful for viewing progress and informing current session decisions.
  */
 
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from './queryKeys';
 
 /**
  * @param {string} rootId - ID of the fractal
@@ -16,46 +17,25 @@ import { fractalApi } from '../utils/api';
  */
 export function useActivityHistory(rootId, activityDefinitionId, excludeSessionId = null, options = {}) {
     const { limit = 10 } = options;
-
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        // Reset state when no activity is selected
-        if (!rootId || !activityDefinitionId) {
-            setHistory([]);
-            setLoading(false);
-            return;
-        }
-
-        const fetchHistory = async () => {
-            setLoading(true);
-            setError(null);
-
-            try {
-                const response = await fractalApi.getActivityHistory(
-                    rootId,
-                    activityDefinitionId,
-                    { limit, excludeSession: excludeSessionId }
-                );
-                setHistory(response.data || []);
-            } catch (err) {
-                console.error('Failed to fetch activity history:', err);
-                setError(err.message || 'Failed to fetch history');
-                setHistory([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHistory();
-    }, [rootId, activityDefinitionId, excludeSessionId, limit]);
+    const enabled = Boolean(rootId && activityDefinitionId);
+    const query = useQuery({
+        queryKey: queryKeys.activityHistory(rootId, activityDefinitionId, excludeSessionId, limit),
+        enabled,
+        retry: false,
+        queryFn: async () => {
+            const response = await fractalApi.getActivityHistory(
+                rootId,
+                activityDefinitionId,
+                { limit, excludeSession: excludeSessionId }
+            );
+            return response.data || [];
+        },
+    });
 
     return {
-        history,
-        loading,
-        error
+        history: enabled ? (query.data || []) : [],
+        loading: enabled ? query.isLoading : false,
+        error: query.error ? (query.error.message || 'Failed to fetch history') : null,
     };
 }
 

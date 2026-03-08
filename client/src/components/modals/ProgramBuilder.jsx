@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fractalApi } from '../../utils/api';
 import { flattenGoals } from '../../utils/goalHelpers';
@@ -10,21 +10,35 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import styles from './ProgramBuilder.module.css';
 
+function buildInitialProgramData(initialData) {
+    if (!initialData) {
+        return {
+            name: '',
+            description: '',
+            selectedGoals: [],
+            startDate: '',
+            endDate: '',
+        };
+    }
+
+    return {
+        name: initialData.name || '',
+        description: initialData.description || '',
+        selectedGoals: initialData.goal_ids || [],
+        startDate: initialData.start_date ? initialData.start_date.split('T')[0] : '',
+        endDate: initialData.end_date ? initialData.end_date.split('T')[0] : '',
+    };
+}
+
 /**
  * ProgramBuilder Modal - Program creation/editing (Metadata only)
  */
-function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
+function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
     const { rootId } = useParams();
     const [goals, setGoals] = useState([]);
     const [errors, setErrors] = useState({});
 
-    const [programData, setProgramData] = useState({
-        name: '',
-        description: '',
-        selectedGoals: [],
-        startDate: '',
-        endDate: '',
-    });
+    const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData));
 
     // Calculate number of weeks between dates
     const calculateWeeks = () => {
@@ -36,42 +50,25 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
     };
 
     useEffect(() => {
-        if (isOpen && rootId) {
-            fetchGoals();
+        if (!rootId) {
+            return;
         }
 
-        if (isOpen && initialData) {
-            setProgramData({
-                name: initialData.name || '',
-                description: initialData.description || '',
-                selectedGoals: initialData.goal_ids || [],
-                startDate: initialData.start_date ? initialData.start_date.split('T')[0] : '',
-                endDate: initialData.end_date ? initialData.end_date.split('T')[0] : '',
-            });
-        } else if (isOpen) {
-            // Reset if creating new
-            setProgramData({
-                name: '',
-                description: '',
-                selectedGoals: [],
-                startDate: '',
-                endDate: '',
-            });
-        }
-    }, [isOpen, rootId, initialData]);
+        const fetchGoals = async () => {
+            try {
+                const res = await fractalApi.getGoal(rootId, rootId);
+                const allGoals = flattenGoals([res.data]);
+                const eligibleGoals = allGoals.filter(g =>
+                    ['MidTermGoal', 'LongTermGoal'].includes(g.attributes?.type)
+                );
+                setGoals(eligibleGoals);
+            } catch (err) {
+                console.error('Failed to fetch goals:', err);
+            }
+        };
 
-    const fetchGoals = async () => {
-        try {
-            const res = await fractalApi.getGoal(rootId, rootId);
-            const allGoals = flattenGoals([res.data]);
-            const eligibleGoals = allGoals.filter(g =>
-                ['MidTermGoal', 'LongTermGoal'].includes(g.attributes?.type)
-            );
-            setGoals(eligibleGoals);
-        } catch (err) {
-            console.error('Failed to fetch goals:', err);
-        }
-    };
+        fetchGoals();
+    }, [rootId]);
 
     const toggleGoal = (goalId) => {
         setProgramData({
@@ -111,20 +108,12 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
     };
 
     const handleClose = () => {
-        setProgramData({
-            name: '',
-            description: '',
-            selectedGoals: [],
-            startDate: '',
-            endDate: '',
-        });
-        setErrors({});
         onClose();
     };
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={handleClose}
             title={initialData ? 'Edit Program' : 'Create Program'}
             size="md"
@@ -266,6 +255,22 @@ function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
                 </Button>
             </ModalFooter>
         </Modal>
+    );
+}
+
+function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = initialData?.id || 'new-program';
+    return (
+        <ProgramBuilderInner
+            key={modalKey}
+            onClose={onClose}
+            onSave={onSave}
+            initialData={initialData}
+        />
     );
 }
 

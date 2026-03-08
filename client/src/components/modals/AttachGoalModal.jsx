@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import moment from 'moment';
 import notify from '../../utils/notify';
 import Modal from '../atoms/Modal';
@@ -6,19 +6,12 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
-import { Heading, Text } from '../atoms/Typography';
+import { Text } from '../atoms/Typography';
 import styles from './AttachGoalModal.module.css';
 
-const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
+const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [deadline, setDeadline] = useState('');
-
-    useEffect(() => {
-        if (isOpen) {
-            setSelectedGoalId('');
-            setDeadline('');
-        }
-    }, [isOpen]);
 
     const handleSubmit = () => {
         if (!selectedGoalId) {
@@ -34,7 +27,7 @@ const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={onClose}
             title={`Attach Goal to ${block?.name || 'Block'}`}
             size="md"
@@ -105,6 +98,23 @@ const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
                 </Button>
             </ModalFooter>
         </Modal>
+    );
+};
+
+const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = block?.id || 'attach-goal';
+    return (
+        <AttachGoalModalInner
+            key={modalKey}
+            onClose={onClose}
+            onSave={onSave}
+            goals={goals}
+            block={block}
+        />
     );
 };
 

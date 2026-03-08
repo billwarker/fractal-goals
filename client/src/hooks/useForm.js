@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 
 /**
  * A lightweight hook for handling form state and validation.
@@ -12,13 +12,6 @@ export function useForm(initialValues = {}, validate, validateOnChange = false) 
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Reset form when initialValues change deeply (simple JSON check)
-    useEffect(() => {
-        setValues(initialValues);
-        setErrors({});
-        setTouched({});
-    }, [JSON.stringify(initialValues)]);
 
     const handleChange = useCallback((e) => {
         // Handle both native events and direct value updates (if we pass simple values)
@@ -94,8 +87,8 @@ export function useForm(initialValues = {}, validate, validateOnChange = false) 
         setIsSubmitting(false);
     }, [values, validate]);
 
-    const resetForm = useCallback(() => {
-        setValues(initialValues);
+    const resetForm = useCallback((nextValues = initialValues) => {
+        setValues(nextValues);
         setErrors({});
         setTouched({});
         setIsSubmitting(false);

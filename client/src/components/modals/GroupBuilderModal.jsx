@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import { useGoals } from '../../contexts/GoalsContext';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
 import { sortGroupsTreeOrder, getGroupBreadcrumb } from '../../utils/manageActivities';
@@ -11,57 +10,73 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 
-export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
+function flattenGoals(node, goals = []) {
+    if (!node) return goals;
+    goals.push({
+        id: node.id || node.attributes?.id,
+        name: node.name,
+        type: node.attributes?.type || node.type,
+    });
+    if (node.children && node.children.length > 0) {
+        node.children.forEach((child) => flattenGoals(child, goals));
+    }
+    return goals;
+}
+
+function getGroupDepth(groupId, activityGroups) {
+    let depth = 0;
+    let currentId = groupId;
+    const seen = new Set();
+    while (currentId) {
+        if (seen.has(currentId)) break;
+        seen.add(currentId);
+        const group = (activityGroups || []).find((item) => item.id === currentId);
+        if (!group || !group.parent_id) break;
+        depth++;
+        currentId = group.parent_id;
+    }
+    return depth;
+}
+
+function buildInitialGroupFormState(editingGroup) {
+    if (!editingGroup) {
+        return {
+            name: '',
+            description: '',
+            parentId: '',
+            selectedGoalIds: [],
+        };
+    }
+
+    return {
+        name: editingGroup.name || '',
+        description: editingGroup.description || '',
+        parentId: editingGroup.parent_id || '',
+        selectedGoalIds: editingGroup.associated_goal_ids || [],
+    };
+}
+
+function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
     const { useFractalTreeQuery } = useGoals();
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
+    const initialState = buildInitialGroupFormState(editingGroup);
 
     // Use the query hook to get the fractal tree for goal selection
     const { data: currentFractal } = useFractalTreeQuery(rootId);
     const isMobile = useIsMobile();
 
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [parentId, setParentId] = useState('');
-    const [selectedGoalIds, setSelectedGoalIds] = useState([]);
+    const [name, setName] = useState(initialState.name);
+    const [description, setDescription] = useState(initialState.description);
+    const [parentId, setParentId] = useState(initialState.parentId);
+    const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     // UI State for Goal Selector
     const [showGoalSelector, setShowGoalSelector] = useState(false);
 
-    // Flatten goal tree for selection
-    const flattenGoals = (node, goals = []) => {
-        if (!node) return goals;
-        goals.push({
-            id: node.id || node.attributes?.id,
-            name: node.name,
-            type: node.attributes?.type || node.type
-        });
-        if (node.children && node.children.length > 0) {
-            node.children.forEach(child => flattenGoals(child, goals));
-        }
-        return goals;
-    };
-
     const allGoals = useMemo(() => flattenGoals(currentFractal), [currentFractal]);
-
-    useEffect(() => {
-        if (editingGroup) {
-            setName(editingGroup.name);
-            setDescription(editingGroup.description || '');
-            setParentId(editingGroup.parent_id || '');
-            setSelectedGoalIds(editingGroup.associated_goal_ids || []);
-        } else {
-            setName('');
-            setDescription('');
-            setParentId('');
-            setSelectedGoalIds([]);
-        }
-        setError(null);
-        setShowGoalSelector(false);
-    }, [editingGroup, isOpen]);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -99,22 +114,6 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
         }
     };
 
-    // Compute depth of a group (0 = root, 1 = child, 2 = grandchild)
-    const getGroupDepth = (groupId) => {
-        let depth = 0;
-        let currentId = groupId;
-        const seen = new Set();
-        while (currentId) {
-            if (seen.has(currentId)) break;
-            seen.add(currentId);
-            const group = (activityGroups || []).find(g => g.id === currentId);
-            if (!group || !group.parent_id) break;
-            depth++;
-            currentId = group.parent_id;
-        }
-        return depth;
-    };
-
     // Build breadcrumb path using shared utility
     const groupBreadcrumb = (groupId) => getGroupBreadcrumb(groupId, activityGroups || []);
 
@@ -147,14 +146,12 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
         }
 
         // Only show groups at depth < 2 (so new child would be at depth <= 2, max 3 levels)
-        return sortGroupsTreeOrder(candidates.filter(g => getGroupDepth(g.id) < 2));
+        return sortGroupsTreeOrder(candidates.filter((group) => getGroupDepth(group.id, activityGroups) < 2));
     }, [activityGroups, editingGroup]);
-
-    if (!isOpen) return null;
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={onClose}
             title={editingGroup ? 'Edit Group' : 'Create Group'}
             size="md"
@@ -290,5 +287,23 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
                 </ModalFooter>
             </form>
         </Modal>
+    );
+}
+
+export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = editingGroup?.id || 'new-activity-group';
+    return (
+        <GroupBuilderModalInner
+            key={modalKey}
+            onClose={onClose}
+            editingGroup={editingGroup}
+            rootId={rootId}
+            activityGroups={activityGroups}
+            onSave={onSave}
+        />
     );
 }

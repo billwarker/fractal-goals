@@ -11,7 +11,7 @@ export function GoalsProvider({ children }) {
 
     // 1. Queries
     const fractalsQuery = useQuery({
-        queryKey: ['fractals'],
+        queryKey: queryKeys.fractals(),
         queryFn: async () => {
             const res = await globalApi.getAllFractals();
             return res.data;
@@ -35,7 +35,7 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['fractals'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
         }
     });
 

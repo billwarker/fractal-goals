@@ -76,7 +76,7 @@ function GoalDetailModal({
         targets, setTargets,
         resetForm,
         errors, validateForm
-    } = useGoalForm(goal, mode, isOpen);
+    } = useGoalForm(goal, mode);
     // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
     const goalType = mode === 'create'
         ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
