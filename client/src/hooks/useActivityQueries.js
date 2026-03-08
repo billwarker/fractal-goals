@@ -18,6 +18,22 @@ export function useActivities(rootId) {
     return { activities, isLoading, error };
 }
 
+export function useActivityGroups(rootId) {
+    const isReady = Boolean(rootId);
+
+    const { data: activityGroups = [], isLoading, error } = useQuery({
+        queryKey: queryKeys.activityGroups(rootId),
+        queryFn: async () => {
+            const res = await fractalApi.getActivityGroups(rootId);
+            return res.data || [];
+        },
+        enabled: isReady,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    return { activityGroups, isLoading, error };
+}
+
 export function useCreateActivity(rootId) {
     const queryClient = useQueryClient();
     return useMutation({

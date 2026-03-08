@@ -47,7 +47,7 @@ const ActivityAssociator = ({
     onSave,
     onRefreshAssociations
 }) => {
-    const { createActivityGroup, setActivityGroupGoals, fetchActivityGroups } = useActivities();
+    const { createActivityGroup, setActivityGroupGoals } = useActivities();
 
     // STATE
     const [isDiscoveryActive, setIsDiscoveryActive] = useState(false);
@@ -294,12 +294,12 @@ const ActivityAssociator = ({
                 }
             }
 
-            // Refresh groups and sync to parent-local state used by this modal
-            if (fetchActivityGroups) {
-                const refreshedGroups = await fetchActivityGroups(rootId);
-                if (setActivityGroups && Array.isArray(refreshedGroups)) {
-                    setActivityGroups(refreshedGroups);
-                }
+            if (setActivityGroups && result) {
+                setActivityGroups((prev = []) => {
+                    if (!Array.isArray(prev)) return [result];
+                    if (prev.some((group) => group.id === result.id)) return prev;
+                    return sortGroupsTreeOrder([...prev, result]);
+                });
             }
 
             notify.success(`Created group "${trimmedName}"`);

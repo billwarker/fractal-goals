@@ -1,6 +1,20 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
+
+export function useFractalTree(rootId) {
+    const isReady = Boolean(rootId);
+
+    return useQuery({
+        queryKey: queryKeys.fractalTree(rootId),
+        queryFn: async () => {
+            const res = await fractalApi.getGoals(rootId);
+            return res.data;
+        },
+        enabled: isReady,
+        staleTime: 5 * 60 * 1000,
+    });
+}
 
 export function useGoalAssociations(rootId, goalId) {
     const isReady = Boolean(rootId && goalId);

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
-import { useGoals } from '../../contexts/GoalsContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { useFractalTree } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
 import { sortGroupsTreeOrder, getGroupBreadcrumb } from '../../utils/manageActivities';
@@ -58,12 +58,11 @@ function buildInitialGroupFormState(editingGroup) {
 
 function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
-    const { useFractalTreeQuery } = useGoals();
     const { getGoalColor } = useGoalLevels();
     const initialState = buildInitialGroupFormState(editingGroup);
 
     // Use the query hook to get the fractal tree for goal selection
-    const { data: currentFractal } = useFractalTreeQuery(rootId);
+    const { data: currentFractal } = useFractalTree(rootId);
     const isMobile = useIsMobile();
 
     const [name, setName] = useState(initialState.name);

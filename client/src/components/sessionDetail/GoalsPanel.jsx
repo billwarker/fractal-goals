@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
-import { useGoals } from '../../contexts/GoalsContext';
 import { useGoalsForSelection } from '../../hooks/useGoalQueries';
 import { queryKeys } from '../../hooks/queryKeys';
 import { fractalApi } from '../../utils/api';
@@ -46,8 +45,8 @@ function GoalsPanel({
     } = useActiveSession();
     const queryClient = useQueryClient();
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
-    const { fetchFractalTree } = useGoals();
 
     const { goals: allShortTermGoals } = useGoalsForSelection(rootId);
 
@@ -265,7 +264,7 @@ function GoalsPanel({
                     console.warn('Could not associate micro goal with activity', assocErr);
                 }
             }
-            fetchFractalTree(rootId);
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             refreshSession?.();
             notify.success(`Micro goal created: ${goalName}`);
             if (onGoalCreated) onGoalCreated(goalName);
@@ -275,7 +274,7 @@ function GoalsPanel({
         }
         setShowMicroTargetBuilder(false);
         setTargetBuilderGoal(null);
-    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fetchFractalTree, onGoalCreated, queryClient, refreshSession, selectedActivity, sessionGoalsViewKey]);
+    }, [targetBuilderGoal, rootId, sessionId, createGoal, activeActivityDef, fractalTreeKey, onGoalCreated, queryClient, refreshSession, selectedActivity, sessionGoalsViewKey]);
 
     // --- Sub-goal Creation via GoalDetailModal ---
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null); // goal node
@@ -296,7 +295,7 @@ function GoalsPanel({
                     console.error('Failed to associate new sub-goal with activity', assocErr);
                 }
             }
-            fetchFractalTree(rootId);
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             setCreateSubGoalParent(null);
             if (onGoalCreated) onGoalCreated(newGoalData?.name);
             return newGoalData;
@@ -304,7 +303,7 @@ function GoalsPanel({
             console.error('Failed to create sub goal', err);
             throw err;
         }
-    }, [viewMode, activeActivityDef, rootId, fetchFractalTree, onGoalCreated, createGoal, queryClient, sessionGoalsViewKey]);
+    }, [viewMode, activeActivityDef, fractalTreeKey, onGoalCreated, createGoal, queryClient, rootId, sessionGoalsViewKey]);
 
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');

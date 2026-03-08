@@ -1,28 +1,23 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import { useGoals } from '../contexts/GoalsContext';
+import { useActivityGroups } from '../hooks/useActivityQueries';
+import { useFractalTree } from '../hooks/useGoalQueries';
 import ActivityBuilderForm from './activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from './activityBuilder/activityBuilderUtils';
 import styles from './ActivityBuilder.module.css';
 
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
-    const { createActivity, updateActivity, activityGroups, fetchActivityGroups } = useActivities();
-    const { useFractalTreeQuery } = useGoals();
+    const { createActivity, updateActivity } = useActivities();
     const { getGoalColor } = useGoalLevels();
-    const { data: currentFractal } = useFractalTreeQuery(rootId);
+    const { activityGroups = [] } = useActivityGroups(rootId);
+    const { data: currentFractal } = useFractalTree(rootId);
 
     const allGoals = useMemo(
         () => flattenGoals(currentFractal, editingActivity?.id),
         [currentFractal, editingActivity?.id]
     );
-
-    useEffect(() => {
-        if (isOpen && rootId) {
-            fetchActivityGroups(rootId);
-        }
-    }, [fetchActivityGroups, isOpen, rootId]);
 
     if (!isOpen) {
         return null;

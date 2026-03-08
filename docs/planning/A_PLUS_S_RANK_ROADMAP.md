@@ -2,9 +2,42 @@
 
 This roadmap turns the 50 quality recommendations into an execution plan.
 
+## Current Status
+
+- Completed: `43 / 50` (`86%`)
+- Remaining: `7 / 50` (`14%`)
+- Open items: `2, 10, 11, 35, 36, 37, 40`
+
+## Active Focus
+
+The roadmap is now concentrated in three areas:
+
+1. Backend service/domain tightening
+   Items `2` and `10`
+   The main gap is not endpoint coverage anymore; it is finishing the move of validation/transaction/domain rules into clean backend service and domain helper boundaries.
+
+2. Environment-independent backend testing
+   Item `11`
+   The repo now has reproducible DB bootstrap and CI coverage, but the remaining step is making local backend test runs fully ambient-free in all supported environments.
+
+3. Final frontend correctness/polish pass
+   Items `35`, `36`, `37`, `40`
+   These are now about consistency and model quality:
+   optimistic updates only where rollback is explicit, normalized goal/tree shapes, explicit structural vs execution goal modeling, and modal primitive consolidation.
+
+## Open Item Notes
+
+- `2`: Service boundaries are substantially improved. Remaining work is to make services the undisputed source of validation and transaction invariants everywhere, not just on the main refactored routes.
+- `10`: Partial completion already exists via `goal_target_rules.py`, but it is not yet the full small domain-rules layer originally intended.
+- `11`: CI and Docker paths are in place; local backend runs still need a more turnkey path that does not rely on environment assumptions.
+- `35`: The codebase now uses invalidation heavily, but optimistic updates still need a formal bar and a small audit to ensure rollback is explicit wherever optimism exists.
+- `36`: Several helpers normalize data, but there is not yet one reusable frontend layer that defines the canonical goal/tree node shape.
+- `37`: The app behavior distinguishes structural and execution goals in practice, but the helpers/model layer still do this implicitly rather than explicitly.
+- `40`: Modal primitives improved a lot, but layout/body/footer/header patterns are still not fully unified across the remaining modal surfaces.
+
 ## Phase 1: Foundation
 
-1. Finish migration to a single frontend data-fetching model.
+1. ~~Finish migration to a single frontend data-fetching model.~~
 2. Make backend services the canonical boundary for validation and transaction invariants.
 3. ~~Continue decomposing `GoalDetailModal.jsx` into orchestration hooks and view components.~~
 4. ~~Move goal association persistence into dedicated mutation hooks.~~
@@ -119,6 +152,7 @@ Completed in the current workspace:
 - 31 progress: `CreateSessionTemplate.jsx` now reads session templates, activities, and activity groups through shared React Query keys instead of owning its own fetch/loading state, and template save/delete/duplicate flows now refresh through invalidation-backed mutations
 - 31 progress: `LogsModal.jsx` now derives paged log rows from shared `logs` query caches instead of holding its own fetched log list/loading state, and it resets via mount-seeded pagination while clear-log flows update shared query state directly
 - 31: remaining major fetched-data mirrors have now been removed from `CreateSession.jsx`, `Analytics.jsx`, `ProgramDayModal.jsx`, `ProgramBuilder.jsx`, `AnnotatedHeatmap.jsx`, `AnnotatedChartWrapper.jsx`, `ActivitiesContext.jsx`, and `FractalGoals.jsx`; query-backed hooks and canonical keys now own those remote datasets instead of local component/context caches
+- 1: the frontend data layer is now consistently query-first; `useFractalTree`, `useAllSessions`, and related dedicated hooks own read concerns, `GoalsContext` and `ActivitiesContext` have been reduced to mutation/selection facades, `SessionsContext` was removed, `ManageActivities.jsx` and `FractalGoals.jsx` now read sessions through shared hooks instead of bridge contexts, and `ActivityAssociator.jsx` no longer calls imperative fetch helpers just to refresh group state
 
 ## Next Tranche
 

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useGoals } from '../../contexts/GoalsContext';
+import { useFractalTree } from '../../hooks/useGoalQueries';
 import TargetCard from '../TargetCard';
 
 import styles from './GoalsPanel.module.css';
@@ -13,8 +13,7 @@ function TargetsSection({
     allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds,
     targets = null,
 }) {
-    const { useFractalTreeQuery } = useGoals();
-    const { data: goalTree } = useFractalTreeQuery(rootId);
+    const { data: goalTree } = useFractalTree(rootId);
 
     // Flatten all goals and extract targets
     const allTargets = useMemo(() => {

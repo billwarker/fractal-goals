@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
-import { useSessions } from '../contexts/SessionsContext';
+import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
+import { useAllSessions } from '../hooks/useSessionQueries';
 import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
 
@@ -17,12 +18,12 @@ import styles from './ManageActivities.module.css'; // Import CSS Module
 function ManageActivities() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, updateActivity, deleteActivity, loading,
-        activityGroups, fetchActivityGroups, deleteActivityGroup, reorderActivityGroups } = useActivities();
-    const { useAllSessionsQuery } = useSessions();
+    const { updateActivity, deleteActivity, deleteActivityGroup, reorderActivityGroups } = useActivities();
+    const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
+    const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
 
-    const { data: sessionsData } = useAllSessionsQuery(rootId);
-    const sessions = sessionsData || [];
+    const { data: sessionsData } = useAllSessions(rootId);
+    const sessions = useMemo(() => (Array.isArray(sessionsData) ? sessionsData : []), [sessionsData]);
 
     const [error, setError] = useState(null);
     const creating = false;
@@ -45,11 +46,8 @@ function ManageActivities() {
     useEffect(() => {
         if (!rootId) {
             navigate('/');
-            return;
         }
-        fetchActivities(rootId);
-        fetchActivityGroups(rootId);
-    }, [rootId, navigate, fetchActivities, fetchActivityGroups]);
+    }, [rootId, navigate]);
 
     const lastInstantiatedByActivity = useMemo(() => {
         return buildLastInstantiatedMap(sessions);
@@ -251,7 +249,7 @@ function ManageActivities() {
         setDragOverGroupId(null);
     };
 
-    if (loading) {
+    if (activitiesLoading || activityGroupsLoading) {
         return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading activities...</div>;
     }
 
@@ -488,7 +486,6 @@ function ManageActivities() {
                 rootId={rootId}
                 activityGroups={activityGroups} // Pass groups for parent selection
                 onSave={() => {
-                    fetchActivityGroups(rootId);
                     setShowGroupBuilder(false);
                 }}
             />

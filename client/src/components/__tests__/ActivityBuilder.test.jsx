@@ -6,28 +6,30 @@ import ActivityBuilder from '../ActivityBuilder';
 const {
     mockCreateActivity,
     mockUpdateActivity,
-    mockFetchActivityGroups,
-    mockUseFractalTreeQuery,
+    mockUseFractalTree,
 } = vi.hoisted(() => ({
     mockCreateActivity: vi.fn(),
     mockUpdateActivity: vi.fn(),
-    mockFetchActivityGroups: vi.fn(),
-    mockUseFractalTreeQuery: vi.fn(),
+    mockUseFractalTree: vi.fn(),
 }));
 
 vi.mock('../../contexts/ActivitiesContext', () => ({
     useActivities: () => ({
         createActivity: mockCreateActivity,
         updateActivity: mockUpdateActivity,
-        activityGroups: [{ id: 'group-1', name: 'Technique' }],
-        fetchActivityGroups: mockFetchActivityGroups,
     }),
 }));
 
-vi.mock('../../contexts/GoalsContext', () => ({
-    useGoals: () => ({
-        useFractalTreeQuery: mockUseFractalTreeQuery,
+vi.mock('../../hooks/useActivityQueries', () => ({
+    useActivityGroups: () => ({
+        activityGroups: [{ id: 'group-1', name: 'Technique' }],
+        isLoading: false,
+        error: null,
     }),
+}));
+
+vi.mock('../../hooks/useGoalQueries', () => ({
+    useFractalTree: (...args) => mockUseFractalTree(...args),
 }));
 
 vi.mock('../../contexts/GoalLevelsContext', () => ({
@@ -59,7 +61,7 @@ describe('ActivityBuilder', () => {
         vi.clearAllMocks();
         mockCreateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
         mockUpdateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
-        mockUseFractalTreeQuery.mockReturnValue({
+        mockUseFractalTree.mockReturnValue({
             data: {
                 id: 'goal-root',
                 name: 'Root Goal',
@@ -84,8 +86,6 @@ describe('ActivityBuilder', () => {
                 onSave={onSave}
             />
         );
-
-        expect(mockFetchActivityGroups).toHaveBeenCalledWith('root-1');
 
         fireEvent.change(screen.getByLabelText('Activity Name'), {
             target: { value: 'Scale Practice' },

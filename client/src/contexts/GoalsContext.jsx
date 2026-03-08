@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fractalApi, globalApi } from '../utils/api';
+import React, { createContext, useContext } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
 
@@ -9,36 +9,7 @@ const GoalsContext = createContext();
 export function GoalsProvider({ children }) {
     const queryClient = useQueryClient();
 
-    // 1. Queries
-    const fractalsQuery = useQuery({
-        queryKey: queryKeys.fractals(),
-        queryFn: async () => {
-            const res = await globalApi.getAllFractals();
-            return res.data;
-        }
-    });
-
-    const useFractalTreeQuery = (rootId) => useQuery({
-        queryKey: queryKeys.fractalTree(rootId),
-        queryFn: async () => {
-            if (!rootId) return null;
-            const res = await fractalApi.getGoals(rootId);
-            return res.data;
-        },
-        enabled: !!rootId
-    });
-
     // 2. Mutations
-    const createFractalMutation = useMutation({
-        mutationFn: async (data) => {
-            const res = await globalApi.createFractal(data);
-            return res.data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
-        }
-    });
-
     const createGoalMutation = useMutation({
         mutationFn: async ({ rootId, goalData }) => {
             const res = await fractalApi.createGoal(rootId, goalData);
@@ -85,47 +56,17 @@ export function GoalsProvider({ children }) {
         }
     });
 
-    // 3. Glue/Backwards Compatibility
-    // We can't use useFractalTreeQuery here dynamically for all rootIds, 
-    // so we expose a way to get the data for the 'currently active' rootId if needed.
-    // However, most components pass rootId to the fetch functions.
-
-    // For now, we'll keep the "last fetched" tree in a state-like way if needed, 
-    // but better to encourage components to use the query hooks.
-    // To maintain compatibility with current views:
-    const fetchFractals = useCallback(() => fractalsQuery.refetch(), [fractalsQuery]);
-
-    // This is a bridge: it doesn't return data but triggers a fetch/refetch
-    const fetchFractalTree = useCallback((rootId) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
-    }, [queryClient]);
-
     const [activeRootId, setActiveRootId] = React.useState(null);
 
     const value = React.useMemo(() => ({
-        fractals: fractalsQuery.data || [],
-        currentFractal: null, // This will be handled differently in components
         activeRootId,
         setActiveRootId,
-        loading: fractalsQuery.isLoading,
-        error: fractalsQuery.error,
-        fetchFractals,
-        fetchFractalTree,
-        createFractal: createFractalMutation.mutateAsync,
         createGoal: (rootId, goalData) => createGoalMutation.mutateAsync({ rootId, goalData }),
         updateGoal: (rootId, goalId, updates) => updateGoalMutation.mutateAsync({ rootId, goalId, updates }),
         deleteGoal: (rootId, goalId) => deleteGoalMutation.mutateAsync({ rootId, goalId }),
         toggleGoalCompletion: (rootId, goalId, completed) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed }),
-        // New Query-specific additions
-        useFractalTreeQuery
     }), [
-        fractalsQuery.data,
-        fractalsQuery.isLoading,
-        fractalsQuery.error,
         activeRootId,
-        fetchFractals,
-        fetchFractalTree,
-        createFractalMutation.mutateAsync,
         createGoalMutation,
         updateGoalMutation,
         deleteGoalMutation,

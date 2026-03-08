@@ -53,24 +53,6 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../contexts/GoalsContext', () => ({
-    useGoals: () => ({
-        useFractalTreeQuery: () => ({
-            data: {
-                id: 'root-1',
-                type: 'UltimateGoal',
-                name: 'Root',
-                children: [
-                    { id: 'stg-1', type: 'ShortTermGoal', name: 'STG', children: [] },
-                    { id: 'ig-1', type: 'ImmediateGoal', name: 'IG', children: [] }
-                ]
-            },
-            isLoading: false
-        }),
-        fetchFractalTree: vi.fn()
-    })
-}));
-
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         getGoalsForSelection: vi.fn(() => Promise.resolve({ data: [] })),

@@ -3,9 +3,11 @@ import { render, screen } from '@testing-library/react';
 import TargetsSection from '../TargetsSection';
 
 vi.mock('../../../contexts/GoalsContext', () => ({
-    useGoals: () => ({
-        useFractalTreeQuery: () => ({ data: null })
-    })
+    useGoals: () => ({})
+}));
+
+vi.mock('../../../hooks/useGoalQueries', () => ({
+    useFractalTree: () => ({ data: null })
 }));
 
 vi.mock('../../TargetCard', () => ({

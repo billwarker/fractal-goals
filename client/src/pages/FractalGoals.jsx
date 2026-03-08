@@ -8,10 +8,11 @@ import GoalDetailModal from '../components/GoalDetailModal';
 import AlertModal from '../components/modals/AlertModal';
 import Checkbox from '../components/atoms/Checkbox';
 import { useGoals } from '../contexts/GoalsContext';
-import { useSessions } from '../contexts/SessionsContext';
-import { useActivities } from '../contexts/ActivitiesContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
+import { useFractalTree } from '../hooks/useGoalQueries';
+import { useAllSessions } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile from '../hooks/useIsMobile';
@@ -32,7 +33,6 @@ function FractalGoals() {
 
     // Contexts
     const {
-        useFractalTreeQuery,
         createGoal,
         updateGoal,
         deleteGoal,
@@ -44,24 +44,14 @@ function FractalGoals() {
     const {
         data: fractalData,
         isLoading: goalsLoading
-    } = useFractalTreeQuery(rootId);
+    } = useFractalTree(rootId);
 
-    const {
-        useAllSessionsQuery
-    } = useSessions();
-
-    const {
-        data: sessionsData,
-    } = useAllSessionsQuery(rootId);
+    const { data: sessionsData } = useAllSessions(rootId);
 
     const sessions = useMemo(() => (Array.isArray(sessionsData) ? sessionsData : []), [sessionsData]);
 
-    const {
-        activities,
-        activityGroups,
-        fetchActivities,
-        fetchActivityGroups
-    } = useActivities();
+    const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
+    const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
 
     const { debugMode } = useDebug();
     const { getGoalColor } = useGoalLevels();
@@ -69,7 +59,7 @@ function FractalGoals() {
 
     const { programs = [] } = usePrograms(rootId);
 
-    const loading = goalsLoading;
+    const loading = goalsLoading || activitiesLoading || activityGroupsLoading;
 
     // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
@@ -92,7 +82,6 @@ function FractalGoals() {
     };
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
 
-    // Initial Data Fetch (Only for non-Query managed data)
     useEffect(() => {
         if (!rootId) {
             navigate('/');
@@ -100,11 +89,9 @@ function FractalGoals() {
         }
         setActiveRootId(rootId);
         localStorage.setItem('fractal_recent_root_id', rootId);
-        fetchActivities(rootId);
-        fetchActivityGroups(rootId);
 
         return () => setActiveRootId(null);
-    }, [rootId, navigate, setActiveRootId, fetchActivities, fetchActivityGroups]);
+    }, [rootId, navigate, setActiveRootId]);
 
     useEffect(() => {
         if (!rootId) return;

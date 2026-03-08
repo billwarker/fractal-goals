@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
-import { useGoals } from '../contexts/GoalsContext';
 import { useActiveSession } from '../contexts/ActiveSessionContext';
+import { useFractalTree } from './useGoalQueries';
 import useSessionNotes from './useSessionNotes';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
-    const { useFractalTreeQuery } = useGoals();
-
     const {
         session,
         activities,
@@ -33,7 +31,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const [associationContext, setAssociationContext] = useState(null);
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
 
-    const { data: fullGoalTree } = useFractalTreeQuery(rootId);
+    const { data: fullGoalTree } = useFractalTree(rootId);
     const allAvailableGoals = useMemo(() => {
         if (!fullGoalTree) return [];
         const goals = [];
