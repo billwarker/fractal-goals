@@ -1,6 +1,8 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import AnnotationModal from './AnnotationModal';
 import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
 import notify from '../../utils/notify';
 import useIsMobile from '../../hooks/useIsMobile';
 
@@ -20,11 +22,11 @@ function AnnotatedChartWrapper({
     visualizationType,
     rootId,
     context = {},
-    chartType = 'scatter', // 'scatter', 'cartesian'
     annotationMode = false,
     onSetAnnotationMode,
     highlightedAnnotationId
 }) {
+    const queryClient = useQueryClient();
     const containerRef = useRef(null);
     const isMobile = useIsMobile();
 
@@ -35,29 +37,23 @@ function AnnotatedChartWrapper({
     const [selectedPoints, setSelectedPoints] = useState([]);
     const selectedPointsRef = useRef([]); // Ref to avoid stale closure in mouseup handler
     const [showModal, setShowModal] = useState(false);
-    const [annotations, setAnnotations] = useState([]);
     const [viewingAnnotation, setViewingAnnotation] = useState(null);
 
     // Memoize context string to prevent infinite loops if parent passes new object every render
     const contextStr = JSON.stringify(context);
-
-    // Load existing annotations
-    const loadAnnotations = useCallback(async () => {
-        try {
+    const annotationsQuery = useQuery({
+        queryKey: queryKeys.annotations(rootId, visualizationType, contextStr),
+        enabled: Boolean(rootId && visualizationType),
+        queryFn: async () => {
             const response = await fractalApi.getAnnotations(rootId, visualizationType, context);
-            // API returns { data: [...] } structure
             const annotationsArray = response.data?.data || response.data || [];
-            setAnnotations(Array.isArray(annotationsArray) ? annotationsArray : []);
-        } catch (err) {
-            console.error('Failed to load annotations:', err);
-        }
-    }, [rootId, visualizationType, contextStr]);
-
-    useEffect(() => {
-        if (rootId) {
-            loadAnnotations();
-        }
-    }, [rootId, loadAnnotations]);
+            return Array.isArray(annotationsArray) ? annotationsArray : [];
+        },
+    });
+    const annotations = React.useMemo(
+        () => annotationsQuery.data || [],
+        [annotationsQuery.data]
+    );
 
     // Helper to reset selection state
     const resetSelection = () => {
@@ -136,7 +132,10 @@ function AnnotatedChartWrapper({
             console.log('Annotation saved successfully:', response.data);
 
             const data = response.data?.data || response.data;
-            setAnnotations(prev => [data, ...(Array.isArray(prev) ? prev : [])]);
+            queryClient.setQueryData(
+                queryKeys.annotations(rootId, visualizationType, contextStr),
+                (current = []) => [data, ...(Array.isArray(current) ? current : [])]
+            );
             setShowModal(false);
             resetSelection();
             if (onSetAnnotationMode) onSetAnnotationMode(false);
@@ -151,10 +150,16 @@ function AnnotatedChartWrapper({
 
     // Listen for external updates
     useEffect(() => {
-        const handleUpdate = () => loadAnnotations();
+        const handleUpdate = () => {
+            if (rootId && visualizationType) {
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.annotations(rootId, visualizationType, contextStr),
+                });
+            }
+        };
         window.addEventListener('annotation-update', handleUpdate);
         return () => window.removeEventListener('annotation-update', handleUpdate);
-    }, [loadAnnotations]);
+    }, [contextStr, queryClient, rootId, visualizationType]);
 
     // Ref to store original point colors for restoration
     const originalColorsRef = useRef(null);
@@ -527,41 +532,33 @@ function AnnotatedChartWrapper({
         }
     };
 
-    const handleMouseUp = useCallback(() => {
-        if (!isSelecting) return;
-        setIsSelecting(false);
-
-        // Calculate selection size
-        const selectionWidth = Math.abs((selectionEnd?.x || 0) - (selectionStart?.x || 0));
-        const selectionHeight = Math.abs((selectionEnd?.y || 0) - (selectionStart?.y || 0));
-        const hasValidSelection = selectionWidth > 10 && selectionHeight > 10;
-
-        // Use ref to get latest selectedPoints (avoids stale closure)
-        const capturedPoints = selectedPointsRef.current;
-
-        console.log('Annotation drag ended:', {
-            capturedPointsCount: capturedPoints.length,
-            selectionWidth,
-            selectionHeight,
-            hasValidSelection,
-            capturedPoints
-        });
-
-        // Show modal if we have points OR if we have a valid selection area
-        if (capturedPoints.length > 0 || hasValidSelection) {
-            setShowModal(true);
-        }
-
-        // Keep the selection bounds for saving, don't reset to null yet
-        // Only reset after modal closes
-    }, [isSelecting, selectionStart, selectionEnd]);
-
     useEffect(() => {
         if (isSelecting) {
+            const handleMouseUp = () => {
+                setIsSelecting(false);
+
+                const selectionWidth = Math.abs((selectionEnd?.x || 0) - (selectionStart?.x || 0));
+                const selectionHeight = Math.abs((selectionEnd?.y || 0) - (selectionStart?.y || 0));
+                const hasValidSelection = selectionWidth > 10 && selectionHeight > 10;
+                const capturedPoints = selectedPointsRef.current;
+
+                console.log('Annotation drag ended:', {
+                    capturedPointsCount: capturedPoints.length,
+                    selectionWidth,
+                    selectionHeight,
+                    hasValidSelection,
+                    capturedPoints
+                });
+
+                if (capturedPoints.length > 0 || hasValidSelection) {
+                    setShowModal(true);
+                }
+            };
+
             window.addEventListener('mouseup', handleMouseUp);
             return () => window.removeEventListener('mouseup', handleMouseUp);
         }
-    }, [isSelecting, handleMouseUp]);
+    }, [isSelecting, selectionStart, selectionEnd]);
 
     // Draw annotation indicators? 
     // For Chart.js, it's hard to overlay exact elements on data points without a plugin.

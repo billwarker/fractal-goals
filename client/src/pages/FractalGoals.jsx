@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -11,9 +11,9 @@ import { useGoals } from '../contexts/GoalsContext';
 import { useSessions } from '../contexts/SessionsContext';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useDebug } from '../contexts/DebugContext';
-import { useTheme } from '../contexts/ThemeContext'
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { getChildType } from '../utils/goalHelpers';
+import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
 import './FractalGoals.css';
@@ -67,18 +67,7 @@ function FractalGoals() {
     const { getGoalColor } = useGoalLevels();
     const isMobile = useIsMobile();
 
-    // Programs State
-    const [programs, setPrograms] = useState([]);
-
-    const fetchPrograms = useCallback(async (id) => {
-        try {
-            const { fractalApi } = await import('../utils/api');
-            const res = await fractalApi.getPrograms(id);
-            setPrograms(res.data || []);
-        } catch (err) {
-            console.error("Failed to fetch programs:", err);
-        }
-    }, []);
+    const { programs = [] } = usePrograms(rootId);
 
     const loading = goalsLoading;
 
@@ -113,10 +102,9 @@ function FractalGoals() {
         localStorage.setItem('fractal_recent_root_id', rootId);
         fetchActivities(rootId);
         fetchActivityGroups(rootId);
-        fetchPrograms(rootId);
 
         return () => setActiveRootId(null);
-    }, [rootId, navigate, setActiveRootId, fetchActivities, fetchActivityGroups, fetchPrograms]);
+    }, [rootId, navigate, setActiveRootId, fetchActivities, fetchActivityGroups]);
 
     useEffect(() => {
         if (!rootId) return;

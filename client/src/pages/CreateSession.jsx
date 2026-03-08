@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
-import GoalDetailModal from '../components/GoalDetailModal';
 import { getLocalISOString } from '../utils/dateUtils';
+import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
 import {
     ProgramSelector,
@@ -30,18 +30,6 @@ function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const [searchParams] = useSearchParams();
-
-    // Data state
-    const [templates, setTemplates] = useState([]);
-    const [goals, setGoals] = useState([]);
-    const [allGoals, setAllGoals] = useState([]);
-    const [programDays, setProgramDays] = useState([]);
-    const [programsByName, setProgramsByName] = useState({});
-    const [existingImmediateGoals, setExistingImmediateGoals] = useState([]);
-    const [activityDefinitions, setActivityDefinitions] = useState([]);
-    const [activityGroups, setActivityGroups] = useState([]);
-
     // Selection state
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -50,100 +38,35 @@ function CreateSession() {
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
 
     // UI state
-    const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
+    const {
+        templates,
+        allGoals,
+        programDays,
+        programsByName,
+        activityDefinitions,
+        loading,
+    } = useCreateSessionPageData(rootId);
 
     useEffect(() => {
         if (!rootId) {
             navigate('/');
-            return;
         }
-        fetchData();
     }, [rootId, navigate]);
 
-    const fetchData = async () => {
-        try {
-            const [templatesRes, goalsRes, treeRes, programDaysRes, activitiesRes, groupsRes] = await Promise.all([
-                fractalApi.getSessionTemplates(rootId),
-                fractalApi.getGoalsForSelection(rootId),
-                fractalApi.getGoals(rootId),
-                fractalApi.getActiveProgramDays(rootId),
-                fractalApi.getActivities(rootId),
-                fractalApi.getActivityGroups(rootId)
-            ]);
-
-            setTemplates(templatesRes.data);
-            setGoals(goalsRes.data || []);
-
-            // Flatten goal tree for comprehensive lookup
-            const flattenGoals = (goal) => {
-                let list = [goal];
-                if (goal.children && goal.children.length > 0) {
-                    goal.children.forEach(child => {
-                        list = [...list, ...flattenGoals(child)];
-                    });
-                }
-                return list;
-            };
-            const fullGoalList = treeRes.data ? flattenGoals(treeRes.data) : [];
-            setAllGoals(fullGoalList);
-
-            const allProgramDays = programDaysRes.data || [];
-
-            // Deduplicate program days to avoid showing multiple instances of the same training day
-            const seenKeys = new Set();
-            const uniqueProgramDays = allProgramDays
-                .sort((a, b) => {
-                    // Prioritize template days (no specific date)
-                    if (!a.date && b.date) return -1;
-                    if (a.date && !b.date) return 1;
-                    return 0;
-                })
-                .filter(day => {
-                    const templateIds = (day.sessions || []).map(s => s.template_id).sort().join(',');
-                    const key = `${day.program_id}-${day.block_id}-${day.day_name}-${templateIds}`;
-                    if (seenKeys.has(key)) return false;
-                    seenKeys.add(key);
-                    return true;
-                });
-
-            setProgramDays(uniqueProgramDays);
-
-            // Group program days by program name
-            const grouped = {};
-            uniqueProgramDays.forEach(day => {
-                const programName = day.program_name;
-                if (!grouped[programName]) {
-                    grouped[programName] = {
-                        program_id: day.program_id,
-                        program_name: programName,
-                        days: []
-                    };
-                }
-                grouped[programName].days.push(day);
-            });
-            setProgramsByName(grouped);
-
-            setActivityDefinitions(activitiesRes.data || []);
-            setActivityGroups(groupsRes.data || []);
-
-            // Auto-select session source and program if only one option available
-            const programNames = Object.keys(grouped);
-            if (programNames.length === 1 && templatesRes.data.length === 0) {
-                setSessionSource('program');
-                setSelectedProgram(programNames[0]);
-            } else if (programNames.length === 1 && templatesRes.data.length > 0) {
-                setSelectedProgram(programNames[0]);
-            } else if (programNames.length === 0 && templatesRes.data.length > 0) {
-                setSessionSource('template');
-            }
-
-            setLoading(false);
-        } catch (err) {
-            console.error("Failed to fetch data", err);
-            setLoading(false);
+    const programNames = Object.keys(programsByName);
+    const defaultProgram = programNames.length === 1 ? programNames[0] : null;
+    const defaultSessionSource = (() => {
+        if (programNames.length === 1 && templates.length === 0) {
+            return 'program';
         }
-    };
+        if (programNames.length === 0 && templates.length > 0) {
+            return 'template';
+        }
+        return null;
+    })();
+    const effectiveSelectedProgram = selectedProgram ?? defaultProgram;
+    const effectiveSessionSource = sessionSource ?? defaultSessionSource;
 
     // Handler functions
     const handleSelectProgramDay = (programDay) => {
@@ -343,12 +266,11 @@ function CreateSession() {
     // Derived state for conditional rendering
     const hasProgramDays = programDays.length > 0;
     const hasTemplates = templates.length > 0;
-    const programNames = Object.keys(programsByName);
     const hasMultiplePrograms = programNames.length > 1;
     const hasSingleProgram = programNames.length === 1;
     const showSourceChoice = hasSingleProgram && hasTemplates;
     const showProgramChoice = hasMultiplePrograms;
-    const currentProgramDays = selectedProgram ? (programsByName[selectedProgram]?.days || []) : [];
+    const currentProgramDays = effectiveSelectedProgram ? (programsByName[effectiveSelectedProgram]?.days || []) : [];
 
     return (
         <div className="page-container">
@@ -361,10 +283,10 @@ function CreateSession() {
                 {showProgramChoice && (
                     <ProgramSelector
                         programsByName={programsByName}
-                        selectedProgram={selectedProgram}
+                        selectedProgram={effectiveSelectedProgram}
                         onSelectProgram={handleSelectProgram}
                         hasTemplates={hasTemplates}
-                        sessionSource={sessionSource}
+                        sessionSource={effectiveSessionSource}
                         onSelectTemplateSource={() => handleSelectSource('template')}
                     />
                 )}
@@ -372,14 +294,14 @@ function CreateSession() {
                 {/* Step 0b: Choose Session Source (if single program AND templates available) */}
                 {showSourceChoice && (
                     <SourceSelector
-                        sessionSource={sessionSource}
+                        sessionSource={effectiveSessionSource}
                         onSelectSource={handleSelectSource}
-                        programName={selectedProgram}
+                        programName={effectiveSelectedProgram}
                     />
                 )}
 
                 {/* Step 1: Select Program Day */}
-                {(sessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
+                {(effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
                     <ProgramDayPicker
                         programDays={currentProgramDays}
                         selectedProgramDay={selectedProgramDay}
@@ -392,7 +314,7 @@ function CreateSession() {
                 )}
 
                 {/* Step 1: Select Template */}
-                {(sessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
+                {(effectiveSessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
                     <TemplatePicker
                         templates={templates}
                         selectedTemplate={selectedTemplate}

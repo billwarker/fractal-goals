@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
@@ -14,11 +16,8 @@ import '../App.css';
 function CreateSessionTemplate() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
-    const [templates, setTemplates] = useState([]);
-    const [activities, setActivities] = useState([]);
-    const [activityGroups, setActivityGroups] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Modal states
@@ -26,37 +25,98 @@ function CreateSessionTemplate() {
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [templateToDelete, setTemplateToDelete] = useState(null);
 
-
-
     useEffect(() => {
         if (!rootId) {
             navigate('/');
-            return;
         }
-        fetchData();
     }, [rootId, navigate]);
 
-    const fetchData = async () => {
-        try {
-            const [templatesRes, activitiesRes, groupsRes] = await Promise.all([
-                fractalApi.getSessionTemplates(rootId),
-                fractalApi.getActivities(rootId),
-                fractalApi.getActivityGroups(rootId)
-            ]);
-            setTemplates(templatesRes.data);
-            setActivities(activitiesRes.data);
-            setActivityGroups(groupsRes.data);
-            setLoading(false);
-        } catch (err) {
-            console.error("Failed to fetch data", err);
-            setError("Failed to load templates");
-            setLoading(false);
-        }
-    };
+    const isReady = Boolean(rootId);
+
+    const templatesQuery = useQuery({
+        queryKey: queryKeys.sessionTemplates(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getSessionTemplates(rootId);
+            return response.data || [];
+        },
+        enabled: isReady,
+    });
+
+    const activitiesQuery = useQuery({
+        queryKey: queryKeys.activities(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivities(rootId);
+            return response.data || [];
+        },
+        enabled: isReady,
+    });
+
+    const activityGroupsQuery = useQuery({
+        queryKey: queryKeys.activityGroups(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivityGroups(rootId);
+            return response.data || [];
+        },
+        enabled: isReady,
+    });
+
+    const saveTemplateMutation = useMutation({
+        mutationFn: async ({ payload, templateId }) => {
+            if (templateId) {
+                await fractalApi.updateSessionTemplate(rootId, templateId, payload);
+                return 'updated';
+            }
+
+            await fractalApi.createSessionTemplate(rootId, payload);
+            return 'created';
+        },
+        onSuccess: async (_, variables) => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            setShowBuilder(false);
+            setEditingTemplate(null);
+            setError(null);
+            notify.success(`Template ${variables.templateId ? 'updated' : 'created'} successfully!`);
+        },
+    });
+
+    const deleteTemplateMutation = useMutation({
+        mutationFn: async (templateId) => {
+            await fractalApi.deleteSessionTemplate(rootId, templateId);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            setTemplateToDelete(null);
+            setError(null);
+        },
+    });
+
+    const duplicateTemplateMutation = useMutation({
+        mutationFn: async (template) => {
+            const payload = {
+                name: `${template.name} (Copy)`,
+                description: template.description || '',
+                template_data: template.template_data,
+            };
+
+            await fractalApi.createSessionTemplate(rootId, payload);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            setError(null);
+            notify.success('Template duplicated successfully!');
+        },
+    });
+
+    const templates = templatesQuery.data || [];
+    const activities = activitiesQuery.data || [];
+    const activityGroups = activityGroupsQuery.data || [];
+    const loading = templatesQuery.isLoading || activitiesQuery.isLoading || activityGroupsQuery.isLoading;
+    const loadError = templatesQuery.error || activitiesQuery.error || activityGroupsQuery.error;
 
     const handleCreateClick = () => {
         setEditingTemplate(null);
         setShowBuilder(true);
+        setError(null);
     };
 
     const handleEditClick = (template) => {
@@ -71,19 +131,10 @@ function CreateSessionTemplate() {
 
     const handleBuilderSave = async (payload, templateId) => {
         try {
-            if (templateId) {
-                await fractalApi.updateSessionTemplate(rootId, templateId, payload);
-            } else {
-                await fractalApi.createSessionTemplate(rootId, payload);
-            }
-
-            await fetchData();
-            setShowBuilder(false);
-            setEditingTemplate(null);
-
-            notify.success(`Template ${templateId ? 'updated' : 'created'} successfully!`);
+            await saveTemplateMutation.mutateAsync({ payload, templateId });
         } catch (err) {
             console.error("Failed to save template", err);
+            setError('Failed to save template');
             notify.error('Failed to save template: ' + err.message);
         }
     };
@@ -95,9 +146,7 @@ function CreateSessionTemplate() {
     const handleConfirmDelete = async () => {
         if (!templateToDelete) return;
         try {
-            await fractalApi.deleteSessionTemplate(rootId, templateToDelete.id);
-            await fetchData();
-            setTemplateToDelete(null);
+            await deleteTemplateMutation.mutateAsync(templateToDelete.id);
         } catch (err) {
             console.error("Failed to delete template", err);
             setError("Failed to delete template");
@@ -107,21 +156,21 @@ function CreateSessionTemplate() {
 
     const handleDuplicate = async (template) => {
         try {
-            const payload = {
-                name: `${template.name} (Copy)`,
-                description: template.description || '',
-                template_data: template.template_data
-            };
-
-            await fractalApi.createSessionTemplate(rootId, payload);
-            await fetchData();
-
-            notify.success('Template duplicated successfully!');
+            await duplicateTemplateMutation.mutateAsync(template);
         } catch (err) {
             console.error("Failed to duplicate template", err);
+            setError('Failed to duplicate template');
             notify.error('Failed to duplicate template: ' + err.message);
         }
     };
+
+    if (loadError) {
+        return (
+            <div className="page-container" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-primary)' }}>
+                Failed to load templates
+            </div>
+        );
+    }
 
     if (loading) {
         return <div className="page-container" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-primary)' }}>Loading templates...</div>;

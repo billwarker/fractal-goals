@@ -43,7 +43,7 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 
 ## Phase 4: Frontend Correctness
 
-31. Eliminate stale derived local state where query data can be source of truth.
+31. ~~Eliminate stale derived local state where query data can be source of truth.~~
 32. ~~Remove effects that only mirror props into state.~~
 33. ~~Resolve effect dependency warnings in touched files by restructuring logic.~~
 34. ~~Prefer invalidation-based mutation hooks over local refresh functions.~~
@@ -116,6 +116,9 @@ Completed in the current workspace:
 - 31 progress: `useActivityHistory` now reads prior activity instances through React Query with a canonical `activity-history` key instead of maintaining local fetched state, so `HistoryPanel` consumes a query-backed source of truth rather than a hand-rolled cache
 - 31 progress: `AnnotationsList` now also reads visualization annotations through React Query with canonical `annotations` keys and invalidation on annotation-update events instead of running its own fetched-data cache and reload state machine
 - 31 progress: `Selection.jsx` now reads fractals plus recent/per-root goal levels through React Query with canonical `fractals` and `goalLevels` keys, replacing four local fetch/cache states and moving create/delete flows onto shared query invalidation and cache updates
+- 31 progress: `CreateSessionTemplate.jsx` now reads session templates, activities, and activity groups through shared React Query keys instead of owning its own fetch/loading state, and template save/delete/duplicate flows now refresh through invalidation-backed mutations
+- 31 progress: `LogsModal.jsx` now derives paged log rows from shared `logs` query caches instead of holding its own fetched log list/loading state, and it resets via mount-seeded pagination while clear-log flows update shared query state directly
+- 31: remaining major fetched-data mirrors have now been removed from `CreateSession.jsx`, `Analytics.jsx`, `ProgramDayModal.jsx`, `ProgramBuilder.jsx`, `AnnotatedHeatmap.jsx`, `AnnotatedChartWrapper.jsx`, `ActivitiesContext.jsx`, and `FractalGoals.jsx`; query-backed hooks and canonical keys now own those remote datasets instead of local component/context caches
 
 ## Next Tranche
 

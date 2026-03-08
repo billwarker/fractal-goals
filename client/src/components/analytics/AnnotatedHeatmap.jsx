@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
 import AnnotationModal from './AnnotationModal';
+import { queryKeys } from '../../hooks/queryKeys';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './AnnotatedHeatmap.module.css';
 
@@ -14,8 +16,8 @@ function AnnotatedHeatmap({
     months = 12,
     rootId,
     highlightedAnnotationId,
-    setHighlightedAnnotationId
 }) {
+    const queryClient = useQueryClient();
     const containerRef = useRef(null);
     const cellRefs = useRef({}); // Store refs to each cell for hit detection
     const isMobile = useIsMobile();
@@ -27,14 +29,16 @@ function AnnotatedHeatmap({
     const [selectionEnd, setSelectionEnd] = useState(null);
     const [selectedDates, setSelectedDates] = useState([]);
     const [showModal, setShowModal] = useState(false);
-    const [annotations, setAnnotations] = useState([]);
     const [viewingAnnotation, setViewingAnnotation] = useState(null);
 
     // Heatmap data state (we'll compute this like ActivityHeatmap does)
     const [hoveredCell, setHoveredCell] = useState(null);
 
     // Ensure sessions is always an array
-    const safeSessions = Array.isArray(sessions) ? sessions : [];
+    const safeSessions = React.useMemo(
+        () => (Array.isArray(sessions) ? sessions : []),
+        [sessions]
+    );
 
     // Process sessions into daily counts
     const { dailyData, weeks, maxCount, monthLabels } = React.useMemo(() => {
@@ -115,44 +119,58 @@ function AnnotatedHeatmap({
         }
     }, [safeSessions, months]);
 
-    // Define loadAnnotations first so it can be used in useEffect
-    const loadAnnotations = useCallback(async () => {
-        try {
-            const context = { time_range: months };
+    const context = { time_range: months };
+    const contextKey = JSON.stringify(context);
+    const annotationsQuery = useQuery({
+        queryKey: queryKeys.annotations(rootId, 'heatmap', contextKey),
+        enabled: Boolean(rootId),
+        queryFn: async () => {
             const response = await fractalApi.getAnnotations(rootId, 'heatmap', context);
-            // API usually returns { status: 'success', data: [...] } or just [...]
             const annotationsData = response.data?.data || response.data || [];
-            setAnnotations(Array.isArray(annotationsData) ? annotationsData : []);
-        } catch (err) {
-            console.error('Failed to load annotations:', err);
-        }
-    }, [rootId, months]);
+            return Array.isArray(annotationsData) ? annotationsData : [];
+        },
+    });
+    const annotations = annotationsQuery.data || [];
 
-    // Load existing annotations
-    useEffect(() => {
-        if (rootId) {
-            loadAnnotations();
-        }
-    }, [rootId, months, loadAnnotations]);
-
-    const saveAnnotation = async (content) => {
-        try {
-            const response = await fractalApi.createAnnotation(rootId, {
-                visualization_type: 'heatmap',
-                visualization_context: { time_range: months },
-                selected_points: selectedDates,
-                content
-            });
-
-            const data = response.data;
-            setAnnotations(prev => [data, ...prev]);
+    const createAnnotationMutation = useMutation({
+        mutationFn: async (content) => fractalApi.createAnnotation(rootId, {
+            visualization_type: 'heatmap',
+            visualization_context: context,
+            selected_points: selectedDates,
+            content,
+        }),
+        onSuccess: (response) => {
+            const data = response.data?.data || response.data;
+            queryClient.setQueryData(
+                queryKeys.annotations(rootId, 'heatmap', contextKey),
+                (current = []) => [data, ...current]
+            );
             setShowModal(false);
             setSelectedDates([]);
             setAnnotationMode(false);
+            window.dispatchEvent(new CustomEvent('annotation-update'));
+        },
+    });
+
+    const saveAnnotation = async (content) => {
+        try {
+            await createAnnotationMutation.mutateAsync(content);
         } catch (err) {
             console.error('Failed to save annotation:', err);
         }
     };
+
+    useEffect(() => {
+        const handleUpdate = () => {
+            if (rootId) {
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.annotations(rootId, 'heatmap', contextKey),
+                });
+            }
+        };
+        window.addEventListener('annotation-update', handleUpdate);
+        return () => window.removeEventListener('annotation-update', handleUpdate);
+    }, [contextKey, queryClient, rootId]);
 
     // Get color intensity based on count
     const getColor = (count, isSelected = false, isHighlighted = false) => {

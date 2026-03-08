@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import Linkify from '../atoms/Linkify';
 import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -9,61 +11,63 @@ import './LogsModal.css';
 /**
  * LogsModal - Displays a searchable and filterable list of application event logs.
  */
-function LogsModal({ isOpen, onClose, rootId }) {
-    const [logs, setLogs] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [offset, setOffset] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
+function LogsModalInner({ onClose, rootId }) {
+    const queryClient = useQueryClient();
+    const [pageCount, setPageCount] = useState(1);
     const limit = 50;
 
-    useEffect(() => {
-        if (isOpen && rootId) {
-            fetchLogs(true);
-        }
-    }, [isOpen, rootId]);
+    const logQueries = useQueries({
+        queries: rootId
+            ? Array.from({ length: pageCount }, (_, index) => {
+                const page = index + 1;
+                return {
+                    queryKey: queryKeys.logs(rootId, page, limit),
+                    queryFn: async () => {
+                        const res = await fractalApi.getLogs(rootId, {
+                            limit,
+                            offset: index * limit,
+                        });
+                        return res.data;
+                    },
+                    enabled: true,
+                };
+            })
+            : [],
+    });
 
-    const fetchLogs = async (refresh = false) => {
-        try {
-            setLoading(true);
-            const currentOffset = refresh ? 0 : offset;
-            const res = await fractalApi.getLogs(rootId, limit, currentOffset);
+    const logs = useMemo(
+        () => logQueries.flatMap((query) => query.data?.logs || []),
+        [logQueries]
+    );
+    const loading = logQueries.some((query) => query.isLoading);
+    const lastPageLogs = logQueries[logQueries.length - 1]?.data?.logs || [];
+    const hasMore = lastPageLogs.length === limit;
 
-            const newLogs = res.data.logs || [];
-
-            if (refresh) {
-                setLogs(newLogs);
-                setOffset(newLogs.length);
-            } else {
-                setLogs(prev => [...prev, ...newLogs]);
-                setOffset(prev => prev + newLogs.length);
-            }
-
-            setHasMore(newLogs.length === limit);
-        } catch (err) {
-            console.error("Failed to fetch logs:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const clearLogsMutation = useMutation({
+        mutationFn: async () => fractalApi.clearLogs(rootId),
+        onSuccess: async () => {
+            queryClient.setQueriesData(
+                { queryKey: queryKeys.logs(rootId) },
+                (current) => current ? { ...current, logs: [], pagination: { ...(current.pagination || {}), total: 0 } } : current
+            );
+            setPageCount(1);
+            await queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
+        },
+    });
 
     const handleClearLogs = async () => {
         if (!window.confirm("Are you sure you want to clear all logs? This cannot be undone.")) return;
 
         try {
-            await fractalApi.clearLogs(rootId);
-            setLogs([]);
-            setOffset(0);
-            setHasMore(false);
+            await clearLogsMutation.mutateAsync();
         } catch (err) {
             console.error("Failed to clear logs:", err);
         }
     };
 
-    if (!isOpen) return null;
-
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen={true}
             onClose={onClose}
             title="Application Logs"
             size="lg"
@@ -104,7 +108,7 @@ function LogsModal({ isOpen, onClose, rootId }) {
                         {hasMore && (
                             <button
                                 className="load-more-logs"
-                                onClick={() => fetchLogs()}
+                                onClick={() => setPageCount((current) => current + 1)}
                                 disabled={loading}
                             >
                                 {loading ? 'Loading...' : 'Load More'}
@@ -116,7 +120,7 @@ function LogsModal({ isOpen, onClose, rootId }) {
 
             <ModalFooter>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <Button variant="danger" onClick={handleClearLogs}>
+                    <Button variant="danger" onClick={handleClearLogs} isLoading={clearLogsMutation.isPending}>
                         Clear All Logs
                     </Button>
                     <Button variant="secondary" onClick={onClose}>
@@ -126,6 +130,14 @@ function LogsModal({ isOpen, onClose, rootId }) {
             </ModalFooter>
         </Modal>
     );
+}
+
+function LogsModal({ isOpen, onClose, rootId }) {
+    if (!isOpen) {
+        return null;
+    }
+
+    return <LogsModalInner key={rootId || 'logs-modal'} onClose={onClose} rootId={rootId} />;
 }
 
 export default LogsModal;

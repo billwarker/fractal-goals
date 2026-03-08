@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
 import { flattenGoals } from '../../utils/goalHelpers';
+import { queryKeys } from '../../hooks/queryKeys';
 import moment from 'moment';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
@@ -35,7 +37,6 @@ function buildInitialProgramData(initialData) {
  */
 function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
     const { rootId } = useParams();
-    const [goals, setGoals] = useState([]);
     const [errors, setErrors] = useState({});
 
     const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData));
@@ -49,26 +50,24 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
         return weeks > 0 ? weeks : 0;
     };
 
-    useEffect(() => {
-        if (!rootId) {
-            return;
+    const goalsTreeQuery = useQuery({
+        queryKey: queryKeys.goalsTree(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getGoals(rootId);
+            return response.data || null;
+        },
+        enabled: Boolean(rootId),
+    });
+
+    const goals = useMemo(() => {
+        if (!goalsTreeQuery.data) {
+            return [];
         }
 
-        const fetchGoals = async () => {
-            try {
-                const res = await fractalApi.getGoal(rootId, rootId);
-                const allGoals = flattenGoals([res.data]);
-                const eligibleGoals = allGoals.filter(g =>
-                    ['MidTermGoal', 'LongTermGoal'].includes(g.attributes?.type)
-                );
-                setGoals(eligibleGoals);
-            } catch (err) {
-                console.error('Failed to fetch goals:', err);
-            }
-        };
-
-        fetchGoals();
-    }, [rootId]);
+        return flattenGoals([goalsTreeQuery.data]).filter((goal) =>
+            ['MidTermGoal', 'LongTermGoal'].includes(goal.attributes?.type)
+        );
+    }, [goalsTreeQuery.data]);
 
     const toggleGoal = (goalId) => {
         setProgramData({

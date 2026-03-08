@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from './queryKeys';
 
 export function useLogsData(rootId, { page, pageSize, eventType, startDate, endDate }) {
     const queryClient = useQueryClient();
 
     const logsQuery = useQuery({
-        queryKey: ['logs', rootId, page, pageSize, eventType, startDate, endDate],
+        queryKey: queryKeys.logs(rootId, page, pageSize, eventType, startDate, endDate),
         enabled: Boolean(rootId),
         queryFn: async () => {
             const offset = (page - 1) * pageSize;
@@ -23,7 +24,7 @@ export function useLogsData(rootId, { page, pageSize, eventType, startDate, endD
     const clearLogsMutation = useMutation({
         mutationFn: async () => fractalApi.clearLogs(rootId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['logs', rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
         }
     });
 

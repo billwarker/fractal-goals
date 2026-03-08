@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fractalApi } from '../utils/api';
-import { useActivities } from '../contexts/ActivitiesContext';
+import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
 import ProfileWindow from '../components/analytics/ProfileWindow';
 import ProfileWindowLayout, {
     countWindows,
@@ -56,12 +55,13 @@ const generateWindowId = () => `window-${++windowIdCounter}`;
 function Analytics() {
     const { rootId } = useParams();
     const navigate = useNavigate();
-    const { activities, fetchActivities, loading: activitiesLoading } = useActivities();
-
-    const [loading, setLoading] = useState(true);
-    const [sessions, setSessions] = useState([]);
-    const [goalAnalytics, setGoalAnalytics] = useState(null);
-    const [activityInstances, setActivityInstances] = useState({});
+    const {
+        activities,
+        activityInstances,
+        goalAnalytics,
+        loading,
+        sessions,
+    } = useAnalyticsPageData(rootId);
 
     // Shared state for annotation highlighting across windows
     const [highlightedAnnotationId, setHighlightedAnnotationId] = useState(null);
@@ -97,69 +97,8 @@ function Analytics() {
     useEffect(() => {
         if (!rootId) {
             navigate('/');
-            return;
         }
-
-        let isMounted = true;
-
-        const loadData = async () => {
-            try {
-                // Load sessions with higher limit for analytics (we need more data for charts)
-                const [sessionsRes, goalAnalyticsRes] = await Promise.all([
-                    fractalApi.getSessions(rootId, { limit: 50 }),
-                    fractalApi.getGoalAnalytics(rootId)
-                ]);
-                await fetchActivities(rootId);
-
-                if (!isMounted) return;
-
-                // Handle paginated response format
-                const sessionsData = sessionsRes.data.sessions || sessionsRes.data;
-                setSessions(sessionsData);
-                setGoalAnalytics(goalAnalyticsRes.data);
-
-                // Build activity instances map from sessions
-                const instancesMap = {};
-                sessionsData.forEach(session => {
-                    const sessionData = session.attributes?.session_data;
-                    if (sessionData?.sections) {
-                        sessionData.sections.forEach(section => {
-                            if (section.exercises) {
-                                section.exercises.forEach(exercise => {
-                                    if (exercise.type === 'activity' && exercise.activity_id) {
-                                        if (!instancesMap[exercise.activity_id]) {
-                                            instancesMap[exercise.activity_id] = [];
-                                        }
-                                        const sessionStart = session.session_start || session.attributes?.session_data?.session_start || session.attributes?.created_at;
-                                        instancesMap[exercise.activity_id].push({
-                                            ...exercise,
-                                            session_id: session.id,
-                                            session_name: session.name,
-                                            session_date: sessionStart
-                                        });
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-
-                setActivityInstances(instancesMap);
-                setLoading(false);
-            } catch (err) {
-                console.error("Failed to fetch analytics data", err);
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        loadData();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [rootId, navigate, fetchActivities]);
+    }, [rootId, navigate]);
 
     // Handle split - splits a window in the given direction
     const handleSplit = useCallback((windowId, direction) => {
@@ -191,7 +130,7 @@ function Analytics() {
 
         // Clean up window state
         setWindowStates(prev => {
-            const { [windowId]: removed, ...rest } = prev;
+            const { [windowId]: _removed, ...rest } = prev;
             return rest;
         });
     }, [layout]);
@@ -212,17 +151,17 @@ function Analytics() {
     }, []);
 
     // Shared data for all windows
-    const sharedData = {
+    const sharedData = useMemo(() => ({
         sessions,
         goalAnalytics,
         activities,
         activityInstances,
         formatDuration,
         rootId
-    };
+    }), [sessions, goalAnalytics, activities, activityInstances, rootId]);
 
     // Render a single profile window
-    const renderWindow = useCallback((windowId, path) => {
+    const renderWindow = useCallback((windowId) => {
         const windowCount = countWindows(layout);
         const windowIds = getWindowIds(layout);
         const canSplit = windowCount < MAX_WINDOWS;
@@ -258,7 +197,7 @@ function Analytics() {
         );
     }, [layout, windowStates, sharedData, handleSplit, handleCloseWindow, handleAnnotationsClick, highlightedAnnotationId, selectedWindowId]);
 
-    if (loading || activitiesLoading) {
+    if (loading) {
         return (
             <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
                 Loading analytics...

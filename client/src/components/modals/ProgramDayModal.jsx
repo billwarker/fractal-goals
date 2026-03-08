@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
 import moment from 'moment';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
@@ -57,14 +59,12 @@ function buildInitialProgramDayState(initialData) {
 }
 
 const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initialData }) => {
+    const queryClient = useQueryClient();
     const initialState = buildInitialProgramDayState(initialData);
     const [name, setName] = useState(initialState.name);
     const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
     const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
 
-    const [sessionTemplates, setSessionTemplates] = useState([]);
-    const [activities, setActivities] = useState([]);
-    const [activityGroups, setActivityGroups] = useState([]);
     const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
     const [copyMode] = useState(initialState.copyMode);
 
@@ -74,34 +74,51 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
 
     const isEdit = !!initialData;
 
-    const fetchTemplates = async () => {
-        if (!rootId) return;
-        try {
-            const res = await fractalApi.getSessionTemplates(rootId);
-            setSessionTemplates(res.data);
-        } catch {
-            console.error("Failed to fetch templates");
-        }
-    };
+    const { data: sessionTemplates = [] } = useQuery({
+        queryKey: queryKeys.sessionTemplates(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getSessionTemplates(rootId);
+            return response.data || [];
+        },
+        enabled: Boolean(rootId),
+    });
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!rootId) return;
-            try {
-                const [templatesRes, activitiesRes, groupsRes] = await Promise.all([
-                    fractalApi.getSessionTemplates(rootId),
-                    fractalApi.getActivities(rootId),
-                    fractalApi.getActivityGroups(rootId)
-                ]);
-                setSessionTemplates(templatesRes.data);
-                setActivities(activitiesRes.data);
-                setActivityGroups(groupsRes.data);
-            } catch {
-                console.error("Failed to fetch data");
+    const { data: activities = [] } = useQuery({
+        queryKey: queryKeys.activities(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivities(rootId);
+            return response.data || [];
+        },
+        enabled: Boolean(rootId),
+    });
+
+    const { data: activityGroups = [] } = useQuery({
+        queryKey: queryKeys.activityGroups(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivityGroups(rootId);
+            return response.data || [];
+        },
+        enabled: Boolean(rootId),
+    });
+
+    const saveTemplateMutation = useMutation({
+        mutationFn: async ({ payload, templateId }) => {
+            if (templateId) {
+                await fractalApi.updateSessionTemplate(rootId, templateId, payload);
+                return null;
             }
-        };
-        fetchData();
-    }, [rootId]);
+
+            const response = await fractalApi.createSessionTemplate(rootId, payload);
+            return response.data;
+        },
+        onSuccess: async (savedTemplate) => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            if (savedTemplate?.id) {
+                setSelectedTemplates((current) => [...current, savedTemplate.id]);
+            }
+            setShowTemplateBuilder(false);
+        },
+    });
 
     const handleSave = () => {
         onSave({
@@ -146,19 +163,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
 
     const handleTemplateBuilderSave = async (payload, templateId) => {
         try {
-            if (templateId) {
-                await fractalApi.updateSessionTemplate(rootId, templateId, payload);
-            } else {
-                const response = await fractalApi.createSessionTemplate(rootId, payload);
-                // Auto-add the newly created template to selected templates
-                if (response.data && response.data.id) {
-                    setSelectedTemplates([...selectedTemplates, response.data.id]);
-                }
-            }
-
-            // Refresh templates list
-            await fetchTemplates();
-            setShowTemplateBuilder(false);
+            await saveTemplateMutation.mutateAsync({ payload, templateId });
         } catch (err) {
             console.error("Failed to save template", err);
             // Show error - could add alert modal here
