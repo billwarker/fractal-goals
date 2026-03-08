@@ -20,6 +20,8 @@ from datetime import datetime, timedelta
 from datetime import timezone
 import uuid
 
+from models import Goal, GoalLevel
+
 
 @pytest.mark.integration
 class TestFractalEndpoints:
@@ -93,6 +95,49 @@ class TestGoalTreeEndpoints:
         """Test retrieving goal tree for nonexistent fractal."""
         response = authed_client.get('/api/nonexistent-id/goals')
         assert response.status_code == 404
+
+    def test_get_active_goals_for_selection(self, authed_client, db_session, sample_goal_hierarchy):
+        """Test retrieving active short-term goals and immediate children for selection."""
+        short_term = sample_goal_hierarchy['short_term']
+        root_id = sample_goal_hierarchy['ultimate'].id
+
+        short_term_level = GoalLevel(id=str(uuid.uuid4()), name='Short Term Goal', rank=3)
+        immediate_level = GoalLevel(id=str(uuid.uuid4()), name='Immediate Goal', rank=4)
+        db_session.add_all([short_term_level, immediate_level])
+        db_session.flush()
+
+        short_term.level_id = short_term_level.id
+        immediate_goal = Goal(
+            id=str(uuid.uuid4()),
+            name='Practice pytest fixtures',
+            description='Set up reusable fixture patterns',
+            parent_id=short_term.id,
+            root_id=root_id,
+            level_id=immediate_level.id,
+            completed=False,
+            created_at=datetime.now(timezone.utc),
+        )
+        completed_immediate = Goal(
+            id=str(uuid.uuid4()),
+            name='Already done immediate goal',
+            description='Should be filtered out',
+            parent_id=short_term.id,
+            root_id=root_id,
+            level_id=immediate_level.id,
+            completed=True,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add_all([immediate_goal, completed_immediate])
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/goals/selection')
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert len(data) == 1
+        assert data[0]['id'] == short_term.id
+        assert len(data[0]['immediateGoals']) == 1
+        assert data[0]['immediateGoals'][0]['id'] == immediate_goal.id
 
 
 @pytest.mark.integration

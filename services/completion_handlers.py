@@ -14,6 +14,10 @@ from datetime import datetime, timezone
 import json
 
 from services.events import event_bus, Event, Events
+from services.goal_target_rules import (
+    check_metric_value as _check_metric_value,
+    check_metrics_meet_target as _check_metrics_meet_target,
+)
 import models
 from models import (
     get_session, Goal, Session, ActivityInstance, Target,
@@ -881,59 +885,6 @@ def _recalculate_program_progress(db_session, program):
         'goals_completed': completed_count,
         'goals_total': total_count
     }))
-
-
-def _check_metric_value(target_value, actual_value, operator='>='):
-    """Check if actual value meets target value based on operator."""
-    try:
-        t_val = float(target_value)
-        a_val = float(actual_value)
-    except (ValueError, TypeError):
-        return False
-        
-    if operator == '>=':
-        return a_val >= t_val
-    elif operator == '<=':
-        return a_val <= t_val
-    elif operator == '==' or operator == '=':
-        return abs(a_val - t_val) < 0.001  # Float equality with epsilon
-    elif operator == '>':
-        return a_val > t_val
-    elif operator == '<':
-        return a_val < t_val
-    
-    return False
-
-def _check_metrics_meet_target(target_metrics: list, actual_metrics: list) -> bool:
-    """Check if actual metrics meet or exceed all target metrics."""
-    if not target_metrics:
-        return False
-    
-    # Build a map of actual metric values
-    actual_map = {}
-    for m in actual_metrics:
-        metric_id = m.get('metric_id') or m.get('metric_definition_id')
-        if metric_id and m.get('value') is not None:
-            actual_map[metric_id] = m['value']
-    
-    # Check all target metrics are met
-    for tm in target_metrics:
-        metric_id = tm.get('metric_id')
-        target_value = tm.get('value')
-        operator = tm.get('operator', '>=')  # Default to >=
-        
-        if not metric_id or target_value is None:
-            continue
-        
-        actual_value = actual_map.get(metric_id)
-        if actual_value is None:
-            return False
-        
-        if not _check_metric_value(target_value, actual_value, operator):
-            return False
-    
-    return True
-
 
 # ============================================================================
 # INITIALIZATION

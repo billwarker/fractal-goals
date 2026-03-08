@@ -10,7 +10,7 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 4. ~~Move goal association persistence into dedicated mutation hooks.~~
 5. ~~Move goal duration/chart loading into a dedicated hook.~~
 6. ~~Standardize query keys in one module and remove string drift.~~
-7. Expand application service coverage across goals, sessions, notes, and programs.
+7. ~~Expand application service coverage across goals, sessions, notes, and programs.~~
 8. Shrink oversized blueprints, especially `goals_api.py`.
 9. Isolate serialization from business logic.
 10. Build a small domain-rules layer for completion, targets, and inheritance.
@@ -98,10 +98,11 @@ Completed in the current workspace:
 - 3: `GoalDetailModal` orchestration now runs through dedicated hooks, including `useGoalDetailController`, reducing the modal to a thinner coordinator
 - 38: target-card and activity-focus coverage now includes deleted-activity fallback behavior and focused target-card filtering by activity instance
 - 39: `ActivityBuilder` now runs as a thin coordinator over `ActivityBuilderForm` plus extracted association, splits, and metrics subviews, with smoke coverage for create and edit-warning flows
+- 7: application service coverage now spans goals, sessions, notes, and programs via `GoalService`, `SessionService`, `NoteService`, and `ProgramService`; goal CRUD, target mutations, manual completion, target evaluation, fractal list/create/delete, fractal tree loading, and selection-goal retrieval now route through services, reducing `goals_api.py` to 830 lines and sharing target-evaluation rules via `services/goal_target_rules.py`
 
 ## Next Tranche
 
-1. Expand application service coverage across goals, sessions, notes, and programs.
-2. Shrink oversized blueprints, especially `goals_api.py`.
-3. Centralize payload normalization for activities, goals, notes, and sessions.
-4. Isolate serialization from business logic.
+1. Shrink oversized blueprints, especially `goals_api.py`.
+2. Centralize payload normalization for activities, goals, notes, and sessions.
+3. Isolate serialization from business logic.
+4. Start the same blueprint-reduction pass on `activities_api.py` while continuing to peel direct business logic out of `goals_api.py`.
