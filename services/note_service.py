@@ -8,12 +8,18 @@ from models import (
     Goal,
     Note,
     Session,
-    format_utc,
     session_goals,
     validate_root_goal,
 )
+from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
-from services.serializers import serialize_activity_instance, serialize_note
+from services.service_types import JsonDict, JsonList, ServiceResult
+from services.serializers import serialize_note
+from services.view_serializers import (
+    serialize_activity_history_entry,
+    serialize_note_with_session,
+    serialize_previous_session_notes_group,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +28,13 @@ class NoteService:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def _validate_owned_root(self, root_id, current_user_id):
+    def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
-    def get_session_notes(self, root_id, session_id, current_user_id):
+    def get_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -40,7 +46,7 @@ class NoteService:
         ).order_by(Note.created_at.desc()).all()
         return [serialize_note(note) for note in notes], None, 200
 
-    def get_activity_instance_notes(self, root_id, instance_id, current_user_id):
+    def get_activity_instance_notes(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -52,7 +58,7 @@ class NoteService:
         ).order_by(Note.created_at.desc()).all()
         return [serialize_note(note) for note in notes], None, 200
 
-    def get_previous_session_notes(self, root_id, session_id, current_user_id):
+    def get_previous_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -93,18 +99,15 @@ class NoteService:
 
         results = []
         for session in previous_sessions:
-            session_notes = [serialize_note(note) for note in notes if note.session_id == session.id]
+            session_notes = [note for note in notes if note.session_id == session.id]
             if session_notes:
-                results.append({
-                    'session_id': session.id,
-                    'session_name': session.name,
-                    'session_date': format_utc(session.session_start or session.created_at),
-                    'notes': session_notes,
-                })
+                results.append(serialize_previous_session_notes_group(session, session_notes))
 
         return results, None, 200
 
-    def get_activity_definition_notes(self, root_id, activity_id, current_user_id, limit=20, exclude_session_id=None):
+    def get_activity_definition_notes(
+        self, root_id, activity_id, current_user_id, limit=20, exclude_session_id=None
+    ) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -121,15 +124,13 @@ class NoteService:
         notes = query.order_by(Note.created_at.desc()).limit(limit).all()
         results = []
         for note in notes:
-            payload = serialize_note(note)
-            if note.session:
-                payload['session_name'] = note.session.name
-                payload['session_date'] = format_utc(note.session.session_start or note.session.created_at)
-            results.append(payload)
+            results.append(serialize_note_with_session(note))
 
         return results, None, 200
 
-    def get_activity_history(self, root_id, activity_id, current_user_id, limit=3, exclude_session_id=None):
+    def get_activity_history(
+        self, root_id, activity_id, current_user_id, limit=3, exclude_session_id=None
+    ) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -145,24 +146,21 @@ class NoteService:
 
         instances = query.order_by(ActivityInstance.created_at.desc()).limit(limit).all()
         instance_ids = [instance.id for instance in instances]
-        notes_by_instance = {}
+        notes = []
 
         if instance_ids:
             notes = self.db_session.query(Note).filter(
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
             ).order_by(Note.created_at).all()
-            for note in notes:
-                notes_by_instance.setdefault(note.activity_instance_id, []).append(serialize_note(note))
 
         results = []
         for instance in instances:
-            payload = serialize_activity_instance(instance)
-            if instance.session:
-                payload['session_name'] = instance.session.name
-                payload['session_date'] = format_utc(instance.session.session_start or instance.session.created_at)
-            payload['notes'] = notes_by_instance.get(instance.id, [])
-            results.append(payload)
+            instance_notes = [
+                note for note in notes
+                if note.activity_instance_id == instance.id
+            ] if instance_ids else []
+            results.append(serialize_activity_history_entry(instance, instance_notes))
 
         return results, None, 200
 
@@ -221,15 +219,13 @@ class NoteService:
 
         return None
 
-    def create_note(self, root_id, current_user_id, data):
+    def create_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        data = normalize_note_payload(data)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
-
         content = data.get('content', '')
         image_data = data.get('image_data')
-        if not content and image_data:
-            content = '[Image]'
 
         session_id = data.get('session_id')
         nano_goal_id = data.get('nano_goal_id')
@@ -264,7 +260,8 @@ class NoteService:
         logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
         return serialize_note(note), None, 201
 
-    def update_note(self, root_id, note_id, current_user_id, data):
+    def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        data = normalize_note_payload(data, partial=True)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -284,7 +281,7 @@ class NoteService:
         logger.info("Updated note %s", note_id)
         return serialize_note(note), None, 200
 
-    def delete_note(self, root_id, note_id, current_user_id):
+    def delete_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error

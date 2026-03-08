@@ -6,6 +6,7 @@ import models
 from models import Goal, Session, session_goals, ActivityDefinition, get_session
 from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
+from services.view_serializers import serialize_session_goals_view_payload
 
 logger = logging.getLogger(__name__)
 
@@ -165,13 +166,13 @@ class GoalTreeService:
         )
         micro_goals = self.db_session.execute(micro_stmt).scalars().all()
 
-        payload = {
-            "goal_tree": pruned_goal_tree,
-            "session_goal_ids": session_goal_ids,
-            "session_goal_sources": session_goal_sources,
-            "session_activity_ids": session_activity_ids,
-            "activity_goal_ids_by_activity": activity_goal_ids_by_activity,
-            "micro_goals": [serialize_goal(g) for g in micro_goals],
-        }
+        payload = serialize_session_goals_view_payload(
+            goal_tree=pruned_goal_tree,
+            session_goal_ids=session_goal_ids,
+            session_goal_sources=session_goal_sources,
+            session_activity_ids=session_activity_ids,
+            activity_goal_ids_by_activity=activity_goal_ids_by_activity,
+            micro_goals=micro_goals,
+        )
         
         return payload, None, 200

@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import EventLog, get_scoped_session, validate_root_goal
 from blueprints.auth_api import token_required
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import select, desc
 from services.serializers import serialize_event_log
 import logging
@@ -79,9 +80,10 @@ def get_logs(current_user, root_id):
                 "has_more": (offset + limit) < total_count
             }
         })
-    except Exception as e:
-        logger.exception(f"Error fetching logs for root {root_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching logs for root %s", root_id)
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -108,9 +110,9 @@ def clear_logs(current_user, root_id):
         logger.info(f"Cleared logs for root {root_id}")
         return jsonify({"message": "Logs cleared successfully"})
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        logger.exception(f"Error clearing logs for root {root_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error clearing logs for root %s", root_id)
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()

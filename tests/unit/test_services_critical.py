@@ -9,6 +9,7 @@ import services.completion_handlers as completion_handlers
 from services.completion_handlers import (
     _check_metric_value,
     _check_metrics_meet_target,
+    _check_parent_completion,
     _evaluate_threshold_target,
     _evaluate_sum_target,
     _evaluate_frequency_target,
@@ -113,6 +114,34 @@ class TestCompletionHandlersHelpers:
         freq_met, freq_count = _evaluate_frequency_target({"frequency_count": 2}, instances)
         assert freq_met is True
         assert freq_count == 2
+
+    def test_check_parent_completion_queues_goal_completed_event(self, db_session, sample_ultimate_goal, monkeypatch):
+        parent = Goal(
+            id="parent-goal",
+            name="Parent Goal",
+            parent_id=sample_ultimate_goal.id,
+            root_id=sample_ultimate_goal.id,
+            completed=False,
+            completed_via_children=True,
+        )
+        child = Goal(
+            name="Child Goal",
+            parent_id=parent.id,
+            root_id=sample_ultimate_goal.id,
+            completed=True,
+        )
+        db_session.add_all([parent, child])
+        db_session.flush()
+
+        emitted = []
+        pending_events = []
+        monkeypatch.setattr(completion_handlers.event_bus, "emit", lambda event: emitted.append(event.name))
+
+        _check_parent_completion(db_session, parent, pending_events=pending_events)
+
+        assert parent.completed is True
+        assert emitted == []
+        assert [event.name for event in pending_events] == [Events.GOAL_COMPLETED]
 
 
 @pytest.mark.unit
@@ -336,7 +365,7 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_revert_achievements_for_instance",
-            lambda _db, instance_id: reverted.append(instance_id),
+            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
         )
 
         handle_activity_instance_updated(
@@ -359,7 +388,7 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_run_evaluation_for_instance",
-            lambda _db, inst, session_id, root_id: evaluated.append((inst, session_id, root_id)),
+            lambda _db, inst, session_id, root_id, pending_events=None: evaluated.append((inst, session_id, root_id)),
         )
 
         handle_activity_instance_updated(

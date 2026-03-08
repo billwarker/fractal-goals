@@ -3,11 +3,8 @@ import json
 import uuid
 import logging
 import models
-from models import (
-    get_session,
-    SessionTemplate,
-    validate_root_goal
-)
+from sqlalchemy.exc import SQLAlchemyError
+from models import get_session, SessionTemplate
 from validators import (
     validate_request,
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema
@@ -15,6 +12,7 @@ from validators import (
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root, etag_json_response
 from services.events import event_bus, Event, Events
+from services.owned_entity_queries import get_owned_session_template
 from services.serializers import serialize_session_template
 
 # Create blueprint
@@ -35,7 +33,10 @@ def get_session_templates(current_user, root_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        templates_q = session.query(SessionTemplate).filter_by(root_id=root_id)
+        templates_q = session.query(SessionTemplate).filter(
+            SessionTemplate.root_id == root_id,
+            SessionTemplate.deleted_at.is_(None),
+        )
         limit, offset = parse_optional_pagination(request, max_limit=500)
         if limit is not None:
             templates_q = templates_q.offset(offset).limit(limit)
@@ -58,7 +59,7 @@ def get_session_template(current_user, root_id, template_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
+        template = get_owned_session_template(session, root_id, template_id)
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
@@ -103,7 +104,7 @@ def create_session_template(current_user, root_id, validated_data):
         
         return jsonify(serialize_session_template(new_template)), 201
         
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating session template")
         return internal_error(logger, "Template API request failed")
@@ -115,7 +116,7 @@ def create_session_template(current_user, root_id, validated_data):
 @token_required
 @validate_request(SessionTemplateUpdateSchema)
 def update_session_template(current_user, root_id, template_id, validated_data):
-    """Update a session template if owned by user."""
+    """Patch scalar fields; replace template_data only when that key is present."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
@@ -123,7 +124,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
+        template = get_owned_session_template(session, root_id, template_id)
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
@@ -146,7 +147,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
         
         return jsonify(serialize_session_template(template))
         
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating session template")
         return internal_error(logger, "Template API request failed")
@@ -157,7 +158,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['DELETE'])
 @token_required
 def delete_session_template(current_user, root_id, template_id):
-    """Delete a session template if owned by user."""
+    """Soft-delete a session template if owned by user."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
@@ -165,16 +166,16 @@ def delete_session_template(current_user, root_id, template_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        template = session.query(SessionTemplate).filter_by(id=template_id, root_id=root_id).first()
+        template = get_owned_session_template(session, root_id, template_id)
         if not template:
             return jsonify({"error": "Template not found"}), 404
         
-        session.delete(template)
+        template.deleted_at = models.utc_now()
         session.commit()
         
         return jsonify({"message": "Template deleted successfully"})
         
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error deleting session template")
         return internal_error(logger, "Template API request failed")

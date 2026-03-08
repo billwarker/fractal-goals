@@ -261,10 +261,11 @@ def get_all_root_goals(db_session):
         selectinload(Goal.associated_activity_groups),
         selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children)
     ).filter(
-        Goal.parent_id == None
+        Goal.parent_id == None,
+        Goal.deleted_at == None,
     ).all()
 
-def get_goal_by_id(db_session, goal_id, load_associations=True):
+def get_goal_by_id(db_session, goal_id, load_associations=True, include_deleted=False):
     from sqlalchemy.orm import selectinload
     query = db_session.query(Goal)
     if load_associations:
@@ -273,7 +274,10 @@ def get_goal_by_id(db_session, goal_id, load_associations=True):
             selectinload(Goal.associated_activity_groups),
             selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children).selectinload(Goal.children)
         )
-    return query.filter(Goal.id == goal_id).first()
+    query = query.filter(Goal.id == goal_id)
+    if not include_deleted:
+        query = query.filter(Goal.deleted_at == None)
+    return query.first()
 
 def get_root_id_for_goal(db_session, goal_id):
     goal = get_goal_by_id(db_session, goal_id)

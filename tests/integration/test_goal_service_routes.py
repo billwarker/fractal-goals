@@ -79,5 +79,10 @@ class TestGoalServiceBackedRoutes:
         delete_response = authed_client.delete(f"/api/{sample_ultimate_goal.id}/goals/{goal_id}")
         assert delete_response.status_code == 200
 
+        db_session.expire_all()
+        deleted_goal = db_session.query(Goal).filter_by(id=goal_id).first()
+        assert deleted_goal is not None
+        assert deleted_goal.deleted_at is not None
+
         missing_response = authed_client.get(f"/api/{sample_ultimate_goal.id}/goals/{goal_id}")
         assert missing_response.status_code == 404

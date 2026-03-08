@@ -16,6 +16,7 @@ Tests cover:
 import pytest
 import json
 from datetime import datetime, timedelta
+from models import ActivityInstance
 
 
 @pytest.mark.integration
@@ -265,6 +266,11 @@ class TestSessionActivityEndpoints:
             f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}'
         )
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        assert deleted_instance is not None
+        assert deleted_instance.deleted_at is not None
     
     def test_update_activity_instance(self, authed_client, db_session, sample_activity_instance):
         """Test updating an activity instance."""
@@ -372,8 +378,87 @@ class TestSessionActivityEndpoints:
             content_type='application/json'
         )
         assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "Invalid metric_id" in data['error']
+
+    def test_update_activity_metrics_replaces_existing_rows(self, authed_client, db_session, sample_activity_instance):
+        """The metrics endpoint should replace the instance metric set, not merge it."""
+        from models import PracticeSession, MetricDefinition, MetricValue
+
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        session_id = session.id
+        instance_id = sample_activity_instance.id
+
+        metric_a = MetricDefinition(
+            activity_id=sample_activity_instance.activity_definition_id,
+            root_id=root_id,
+            name='Metric A',
+            unit='kg'
+        )
+        metric_b = MetricDefinition(
+            activity_id=sample_activity_instance.activity_definition_id,
+            root_id=root_id,
+            name='Metric B',
+            unit='reps'
+        )
+        db_session.add_all([metric_a, metric_b])
+        db_session.commit()
+
+        first_response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            json={'metrics': [
+                {'metric_id': metric_a.id, 'value': 10},
+                {'metric_id': metric_b.id, 'value': 20},
+            ]}
+        )
+        assert first_response.status_code == 200
+
+        replace_response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            json={'metrics': [
+                {'metric_id': metric_b.id, 'value': 30},
+            ]}
+        )
+        assert replace_response.status_code == 200
+
+        metric_values = db_session.query(MetricValue).filter_by(activity_instance_id=instance_id).all()
+        assert len(metric_values) == 1
+        assert metric_values[0].metric_definition_id == metric_b.id
+        assert metric_values[0].value == 30
+
+    def test_update_activity_metrics_empty_list_clears_existing_rows(self, authed_client, db_session, sample_activity_instance):
+        """Providing metrics=[] should clear persisted metric values for the instance."""
+        from models import PracticeSession, MetricDefinition, MetricValue
+
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        session_id = session.id
+        instance_id = sample_activity_instance.id
+
+        metric_def = MetricDefinition(
+            activity_id=sample_activity_instance.activity_definition_id,
+            root_id=root_id,
+            name='Metric Clear',
+            unit='kg'
+        )
+        db_session.add(metric_def)
+        db_session.commit()
+
+        seed_response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            json={'metrics': [{'metric_id': metric_def.id, 'value': 42}]}
+        )
+        assert seed_response.status_code == 200
+
+        clear_response = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}/metrics',
+            json={'metrics': []}
+        )
+        assert clear_response.status_code == 200
+
+        remaining = db_session.query(MetricValue).filter_by(activity_instance_id=instance_id).count()
+        assert remaining == 0
+        data = json.loads(clear_response.data)
+        assert data['metric_values'] == []
 
     def test_reorder_activities(self, authed_client, sample_practice_session, sample_activity_definition):
         """Test reordering activities in a session."""

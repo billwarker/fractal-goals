@@ -1,6 +1,8 @@
 import pytest
 import json
 import uuid
+from models import ActivityGroup, MetricDefinition, Goal, SplitDefinition
+
 
 @pytest.mark.integration
 class TestActivityGroups:
@@ -58,18 +60,61 @@ class TestActivityGroups:
         assert data['name'] == 'Updated Strength'
         assert data['description'] == 'Updated description'
 
-    def test_delete_activity_group(self, authed_client, sample_ultimate_goal, sample_activity_group):
+    def test_delete_activity_group(self, authed_client, db_session, sample_ultimate_goal, sample_activity_group):
         """Test deleting an activity group."""
         root_id = sample_ultimate_goal.id
         group_id = sample_activity_group.id
         
         response = authed_client.delete(f'/api/{root_id}/activity-groups/{group_id}')
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_group = db_session.query(ActivityGroup).filter_by(id=group_id).first()
+        assert deleted_group is not None
+        assert deleted_group.deleted_at is not None
         
         # Verify deletion
         response = authed_client.get(f'/api/{root_id}/activity-groups')
         data = json.loads(response.data)
         assert not any(g['id'] == group_id for g in data)
+
+    def test_delete_activity_group_soft_deletes_descendants_and_detaches_activities(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        sample_activity_group,
+    ):
+        """Deleting a parent group should soft-delete descendants and detach their activities."""
+        root_id = sample_ultimate_goal.id
+        parent_group_id = sample_activity_group.id
+
+        child_group = authed_client.post(
+            f'/api/{root_id}/activity-groups',
+            json={'name': 'Child Group', 'parent_id': parent_group_id}
+        ).get_json()
+
+        activity = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Nested Activity', 'group_id': child_group['id']}
+        ).get_json()
+
+        response = authed_client.delete(f'/api/{root_id}/activity-groups/{parent_group_id}')
+        assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_child = db_session.query(ActivityGroup).filter_by(id=child_group['id']).first()
+        assert deleted_child is not None
+        assert deleted_child.deleted_at is not None
+
+        response = authed_client.get(f'/api/{root_id}/activity-groups')
+        groups = response.get_json()
+        assert not any(group['id'] == child_group['id'] for group in groups)
+
+        activities_response = authed_client.get(f'/api/{root_id}/activities')
+        activities = activities_response.get_json()
+        deleted_activity = next(item for item in activities if item['id'] == activity['id'])
+        assert deleted_activity['group_id'] is None
 
     def test_reorder_activity_groups(self, authed_client, sample_ultimate_goal):
         """Test reordering activity groups."""
@@ -112,6 +157,41 @@ class TestActivityGroups:
         )
         assert response.status_code == 400
         assert 'cycle' in response.get_json().get('error', '').lower()
+
+    def test_create_activity_group_with_goal_ids_persists_associations(self, authed_client, sample_goal_hierarchy):
+        """Create should persist provided group-goal associations."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_ids = [sample_goal_hierarchy['ultimate'].id, sample_goal_hierarchy['short_term'].id]
+
+        response = authed_client.post(
+            f'/api/{root_id}/activity-groups',
+            json={'name': 'Linked Group', 'goal_ids': goal_ids}
+        )
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert set(data['associated_goal_ids']) == set(goal_ids)
+
+    def test_set_activity_group_goals_replaces_associations(self, authed_client, sample_goal_hierarchy, sample_activity_group):
+        """Setting group-goal associations should replace the previous set."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        group_id = sample_activity_group.id
+        first_goal_id = sample_goal_hierarchy['ultimate'].id
+        second_goal_id = sample_goal_hierarchy['short_term'].id
+
+        first_response = authed_client.post(
+            f'/api/{root_id}/activity-groups/{group_id}/goals',
+            json={'goal_ids': [first_goal_id, second_goal_id]}
+        )
+        assert first_response.status_code == 200
+        assert set(first_response.get_json()['associated_goal_ids']) == {first_goal_id, second_goal_id}
+
+        replace_response = authed_client.post(
+            f'/api/{root_id}/activity-groups/{group_id}/goals',
+            json={'goal_ids': [second_goal_id]}
+        )
+        assert replace_response.status_code == 200
+        assert set(replace_response.get_json()['associated_goal_ids']) == {second_goal_id}
 
 
 @pytest.mark.integration
@@ -400,7 +480,7 @@ class TestActivities:
         new_m = next(m for m in data['metric_definitions'] if m['id'] != metric_id_to_keep)
         assert new_m['name'] == 'New Duration'
 
-    def test_update_activity_splits(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+    def test_update_activity_splits(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         """Test updating activity splits."""
         root_id = sample_ultimate_goal.id
         activity_id = sample_activity_definition.id
@@ -422,6 +502,8 @@ class TestActivities:
         activity = next(a for a in data if a['id'] == activity_id)
         split_id = activity['split_definitions'][0]['id']
         
+        removed_split_id = activity['split_definitions'][1]['id']
+
         payload_update = {
             'splits': [
                 {'id': split_id, 'name': 'Left Updated'},
@@ -442,6 +524,76 @@ class TestActivities:
         assert updated['name'] == 'Left Updated'
         other = next(s for s in data['split_definitions'] if s['id'] != split_id)
         assert other['name'] == 'Center'
+
+        deleted_split = db_session.query(SplitDefinition).filter_by(id=removed_split_id).first()
+        assert deleted_split is not None
+        assert deleted_split.deleted_at is not None
+
+    def test_update_activity_omits_metrics_to_preserve_existing(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Omitting metrics should patch scalars only and preserve the current metric set."""
+        root_id = sample_ultimate_goal.id
+        activity_id = sample_activity_definition.id
+        original_metric_ids = {metric.id for metric in sample_activity_definition.metric_definitions}
+
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{activity_id}',
+            json={'description': 'Patched only'}
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        returned_metric_ids = {metric['id'] for metric in data['metric_definitions']}
+        assert returned_metric_ids == original_metric_ids
+
+    def test_update_activity_empty_metrics_clears_existing(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
+        """Providing metrics=[] should replace the metric set with an empty collection."""
+        root_id = sample_ultimate_goal.id
+        activity_id = sample_activity_definition.id
+
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{activity_id}',
+            json={'metrics': []}
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['metric_definitions'] == []
+
+        remaining = db_session.query(MetricDefinition).filter(
+            MetricDefinition.activity_id == activity_id,
+            MetricDefinition.deleted_at.is_(None),
+        ).count()
+        assert remaining == 0
+
+    def test_update_activity_goal_ids_omit_preserves_and_empty_clears(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):
+        """goal_ids follows omit-preserves, present-replaces semantics."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        activity_id = sample_activity_definition.id
+        keep_goal_id = sample_goal_hierarchy['short_term'].id
+
+        set_response = authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/goals',
+            json={'goal_ids': [keep_goal_id]}
+        )
+        assert set_response.status_code == 200
+
+        preserve_response = authed_client.put(
+            f'/api/{root_id}/activities/{activity_id}',
+            json={'description': 'Preserve associations'}
+        )
+        assert preserve_response.status_code == 200
+        preserved_goal_ids = {goal['id'] for goal in preserve_response.get_json()['associated_goals']}
+        assert preserved_goal_ids == {keep_goal_id}
+
+        clear_response = authed_client.put(
+            f'/api/{root_id}/activities/{activity_id}',
+            json={'goal_ids': []}
+        )
+        assert clear_response.status_code == 200
+        assert clear_response.get_json()['associated_goals'] == []
+
+        db_session.refresh(sample_activity_definition)
+        assert sample_activity_definition.associated_goals == []
 
     def test_delete_activity(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Test deleting an activity."""
@@ -491,3 +643,112 @@ class TestActivities:
         res = authed_client.get(f'/api/{root_id}/activities')
         data = res.get_json()
         assert not any(a['id'] == activity_id for a in data)
+
+
+@pytest.mark.integration
+class TestActivityGoalAssociations:
+    """Test activity-goal association endpoints used by goal detail flows."""
+
+    def test_set_activity_goals_replaces_associations(self, authed_client, sample_goal_hierarchy, sample_activity_definition):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        activity_id = sample_activity_definition.id
+        goal_ids = [sample_goal_hierarchy['ultimate'].id, sample_goal_hierarchy['short_term'].id]
+
+        response = authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/goals',
+            json={'goal_ids': goal_ids}
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        associated_goal_ids = {goal['id'] for goal in data['associated_goals']}
+        assert associated_goal_ids == set(goal_ids)
+
+    def test_remove_activity_goal_deletes_specific_association(self, authed_client, sample_goal_hierarchy, sample_activity_definition):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        activity_id = sample_activity_definition.id
+        keep_goal_id = sample_goal_hierarchy['ultimate'].id
+        remove_goal_id = sample_goal_hierarchy['short_term'].id
+
+        authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/goals',
+            json={'goal_ids': [keep_goal_id, remove_goal_id]}
+        )
+
+        response = authed_client.delete(
+            f'/api/{root_id}/activities/{activity_id}/goals/{remove_goal_id}'
+        )
+
+        assert response.status_code == 200
+        assert response.get_json()['message'] == 'Goal association removed'
+
+        goals_response = authed_client.get(f'/api/{root_id}/activities/{activity_id}/goals')
+        goal_ids = {goal['id'] for goal in goals_response.get_json()}
+        assert goal_ids == {keep_goal_id}
+
+    def test_set_goal_associations_batch_filters_invalid_ids(self, authed_client, sample_goal_hierarchy, sample_activity_definition, sample_activity_group):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['ultimate'].id
+
+        response = authed_client.put(
+            f'/api/{root_id}/goals/{goal_id}/associations/batch',
+            json={
+                'activity_ids': [sample_activity_definition.id, str(uuid.uuid4())],
+                'group_ids': [sample_activity_group.id, str(uuid.uuid4())],
+            }
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['activity_ids'] == [sample_activity_definition.id]
+        assert data['group_ids'] == [sample_activity_group.id]
+
+        activities_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activities')
+        activity_ids = {activity['id'] for activity in activities_response.get_json()}
+        assert sample_activity_definition.id in activity_ids
+
+        groups_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activity-groups')
+        group_ids = {group['id'] for group in groups_response.get_json()}
+        assert group_ids == {sample_activity_group.id}
+
+    def test_get_goal_activities_includes_inherited_child_associations(self, authed_client, sample_goal_hierarchy, sample_activity_definition):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        parent_goal_id = sample_goal_hierarchy['ultimate'].id
+        child_goal_id = sample_goal_hierarchy['short_term'].id
+
+        set_response = authed_client.post(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}/goals',
+            json={'goal_ids': [child_goal_id]}
+        )
+        assert set_response.status_code == 200
+
+        response = authed_client.get(f'/api/{root_id}/goals/{parent_goal_id}/activities')
+        assert response.status_code == 200
+
+        activities = response.get_json()
+        inherited = next(activity for activity in activities if activity['id'] == sample_activity_definition.id)
+        assert inherited['is_inherited'] is True
+        assert inherited['source_goal_id'] == child_goal_id
+
+    def test_link_and_unlink_goal_activity_group(self, authed_client, sample_goal_hierarchy, sample_activity_group):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['ultimate'].id
+        group_id = sample_activity_group.id
+
+        link_response = authed_client.post(
+            f'/api/{root_id}/goals/{goal_id}/activity-groups/{group_id}'
+        )
+        assert link_response.status_code == 201
+
+        groups_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activity-groups')
+        group_ids = {group['id'] for group in groups_response.get_json()}
+        assert group_ids == {group_id}
+
+        unlink_response = authed_client.delete(
+            f'/api/{root_id}/goals/{goal_id}/activity-groups/{group_id}'
+        )
+        assert unlink_response.status_code == 200
+        assert unlink_response.get_json()['message'] == 'Group unlinked successfully'
+
+        groups_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activity-groups')
+        assert groups_response.get_json() == []

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import uuid
 import logging
 import models
+from sqlalchemy.exc import SQLAlchemyError
 from models import get_engine, get_session, GoalLevel, User
 from blueprints.auth_api import token_required
 from blueprints.api_utils import internal_error
@@ -84,7 +85,8 @@ def get_goal_levels(current_user):
         merged_levels.sort(key=lambda x: x.rank)
         
         return jsonify([serialize_goal_level(l) for l in merged_levels])
-    except Exception as e:
+    except SQLAlchemyError:
+        db_session.rollback()
         logger.exception("Error fetching goal levels")
         return internal_error(logger, "Failed to fetch goal levels")
     finally:
@@ -212,7 +214,7 @@ def update_goal_level(current_user, level_id):
         db_session.commit()
         return jsonify(serialize_goal_level(level))
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating goal level")
         return internal_error(logger, "Failed to update goal level")
@@ -252,7 +254,7 @@ def reset_goal_level(current_user, level_id):
         
         return jsonify({"status": "success", "message": "Goal level reset to system default"})
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error resetting goal level")
         return internal_error(logger, "Failed to reset goal level")

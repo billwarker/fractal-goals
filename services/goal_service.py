@@ -7,23 +7,35 @@ from sqlalchemy.orm import selectinload
 
 from models import (
     ActivityInstance,
+    ActivityDefinition,
+    ActivityGroup,
     Goal,
     GoalLevel,
+    MetricDefinition,
+    Note,
     Session,
+    SessionTemplate,
+    SplitDefinition,
     Target,
     TargetMetricCondition,
+    VisualizationAnnotation,
     get_goal_by_id,
     get_session_by_id,
     session_goals,
     validate_root_goal,
 )
 from services.goal_target_rules import check_metrics_meet_target
+from services.payload_normalizers import normalize_goal_payload
+from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import (
     calculate_smart_status,
-    format_utc,
     serialize_activity_instance,
-    serialize_goal,
     serialize_target,
+)
+from services.view_serializers import (
+    serialize_fractal_summary,
+    serialize_goal_selection_item,
+    serialize_goal_target_evaluation_result,
 )
 from validators import parse_date_string
 
@@ -40,7 +52,7 @@ _TYPE_TO_LEVEL_NAME = {
 }
 
 
-def resolve_level_id(db_session, type_value):
+def resolve_level_id(db_session, type_value) -> str | None:
     level_name = _TYPE_TO_LEVEL_NAME.get(
         type_value,
         type_value.replace('Goal', ' Goal') if isinstance(type_value, str) else None,
@@ -54,12 +66,12 @@ def resolve_level_id(db_session, type_value):
     return level.id if level else None
 
 
-def session_goals_supports_source(db_session):
+def session_goals_supports_source(db_session) -> bool:
     cols = inspect(db_session.bind).get_columns('session_goals')
     return any(column.get('name') == 'association_source' for column in cols)
 
 
-def session_goal_insert_values(db_session, session_id, goal_id, goal_type, association_source):
+def session_goal_insert_values(db_session, session_id, goal_id, goal_type, association_source) -> JsonDict:
     values = {
         'session_id': session_id,
         'goal_id': goal_id,
@@ -70,7 +82,7 @@ def session_goal_insert_values(db_session, session_id, goal_id, goal_type, assoc
     return values
 
 
-def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None):
+def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None) -> str | None:
     if not goal:
         return None
 
@@ -83,7 +95,7 @@ def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None):
     return authorized_root_id
 
 
-def sync_goal_targets(db_session, goal, incoming_targets):
+def sync_goal_targets(db_session, goal, incoming_targets) -> None:
     def _parse_date(value):
         if not value:
             return None
@@ -216,7 +228,7 @@ def sync_goal_targets(db_session, goal, incoming_targets):
         logger.debug("Created new target %s with activity_id=%s", new_target.id, activity_id)
 
 
-def normalize_target_metrics(metrics):
+def normalize_target_metrics(metrics) -> list[JsonDict]:
     if not isinstance(metrics, list):
         return []
 
@@ -246,16 +258,88 @@ class GoalService:
         self.db_session = db_session
         self.sync_targets = sync_targets
 
-    def _validate_owned_root(self, root_id, current_user_id):
+    def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
-    def _authorize_goal_access(self, current_user_id, goal, root_id_hint=None):
+    def _collect_goal_subtree(self, goal: Goal) -> list[Goal]:
+        root_scope_id = goal.root_id or goal.id
+        active_goals = self.db_session.query(Goal).filter(
+            Goal.root_id == root_scope_id,
+            Goal.deleted_at.is_(None),
+        ).all()
+        goals_by_id = {item.id: item for item in active_goals}
+        children_by_parent: dict[str | None, list[Goal]] = {}
+        for item in active_goals:
+            children_by_parent.setdefault(item.parent_id, []).append(item)
+
+        subtree: list[Goal] = []
+        stack = [goal.id]
+        seen: set[str] = set()
+        while stack:
+            current_id = stack.pop()
+            if current_id in seen:
+                continue
+            seen.add(current_id)
+
+            current = goals_by_id.get(current_id)
+            if not current:
+                continue
+
+            subtree.append(current)
+            stack.extend(child.id for child in children_by_parent.get(current.id, []))
+
+        return subtree
+
+    def _soft_delete_goal_subtree(self, goal: Goal, deleted_at: datetime) -> list[Goal]:
+        subtree = self._collect_goal_subtree(goal)
+        subtree_ids = [item.id for item in subtree]
+
+        for item in subtree:
+            item.deleted_at = deleted_at
+
+        for target in self.db_session.query(Target).filter(
+            Target.goal_id.in_(subtree_ids),
+            Target.deleted_at.is_(None),
+        ).all():
+            target.deleted_at = deleted_at
+
+        for note in self.db_session.query(Note).filter(
+            Note.nano_goal_id.in_(subtree_ids),
+            Note.deleted_at.is_(None),
+        ).all():
+            note.deleted_at = deleted_at
+
+        return subtree
+
+    def _soft_delete_root_entities(self, root_id: str, deleted_at: datetime) -> None:
+        for model in (
+            Session,
+            ActivityInstance,
+            ActivityDefinition,
+            ActivityGroup,
+            MetricDefinition,
+            SplitDefinition,
+            SessionTemplate,
+            Target,
+            Note,
+            VisualizationAnnotation,
+        ):
+            query = self.db_session.query(model).filter(model.root_id == root_id)
+            if hasattr(model, "deleted_at"):
+                query = query.filter(model.deleted_at.is_(None))
+
+            for row in query.all():
+                row.deleted_at = deleted_at
+                if isinstance(row, MetricDefinition):
+                    row.is_active = False
+
+    def _authorize_goal_access(self, current_user_id, goal, root_id_hint=None) -> str | None:
         return authorize_goal_access(self.db_session, current_user_id, goal, root_id_hint)
 
-    def _parse_deadline(self, deadline_value):
+    def _parse_deadline(self, deadline_value) -> tuple[datetime | None, str | None]:
         if not deadline_value:
             return None, None
 
@@ -267,13 +351,13 @@ class GoalService:
         except ValueError:
             return None, "Invalid deadline format. Use YYYY-MM-DD"
 
-    def _validate_description_required(self, level_obj, description):
+    def _validate_description_required(self, level_obj, description) -> str | None:
         if level_obj and getattr(level_obj, 'description_required', False):
             if not description or not description.strip():
                 return f"A description is required for {level_obj.name}s."
         return None
 
-    def _validate_parent_capacity(self, parent_goal, *, error_prefix):
+    def _validate_parent_capacity(self, parent_goal, *, error_prefix) -> str | None:
         if not parent_goal or not parent_goal.level:
             return None
 
@@ -296,7 +380,7 @@ class GoalService:
             current_max = self._find_max_updated(child, current_max)
         return current_max
 
-    def list_fractals(self, current_user_id):
+    def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
@@ -310,19 +394,10 @@ class GoalService:
         fractals = []
         for root in roots:
             last_activity = self._find_max_updated(root, root.updated_at)
-            level_name = root.level.name if getattr(root, 'level', None) else "Ultimate Goal"
-            fractals.append({
-                "id": root.id,
-                "name": root.name,
-                "description": root.description,
-                "type": level_name.replace(" ", ""),
-                "created_at": format_utc(root.created_at),
-                "updated_at": format_utc(last_activity),
-                "is_smart": all(calculate_smart_status(root).values()),
-            })
+            fractals.append(serialize_fractal_summary(root, last_activity))
         return fractals, None, 200
 
-    def create_fractal(self, current_user_id, data):
+    def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
         level = self.db_session.query(GoalLevel).filter_by(name="Ultimate Goal").first()
         if not level:
             level = GoalLevel(name="Ultimate Goal", rank=0)
@@ -342,20 +417,18 @@ class GoalService:
         self.db_session.refresh(new_fractal)
         return new_fractal, None, 201
 
-    def delete_fractal(self, root_id, current_user_id):
+    def delete_fractal(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        sessions = self.db_session.query(Session).filter_by(root_id=root_id).all()
-        for session in sessions:
-            self.db_session.delete(session)
-
-        self.db_session.delete(root)
+        deleted_at = datetime.now(timezone.utc)
+        self._soft_delete_root_entities(root_id, deleted_at)
+        self._soft_delete_goal_subtree(root, deleted_at)
         self.db_session.commit()
         return {"status": "success", "message": "Fractal deleted"}, None, 200
 
-    def get_fractal_tree(self, root_id, current_user_id):
+    def get_fractal_tree(self, root_id, current_user_id) -> ServiceResult[Goal]:
         root = self.db_session.query(Goal).options(
             selectinload(Goal.children),
             selectinload(Goal.associated_activities),
@@ -374,7 +447,7 @@ class GoalService:
 
         return root, None, 200
 
-    def get_active_goals_for_selection(self, root_id, current_user_id):
+    def get_active_goals_for_selection(self, root_id, current_user_id) -> ServiceResult[JsonList]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -396,20 +469,14 @@ class GoalService:
             for child in short_term_goal.children:
                 is_immediate_goal = getattr(child, 'level', None) and child.level.name == 'Immediate Goal'
                 if is_immediate_goal and not child.completed and not child.deleted_at:
-                    active_children.append(serialize_goal(child, include_children=False))
+                    active_children.append(child)
 
-            result.append({
-                "id": short_term_goal.id,
-                "name": short_term_goal.name,
-                "description": short_term_goal.description,
-                "deadline": format_utc(short_term_goal.deadline),
-                "completed": short_term_goal.completed,
-                "immediateGoals": active_children,
-            })
+            result.append(serialize_goal_selection_item(short_term_goal, active_children))
 
         return result, None, 200
 
-    def create_global_goal(self, current_user_id, data):
+    def create_global_goal(self, current_user_id, data) -> ServiceResult[Goal]:
+        data = normalize_goal_payload(data)
         parent = None
         parent_id = data.get('parent_id')
         if parent_id:
@@ -483,7 +550,8 @@ class GoalService:
         self.db_session.refresh(new_goal)
         return new_goal, None, 201
 
-    def create_fractal_goal(self, root_id, current_user_id, data):
+    def create_fractal_goal(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
+        data = normalize_goal_payload(data)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -553,7 +621,7 @@ class GoalService:
         self.db_session.refresh(new_goal)
         return new_goal, None, 201
 
-    def get_fractal_goal(self, root_id, goal_id, current_user_id):
+    def get_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -563,7 +631,8 @@ class GoalService:
             return None, "Goal not found", 404
         return goal, None, 200
 
-    def update_fractal_goal(self, root_id, goal_id, current_user_id, data):
+    def update_fractal_goal(self, root_id, goal_id, current_user_id, data) -> ServiceResult[Goal]:
+        data = normalize_goal_payload(data, partial=True)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -590,6 +659,7 @@ class GoalService:
                 return None, deadline_error, 400
             goal.deadline = deadline
 
+        # Target updates are replace-by-presence: omit to preserve, include to replace.
         if 'targets' in data:
             self.sync_targets(self.db_session, goal, data['targets'] or [])
             goal.targets = None
@@ -621,7 +691,7 @@ class GoalService:
         self.db_session.refresh(goal)
         return goal, None, 200
 
-    def delete_fractal_goal(self, root_id, goal_id, current_user_id):
+    def delete_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -632,11 +702,12 @@ class GoalService:
         if goal.root_id != root_id:
             return None, "Goal not found in this fractal", 404
 
-        self.db_session.delete(goal)
+        deleted_at = datetime.now(timezone.utc)
+        self._soft_delete_goal_subtree(goal, deleted_at)
         self.db_session.commit()
         return goal, None, 200
 
-    def add_goal_target(self, goal_id, current_user_id, data):
+    def add_goal_target(self, goal_id, current_user_id, data) -> ServiceResult[JsonDict]:
         goal = get_goal_by_id(self.db_session, goal_id)
         if not goal:
             return None, "Goal not found", 404
@@ -676,7 +747,7 @@ class GoalService:
         self.db_session.refresh(new_target)
         return {"goal": goal, "target": new_target}, None, 201
 
-    def remove_goal_target(self, goal_id, target_id, current_user_id):
+    def remove_goal_target(self, goal_id, target_id, current_user_id) -> ServiceResult[JsonDict]:
         goal = get_goal_by_id(self.db_session, goal_id)
         if not goal:
             return None, "Goal not found", 404
@@ -695,7 +766,7 @@ class GoalService:
         self.db_session.commit()
         return {"goal": goal, "target": target}, None, 200
 
-    def update_goal_completion(self, goal_id, current_user_id, data, root_id=None):
+    def update_goal_completion(self, goal_id, current_user_id, data, root_id=None) -> ServiceResult[Goal]:
         goal = get_goal_by_id(self.db_session, goal_id)
         if not goal:
             return None, "Goal not found", 404
@@ -726,7 +797,7 @@ class GoalService:
         self.db_session.refresh(goal)
         return goal, None, 200
 
-    def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id):
+    def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -745,13 +816,13 @@ class GoalService:
 
         targets = [target for target in goal.targets_rel if target.deleted_at is None]
         if not targets:
-            return {
-                "goal": serialize_goal(goal, include_children=False),
-                "targets_evaluated": 0,
-                "targets_completed": 0,
-                "newly_completed_targets": [],
-                "goal_completed": False,
-            }, None, 200
+            return serialize_goal_target_evaluation_result(
+                goal,
+                targets_evaluated=0,
+                targets_completed=0,
+                newly_completed_targets=[],
+                goal_completed=False,
+            ), None, 200
 
         activity_instances = self.db_session.query(ActivityInstance).filter(
             ActivityInstance.session_id == session_id,
@@ -818,10 +889,10 @@ class GoalService:
         self.db_session.commit()
         self.db_session.refresh(goal)
 
-        return {
-            "goal": serialize_goal(goal, include_children=False),
-            "targets_evaluated": targets_total,
-            "targets_completed": targets_completed,
-            "newly_completed_targets": newly_completed_targets,
-            "goal_completed": goal_was_completed,
-        }, None, 200
+        return serialize_goal_target_evaluation_result(
+            goal,
+            targets_evaluated=targets_total,
+            targets_completed=targets_completed,
+            newly_completed_targets=newly_completed_targets,
+            goal_completed=goal_was_completed,
+        ), None, 200

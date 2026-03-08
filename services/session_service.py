@@ -10,11 +10,13 @@ from models import (
 )
 import models
 from services import event_bus, Event, Events
+from services.payload_normalizers import normalize_session_payload
+from services.service_types import JsonDict, ServiceResult
 from services.serializers import serialize_session
 from services.goal_type_utils import get_canonical_goal_type
 logger = logging.getLogger(__name__)
 
-def _program_goal_ids(db_session, program_id):
+def _program_goal_ids(db_session, program_id) -> set[str]:
     if not program_id:
         return set()
     return set(
@@ -25,7 +27,7 @@ def _program_goal_ids(db_session, program_id):
     )
 
 
-def _parse_iso_datetime_strict(value):
+def _parse_iso_datetime_strict(value) -> datetime | None:
     """Parse strict ISO-8601 datetime into UTC-aware datetime."""
     if value is None:
         return None
@@ -41,7 +43,7 @@ class SessionService:
         self._session_goals_has_source = None
 
     @staticmethod
-    def _extract_activity_definition_id(raw_item):
+    def _extract_activity_definition_id(raw_item) -> str | None:
         """Extract activity definition id from legacy/current template exercise shapes."""
         if isinstance(raw_item, str):
             return raw_item
@@ -69,13 +71,13 @@ class SessionService:
                     return value
         return None
 
-    def _session_goals_supports_source(self):
+    def _session_goals_supports_source(self) -> bool:
         if self._session_goals_has_source is None:
             cols = inspect(self.db_session.bind).get_columns('session_goals')
             self._session_goals_has_source = any(c.get('name') == 'association_source' for c in cols)
         return self._session_goals_has_source
 
-    def _session_goal_insert_values(self, session_id, goal_id, goal_type, association_source):
+    def _session_goal_insert_values(self, session_id, goal_id, goal_type, association_source) -> JsonDict:
         values = {
             'session_id': session_id,
             'goal_id': goal_id,
@@ -85,7 +87,7 @@ class SessionService:
             values['association_source'] = association_source
         return values
 
-    def _derive_session_goals_from_activities(self, session_obj):
+    def _derive_session_goals_from_activities(self, session_obj) -> list[Goal]:
         """Derive display goals from session activities when persisted links are missing."""
         activity_def_ids = set()
 
@@ -130,7 +132,7 @@ class SessionService:
 
         return list(derived.values())
 
-    def get_fractal_sessions(self, root_id, current_user_id, limit=10, offset=0):
+    def get_fractal_sessions(self, root_id, current_user_id, limit=10, offset=0) -> ServiceResult[JsonDict]:
         """Get sessions for a specific fractal."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
@@ -163,7 +165,7 @@ class SessionService:
             }
         }, None, 200
 
-    def get_session_details(self, root_id, session_id, current_user_id):
+    def get_session_details(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
         """Get a single session with full details."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
@@ -189,8 +191,9 @@ class SessionService:
 
         return serialize_session(session, include_image_data=True), None, 200
 
-    def create_session(self, root_id, current_user_id, data):
+    def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         """Create a new session with automatic goal inheritance."""
+        data = normalize_session_payload(data)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -201,8 +204,6 @@ class SessionService:
             s_end = _parse_iso_datetime_strict(data.get('session_end')) if 'session_end' in data else None
         except ValueError:
             return None, "Invalid datetime format. Use ISO-8601 (e.g. 2026-02-18T15:30:00Z)", 400
-
-        session_data = models._safe_load_json(data.get('session_data'), {})
 
         new_session = Session(
             name=data.get('name', 'Untitled Session'),
@@ -215,7 +216,7 @@ class SessionService:
             template_id=data.get('template_id')
         )
         
-        session_data_dict = models._safe_load_json(session_data, {})
+        session_data_dict = models._safe_load_json(data.get('session_data'), {})
         new_session.attributes = session_data_dict
         
         # Program Context
@@ -448,8 +449,9 @@ class SessionService:
 
         return serialize_session(new_session), None, 201
 
-    def update_session(self, root_id, session_id, current_user_id, data):
+    def update_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
         """Update session details."""
+        data = normalize_session_payload(data, partial=True)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
              return None, "Fractal not found or access denied", 404
@@ -559,7 +561,7 @@ class SessionService:
             
         return serialize_session(session), None, 200
 
-    def delete_session(self, root_id, session_id, current_user_id):
+    def delete_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
              return None, "Fractal not found or access denied", 404

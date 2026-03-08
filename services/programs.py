@@ -10,6 +10,7 @@ from models import (
     validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
+from services.owned_entity_queries import get_owned_program
 from services.serializers import serialize_program, serialize_program_block, serialize_program_day
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,20 @@ class ProgramService:
     """
     Service for managing training programs, blocks, and days.
     """
+
+    @staticmethod
+    def _commit(session, *instances):
+        session.commit()
+        for instance in instances:
+            if instance is not None:
+                session.refresh(instance)
+
+    @staticmethod
+    def _queue_or_emit_event(pending_events, event):
+        if pending_events is None:
+            event_bus.emit(event)
+            return
+        pending_events.append(event)
 
     @staticmethod
     def _replace_program_goals(session, program_id: str, goal_ids: List[str], root_id: str) -> List[Goal]:
@@ -167,7 +182,7 @@ class ProgramService:
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
                 .selectinload(ProgramDay.completed_sessions)
-        ).filter_by(id=program_id, root_id=root_id).first()
+        ).filter(Program.id == program_id, Program.root_id == root_id).first()
         if not program:
             return None
         
@@ -178,7 +193,7 @@ class ProgramService:
         root = validate_root_goal(session, root_id)
         if not root:
             raise ValueError("Fractal not found")
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
 
@@ -219,6 +234,7 @@ class ProgramService:
         if data.get('goal_ids'):
             ProgramService._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
 
+        ProgramService._commit(session, new_block)
         return serialize_program_block(new_block)
 
     @staticmethod
@@ -226,7 +242,7 @@ class ProgramService:
         root = validate_root_goal(session, root_id)
         if not root:
             raise ValueError("Fractal not found")
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
@@ -253,6 +269,7 @@ class ProgramService:
             ProgramService._replace_block_goals(session, block.id, data['goal_ids'], root_id)
             session.expire(block, ['goals'])
 
+        ProgramService._commit(session, block)
         return serialize_program_block(block)
 
     @staticmethod
@@ -260,7 +277,7 @@ class ProgramService:
         root = validate_root_goal(session, root_id)
         if not root:
             raise ValueError("Fractal not found")
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
@@ -268,6 +285,7 @@ class ProgramService:
             raise ValueError("Block not found")
 
         session.delete(block)
+        ProgramService._commit(session)
 
     @staticmethod
     def create_program(session, root_id: str, validated_data: Dict) -> Dict:
@@ -309,8 +327,8 @@ class ProgramService:
         # Sync to new tables
         ProgramService._sync_program_structure(session, new_program, schedule_list)
         
-        # Flush to get IDs if needed (though UUIDs are generated above)
-        
+        ProgramService._commit(session, new_program)
+
         event_bus.emit(Event(Events.PROGRAM_CREATED, {
             'program_id': new_program.id,
             'program_name': new_program.name,
@@ -321,7 +339,7 @@ class ProgramService:
 
     @staticmethod
     def update_program(session, root_id: str, program_id: str, validated_data: Dict) -> Optional[Dict]:
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             return None
         
@@ -349,6 +367,8 @@ class ProgramService:
                     Program.root_id == root_id,
                     Program.id != program_id
                 ).update({'is_active': False})
+
+        ProgramService._commit(session, program)
         
         event_bus.emit(Event(Events.PROGRAM_UPDATED, {
             'program_id': program.id,
@@ -361,7 +381,7 @@ class ProgramService:
 
     @staticmethod
     def delete_program(session, root_id: str, program_id: str) -> Dict:
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
         
@@ -373,6 +393,7 @@ class ProgramService:
         
         program_name = program.name
         session.delete(program)
+        ProgramService._commit(session)
         
         event_bus.emit(Event(Events.PROGRAM_DELETED, {
             'program_id': program_id,
@@ -384,7 +405,7 @@ class ProgramService:
 
     @staticmethod
     def get_program_session_count(session, root_id: str, program_id: str) -> int:
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
              raise ValueError("Program not found")
         
@@ -420,6 +441,7 @@ class ProgramService:
             except StopIteration: pass
 
         created_count = 0
+        emitted_days = []
         
         # Determine the date if provided
         target_date = None
@@ -454,16 +476,17 @@ class ProgramService:
                 day.templates = templates
             
             created_count += 1
-            
-            # Emit event for day creation
-            event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, {
+            emitted_days.append({
                 'day_id': day.id,
                 'day_name': day.name or f"Day {day.day_number}",
                 'block_id': target.id,
                 'program_id': program_id,
-                'root_id': root_id
-            }, source='ProgramService.add_block_day'))
-                
+                'root_id': root_id,
+            })
+
+        ProgramService._commit(session)
+        for event_payload in emitted_days:
+            event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, event_payload, source='ProgramService.add_block_day'))
         return created_count
 
     @staticmethod
@@ -524,6 +547,8 @@ class ProgramService:
                              t_day.templates = new_templates
             except StopIteration: pass
 
+        ProgramService._commit(session, day)
+
         event_bus.emit(Event(Events.PROGRAM_DAY_UPDATED, {
             'day_id': day.id,
             'day_name': day.name,
@@ -541,6 +566,7 @@ class ProgramService:
         
         day_name = day.name # Capture before delete
         session.delete(day)
+        ProgramService._commit(session)
 
         event_bus.emit(Event(Events.PROGRAM_DAY_DELETED, {
             'day_id': day_id,
@@ -587,6 +613,7 @@ class ProgramService:
              
              copied_count += 1
         
+        ProgramService._commit(session)
         return copied_count
 
     @staticmethod
@@ -688,6 +715,7 @@ class ProgramService:
             return serialize_program_day(day)
 
         session.expire(day, ['goals'])
+        ProgramService._commit(session, day)
 
         event_bus.emit(Event(Events.GOAL_DAY_ASSOCIATED, {
             'day_id': day.id,
@@ -705,7 +733,7 @@ class ProgramService:
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
             raise ValueError("Block not found")
-        program = session.query(Program).filter_by(id=program_id, root_id=root_id).first()
+        program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found in this fractal")
         
@@ -743,6 +771,8 @@ class ProgramService:
                 session.add(goal)
             except ValueError:
                 raise ValueError("Invalid date format")
+
+        ProgramService._commit(session, block)
         
         event_bus.emit(Event(Events.GOAL_BLOCK_ASSOCIATED, {
             'block_id': block.id,
@@ -755,7 +785,7 @@ class ProgramService:
         return serialize_program_block(block)
 
     @staticmethod
-    def check_program_day_completion(session, session_id: str) -> bool:
+    def check_program_day_completion(session, session_id: str, pending_events=None) -> bool:
         """
         Check if the completed session fulfills a Program Day.
         If so, mark the day as completed and trigger events.
@@ -796,22 +826,23 @@ class ProgramService:
             p_day.is_completed = True
             logger.info(f"Program Day Completed: {p_day.name} ({p_day.id})")
             
-            event_bus.emit(Event(Events.PROGRAM_DAY_COMPLETED, {
+            ProgramService._queue_or_emit_event(pending_events, Event(Events.PROGRAM_DAY_COMPLETED, {
                 'day_id': p_day.id,
                 'day_name': p_day.name,
                 'block_id': p_day.block_id,
+                'root_id': p_day.block.program.root_id if p_day.block and p_day.block.program else completed_session.root_id,
                 'date': format_utc(p_day.date)
             }, source='ProgramService.check_program_day_completion'))
             
             # Check Block Completion
-            ProgramService._check_block_completion(session, p_day.block_id)
+            ProgramService._check_block_completion(session, p_day.block_id, pending_events=pending_events)
             
             return True
         
         return False
 
     @staticmethod
-    def _check_block_completion(session, block_id: str):
+    def _check_block_completion(session, block_id: str, pending_events=None):
         block = session.query(ProgramBlock).filter_by(id=block_id).first()
         if not block: return
 
@@ -828,20 +859,21 @@ class ProgramService:
             if not block.is_completed:
                 block.is_completed = True
                 logger.info(f"Program Block Completed: {block.name}")
-                event_bus.emit(Event(Events.PROGRAM_BLOCK_COMPLETED, {
+                ProgramService._queue_or_emit_event(pending_events, Event(Events.PROGRAM_BLOCK_COMPLETED, {
                     'block_id': block.id,
                     'block_name': block.name,
-                    'program_id': block.program_id
+                    'program_id': block.program_id,
+                    'root_id': block.program.root_id if block.program else None,
                 }, source='ProgramService._check_block_completion'))
 
             # Check Program Completion
-            ProgramService._check_program_completion(session, block.program_id)
+            ProgramService._check_program_completion(session, block.program_id, pending_events=pending_events)
         else:
             if block.is_completed:
                 block.is_completed = False
 
     @staticmethod
-    def _check_program_completion(session, program_id: str):
+    def _check_program_completion(session, program_id: str, pending_events=None):
         program = session.query(Program).filter_by(id=program_id).first()
         if not program: return
 
@@ -860,7 +892,7 @@ class ProgramService:
             if not program.is_completed:
                  program.is_completed = True
                  logger.info(f"Program Completed: {program.name}")
-                 event_bus.emit(Event(Events.PROGRAM_COMPLETED, {
+                 ProgramService._queue_or_emit_event(pending_events, Event(Events.PROGRAM_COMPLETED, {
                     'program_id': program.id,
                     'program_name': program.name,
                     'root_id': program.root_id

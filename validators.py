@@ -524,6 +524,7 @@ class ActivityGroupCreateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sort_order: Optional[int] = Field(None, ge=0)
     parent_id: Optional[str] = None
+    goal_ids: Optional[list[str]] = None
     
     @field_validator('name')
     @classmethod
@@ -537,6 +538,7 @@ class ActivityGroupUpdateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sort_order: Optional[int] = Field(None, ge=0)
     parent_id: Optional[str] = None
+    goal_ids: Optional[list[str]] = None
 
 
 class MetricDefinitionSchema(BaseModel):

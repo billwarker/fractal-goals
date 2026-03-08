@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime, date, timezone, timedelta
 from unittest.mock import patch
 
-from models import Program, ProgramBlock, ProgramDay, Goal, Session, SessionTemplate, ProgramDaySession
+import models
+from models import Program, ProgramBlock, ProgramDay, Goal, Session, SessionTemplate, ProgramDaySession, get_session
 from services.programs import ProgramService
 from services.events import event_bus, Events, Event
 
@@ -71,6 +72,33 @@ def test_update_program(db_session, sample_program, sample_goal_hierarchy):
     program_db = db_session.query(Program).get(result['id'])
     assert len(program_db.goals) == 1
     assert program_db.goals[0].id == goal_id
+
+
+def test_program_service_mutations_commit_without_caller_commit(db_session, sample_ultimate_goal):
+    root_id = sample_ultimate_goal.id
+
+    created = ProgramService.create_program(db_session, root_id, {
+        'name': 'Committed Program',
+        'start_date': datetime.now(timezone.utc).isoformat(),
+        'end_date': (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+        'weeklySchedule': [],
+    })
+
+    verify_session = get_session(models.get_engine())
+    try:
+        persisted = verify_session.query(Program).filter_by(id=created['id']).first()
+        assert persisted is not None
+
+        ProgramService.update_program(verify_session, root_id, persisted.id, {'name': 'Renamed Program'})
+
+        second_verify = get_session(models.get_engine())
+        try:
+            updated = second_verify.query(Program).filter_by(id=persisted.id).first()
+            assert updated.name == 'Renamed Program'
+        finally:
+            second_verify.close()
+    finally:
+        verify_session.close()
 
 def test_create_block_and_day(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
@@ -146,3 +174,50 @@ def test_check_program_day_completion(db_session, sample_program, sample_session
     
     db_session.refresh(day)
     assert day.is_completed is True
+
+
+def test_check_program_day_completion_queues_events_until_commit(
+    db_session,
+    sample_program,
+    sample_session_template,
+    sample_goal_hierarchy,
+    monkeypatch,
+):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    block = ProgramBlock(program_id=sample_program.id, name="Queued Block")
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name="Queued Day", day_number=1)
+    day.templates.append(sample_session_template)
+    db_session.add(day)
+    db_session.commit()
+
+    completed_sess = Session(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name="Queued Session",
+        completed=True,
+        program_day_id=day.id,
+        template_id=sample_session_template.id,
+    )
+    db_session.add(completed_sess)
+    db_session.commit()
+
+    emitted = []
+    pending_events = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event.name))
+
+    is_complete = ProgramService.check_program_day_completion(
+        db_session,
+        completed_sess.id,
+        pending_events=pending_events,
+    )
+
+    assert is_complete is True
+    assert emitted == []
+    pending_names = [event.name for event in pending_events]
+    assert Events.PROGRAM_DAY_COMPLETED in pending_names
+    assert Events.PROGRAM_BLOCK_COMPLETED in pending_names
+    assert Events.PROGRAM_COMPLETED in pending_names

@@ -5,16 +5,17 @@ import uuid
 import logging
 import os
 import models
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
-from models import (
-    get_session,
-    ActivityInstance, Session,
-    ActivityDefinition,
-    validate_root_goal
-)
+from models import get_session, ActivityInstance, Session, ActivityDefinition
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root
 from services.events import event_bus, Event, Events
+from services.owned_entity_queries import (
+    get_owned_activity_definition,
+    get_owned_activity_instance,
+    get_owned_session,
+)
 from services.serializers import serialize_activity_instance
 
 # Create blueprint
@@ -53,13 +54,11 @@ def activity_instances(current_user, root_id):
             if not session_id or not activity_definition_id:
                 return jsonify({"error": "session_id and activity_definition_id required"}), 400
 
-            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            session_record = get_owned_session(db_session, root_id, session_id)
             if not session_record:
                 return jsonify({"error": "Session not found in this fractal"}), 404
 
-            activity_def = db_session.query(ActivityDefinition).filter_by(
-                id=activity_definition_id, root_id=root_id, deleted_at=None
-            ).first()
+            activity_def = get_owned_activity_definition(db_session, root_id, activity_definition_id)
             if not activity_def:
                 return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
@@ -79,9 +78,6 @@ def activity_instances(current_user, root_id):
             db_session.add(instance)
             
             # Get activity name directly from definition
-            activity_def = db_session.query(ActivityDefinition).filter_by(
-                id=activity_definition_id, root_id=root_id, deleted_at=None
-            ).first()
             activity_name = activity_def.name if activity_def else 'Unknown'
             db_session.commit()
             
@@ -117,8 +113,9 @@ def activity_instances(current_user, root_id):
             
             return jsonify([serialize_activity_instance(inst) for inst in instances])
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error listing/creating activity instances")
         return internal_error(logger, "Error listing/creating activity instances")
     finally:
         db_session.close()
@@ -137,11 +134,11 @@ def start_activity_timer(current_user, root_id, instance_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
-        instance = (
-            db_session.query(ActivityInstance)
-            .options(joinedload(ActivityInstance.definition))
-            .filter_by(id=instance_id, root_id=root_id, deleted_at=None)
-            .first()
+        instance = get_owned_activity_instance(
+            db_session,
+            root_id,
+            instance_id,
+            query_options=(joinedload(ActivityInstance.definition),),
         )
         
         if not instance:
@@ -155,13 +152,11 @@ def start_activity_timer(current_user, root_id, instance_id):
             if not session_id or not activity_definition_id:
                 return jsonify({"error": "session_id and activity_definition_id required"}), 400
 
-            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            session_record = get_owned_session(db_session, root_id, session_id)
             if not session_record:
                 return jsonify({"error": "Session not found in this fractal"}), 404
 
-            activity_def = db_session.query(ActivityDefinition).filter_by(
-                id=activity_definition_id, root_id=root_id, deleted_at=None
-            ).first()
+            activity_def = get_owned_activity_definition(db_session, root_id, activity_definition_id)
             if not activity_def:
                 return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
@@ -182,7 +177,7 @@ def start_activity_timer(current_user, root_id, instance_id):
         
         # If the session is currently paused, immediately pause this new activity
         # so it doesn't accrue time while the session is paused.
-        session_record = db_session.query(Session).filter_by(id=instance.session_id, root_id=root_id, deleted_at=None).first()
+        session_record = get_owned_session(db_session, root_id, instance.session_id)
         if session_record and session_record.is_paused:
             instance.is_paused = True
             instance.last_paused_at = start_time
@@ -191,10 +186,7 @@ def start_activity_timer(current_user, root_id, instance_id):
             instance.last_paused_at = None
         
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(
-            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
-        ).first()
-        activity_name = activity_def.name if activity_def else 'Unknown'
+        activity_name = instance.definition.name if instance.definition else 'Unknown'
         db_session.commit()
         
         # Emit event
@@ -209,8 +201,9 @@ def start_activity_timer(current_user, root_id, instance_id):
         
         return jsonify(serialize_activity_instance(instance))
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error starting activity timer")
         return internal_error(logger, "Error starting activity timer")
     finally:
         db_session.close()
@@ -229,11 +222,12 @@ def complete_activity_instance(current_user, root_id, instance_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Get the activity instance
-        instance = db_session.query(ActivityInstance).options(joinedload(ActivityInstance.definition)).filter(
-            ActivityInstance.id == instance_id,
-            ActivityInstance.root_id == root_id,
-            ActivityInstance.deleted_at == None
-        ).first()
+        instance = get_owned_activity_instance(
+            db_session,
+            root_id,
+            instance_id,
+            query_options=(joinedload(ActivityInstance.definition),),
+        )
         if not instance:
             return jsonify({
                 "error": "Activity instance not found."
@@ -263,10 +257,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
             instance.completed = True
         
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(
-            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
-        ).first()
-        activity_name = activity_def.name if activity_def else 'Unknown'
+        activity_name = instance.definition.name if instance.definition else 'Unknown'
         db_session.commit()
         
         completion_event = Event(Events.ACTIVITY_INSTANCE_COMPLETED, {
@@ -304,8 +295,9 @@ def complete_activity_instance(current_user, root_id, instance_id):
         
         return jsonify(result)
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error completing activity instance")
         return internal_error(logger, "Error completing activity instance")
     finally:
         db_session.close()
@@ -360,11 +352,11 @@ def update_activity_instance(current_user, root_id, instance_id):
         data = request.get_json() or {}
         
         # Get the activity instance
-        instance = (
-            db_session.query(ActivityInstance)
-            .options(joinedload(ActivityInstance.definition))
-            .filter_by(id=instance_id, root_id=root_id, deleted_at=None)
-            .first()
+        instance = get_owned_activity_instance(
+            db_session,
+            root_id,
+            instance_id,
+            query_options=(joinedload(ActivityInstance.definition),),
         )
         
         if not instance:
@@ -378,13 +370,11 @@ def update_activity_instance(current_user, root_id, instance_id):
                 # If we lack info to create, and it doesn't exist, that's an issue for manual updates
                 return jsonify({"error": "Instance not found and missing creation details"}), 404
 
-            session_record = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+            session_record = get_owned_session(db_session, root_id, session_id)
             if not session_record:
                 return jsonify({"error": "Session not found in this fractal"}), 404
 
-            activity_def = db_session.query(ActivityDefinition).filter_by(
-                id=activity_definition_id, root_id=root_id, deleted_at=None
-            ).first()
+            activity_def = get_owned_activity_definition(db_session, root_id, activity_definition_id)
             if not activity_def:
                 return jsonify({"error": "Activity definition not found in this fractal"}), 404
             
@@ -436,10 +426,7 @@ def update_activity_instance(current_user, root_id, instance_id):
              instance.duration_seconds = None
         
         # Get activity name directly from definition
-        activity_def = db_session.query(ActivityDefinition).filter_by(
-            id=instance.activity_definition_id, root_id=root_id, deleted_at=None
-        ).first()
-        activity_name = activity_def.name if activity_def else 'Unknown'
+        activity_name = instance.definition.name if instance.definition else 'Unknown'
         db_session.commit()
         
         # Emit event
@@ -454,8 +441,9 @@ def update_activity_instance(current_user, root_id, instance_id):
         
         return jsonify(serialize_activity_instance(instance))
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Unexpected error updating activity instance")
         return internal_error(logger, "Unexpected error updating activity instance")
     finally:
         db_session.close()
@@ -471,7 +459,7 @@ def pause_session(current_user, root_id, session_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
-        session = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+        session = get_owned_session(db_session, root_id, session_id)
         if not session:
             return jsonify({"error": "Session not found"}), 404
             
@@ -504,8 +492,9 @@ def pause_session(current_user, root_id, session_id):
         
         from services.serializers import serialize_session
         return jsonify(serialize_session(session))
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error pausing session")
         return internal_error(logger, "Error pausing session")
     finally:
         db_session.close()
@@ -521,7 +510,7 @@ def resume_session(current_user, root_id, session_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
-        session = db_session.query(Session).filter_by(id=session_id, root_id=root_id, deleted_at=None).first()
+        session = get_owned_session(db_session, root_id, session_id)
         if not session:
             return jsonify({"error": "Session not found"}), 404
             
@@ -561,8 +550,9 @@ def resume_session(current_user, root_id, session_id):
         
         from services.serializers import serialize_session
         return jsonify(serialize_session(session))
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error resuming session")
         return internal_error(logger, "Error resuming session")
     finally:
         db_session.close()

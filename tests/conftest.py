@@ -40,6 +40,7 @@ from blueprints.notes_api import notes_bp
 from blueprints.annotations_api import annotations_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
+from blueprints.goal_levels_api import goal_levels_bp
 
 
 @pytest.fixture(scope='function')
@@ -73,6 +74,7 @@ def app():
     test_app.register_blueprint(annotations_bp)
     test_app.register_blueprint(logs_api)
     test_app.register_blueprint(auth_bp)
+    test_app.register_blueprint(goal_levels_bp)
     
     # Initialize Limiter
     from extensions import limiter

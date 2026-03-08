@@ -4,6 +4,7 @@ API Blueprint for Visualization Annotations.
 Provides CRUD operations for annotations on analytics visualizations.
 """
 from flask import Blueprint, request, jsonify
+from sqlalchemy.exc import SQLAlchemyError
 from models import (
     get_engine, get_session, VisualizationAnnotation, validate_root_goal, utc_now
 )
@@ -71,7 +72,7 @@ def get_annotations(current_user, root_id):
                             break
                     if match:
                         filtered_annotations.append(ann)
-                except:
+                except (TypeError, ValueError, json.JSONDecodeError):
                     continue
             annotations = filtered_annotations
         
@@ -79,8 +80,9 @@ def get_annotations(current_user, root_id):
             "data": [serialize_visualization_annotation(a) for a in annotations]
         })
         
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except SQLAlchemyError:
+        db_session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -127,9 +129,9 @@ def create_annotation(current_user, root_id):
             "message": "Annotation created successfully"
         }), 201
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -158,8 +160,9 @@ def get_annotation(current_user, root_id, annotation_id):
         
         return jsonify({"data": serialize_visualization_annotation(annotation)})
         
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except SQLAlchemyError:
+        db_session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -205,9 +208,9 @@ def update_annotation(current_user, root_id, annotation_id):
             "message": "Annotation updated successfully"
         })
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -239,8 +242,8 @@ def delete_annotation(current_user, root_id, annotation_id):
         
         return jsonify({"message": "Annotation deleted successfully"})
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()

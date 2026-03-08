@@ -1,12 +1,11 @@
 from flask import Blueprint, request, jsonify
 import logging
 import models
+from sqlalchemy.exc import SQLAlchemyError
 from models import (
     get_session,
-    ActivityDefinition, MetricDefinition, SplitDefinition, ActivityGroup,
-    validate_root_goal, Goal
+    ActivityDefinition,
 )
-from sqlalchemy import func
 from validators import (
     validate_request,
     ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
@@ -14,73 +13,21 @@ from validators import (
     ActivityGoalsSetSchema, GroupReorderSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, require_owned_root, etag_json_response
-from services.events import event_bus, Event, Events
+from blueprints.api_utils import parse_optional_pagination, require_owned_root, etag_json_response, internal_error
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition
 )
 from services.goal_type_utils import get_canonical_goal_type
+from services.owned_entity_queries import get_owned_activity_definition
+from services.activity_service import (
+    ActivityService,
+    validate_activity_group_id as _validate_activity_group_id,
+)
 
 logger = logging.getLogger(__name__)
 
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
-
-
-def _validate_activity_group_parent(session, root_id, group_id, parent_id):
-    """Validate parent assignment to avoid missing refs and cycles."""
-    if parent_id in (None, ''):
-        return None
-
-    parent = session.query(ActivityGroup).filter_by(id=parent_id, root_id=root_id).first()
-    if not parent:
-        return "Parent group not found in this fractal"
-
-    if group_id and parent_id == group_id:
-        return "A group cannot be its own parent"
-
-    # Enforce max 3 levels of nesting (depth 0=root, 1=child, 2=grandchild)
-    # The NEW group would sit at parent_depth + 1, so parent must be at depth <= 1
-    depth = 0
-    cursor = parent
-    seen = set()
-    while cursor and cursor.parent_id:
-        if cursor.id in seen:
-            return "Invalid parent group: cycle detected"
-        seen.add(cursor.id)
-        depth += 1
-        cursor = session.query(ActivityGroup).filter_by(id=cursor.parent_id, root_id=root_id).first()
-    # depth is now the depth of `parent` (0 = root, 1 = child, etc.)
-    # The new group would be at depth + 1
-    if depth + 1 >= 3:
-        return "Maximum nesting depth (3 levels) reached. Cannot nest deeper."
-
-    if not group_id:
-        return None
-
-    seen = set()
-    cursor = parent
-    while cursor:
-        if cursor.id == group_id:
-            return "Invalid parent group: cycle detected"
-        if cursor.id in seen:
-            return "Invalid parent group: cycle detected"
-        seen.add(cursor.id)
-        if not cursor.parent_id:
-            break
-        cursor = session.query(ActivityGroup).filter_by(id=cursor.parent_id, root_id=root_id).first()
-    return None
-
-
-def _validate_activity_group_id(session, root_id, group_id):
-    """Ensure activity group belongs to the same fractal."""
-    if group_id in (None, ''):
-        return None
-    group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-    if not group:
-        return "Invalid group_id for this fractal"
-    return None
-
 
 def _validate_and_normalize_metrics(metrics_data):
     """Require metrics to include both name and unit if provided."""
@@ -141,12 +88,11 @@ def get_activity_groups(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        groups = session.query(ActivityGroup).filter_by(root_id=root_id).order_by(ActivityGroup.sort_order, ActivityGroup.created_at).all()
-        return jsonify([serialize_activity_group(g) for g in groups])
+        service = ActivityService(session)
+        groups, error, status = service.list_activity_groups(root_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify([serialize_activity_group(group) for group in groups])
     finally:
         session.close()
 
@@ -158,50 +104,15 @@ def create_activity_group(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        parent_id = validated_data.get('parent_id')
-        parent_err = _validate_activity_group_parent(session, root_id, None, parent_id)
-        if parent_err:
-            return jsonify({"error": parent_err}), 400
-
-        # Calculate order
-        max_order = session.query(func.max(ActivityGroup.sort_order)).filter_by(root_id=root_id).scalar()
-        new_order = (max_order or 0) + 1
-
-        new_group = ActivityGroup(
-            root_id=root_id,
-            name=validated_data['name'],  # Already sanitized
-            description=validated_data.get('description', ''),
-            sort_order=new_order,
-            parent_id=parent_id
-        )
-        session.add(new_group)
-        session.flush() # Get ID for goal associations
-
-        goal_ids = validated_data.get('goal_ids', [])
-        if goal_ids:
-            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
-            for goal in goals:
-                if goal not in new_group.associated_goals:
-                    new_group.associated_goals.append(goal)
-        
-        session.commit()
-        
-        # Emit activity group created event
-        event_bus.emit(Event(Events.ACTIVITY_GROUP_CREATED, {
-            'group_id': new_group.id,
-            'name': new_group.name,
-            'root_id': root_id
-        }, source='activities_api.create_activity_group'))
-        
+        service = ActivityService(session)
+        new_group, error, status = service.create_activity_group(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
         return jsonify(serialize_activity_group(new_group)), 201
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating activity group")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -213,54 +124,15 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-        if not group:
-            return jsonify({"error": "Group not found"}), 404
-        
-        if 'parent_id' in validated_data:
-            parent_err = _validate_activity_group_parent(session, root_id, group_id, validated_data.get('parent_id'))
-            if parent_err:
-                return jsonify({"error": parent_err}), 400
-
-        if 'name' in validated_data:
-            group.name = validated_data['name']
-        if 'description' in validated_data:
-            group.description = validated_data['description']
-        if 'parent_id' in validated_data:
-            group.parent_id = validated_data['parent_id']
-        
-        # Update goal associations if provided
-        if 'goal_ids' in validated_data:
-            goal_ids = validated_data.get('goal_ids', [])
-            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
-            
-            # Remove old ones not in the new list
-            group.associated_goals = [g for g in group.associated_goals if g.id in goal_ids]
-            
-            # Add new ones
-            for goal in goals:
-                if goal not in group.associated_goals:
-                    group.associated_goals.append(goal)
-            
-        session.commit()
-        
-        # Emit activity group updated event
-        event_bus.emit(Event(Events.ACTIVITY_GROUP_UPDATED, {
-            'group_id': group_id,
-            'name': group.name,
-            'root_id': root_id,
-            'updated_fields': list(validated_data.keys())
-        }, source='activities_api.update_activity_group'))
-        
-        return jsonify(serialize_activity_group(group))
-    except Exception as e:
+        service = ActivityService(session)
+        group, error, status = service.update_activity_group(root_id, group_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_activity_group(group)), status
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating activity group")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -271,37 +143,15 @@ def delete_activity_group(current_user, root_id, group_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-        if not group:
-            return jsonify({"error": "Group not found"}), 404
-            
-        # Manually unlink activities to be safe/clear
-        activities = session.query(ActivityDefinition).filter_by(group_id=group_id).all()
-        for activity in activities:
-            activity.group_id = None
-            
-        # Capture data before delete
-        group_id = group.id
-        group_name = group.name
-        
-        session.delete(group)
-        session.commit()
-        
-        # Emit activity group deleted event
-        event_bus.emit(Event(Events.ACTIVITY_GROUP_DELETED, {
-            'group_id': group_id,
-            'name': group_name,
-            'root_id': root_id
-        }, source='activities_api.delete_activity_group'))
-        
-        return jsonify({"message": "Group deleted"})
-    except Exception as e:
+        service = ActivityService(session)
+        payload, error, status = service.delete_activity_group(root_id, group_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error deleting activity group")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -313,24 +163,19 @@ def reorder_activity_groups(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        group_ids = validated_data['group_ids']  # Already validated
-              
-        # Update each group
-        for idx, group_id in enumerate(group_ids):
-            group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-            if group:
-                group.sort_order = idx
-                
-        session.commit()
-        return jsonify({"message": "Groups reordered"})
-    except Exception as e:
+        service = ActivityService(session)
+        payload, error, status = service.reorder_activity_groups(
+            root_id,
+            current_user.id,
+            validated_data['group_ids'],
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error reordering activity groups")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -338,69 +183,24 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 @token_required
 def set_activity_group_goals(current_user, root_id, group_id):
     """Set goals associated with an activity group (replaces existing associations)."""
-    # from models import Goal, goal_activity_group_associations # No longer needed
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-        if not group:
-            return jsonify({"error": "Activity group not found"}), 404
-        
         data = request.get_json(silent=True) or {}
-        goal_ids = data.get('goal_ids', [])
-        
-        # Clear existing associations for this group
-        # session.execute( # No longer needed with explicit relationship
-        #     goal_activity_group_associations.delete().where(
-        #         goal_activity_group_associations.c.activity_group_id == group_id
-        #     )
-        # )
-        group.associated_goals.clear() # Clear all existing associations
-        
-        # Add new associations
-        if goal_ids:
-            goals = session.query(Goal).filter(Goal.id.in_(goal_ids), Goal.root_id == root_id).all()
-            for goal in goals:
-                if goal not in group.associated_goals:
-                    group.associated_goals.append(goal)
-        # for goal_id in goal_ids: # No longer needed with explicit relationship
-        #     goal = session.query(Goal).filter(
-        #         Goal.id == goal_id,
-        #         Goal.root_id == root_id,
-        #         Goal.deleted_at == None
-        #     ).first()
-        #     if goal:
-        #         session.execute(
-        #             goal_activity_group_associations.insert().values(
-        #                 activity_group_id=group_id,
-        #                 goal_id=goal_id
-        #             )
-        #         )
-        
-        session.commit()
-        
-        # Refresh and return updated group
-        session.refresh(group)
-        
-        # Emit activity group updated event
-        event_bus.emit(Event(Events.ACTIVITY_GROUP_UPDATED, {
-            'group_id': group_id,
-            'name': group.name,
-            'root_id': root_id,
-            'updated_fields': ['associated_goals']
-        }, source='activities_api.set_activity_group_goals'))
-        
-        return jsonify(serialize_activity_group(group)), 200
-        
-    except Exception as e:
+        service = ActivityService(session)
+        group, error, status = service.set_activity_group_goals(
+            root_id,
+            group_id,
+            current_user.id,
+            data.get('goal_ids', []),
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_activity_group(group)), status
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error setting activity group goals")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -461,17 +261,16 @@ def create_activity(current_user, root_id):
         if len(splits_data) > 5:
              return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
         
-        from services.activity_service import ActivityService
-        
         # Create Activity via service
         service = ActivityService(session)
         new_activity = service.create_activity(root_id, activity_name, data)
         
         return jsonify(serialize_activity_definition(new_activity)), 201
 
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error creating activity")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -487,7 +286,7 @@ def update_activity(current_user, root_id, activity_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
         # Find the activity
-        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        activity = get_owned_activity_definition(session, root_id, activity_id)
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
         
@@ -504,16 +303,15 @@ def update_activity(current_user, root_id, activity_id):
         if payload_err:
             return jsonify({"error": payload_err}), 400
         
-        from services.activity_service import ActivityService
-        
         service = ActivityService(session)
         activity = service.update_activity(root_id, activity, data)
         
         return jsonify(serialize_activity_definition(activity)), 200
     
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error updating activity")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -529,19 +327,18 @@ def delete_activity(current_user, root_id, activity_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
         # Check ownership via root_id
-        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        activity = get_owned_activity_definition(session, root_id, activity_id)
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
             
-        from services.activity_service import ActivityService
-        
         service = ActivityService(session)
         service.delete_activity(root_id, activity)
         
         return jsonify({"message": "Activity deleted"})
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error deleting activity")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -561,7 +358,7 @@ def get_activity_goals(current_user, root_id, activity_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
-        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        activity = get_owned_activity_definition(session, root_id, activity_id)
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
         
@@ -575,62 +372,25 @@ def get_activity_goals(current_user, root_id, activity_id):
 @token_required
 def set_activity_goals(current_user, root_id, activity_id):
     """Set goals associated with an activity (replaces existing associations)."""
-    from models import Goal, activity_goal_associations
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
-        if not activity:
-            return jsonify({"error": "Activity not found"}), 404
-        
-        data = request.get_json()
-        goal_ids = data.get('goal_ids', [])
-        
-        # Clear existing associations for this activity
-        session.execute(
-            activity_goal_associations.delete().where(
-                activity_goal_associations.c.activity_id == activity_id
-            )
+        data = request.get_json() or {}
+        service = ActivityService(session)
+        activity, error, status = service.set_activity_goals(
+            root_id,
+            activity_id,
+            current_user.id,
+            data.get('goal_ids', []),
         )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_activity_definition(activity)), status
         
-        # Add new associations
-        for goal_id in goal_ids:
-            goal = session.query(Goal).filter(
-                Goal.id == goal_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).first()
-            if goal:
-                session.execute(
-                    activity_goal_associations.insert().values(
-                        activity_id=activity_id,
-                        goal_id=goal_id
-                    )
-                )
-        
-        session.commit()
-        
-        # Refresh and return updated activity
-        session.refresh(activity)
-        
-        # Emit activity updated event (goals changed)
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
-            'activity_id': activity_id,
-            'activity_name': activity.name,
-            'root_id': root_id,
-            'updated_fields': ['associated_goals']
-        }, source='activities_api.set_activity_goals'))
-        
-        return jsonify(serialize_activity_definition(activity)), 200
-        
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error setting activity goals")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -639,45 +399,24 @@ def set_activity_goals(current_user, root_id, activity_id):
 @token_required
 def remove_activity_goal(current_user, root_id, activity_id, goal_id):
     """Remove a goal association from an activity."""
-    from models import activity_goal_associations
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        activity = session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
-        if not activity:
-            return jsonify({"error": "Activity not found"}), 404
-        
-        # Remove the association
-        result = session.execute(
-            activity_goal_associations.delete().where(
-                activity_goal_associations.c.activity_id == activity_id,
-                activity_goal_associations.c.goal_id == goal_id
-            )
+        service = ActivityService(session)
+        payload, error, status = service.remove_activity_goal(
+            root_id,
+            activity_id,
+            goal_id,
+            current_user.id,
         )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
         
-        if result.rowcount == 0:
-            return jsonify({"error": "Association not found"}), 404
-        
-        session.commit()
-        
-        # Emit activity updated event (goal removed)
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
-            'activity_id': activity_id,
-            'activity_name': activity.name,
-            'root_id': root_id,
-            'updated_fields': ['associated_goals']
-        }, source='activities_api.remove_activity_goal'))
-        
-        return jsonify({"message": "Goal association removed"}), 200
-        
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error removing activity goal")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -686,86 +425,14 @@ def remove_activity_goal(current_user, root_id, activity_id, goal_id):
 @token_required
 def get_goal_activities(current_user, root_id, goal_id):
     """Get all activities associated with a goal (including those from linked groups and INHERITED from children)."""
-    from models import Goal, ActivityGroup
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        goal = session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-        
-        # Helper to process a goal and add to map
-        def process_goal(g, activities_map, is_inherited=False, source_name=None):
-            # 1. Direct Activities
-            for a in g.associated_activities:
-                if a.deleted_at:
-                    continue
-                
-                # If already exists (e.g. from parent/direct), we might want to prioritize "Direct" over "Inherited"
-                # But if we are processing parent first (top-down), then "Direct" comes first.
-                # If we process recursively, we should decide priority.
-                # Strategy: "Direct" association overrides "Inherited" for the SAME activity.
-                
-                if a.id not in activities_map:
-                    activities_map[a.id] = {
-                        "id": a.id, 
-                        "name": a.name, 
-                        "description": a.description, 
-                        "group_id": a.group_id,
-                        "is_inherited": is_inherited,
-                        "source_goal_name": source_name if is_inherited else None,
-                        "source_goal_id": g.id if is_inherited else None
-                    }
-                elif not is_inherited and activities_map[a.id]['is_inherited']:
-                    # If we found a direct association but had an inherited one, UPGRADE it to direct
-                    activities_map[a.id]['is_inherited'] = False
-                    activities_map[a.id]['source_goal_name'] = None
-                    activities_map[a.id]['source_goal_id'] = None
-            
-            # 2. Group Activities
-            for group in g.associated_activity_groups:
-                for a in group.activities:
-                    if a.deleted_at:
-                        continue
-                        
-                    if a.id not in activities_map:
-                        activities_map[a.id] = {
-                            "id": a.id, 
-                            "name": a.name, 
-                            "description": a.description, 
-                            "group_id": a.group_id, 
-                            "from_linked_group": True,
-                            "is_inherited": is_inherited,
-                            "source_goal_name": source_name if is_inherited else None,
-                            "source_goal_id": g.id if is_inherited else None
-                        }
-                    elif not is_inherited and activities_map[a.id]['is_inherited']:
-                         # Upgrade to direct if found locally
-                        activities_map[a.id]['is_inherited'] = False
-                        activities_map[a.id]['source_goal_name'] = None
-                        activities_map[a.id]['source_goal_id'] = None
-
-        activities_set = {}
-        
-        # 1. Process THIS goal (Direct)
-        process_goal(goal, activities_set, is_inherited=False)
-        
-        # 2. Recursively process descendants (BFS to keep "closest" children? DFS is fine too)
-        # We want to traverse the whole subtree.
-        stack = [goal]
-        while stack:
-            current = stack.pop(0) # BFS
-            for child in current.children:
-                if not child.deleted_at:
-                    process_goal(child, activities_set, is_inherited=True, source_name=child.name)
-                    stack.append(child)
-        
-        return jsonify(list(activities_set.values()))
+        service = ActivityService(session)
+        payload, error, status = service.get_goal_activities(root_id, goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
     finally:
         session.close()
 
@@ -778,21 +445,14 @@ def get_goal_activities(current_user, root_id, goal_id):
 @token_required
 def get_goal_activity_groups(current_user, root_id, goal_id):
     """Get all activity groups linked to a goal."""
-    from models import Goal
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        goal = session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-        
-        groups = [{"id": g.id, "name": g.name} for g in goal.associated_activity_groups]
-        return jsonify(groups)
+        service = ActivityService(session)
+        payload, error, status = service.get_goal_activity_groups(root_id, goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
     finally:
         session.close()
 
@@ -801,67 +461,25 @@ def get_goal_activity_groups(current_user, root_id, goal_id):
 @token_required
 def set_goal_associations_batch(current_user, root_id, goal_id):
     """Set both direct activity and activity-group associations for a goal in one request."""
-    from models import Goal, ActivityDefinition, ActivityGroup, activity_goal_associations, goal_activity_group_associations
-
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        goal = session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-
         data = request.get_json() or {}
-        activity_ids = data.get("activity_ids", []) or []
-        group_ids = data.get("group_ids", []) or []
-        if not isinstance(activity_ids, list) or not isinstance(group_ids, list):
-            return jsonify({"error": "activity_ids and group_ids must be lists"}), 400
-
-        valid_activities = session.query(ActivityDefinition.id).filter(
-            ActivityDefinition.root_id == root_id,
-            ActivityDefinition.id.in_(activity_ids),
-            ActivityDefinition.deleted_at.is_(None)
-        ).all()
-        valid_groups = session.query(ActivityGroup.id).filter(
-            ActivityGroup.root_id == root_id,
-            ActivityGroup.id.in_(group_ids),
-            ActivityGroup.deleted_at.is_(None)
-        ).all()
-        valid_activity_ids = {row[0] for row in valid_activities}
-        valid_group_ids = {row[0] for row in valid_groups}
-
-        # Replace direct activity associations.
-        session.execute(
-            activity_goal_associations.delete().where(activity_goal_associations.c.goal_id == goal_id)
+        service = ActivityService(session)
+        payload, error, status = service.set_goal_associations_batch(
+            root_id,
+            goal_id,
+            current_user.id,
+            data.get("activity_ids", []) or [],
+            data.get("group_ids", []) or [],
         )
-        if valid_activity_ids:
-            session.execute(
-                activity_goal_associations.insert(),
-                [{"goal_id": goal_id, "activity_id": aid} for aid in valid_activity_ids]
-            )
-
-        # Replace group associations.
-        session.execute(
-            goal_activity_group_associations.delete().where(goal_activity_group_associations.c.goal_id == goal_id)
-        )
-        if valid_group_ids:
-            session.execute(
-                goal_activity_group_associations.insert(),
-                [{"goal_id": goal_id, "activity_group_id": gid} for gid in valid_group_ids]
-            )
-
-        session.commit()
-        return jsonify({
-            "activity_ids": list(valid_activity_ids),
-            "group_ids": list(valid_group_ids),
-        }), 200
-    except Exception:
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error setting goal associations in batch")
-        return jsonify({"error": "Internal server error"}), 500
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -870,49 +488,24 @@ def set_goal_associations_batch(current_user, root_id, goal_id):
 @token_required
 def link_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Link an entire activity group to a goal (includes all current and future activities)."""
-    from models import Goal, ActivityGroup, goal_activity_group_associations
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        goal = session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-        
-        group = session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-        if not group:
-            return jsonify({"error": "Activity group not found"}), 404
-        
-        # Check if already linked
-        from sqlalchemy import select
-        existing = session.execute(
-            select(goal_activity_group_associations).where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id
-            )
-        ).first()
-        
-        if existing:
-            return jsonify({"message": "Group already linked"}), 200
-        
-        # Create the link
-        session.execute(
-            goal_activity_group_associations.insert().values(
-                goal_id=goal_id,
-                activity_group_id=group_id
-            )
+        service = ActivityService(session)
+        payload, error, status = service.link_goal_activity_group(
+            root_id,
+            goal_id,
+            group_id,
+            current_user.id,
         )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
         
-        session.commit()
-        return jsonify({"message": "Group linked successfully"}), 201
-        
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error linking goal activity group")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()
 
@@ -921,31 +514,23 @@ def link_goal_activity_group(current_user, root_id, goal_id, group_id):
 @token_required
 def unlink_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Unlink an activity group from a goal."""
-    from models import goal_activity_group_associations
-    
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        # Remove the link
-        result = session.execute(
-            goal_activity_group_associations.delete().where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id
-            )
+        service = ActivityService(session)
+        payload, error, status = service.unlink_goal_activity_group(
+            root_id,
+            goal_id,
+            group_id,
+            current_user.id,
         )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
         
-        if result.rowcount == 0:
-            return jsonify({"error": "Link not found"}), 404
-        
-        session.commit()
-        return jsonify({"message": "Group unlinked successfully"}), 200
-        
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error unlinking goal activity group")
+        return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

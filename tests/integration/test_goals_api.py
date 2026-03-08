@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from datetime import timezone
 import uuid
 
-from models import Goal, GoalLevel
+from models import ActivityDefinition, Goal, GoalLevel, Session, SessionTemplate, Target
 
 
 @pytest.mark.integration
@@ -60,10 +60,29 @@ class TestFractalEndpoints:
         assert len(data) >= 1
         assert any(f['id'] == sample_ultimate_goal.id for f in data)
     
-    def test_delete_fractal(self, authed_client, sample_ultimate_goal):
-        """Test deleting a fractal and all its descendants."""
+    def test_delete_fractal(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        sample_practice_session,
+        sample_session_template,
+    ):
+        """Test deleting a fractal and soft-deleting its root-scoped records."""
         response = authed_client.delete(f'/api/fractals/{sample_ultimate_goal.id}')
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_root = db_session.query(Goal).filter_by(id=sample_ultimate_goal.id).first()
+        deleted_activity = db_session.query(ActivityDefinition).filter_by(id=sample_activity_definition.id).first()
+        deleted_session = db_session.query(Session).filter_by(id=sample_practice_session.id).first()
+        deleted_template = db_session.query(SessionTemplate).filter_by(id=sample_session_template.id).first()
+
+        assert deleted_root is not None and deleted_root.deleted_at is not None
+        assert deleted_activity is not None and deleted_activity.deleted_at is not None
+        assert deleted_session is not None and deleted_session.deleted_at is not None
+        assert deleted_template is not None and deleted_template.deleted_at is not None
         
         # Verify it's gone
         response = authed_client.get('/api/fractals')
@@ -204,17 +223,22 @@ class TestGoalCRUDEndpoints:
         )
         assert response.status_code == 404
     
-    def test_delete_goal(self, authed_client, sample_goal_hierarchy):
+    def test_delete_goal(self, authed_client, db_session, sample_goal_hierarchy):
         """Test deleting a goal."""
         goal_id = sample_goal_hierarchy['short_term'].id
         response = authed_client.delete(f'/api/goals/{goal_id}')
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_goal = db_session.query(Goal).filter_by(id=goal_id).first()
+        assert deleted_goal is not None
+        assert deleted_goal.deleted_at is not None
         
         # Verify it's deleted
         response = authed_client.get(f'/api/goals/{goal_id}')
         assert response.status_code == 404
     
-    def test_delete_goal_cascades_to_children(self, authed_client, sample_goal_hierarchy):
+    def test_delete_goal_cascades_to_children(self, authed_client, db_session, sample_goal_hierarchy):
         """Test that deleting a goal also deletes its children."""
         # Delete mid-term goal (which has short-term as child)
         mid_term_id = sample_goal_hierarchy['mid_term'].id
@@ -222,6 +246,12 @@ class TestGoalCRUDEndpoints:
         
         response = authed_client.delete(f'/api/goals/{mid_term_id}')
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_mid_term = db_session.query(Goal).filter_by(id=mid_term_id).first()
+        deleted_short_term = db_session.query(Goal).filter_by(id=short_term_id).first()
+        assert deleted_mid_term is not None and deleted_mid_term.deleted_at is not None
+        assert deleted_short_term is not None and deleted_short_term.deleted_at is not None
         
         # Verify both are deleted
         response = authed_client.get(f'/api/goals/{mid_term_id}')
@@ -305,6 +335,44 @@ class TestGoalTargetEndpoints:
         )
         # Should succeed or return 404 if target management differs
         assert response.status_code in [200, 404]
+
+    def test_update_goal_omits_targets_to_preserve_existing(self, authed_client, db_session, sample_ultimate_goal):
+        """Omitting targets should patch scalars without replacing the target set."""
+        create_response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={'name': 'Preserved Target', 'metrics': []}
+        )
+        assert create_response.status_code == 201
+        target_id = create_response.get_json()['id']
+
+        update_response = authed_client.put(
+            f'/api/goals/{sample_ultimate_goal.id}',
+            json={'name': 'Renamed Goal'}
+        )
+        assert update_response.status_code == 200
+
+        target = db_session.query(Target).filter(Target.id == target_id).first()
+        assert target is not None
+        assert target.deleted_at is None
+
+    def test_update_goal_empty_targets_clears_existing(self, authed_client, db_session, sample_ultimate_goal):
+        """Providing targets=[] should replace the goal target set with empty."""
+        create_response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={'name': 'Clear Me', 'metrics': []}
+        )
+        assert create_response.status_code == 201
+        target_id = create_response.get_json()['id']
+
+        update_response = authed_client.put(
+            f'/api/goals/{sample_ultimate_goal.id}',
+            json={'targets': []}
+        )
+        assert update_response.status_code == 200
+
+        target = db_session.query(Target).filter(Target.id == target_id).first()
+        assert target is not None
+        assert target.deleted_at is not None
 
 
 @pytest.mark.integration

@@ -27,6 +27,18 @@ from services.serializers import serialize_activity_instance, format_utc
 
 logger = logging.getLogger(__name__)
 
+
+def _queue_event(pending_events, event: Event):
+    if pending_events is None:
+        event_bus.emit(event)
+        return
+    pending_events.append(event)
+
+
+def _emit_pending_events(pending_events):
+    for event in pending_events or []:
+        event_bus.emit(event)
+
 def _target_metrics_from_conditions(target: Target):
     metrics = []
     for condition in (target.metric_conditions or []):
@@ -94,6 +106,7 @@ def handle_session_completed(event: Event):
     logger.info(f"Processing session completion: {session_id}")
     
     db_session = _get_db_session()
+    pending_events = []
     try:
         # Get the session with its linked goals
         session = db_session.query(Session).filter_by(id=session_id).first()
@@ -121,13 +134,24 @@ def handle_session_completed(event: Event):
         # Evaluate targets for each linked goal
         # Evaluate targets for each linked goal
         for goal in linked_goals:
-            _evaluate_goal_targets(db_session, goal, instances_by_activity, session_id)
+            _evaluate_goal_targets(
+                db_session,
+                goal,
+                instances_by_activity,
+                session_id,
+                pending_events=pending_events,
+            )
             
         # Check Program Day Completion
         from services.programs import ProgramService
-        ProgramService.check_program_day_completion(db_session, session_id)
+        ProgramService.check_program_day_completion(
+            db_session,
+            session_id,
+            pending_events=pending_events,
+        )
         
         db_session.commit()
+        _emit_pending_events(pending_events)
         
     except Exception as e:
         db_session.rollback()
@@ -171,7 +195,7 @@ def _track_goal_completion(goal_data: dict):
 
 def _evaluate_threshold_targets_for_activity(
     db_session, goal: Goal, instances_by_activity: dict, 
-    session_id: str, activity_id: str, completed_at: datetime
+    session_id: str, activity_id: str, completed_at: datetime, pending_events=None
 ):
     """
     Evaluate only THRESHOLD targets for a specific activity.
@@ -233,7 +257,7 @@ def _evaluate_threshold_targets_for_activity(
                     'goal_id': goal.id,
                     'goal_name': goal.name
                 })
-                event_bus.emit(Event(Events.TARGET_ACHIEVED, {
+                _queue_event(pending_events, Event(Events.TARGET_ACHIEVED, {
                     'target_id': target.id,
                     'target_name': target.name,
                     'goal_id': goal.id,
@@ -285,7 +309,7 @@ def _evaluate_threshold_targets_for_activity(
             })
             
             # Emit target achieved event
-            event_bus.emit(Event(Events.TARGET_ACHIEVED, {
+            _queue_event(pending_events, Event(Events.TARGET_ACHIEVED, {
                 'target_id': target.id,
                 'target_name': target.name,
                 'goal_id': goal.id,
@@ -319,7 +343,7 @@ def _evaluate_threshold_targets_for_activity(
         })
         
         # Emit goal completed event
-        event_bus.emit(Event(Events.GOAL_COMPLETED, {
+        _queue_event(pending_events, Event(Events.GOAL_COMPLETED, {
             'goal_id': goal.id,
             'goal_name': goal.name,
             'root_id': goal.root_id,
@@ -329,7 +353,7 @@ def _evaluate_threshold_targets_for_activity(
         }))
 
 
-def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, session_id: str):
+def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, session_id: str, pending_events=None):
     """
     Evaluate all targets for a goal against activity instances.
     
@@ -389,7 +413,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             newly_completed.append(target)
             
             # Emit target achieved event
-            event_bus.emit(Event(Events.TARGET_ACHIEVED, {
+            _queue_event(pending_events, Event(Events.TARGET_ACHIEVED, {
                 'target_id': target.id,
                 'target_name': target.name,
                 'goal_id': goal.id,
@@ -411,7 +435,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
         logger.info(f"Auto-completing goal {goal.id} - all {len(all_targets)} targets met")
         
         # Emit goal completed event
-        event_bus.emit(Event(Events.GOAL_COMPLETED, {
+        _queue_event(pending_events, Event(Events.GOAL_COMPLETED, {
             'goal_id': goal.id,
             'goal_name': goal.name,
             'root_id': goal.root_id,
@@ -435,6 +459,7 @@ def handle_activity_instance_updated(event: Event):
         return
         
     db_session = _get_db_session()
+    pending_events = []
     try:
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         if not instance:
@@ -442,15 +467,22 @@ def handle_activity_instance_updated(event: Event):
             
         # If instance is now incomplete, revert its achievements
         if not instance.completed:
-            _revert_achievements_for_instance(db_session, instance_id)
+            _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
             db_session.commit()
         # If instance was JUST marked complete, evaluate targets
         elif 'completed' in updated_fields and instance.completed:
             logger.info(f"[ACTIVITY_UPDATED] Instance {instance_id} marked complete. Evaluating targets.")
             
             # Use same logic as handle_activity_instance_completed but wrapperized
-            _run_evaluation_for_instance(db_session, instance, session_id, root_id)
+            _run_evaluation_for_instance(
+                db_session,
+                instance,
+                session_id,
+                root_id,
+                pending_events=pending_events,
+            )
             db_session.commit()
+        _emit_pending_events(pending_events)
             
     except Exception as e:
         db_session.rollback()
@@ -458,7 +490,7 @@ def handle_activity_instance_updated(event: Event):
     finally:
         db_session.close()
 
-def _run_evaluation_for_instance(db_session, instance, session_id, root_id):
+def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pending_events=None):
     """Refactored core evaluation logic to be reused between event handlers."""
     activity_id = instance.activity_definition_id
     completed_at = instance.time_stop or datetime.now(timezone.utc)
@@ -497,7 +529,7 @@ def _run_evaluation_for_instance(db_session, instance, session_id, root_id):
     for goal in linked_goals:
         _evaluate_threshold_targets_for_activity(
             db_session, goal, instances_by_activity, session_id, 
-            activity_id, completed_at
+            activity_id, completed_at, pending_events=pending_events
         )
 
 @event_bus.on(Events.ACTIVITY_INSTANCE_COMPLETED)
@@ -512,13 +544,21 @@ def handle_activity_instance_completed(event: Event):
         return
     
     db_session = _get_db_session()
+    pending_events = []
     try:
         instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         if not instance:
             return
             
-        _run_evaluation_for_instance(db_session, instance, instance.session_id, root_id)
+        _run_evaluation_for_instance(
+            db_session,
+            instance,
+            instance.session_id,
+            root_id,
+            pending_events=pending_events,
+        )
         db_session.commit()
+        _emit_pending_events(pending_events)
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance completion: {e}")
@@ -536,16 +576,18 @@ def handle_activity_instance_deleted(event: Event):
         return
         
     db_session = _get_db_session()
+    pending_events = []
     try:
-        _revert_achievements_for_instance(db_session, instance_id)
+        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
         db_session.commit()
+        _emit_pending_events(pending_events)
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance deletion: {e}")
     finally:
         db_session.close()
 
-def _revert_achievements_for_instance(db_session, instance_id: str):
+def _revert_achievements_for_instance(db_session, instance_id: str, pending_events=None):
     """Internal helper to find and revert targets tied to an instance."""
     targets = db_session.query(Target).filter_by(
         completed_instance_id=instance_id,
@@ -561,7 +603,7 @@ def _revert_achievements_for_instance(db_session, instance_id: str):
         target.completed_instance_id = None
         
         # Emit reversion event
-        event_bus.emit(Event(Events.TARGET_REVERTED, {
+        _queue_event(pending_events, Event(Events.TARGET_REVERTED, {
             'target_id': target.id,
             'target_name': target.name,
             'goal_id': target.goal_id,
@@ -584,7 +626,7 @@ def _revert_achievements_for_instance(db_session, instance_id: str):
                 goal.completed = False
                 goal.completed_at = None
                 
-                event_bus.emit(Event(Events.GOAL_UNCOMPLETED, {
+                _queue_event(pending_events, Event(Events.GOAL_UNCOMPLETED, {
                     'goal_id': goal.id,
                     'goal_name': goal.name,
                     'root_id': goal.root_id,
@@ -775,6 +817,7 @@ def handle_goal_completed(event: Event):
     logger.info(f"Processing goal completion: {goal_id}")
     
     db_session = _get_db_session()
+    pending_events = []
     try:
         goal = db_session.query(Goal).filter_by(id=goal_id).first()
         if not goal:
@@ -788,12 +831,13 @@ def handle_goal_completed(event: Event):
                 if not auto_complete and getattr(parent, 'level', None):
                     auto_complete = getattr(parent.level, 'auto_complete_when_children_done', False)
                 if auto_complete:
-                    _check_parent_completion(db_session, parent)
+                    _check_parent_completion(db_session, parent, pending_events=pending_events)
         
         # Update any programs this goal is part of
-        _update_program_progress(db_session, goal)
+        _update_program_progress(db_session, goal, pending_events=pending_events)
         
         db_session.commit()
+        _emit_pending_events(pending_events)
         
     except Exception as e:
         db_session.rollback()
@@ -802,7 +846,7 @@ def handle_goal_completed(event: Event):
         db_session.close()
 
 
-def _check_parent_completion(db_session, parent: Goal):
+def _check_parent_completion(db_session, parent: Goal, pending_events=None):
     """Check if a parent goal should be auto-completed based on children."""
     # Get all child goals
     children = db_session.query(Goal).filter(
@@ -822,7 +866,7 @@ def _check_parent_completion(db_session, parent: Goal):
         logger.info(f"Auto-completing parent goal {parent.id} - all children complete")
         
         # Emit event for cascade
-        event_bus.emit(Event(Events.GOAL_COMPLETED, {
+        _queue_event(pending_events, Event(Events.GOAL_COMPLETED, {
             'goal_id': parent.id,
             'goal_name': parent.name,
             'root_id': parent.root_id,
@@ -831,7 +875,7 @@ def _check_parent_completion(db_session, parent: Goal):
         }))
 
 
-def _update_program_progress(db_session, goal: Goal):
+def _update_program_progress(db_session, goal: Goal, pending_events=None):
     """Update program completion percentage when a goal is completed."""
     from models import Program
     
@@ -849,10 +893,10 @@ def _update_program_progress(db_session, goal: Goal):
 
     programs = db_session.query(Program).filter(Program.id.in_(program_ids)).all()
     for program in programs:
-        _recalculate_program_progress(db_session, program)
+        _recalculate_program_progress(db_session, program, pending_events=pending_events)
 
 
-def _recalculate_program_progress(db_session, program):
+def _recalculate_program_progress(db_session, program, pending_events=None):
     """Recalculate the completion percentage for a program."""
     all_goal_ids = {g.id for g in (program.goals or [])}
     
@@ -879,9 +923,10 @@ def _recalculate_program_progress(db_session, program):
     logger.info(f"Program {program.id} progress: {completed_count}/{total_count} goals complete")
     
     # Emit program updated event
-    event_bus.emit(Event(Events.PROGRAM_UPDATED, {
+    _queue_event(pending_events, Event(Events.PROGRAM_UPDATED, {
         'program_id': program.id,
         'program_name': program.name,
+        'root_id': program.root_id,
         'goals_completed': completed_count,
         'goals_total': total_count
     }))

@@ -1,6 +1,7 @@
 import pytest
 import json
 import uuid
+from models import SessionTemplate
 
 @pytest.fixture
 def sample_session_template_api(authed_client, sample_ultimate_goal):
@@ -106,14 +107,52 @@ class TestSessionTemplates:
         assert data['name'] == 'Updated Name'
         assert data['template_data']['sections'][0]['name'] == 'New Section'
 
-    def test_delete_template(self, authed_client, sample_ultimate_goal, sample_session_template_api):
+    def test_update_template_omits_template_data_to_preserve_existing(self, authed_client, sample_ultimate_goal, sample_session_template_api):
+        """Omitting template_data should patch scalars without replacing the stored template body."""
+        root_id = sample_ultimate_goal.id
+        t_id = sample_session_template_api['id']
+
+        response = authed_client.put(
+            f'/api/{root_id}/session-templates/{t_id}',
+            json={'name': 'Patched Name Only'}
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['name'] == 'Patched Name Only'
+        assert data['template_data'] == {'sections': []}
+
+    def test_update_template_empty_object_replaces_template_data(self, authed_client, sample_ultimate_goal, sample_session_template_api):
+        """Providing template_data should replace the stored object, even when empty."""
+        root_id = sample_ultimate_goal.id
+        t_id = sample_session_template_api['id']
+
+        response = authed_client.put(
+            f'/api/{root_id}/session-templates/{t_id}',
+            json={'template_data': {}}
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['template_data'] == {}
+
+    def test_delete_template(self, authed_client, db_session, sample_ultimate_goal, sample_session_template_api):
         """Test deleting a template."""
         root_id = sample_ultimate_goal.id
         t_id = sample_session_template_api['id']
         
         response = authed_client.delete(f'/api/{root_id}/session-templates/{t_id}')
         assert response.status_code == 200
+
+        db_session.expire_all()
+        deleted_template = db_session.query(SessionTemplate).filter_by(id=t_id).first()
+        assert deleted_template is not None
+        assert deleted_template.deleted_at is not None
         
         # Verify deletion
         response = authed_client.get(f'/api/{root_id}/session-templates/{t_id}')
         assert response.status_code == 404
+
+        response = authed_client.get(f'/api/{root_id}/session-templates')
+        templates = response.get_json()
+        assert not any(template['id'] == t_id for template in templates)

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import models
+from sqlalchemy.exc import SQLAlchemyError
 from models import get_session, validate_root_goal
 from validators import (
     ProgramCreateSchema,
@@ -43,7 +44,8 @@ def get_programs(current_user, root_id):
         if limit is not None:
             programs = programs[offset: offset + limit]
         return etag_json_response(programs)
-    except Exception as e:
+    except SQLAlchemyError:
+        session.rollback()
         logger.exception("Error getting programs")
         return internal_error(logger, "Program API request failed")
     finally:
@@ -65,7 +67,8 @@ def get_program(current_user, root_id, program_id):
         if program is None:
             return jsonify({"error": "Program not found"}), 404
         return jsonify(program)
-    except Exception as e:
+    except SQLAlchemyError:
+        session.rollback()
         logger.exception("Error getting program")
         return internal_error(logger, "Program API request failed")
     finally:
@@ -85,11 +88,10 @@ def create_program(current_user, root_id, validated_data):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         result = ProgramService.create_program(session, root_id, validated_data)
-        session.commit()
         return jsonify(result), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating program")
         return internal_error(logger, "Program API request failed")
@@ -112,9 +114,8 @@ def update_program(current_user, root_id, program_id, validated_data):
         result = ProgramService.update_program(session, root_id, program_id, validated_data)
         if not result:
             return jsonify({"error": "Program not found"}), 404
-        session.commit()
         return jsonify(result)
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating program")
         return internal_error(logger, "Program API request failed")
@@ -134,15 +135,15 @@ def delete_program(current_user, root_id, program_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         result = ProgramService.delete_program(session, root_id, program_id)
-        session.commit()
         return jsonify({
             "message": "Program deleted successfully",
             "affected_sessions": result["affected_sessions"]
         })
     except ValueError as e:
          return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
+        logger.exception("Error deleting program")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
@@ -162,7 +163,9 @@ def get_program_session_count(current_user, root_id, program_id):
         return jsonify({"session_count": count})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error getting program session count")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
@@ -184,11 +187,10 @@ def create_block(current_user, root_id, program_id, validated_data):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         block_dict = ProgramService.create_block(session, root_id, program_id, validated_data)
-        session.commit()
         return jsonify(block_dict), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating program block")
         return internal_error(logger, "Program API request failed")
@@ -208,11 +210,10 @@ def update_block(current_user, root_id, program_id, block_id, validated_data):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data)
-        session.commit()
         return jsonify(block_dict)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating program block")
         return internal_error(logger, "Program API request failed")
@@ -231,11 +232,10 @@ def delete_block(current_user, root_id, program_id, block_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         ProgramService.delete_block(session, root_id, program_id, block_id)
-        session.commit()
         return jsonify({"message": "Block deleted"})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error deleting program block")
         return internal_error(logger, "Program API request failed")
@@ -255,11 +255,10 @@ def add_block_day(current_user, root_id, program_id, block_id, validated_data):
             return jsonify({"error": "Fractal not found or access denied"}), 404
             
         count = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data)
-        session.commit()
         return jsonify({"message": f"Added {count} days/sessions"}), 201
     except ValueError as e:
          return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error adding block day")
         return internal_error(logger, "Program API request failed")
@@ -279,12 +278,12 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id, valida
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
         ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data)
-        session.commit()
         return jsonify({"message": "Day updated successfully"})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
+        logger.exception("Error updating block day")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
@@ -301,12 +300,12 @@ def delete_block_day(current_user, root_id, program_id, block_id, day_id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
         ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id)
-        session.commit()
         return jsonify({"message": "Day deleted"})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
+        logger.exception("Error deleting block day")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
@@ -324,12 +323,12 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id):
 
         data = request.get_json()
         count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, data)
-        session.commit()
         return jsonify({"message": f"Copied to {count} blocks"})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
+        logger.exception("Error copying block day")
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
@@ -347,7 +346,8 @@ def get_active_program_days(current_user, root_id):
             
         days = ProgramService.get_active_program_days(session, root_id)
         return jsonify(days or [])
-    except Exception as e:
+    except SQLAlchemyError:
+        session.rollback()
         logger.exception("Error getting active program days")
         return internal_error(logger, "Program API request failed")
     finally:
@@ -366,11 +366,10 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
         block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data)
-        session.commit()
         return jsonify({"message": "Goal attached and updated", "block": block_dict})
     except ValueError as e:
          return jsonify({"error": str(e)}), 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error attaching goal to block")
         return internal_error(logger, "Program API request failed")
@@ -390,11 +389,10 @@ def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, vali
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
         day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data)
-        session.commit()
         return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
     except ValueError as e:
          return jsonify({"error": str(e)}), 400
-    except Exception as e:
+    except SQLAlchemyError:
         session.rollback()
         logger.exception("Error attaching goal to day")
         return internal_error(logger, "Program API request failed")

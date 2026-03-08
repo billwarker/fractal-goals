@@ -7,6 +7,7 @@ Provides endpoints for managing timestamped notes on sessions, activity instance
 import logging
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import internal_error
 from blueprints.auth_api import token_required
@@ -33,7 +34,9 @@ def get_session_notes(current_user, root_id, session_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching session notes")
         return internal_error(logger, "Error fetching session notes")
     finally:
         db_session.close()
@@ -48,7 +51,9 @@ def get_activity_instance_notes(current_user, root_id, instance_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching activity instance notes")
         return internal_error(logger, "Error fetching activity instance notes")
     finally:
         db_session.close()
@@ -63,7 +68,9 @@ def get_previous_session_notes(current_user, root_id, session_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching previous session notes")
         return internal_error(logger, "Error fetching previous session notes")
     finally:
         db_session.close()
@@ -86,7 +93,9 @@ def get_activity_definition_notes(current_user, root_id, activity_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching activity definition notes")
         return internal_error(logger, "Error fetching activity definition notes")
     finally:
         db_session.close()
@@ -109,7 +118,9 @@ def get_activity_history(current_user, root_id, activity_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching activity history")
         return internal_error(logger, "Error fetching activity history")
     finally:
         db_session.close()
@@ -125,8 +136,9 @@ def create_note(current_user, root_id, validated_data):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error creating note")
         return internal_error(logger, "Error creating note")
     finally:
         db_session.close()
@@ -142,8 +154,9 @@ def update_note(current_user, root_id, note_id, validated_data):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error updating note")
         return internal_error(logger, "Error updating note")
     finally:
         db_session.close()
@@ -158,8 +171,9 @@ def delete_note(current_user, root_id, note_id):
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
-    except Exception:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error deleting note")
         return internal_error(logger, "Error deleting note")
     finally:
         db_session.close()

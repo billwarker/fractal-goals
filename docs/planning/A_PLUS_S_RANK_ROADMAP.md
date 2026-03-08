@@ -11,8 +11,8 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 5. ~~Move goal duration/chart loading into a dedicated hook.~~
 6. ~~Standardize query keys in one module and remove string drift.~~
 7. ~~Expand application service coverage across goals, sessions, notes, and programs.~~
-8. Shrink oversized blueprints, especially `goals_api.py`.
-9. Isolate serialization from business logic.
+8. ~~Shrink oversized blueprints, especially `goals_api.py`.~~
+9. ~~Isolate serialization from business logic.~~
 10. Build a small domain-rules layer for completion, targets, and inheritance.
 
 ## Phase 2: Testing And Contracts
@@ -30,16 +30,16 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 
 ## Phase 3: Backend Correctness
 
-21. Centralize payload normalization for activities, goals, notes, and sessions.
-22. Make transaction ownership rules consistent across services.
-23. Add stricter typing and return contracts to service methods.
-24. Audit all endpoints for patch vs replace semantics.
-25. Replace broad exception handling with narrower failure handling.
-26. Standardize soft-delete behavior across the model/service layer.
-27. Emit events only after successful commit and do so consistently.
+21. ~~Centralize payload normalization for activities, goals, notes, and sessions.~~
+22. ~~Make transaction ownership rules consistent across services.~~
+23. ~~Add stricter typing and return contracts to service methods.~~
+24. ~~Audit all endpoints for patch vs replace semantics.~~
+25. ~~Replace broad exception handling with narrower failure handling.~~
+26. ~~Standardize soft-delete behavior across the model/service layer.~~
+27. ~~Emit events only after successful commit and do so consistently.~~
 28. Add stricter array/object shape validation for legacy payloads.
-29. Reuse helper queries for owned-entity lookups inside a root.
-30. Add query-budget tests for high-risk endpoints.
+29. ~~Reuse helper queries for owned-entity lookups inside a root.~~
+30. ~~Add query-budget tests for high-risk endpoints.~~
 
 ## Phase 4: Frontend Correctness
 
@@ -99,10 +99,21 @@ Completed in the current workspace:
 - 38: target-card and activity-focus coverage now includes deleted-activity fallback behavior and focused target-card filtering by activity instance
 - 39: `ActivityBuilder` now runs as a thin coordinator over `ActivityBuilderForm` plus extracted association, splits, and metrics subviews, with smoke coverage for create and edit-warning flows
 - 7: application service coverage now spans goals, sessions, notes, and programs via `GoalService`, `SessionService`, `NoteService`, and `ProgramService`; goal CRUD, target mutations, manual completion, target evaluation, fractal list/create/delete, fractal tree loading, and selection-goal retrieval now route through services, reducing `goals_api.py` to 830 lines and sharing target-evaluation rules via `services/goal_target_rules.py`
+- activity services now also own activity-group CRUD/reorder plus activity-goal and batch goal-association writes, reducing `activities_api.py` from 951 lines to 687 and adding integration coverage for the goal-association endpoints that drive the goal detail modal
+- 8: the largest blueprint hotspots have been cut down substantially; `goals_api.py` dropped from 1836 lines to 830, and `activities_api.py` dropped from 951 lines to 573 after extracting activity-group CRUD, inherited goal-activity reads, and goal-activity-group link flows into services with integration coverage
+- 21: shared payload normalization now lives in `services/payload_normalizers.py`, and activities, goals, notes, and sessions all route their write-path cleanup through it for IDs, JSON payloads, optional strings, and repeated list-shape normalization
+- 9: complex response shaping for fractal summaries, goal selection payloads, target-evaluation responses, note/session history rows, session-goal view payloads, and goal analytics now lives in dedicated serializer helpers under `services/view_serializers.py` instead of being assembled inline inside service methods
+- 22: service-owned transaction boundaries are now consistent across the main application services; `ProgramService` mutating methods now commit internally like `GoalService`, `ActivityService`, `SessionService`, and `NoteService`, and `programs_api.py` no longer double-commits after service calls
+- 27: completion cascades now queue derived events until after commit; `completion_handlers.py` defers `target.achieved`, `goal.completed`, `goal.uncompleted`, `target.reverted`, and derived `program.updated` emissions until persistence succeeds, and `ProgramService.check_program_day_completion` queues day/block/program completion events with `root_id` context for post-commit emission
+- 29: root-scoped lookup helpers now live in `services/owned_entity_queries.py`, and session, timer, activity, template, and program flows now share those helpers for owned session, activity-definition, activity-instance, activity-group, session-template, goal, and program queries instead of repeating the same `root_id` ownership filters inline
+- 23: shared typed service contracts now live in `services/service_types.py`, and the main tuple-returning service boundaries in `ActivityService`, `GoalService`, `SessionService`, and `NoteService` now have explicit return annotations enforced by `tests/unit/services/test_service_contracts.py`
+- 24: patch-vs-replace semantics are now explicit and regression-tested across activity metrics, activity goal associations, goal targets, session activity metrics, and session-template data, with create/update activity-group goal association support brought into schema-validated service flows
+- 25: blanket route-level `except Exception` handling has been retired from the main service-backed blueprints in favor of narrower failure handling, with `activities_api.py`, `sessions_api.py`, `templates_api.py`, `programs_api.py`, `notes_api.py`, `timers_api.py`, `goal_levels_api.py`, `annotations_api.py`, `logs_api.py`, `auth_api.py`, and the service-backed/read-heavy portions of `goals_api.py` now using specific DB/error branches; the lone remaining broad catch in `timers_api.py` is the intentional ISO-datetime parser helper that converts arbitrary parse failures into `ValueError`
+- 26: soft-delete behavior is now consistent for the `deleted_at`-backed model surfaces touched by the main app flows; templates, activity groups, activity instances, removed split definitions, goals, and whole fractals now soft-delete through service-backed paths, with fractal deletion also soft-deleting root-scoped sessions, activities, templates, metrics/splits, notes, annotations, and descendant goals instead of leaving active rows behind a deleted root
+- 30: query-budget coverage now guards the session activities, session detail, goal tree, and session goals-view endpoints in `tests/performance/test_query_budgets.py`, with bounded ceilings based on the current eager-loading/query shape so future refactors cannot silently reintroduce N+1 blowups on these read-heavy surfaces
 
 ## Next Tranche
 
-1. Shrink oversized blueprints, especially `goals_api.py`.
-2. Centralize payload normalization for activities, goals, notes, and sessions.
-3. Isolate serialization from business logic.
-4. Start the same blueprint-reduction pass on `activities_api.py` while continuing to peel direct business logic out of `goals_api.py`.
+1. Continue moving remaining low-level business rules out of route modules and into shared service/domain helpers.
+2. Add stricter validation for legacy payload shapes on remaining permissive endpoints.
+3. Normalize remaining frontend state surfaces that still mirror query data into local state.

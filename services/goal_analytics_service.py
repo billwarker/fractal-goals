@@ -3,7 +3,14 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import joinedload
 
 from models import ActivityInstance, ActivityDefinition, Goal, Session, validate_root_goal
-from services.serializers import format_utc
+from services.view_serializers import (
+    serialize_goal_activity_breakdown_item,
+    serialize_goal_activity_duration_item,
+    serialize_goal_analytics_goal,
+    serialize_goal_analytics_payload,
+    serialize_goal_session_analytics_row,
+    serialize_goal_session_duration_item,
+)
 
 
 class GoalAnalyticsService:
@@ -57,13 +64,14 @@ class GoalAnalyticsService:
                 session_duration = int((end - start).total_seconds())
 
             for goal in session.goals:
-                goal_session_map.setdefault(goal.id, []).append({
-                    "session_id": session.id,
-                    "session_name": session.name,
-                    "duration_seconds": session_duration,
-                    "completed": session.completed,
-                    "session_start": format_utc(session.session_start),
-                })
+                session_payload = serialize_goal_session_analytics_row(
+                    session_id=session.id,
+                    session_name=session.name,
+                    duration_seconds=session_duration,
+                    completed=session.completed,
+                    session_start=session.session_start,
+                )
+                goal_session_map.setdefault(goal.id, []).append(session_payload)
 
         all_activity_instances = self.db_session.query(ActivityInstance).options(
             joinedload(ActivityInstance.definition)
@@ -106,12 +114,12 @@ class GoalAnalyticsService:
                 activity_name = instance.definition.name if instance.definition else "Unknown"
                 activity_id = instance.activity_definition_id
                 if activity_id not in activity_breakdown:
-                    activity_breakdown[activity_id] = {
-                        "activity_id": activity_id,
-                        "activity_name": activity_name,
-                        "instance_count": 0,
-                        "total_duration_seconds": 0,
-                    }
+                    activity_breakdown[activity_id] = serialize_goal_activity_breakdown_item(
+                        activity_id=activity_id,
+                        activity_name=activity_name,
+                        instance_count=0,
+                        total_duration_seconds=0,
+                    )
                 activity_breakdown[activity_id]["instance_count"] += 1
                 if instance.duration_seconds:
                     activity_breakdown[activity_id]["total_duration_seconds"] += instance.duration_seconds
@@ -124,11 +132,11 @@ class GoalAnalyticsService:
             session_durations_by_date = []
             for session in sessions_for_goal:
                 if session["session_start"]:
-                    session_durations_by_date.append({
-                        "date": session["session_start"],
-                        "duration_seconds": session["duration_seconds"],
-                        "session_name": session["session_name"],
-                    })
+                    session_durations_by_date.append(serialize_goal_session_duration_item(
+                        date=session["session_start"],
+                        duration_seconds=session["duration_seconds"],
+                        session_name=session["session_name"],
+                    ))
             session_durations_by_date.sort(key=lambda item: item["date"])
 
             activity_durations_by_date = []
@@ -138,33 +146,25 @@ class GoalAnalyticsService:
                     None,
                 )
                 if session and session["session_start"] and instance.duration_seconds:
-                    activity_durations_by_date.append({
-                        "date": session["session_start"],
-                        "duration_seconds": instance.duration_seconds,
-                        "activity_name": instance.definition.name if instance.definition else "Unknown",
-                    })
+                    activity_durations_by_date.append(serialize_goal_activity_duration_item(
+                        date=session["session_start"],
+                        duration_seconds=instance.duration_seconds,
+                        activity_name=instance.definition.name if instance.definition else "Unknown",
+                    ))
             activity_durations_by_date.sort(key=lambda item: item["date"])
 
-            goals_data.append({
-                "id": goal.id,
-                "name": goal.name,
-                "type": goal.level.name.replace(" ", "") if getattr(goal, "level", None) else "Goal",
-                "description": goal.description,
-                "completed": goal.completed,
-                "completed_at": format_utc(goal.completed_at),
-                "created_at": format_utc(goal.created_at),
-                "deadline": format_utc(goal.deadline),
-                "parent_id": goal.parent_id,
-                "age_days": goal_age_days,
-                "total_duration_seconds": total_duration,
-                "session_count": session_count,
-                "activity_breakdown": list(activity_breakdown.values()),
-                "session_durations_by_date": session_durations_by_date,
-                "activity_durations_by_date": activity_durations_by_date,
-            })
+            goals_data.append(serialize_goal_analytics_goal(
+                goal,
+                age_days=goal_age_days,
+                total_duration_seconds=total_duration,
+                session_count=session_count,
+                activity_breakdown=activity_breakdown.values(),
+                session_durations_by_date=session_durations_by_date,
+                activity_durations_by_date=activity_durations_by_date,
+            ))
 
-        payload = {
-            "summary": {
+        payload = serialize_goal_analytics_payload(
+            {
                 "total_goals": len(all_goals),
                 "completed_goals": total_completed,
                 "completion_rate": (total_completed / len(all_goals) * 100) if all_goals else 0,
@@ -172,6 +172,6 @@ class GoalAnalyticsService:
                 "avg_time_to_completion_days": round(avg_time_to_completion, 1),
                 "avg_duration_to_completion_seconds": round(avg_duration_to_completion, 0),
             },
-            "goals": goals_data,
-        }
+            goals_data,
+        )
         return payload, None, 200

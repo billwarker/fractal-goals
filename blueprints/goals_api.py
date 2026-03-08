@@ -4,6 +4,7 @@ import json
 import uuid
 import logging
 import models
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, or_
 
@@ -115,8 +116,9 @@ def create_goal(current_user, validated_data):
         result = serialize_goal(new_goal)
         return jsonify(result), 201
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error creating goal")
         return internal_error(logger, "Error creating goal")
     finally:
         db_session.close()
@@ -167,7 +169,8 @@ def get_session_micro_goals(current_user, root_id, session_id):
         result = [serialize_goal(g) for g in micro_goals]
         return jsonify(result)
         
-    except Exception as e:
+    except SQLAlchemyError:
+        db_session.rollback()
         logger.exception("Error fetching session micro goals")
         return internal_error(logger, "Goals API request failed")
     finally:
@@ -188,7 +191,8 @@ def get_session_goals_view(current_user, root_id, session_id):
         if error_dict:
             return jsonify(error_dict), status_code
         return jsonify(payload)
-    except Exception:
+    except SQLAlchemyError:
+        db_session.rollback()
         logger.exception("Error fetching session goals view")
         return internal_error(logger, "Goals API request failed")
     finally:
@@ -198,55 +202,45 @@ def get_session_goals_view(current_user, root_id, session_id):
 @goals_bp.route('/goals/<goal_id>', methods=['DELETE'])
 @token_required
 def delete_goal_endpoint(current_user, goal_id: str):
-    """Delete a goal and all its children."""
+    """Soft-delete a goal and all its children."""
     logger.debug(f"Attempting to delete goal with ID: {goal_id}")
     
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
         goal = get_goal_by_id(db_session, goal_id)
-        if goal:
-            if not _authorize_goal_access(db_session, current_user.id, goal):
-                return jsonify({"error": "Goal not found or access denied"}), 404
-            is_root = goal.parent_id is None
-            goal_name = goal.name
-            root_id = goal.root_id
-            
-            # Cascading deletion for Notes associated with Nano Goals
-            from models import Note
-            def get_nano_goal_ids(g):
-                ids = []
-                if g.level and g.level.name == 'Nano Goal':
-                    ids.append(g.id)
-                for child in (g.children or []):
-                    ids.extend(get_nano_goal_ids(child))
-                return ids
-            
-            nano_ids = get_nano_goal_ids(goal)
-            if nano_ids:
-                db_session.query(Note).filter(Note.nano_goal_id.in_(nano_ids)).delete(synchronize_session=False)
+        if not goal:
+            logger.warning(f"Goal {goal_id} not found")
+            return jsonify({"error": "Goal not found"}), 404
 
-            db_session.delete(goal)
-            db_session.commit()
-            logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")
-            
-            # Emit goal deleted event
-            event_bus.emit(Event(Events.GOAL_DELETED, {
-                'goal_id': goal_id,
-                'goal_name': goal_name,
-                'root_id': root_id,
-                'was_root': is_root
-            }, source='goals_api.delete_goal'))
-            
-            return jsonify({"status": "success", "message": f"{'Root g' if is_root else 'G'}oal deleted"})
+        if not _authorize_goal_access(db_session, current_user.id, goal):
+            return jsonify({"error": "Goal not found or access denied"}), 404
+
+        is_root = goal.parent_id is None
+        goal_name = goal.name
+        root_id = goal.root_id
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        if is_root:
+            _, error, status = service.delete_fractal(goal_id, current_user.id)
+        else:
+            _, error, status = service.delete_fractal_goal(root_id, goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+
+        logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")
+
+        event_bus.emit(Event(Events.GOAL_DELETED, {
+            'goal_id': goal_id,
+            'goal_name': goal_name,
+            'root_id': root_id,
+            'was_root': is_root
+        }, source='goals_api.delete_goal'))
+
+        return jsonify({"status": "success", "message": f"{'Root g' if is_root else 'G'}oal deleted"}), status
         
-        # Not found
-        logger.warning(f"Goal {goal_id} not found")
-        return jsonify({"error": "Goal not found"}), 404
-        
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        logger.error(f"Error in delete_goal_endpoint: {str(e)}")
+        logger.exception("Error in delete_goal_endpoint")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -357,9 +351,9 @@ def update_goal_endpoint(current_user, goal_id: str):
         
         return jsonify({"error": "Goal not found"}), 404
         
-    except Exception as e:
-        logger.exception(f"Error in update_goal_endpoint: {e}")
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error in update_goal_endpoint")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -392,8 +386,9 @@ def add_goal_target(current_user, goal_id):
         # Return all current targets
         all_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
         return jsonify({"targets": all_targets, "id": new_target.id}), status
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error adding goal target")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -424,8 +419,9 @@ def remove_goal_target(current_user, goal_id, target_id):
         # Return remaining targets
         remaining_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
         return jsonify({"targets": remaining_targets}), status
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error removing goal target")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -454,8 +450,9 @@ def get_goal_metrics(current_user, goal_id: str):
             return jsonify({"error": "Goal not found"}), 404
             
         return jsonify(metrics)
-    except Exception as e:
-        logger.exception(f"Error fetching goal metrics: {e}")
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal metrics")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -484,8 +481,9 @@ def get_goal_daily_durations(current_user, goal_id: str):
             return jsonify({"error": "Goal not found"}), 404
             
         return jsonify(metrics)
-    except Exception as e:
-        logger.exception(f"Error fetching goal daily durations: {e}")
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal daily durations")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -527,9 +525,9 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None):
         result = serialize_goal(goal)
         return jsonify(result), status
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        logger.error(f"Error in update_goal_completion_endpoint: {str(e)}")
+        logger.exception("Error in update_goal_completion_endpoint")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -568,7 +566,7 @@ def create_fractal(current_user, validated_data):
             return jsonify({"error": error}), status
         return jsonify(serialize_goal(new_fractal, include_children=False)), 201
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error creating fractal")
         return internal_error(logger, "Goals API request failed")
@@ -589,8 +587,9 @@ def delete_fractal(current_user, root_id):
             return jsonify({"error": error}), status
         return jsonify(result)
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error deleting fractal")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -609,7 +608,8 @@ def get_fractal_goals(current_user, root_id):
             return jsonify({"error": error}), status
         return etag_json_response(serialize_goal(root), status=status)
         
-    except Exception as e:
+    except SQLAlchemyError:
+        db_session.rollback()
         logger.exception("Error fetching fractal tree")
         return internal_error(logger, "Goals API request failed")
     finally:
@@ -632,7 +632,8 @@ def get_active_goals_for_selection(current_user, root_id):
             return jsonify({"error": error}), status
         return etag_json_response(result, status=status)
         
-    except Exception as e:
+    except SQLAlchemyError:
+        db_session.rollback()
         logger.exception("Error fetching selection goals")
         return internal_error(logger, "Goals API request failed")
     finally:
@@ -664,8 +665,9 @@ def create_fractal_goal(current_user, root_id, validated_data):
         # Return the created goal
         return jsonify(serialize_goal(new_goal, include_children=False)), 201
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error creating fractal goal")
         return internal_error(logger, "Error creating fractal goal")
     finally:
         db_session.close()
@@ -709,8 +711,9 @@ def delete_fractal_goal(current_user, root_id, goal_id):
         
         return jsonify({"status": "success", "message": "Goal deleted"}), status
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error deleting fractal goal")
         return internal_error(logger, "Error deleting fractal goal")
     finally:
         db_session.close()
@@ -739,8 +742,9 @@ def update_fractal_goal(current_user, root_id, goal_id):
         
         return jsonify(serialize_goal(goal, include_children=False)), status
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
+        logger.exception("Error updating fractal goal")
         return internal_error(logger, "Error updating fractal goal")
     finally:
         db_session.close()
@@ -771,7 +775,9 @@ def get_goal_analytics(current_user, root_id):
         set_analytics(root_id, payload)
         return etag_json_response(payload, status=status)
         
-    except Exception as e:
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal analytics")
         return internal_error(logger, "Error fetching goal analytics")
     finally:
         db_session.close()
@@ -822,7 +828,7 @@ def evaluate_goal_targets(current_user, root_id, goal_id):
             return jsonify({"error": error}), status
         return jsonify(payload), status
         
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error evaluating targets")
         return internal_error(logger, "Goals API request failed")

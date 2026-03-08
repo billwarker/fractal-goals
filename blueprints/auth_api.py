@@ -5,6 +5,7 @@ from functools import wraps
 from flask import request, jsonify, Blueprint
 import models
 from models import get_engine, get_session, User
+from sqlalchemy.exc import SQLAlchemyError
 from config import config
 from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
@@ -55,8 +56,8 @@ def token_required(f):
             return jsonify({'error': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
-        except Exception as e:
-            logger.exception("Unexpected error in token_required decorator")
+        except SQLAlchemyError:
+            logger.exception("Database error in token_required decorator")
             return jsonify({'error': 'Internal server error during authentication'}), 500
             
     return decorated
@@ -89,9 +90,10 @@ def signup(validated_data):
         db_session.refresh(new_user)
         
         return jsonify(serialize_user(new_user)), 201
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error during signup")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -142,7 +144,10 @@ def refresh_token():
         
     except jwt.InvalidTokenError:
         return jsonify({'error': 'Invalid token'}), 401
-    except Exception as e:
+    except SQLAlchemyError:
+        logger.exception("Error in refresh_token")
+        return jsonify({'error': 'Failed to refresh token'}), 500
+    except (TypeError, ValueError):
         logger.exception("Error in refresh_token")
         return jsonify({'error': 'Failed to refresh token'}), 500
 
@@ -199,9 +204,10 @@ def login(validated_data):
             'token': token,
             'user': serialize_user(user)
         })
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error during login")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -239,9 +245,10 @@ def update_preferences(current_user, validated_data):
         
         db_session.commit()
         return jsonify(serialize_user(user))
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error updating preferences")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -264,9 +271,10 @@ def update_password(current_user, validated_data):
         user.set_password(validated_data['new_password'])
         db_session.commit()
         return jsonify({"message": "Password updated successfully"})
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error updating password")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -294,9 +302,10 @@ def update_email(current_user, validated_data):
         user.email = validated_data['email']
         db_session.commit()
         return jsonify(serialize_user(user))
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error updating email")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -329,9 +338,10 @@ def delete_account(current_user, validated_data):
         
         db_session.commit()
         return jsonify({"message": "Account deleted successfully"})
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error deleting account")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
 
@@ -360,9 +370,9 @@ def update_username(current_user, validated_data):
         db_session.commit()
         
         return jsonify(serialize_user(user))
-    except Exception as e:
+    except SQLAlchemyError:
         db_session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error updating username")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         db_session.close()
-
