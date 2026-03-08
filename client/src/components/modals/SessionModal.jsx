@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -8,15 +8,15 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
     const [selectedShortTermGoals, setSelectedShortTermGoals] = useState([]);
     const [immediateGoals, setImmediateGoals] = useState([{ name: '', description: '' }]);
     const [error, setError] = useState(null);
-
-    // Reset state when opening
-    useEffect(() => {
-        if (isOpen) {
-            setSelectedShortTermGoals([]);
-            setImmediateGoals([{ name: '', description: '' }]);
-            setError(null);
-        }
-    }, [isOpen]);
+    const resetDraftState = () => {
+        setSelectedShortTermGoals([]);
+        setImmediateGoals([{ name: '', description: '' }]);
+        setError(null);
+    };
+    const handleClose = () => {
+        resetDraftState();
+        onClose();
+    };
 
     if (!isOpen) return null;
 
@@ -39,12 +39,13 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
             selectedShortTermGoals,
             immediateGoals: validImmediateGoals
         });
+        resetDraftState();
     };
 
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title="Create Session"
             size="md"
         >
@@ -156,7 +157,7 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
 
             <ModalFooter>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', width: '100%' }}>
-                    <Button variant="secondary" onClick={onClose}>
+                    <Button variant="secondary" onClick={handleClose}>
                         Cancel
                     </Button>
                     <Button variant="primary" onClick={handleCreate}>

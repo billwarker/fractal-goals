@@ -279,4 +279,62 @@ describe('SessionActivityItem nano note flow', () => {
             metrics: [{ metric_id: 'm1', value: '123' }]
         });
     });
+
+    it('buffers timer input edits and commits start time on blur', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-3',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-01-01T00:00:00.000Z',
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={onAddNote}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const [startInput] = screen.getAllByPlaceholderText('YYYY-MM-DD HH:MM:SS');
+        expect(startInput).toHaveValue('2026-01-01 00:00:00');
+
+        fireEvent.change(startInput, { target: { value: '2026-01-01 01:15:00' } });
+        expect(updateInstance).not.toHaveBeenCalled();
+        fireEvent.blur(startInput);
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledTimes(1);
+        });
+        expect(updateInstance).toHaveBeenCalledWith('instance-3', {
+            time_start: '2026-01-01T01:15:00.000Z'
+        });
+    });
 });

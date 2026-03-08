@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import useGoalAssociationMutations from '../hooks/useGoalAssociationMutations';
@@ -77,9 +77,6 @@ function GoalDetailModal({
         resetForm,
         errors, validateForm
     } = useGoalForm(goal, mode, isOpen);
-    // Metrics state
-    const [metrics, setMetrics] = useState(null);
-
     // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
     const goalType = mode === 'create'
         ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
@@ -112,6 +109,7 @@ function GoalDetailModal({
         setViewState,
         isScrolled,
         handleScroll,
+        handleClose,
         handleCancel,
         handleCompletionConfirm,
         handleUncompletionConfirm,
@@ -119,7 +117,6 @@ function GoalDetailModal({
         goal,
         goalId,
         mode,
-        isOpen,
         onClose,
         onToggleCompletion,
         resetForm,
@@ -134,11 +131,6 @@ function GoalDetailModal({
     const {
         metrics: fetchedMetrics,
     } = useGoalMetrics(mode === 'create' ? null : depGoalId);
-
-    // Sync metrics from Query to internal state
-    useEffect(() => {
-        setMetrics(fetchedMetrics);
-    }, [fetchedMetrics]);
     const {
         activityGroups,
         setActivityGroups,
@@ -288,7 +280,7 @@ function GoalDetailModal({
                     textColor={textColor}
                     parentGoal={parentGoal}
                     isCompleted={isCompleted}
-                    onClose={onClose}
+                    onClose={handleClose}
                     onCollapse={onMobileCollapse}
                     deadline={deadline}
                     isCompact={isScrolled}
@@ -349,7 +341,7 @@ function GoalDetailModal({
                         childType={childType}
                         displayMode={displayMode}
                         programs={programs}
-                        metrics={metrics}
+                        metrics={fetchedMetrics}
                         targets={targets}
                         associatedActivities={associatedActivities}
                         activityDefinitions={activityDefinitions}
@@ -360,7 +352,7 @@ function GoalDetailModal({
                         relevanceStatement={relevanceStatement}
                         setViewState={setViewState}
                         setIsEditing={setIsEditing}
-                        onClose={onClose}
+                        onClose={handleClose}
                         onToggleCompletion={onToggleCompletion}
                         onAddChild={onAddChild}
                         onDelete={onDelete}
@@ -461,7 +453,7 @@ function GoalDetailModal({
                     onCloseSelector={() => setViewState('goal')}
                     goalType={goalType}
                     headerColor={goalColor}
-                    onClose={onClose}
+                    onClose={handleClose}
                     onSave={!isEditing ? persistAssociations : undefined}
                     onRefreshAssociations={refreshAssociations}
                     onCreateActivity={() => {
@@ -519,7 +511,7 @@ function GoalDetailModal({
         <>
             <div
                 className={styles.modalOverlay}
-                onClick={onClose}
+                onClick={handleClose}
             >
                 <div
                     onClick={(e) => e.stopPropagation()}

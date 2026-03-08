@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -8,19 +8,21 @@ import { Text } from '../atoms/Typography';
 
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete' }) => {
     const [matchingText, setMatchingText] = useState('');
-
-    useEffect(() => {
-        if (isOpen) {
-            setMatchingText('');
-        }
-    }, [isOpen]);
+    const handleClose = () => {
+        setMatchingText('');
+        onClose();
+    };
+    const handleConfirm = () => {
+        setMatchingText('');
+        onConfirm();
+    };
 
     const isConfirmDisabled = requireMatchingText && matchingText !== requireMatchingText;
 
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title={title || "Confirm Delete"}
             size="sm"
             showCloseButton={true}
@@ -62,10 +64,10 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
             </ModalBody>
 
             <ModalFooter>
-                <Button variant="secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={handleClose}>
                     Cancel
                 </Button>
-                <Button variant="danger" onClick={onConfirm} disabled={isConfirmDisabled}>
+                <Button variant="danger" onClick={handleConfirm} disabled={isConfirmDisabled}>
                     {confirmText}
                 </Button>
             </ModalFooter>

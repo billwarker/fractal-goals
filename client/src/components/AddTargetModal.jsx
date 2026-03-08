@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from './atoms/Modal';
 import ModalBody from './atoms/ModalBody';
 import ModalFooter from './atoms/ModalFooter';
@@ -12,38 +12,36 @@ import notify from '../utils/notify';
  * AddTargetModal Component
  * Modal for creating or editing activity targets
  */
+function buildInitialTargetFormState(existingTarget, preselectedActivityId, activityDefinitions) {
+    if (existingTarget) {
+        const metricsObj = {};
+        existingTarget.metrics?.forEach((metric) => {
+            metricsObj[metric.metric_id] = metric.value;
+        });
+
+        return {
+            selectedActivityId: existingTarget.activity_id || '',
+            targetName: existingTarget.name || '',
+            targetDescription: existingTarget.description || '',
+            metricValues: metricsObj,
+        };
+    }
+
+    const preselectedActivity = activityDefinitions.find((activity) => activity.id === preselectedActivityId);
+    return {
+        selectedActivityId: preselectedActivityId || '',
+        targetName: preselectedActivity?.name || '',
+        targetDescription: '',
+        metricValues: {},
+    };
+}
+
 function AddTargetModal({ isOpen, onClose, onSave, activityDefinitions, existingTarget = null, preselectedActivityId = null }) {
-    const [selectedActivityId, setSelectedActivityId] = useState('');
-    const [targetName, setTargetName] = useState('');
-    const [targetDescription, setTargetDescription] = useState('');
-    const [metricValues, setMetricValues] = useState({});
-
-    // Initialize form when modal opens or existing target changes
-    useEffect(() => {
-        if (existingTarget) {
-            setSelectedActivityId(existingTarget.activity_id || '');
-            setTargetName(existingTarget.name || '');
-            setTargetDescription(existingTarget.description || '');
-
-            // Convert metrics array to object for easier editing
-            const metricsObj = {};
-            existingTarget.metrics?.forEach(m => {
-                metricsObj[m.metric_id] = m.value;
-            });
-            setMetricValues(metricsObj);
-        } else {
-            // Reset form for new target, respecting preselectedActivityId
-            setSelectedActivityId(preselectedActivityId || '');
-            setTargetName('');
-            setTargetDescription('');
-            setMetricValues({});
-            // Auto-fill name if an activity is preselected
-            if (preselectedActivityId) {
-                const activity = activityDefinitions.find(a => a.id === preselectedActivityId);
-                if (activity) setTargetName(activity.name);
-            }
-        }
-    }, [existingTarget, isOpen, preselectedActivityId]);
+    const initialFormState = buildInitialTargetFormState(existingTarget, preselectedActivityId, activityDefinitions);
+    const [selectedActivityId, setSelectedActivityId] = useState(initialFormState.selectedActivityId);
+    const [targetName, setTargetName] = useState(initialFormState.targetName);
+    const [targetDescription, setTargetDescription] = useState(initialFormState.targetDescription);
+    const [metricValues, setMetricValues] = useState(initialFormState.metricValues);
 
     const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
 

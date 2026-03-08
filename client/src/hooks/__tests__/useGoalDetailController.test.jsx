@@ -50,4 +50,46 @@ describe('useGoalDetailController', () => {
         expect(result.current.localCompletedAt).toBe('2026-03-01T12:00:00.000Z');
         expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
     });
+
+    it('resets state when the controlled goal changes', () => {
+        const { result, rerender } = renderHook(
+            ({ goal, goalId }) => useGoalDetailController({
+                goal,
+                goalId,
+                mode: 'view',
+                onClose: vi.fn(),
+                onToggleCompletion: vi.fn(),
+                resetForm: vi.fn(),
+            }),
+            {
+                initialProps: {
+                    goal: {
+                        id: 'goal-1',
+                        completed: false,
+                        attributes: { id: 'goal-1', completed: false, completed_at: null },
+                    },
+                    goalId: 'goal-1',
+                },
+            }
+        );
+
+        act(() => {
+            result.current.setIsEditing(true);
+            result.current.setViewState('target-manager');
+        });
+
+        rerender({
+            goal: {
+                id: 'goal-2',
+                completed: true,
+                attributes: { id: 'goal-2', completed: true, completed_at: '2026-03-02T10:00:00.000Z' },
+            },
+            goalId: 'goal-2',
+        });
+
+        expect(result.current.isEditing).toBe(false);
+        expect(result.current.viewState).toBe('goal');
+        expect(result.current.isCompleted).toBe(true);
+        expect(result.current.localCompletedAt).toBe('2026-03-02T10:00:00.000Z');
+    });
 });

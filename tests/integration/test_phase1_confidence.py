@@ -290,6 +290,17 @@ class TestPhase1GoalConfidence:
         )
         assert response.status_code == 400
 
+    def test_evaluate_targets_rejects_non_string_session_id(self, authed_client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy["ultimate"].id
+        goal_id = sample_goal_hierarchy["short_term"].id
+        response = authed_client.post(
+            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
+            data=json.dumps({"session_id": {"bad": "shape"}}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Validation failed"
+
     def test_evaluate_targets_no_targets_returns_empty_result(
         self, authed_client, sample_goal_hierarchy, sample_practice_session
     ):

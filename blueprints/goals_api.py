@@ -4,6 +4,7 @@ import json
 import uuid
 import logging
 import models
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, or_
@@ -18,6 +19,9 @@ from models import (
 from validators import (
     validate_request,
     GoalCreateSchema, GoalUpdateSchema,
+    GoalCompletionUpdateSchema,
+    GoalTargetCreateSchema, GoalTargetEvaluationSchema,
+    GoalAssociationBatchSchema,
     FractalCreateSchema,
     parse_date_string
 )
@@ -266,9 +270,10 @@ def get_goal_endpoint(current_user, goal_id: str):
 
 @goals_bp.route('/goals/<goal_id>', methods=['PUT'])
 @token_required
-def update_goal_endpoint(current_user, goal_id: str):
+@validate_request(GoalUpdateSchema)
+def update_goal_endpoint(current_user, goal_id: str, validated_data):
     """Update goal details."""
-    data = request.get_json()
+    data = validated_data
     
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -361,9 +366,10 @@ def update_goal_endpoint(current_user, goal_id: str):
 
 @goals_bp.route('/goals/<goal_id>/targets', methods=['POST'])
 @token_required
-def add_goal_target(current_user, goal_id):
+@validate_request(GoalTargetCreateSchema)
+def add_goal_target(current_user, goal_id, validated_data):
     """Add a target to a goal using relational Target model."""
-    data = request.get_json()
+    data = validated_data
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
@@ -495,6 +501,27 @@ def get_goal_daily_durations(current_user, goal_id: str):
 def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None):
     """Update goal completion status."""
     data = request.get_json(silent=True) or {}
+    if data and not isinstance(data, dict):
+        return jsonify({
+            "error": "Validation failed",
+            "details": [{
+                "field": "",
+                "message": "Input should be a valid dictionary",
+                "type": "dict_type",
+            }],
+        }), 400
+    try:
+        data = GoalCompletionUpdateSchema(**data).model_dump(exclude_unset=True)
+    except ValidationError as exc:
+        errors = []
+        for error in exc.errors():
+            field = ".".join(str(loc) for loc in error["loc"])
+            errors.append({
+                "field": field,
+                "message": error["msg"],
+                "type": error["type"],
+            })
+        return jsonify({"error": "Validation failed", "details": errors}), 400
     
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -721,12 +748,13 @@ def delete_fractal_goal(current_user, root_id, goal_id):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['PUT'])
 @token_required
-def update_fractal_goal(current_user, root_id, goal_id):
+@validate_request(GoalUpdateSchema)
+def update_fractal_goal(current_user, root_id, goal_id, validated_data):
     """Update a goal within a fractal."""
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        data = request.get_json()
+        data = validated_data
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.update_fractal_goal(root_id, goal_id, current_user.id, data)
         if error:
@@ -789,7 +817,8 @@ def get_goal_analytics(current_user, root_id):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>/evaluate-targets', methods=['POST'])
 @token_required
-def evaluate_goal_targets(current_user, root_id, goal_id):
+@validate_request(GoalTargetEvaluationSchema)
+def evaluate_goal_targets(current_user, root_id, goal_id, validated_data):
     """
     Evaluate targets for a goal against a session's activity instances.
     
@@ -816,13 +845,12 @@ def evaluate_goal_targets(current_user, root_id, goal_id):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        data = request.get_json() or {}
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.evaluate_goal_targets(
             root_id,
             goal_id,
             current_user.id,
-            data.get('session_id'),
+            validated_data['session_id'],
         )
         if error:
             return jsonify({"error": error}), status

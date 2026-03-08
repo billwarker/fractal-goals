@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { fractalApi } from '../utils/api';
 import { getLocalISOString, localToISO } from '../utils/dateUtils';
-import moment from 'moment';
 
 export function useProgramLogic(rootId, program, refreshData) {
 
@@ -96,28 +95,6 @@ export function useProgramLogic(rootId, program, refreshData) {
         await refreshData();
     }, [rootId, program, refreshData]);
 
-    const scheduleBlockDay = useCallback(async (blockId, dayId, date) => {
-        let dayToUpdate = null;
-        program.blocks.some(b => {
-            if (b.id === blockId && b.days) {
-                const found = b.days.find(d => d.id === dayId);
-                if (found) {
-                    dayToUpdate = found;
-                    return true;
-                }
-            }
-            return false;
-        });
-
-        if (!dayToUpdate) {
-            throw new Error("Day not found in local state");
-        }
-
-        const updatedDay = { ...dayToUpdate, date: date };
-        await fractalApi.updateBlockDay(rootId, program.id, blockId, dayId, updatedDay);
-        await refreshData();
-    }, [rootId, program, refreshData]);
-
     const unscheduleDay = useCallback(async (item) => {
         if (item.type === 'session') {
             await fractalApi.deleteSession(rootId, item.id);
@@ -143,7 +120,6 @@ export function useProgramLogic(rootId, program, refreshData) {
         copyDay,
         deleteDay,
         scheduleDay,
-        scheduleBlockDay,
         unscheduleDay,
         attachGoal
     };

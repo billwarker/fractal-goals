@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import { getISOYMDInTimezone, formatDateInTimezone, getDatePart, formatLiteralDate } from '../utils/dateUtils';
+import { getISOYMDInTimezone, getDatePart, formatLiteralDate } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
@@ -18,8 +18,6 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { toast } from 'react-hot-toast';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
-import { getChildType } from '../utils/goalHelpers';
-
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramLogic } from '../hooks/useProgramLogic';
 import useIsMobile from '../hooks/useIsMobile';
@@ -37,10 +35,10 @@ const ProgramDetail = () => {
     const {
         program,
         loading,
-        goals, setGoals,
+        goals,
         activities,
         activityGroups,
-        sessions, setSessions,
+        sessions,
         treeData,
         refreshData,
         getGoalDetails
@@ -84,18 +82,10 @@ const ProgramDetail = () => {
     const [modalMode, setModalMode] = useState('view'); // 'view', 'edit', 'create'
     const [selectedParent, setSelectedParent] = useState(null);
 
-    const formatDate = (dateString, format = 'MMM D, YYYY') => {
+    const formatDate = (dateString) => {
         if (!dateString) return '';
         // Use literal formatting for header/program ranges to avoid timezone shifts
         return formatLiteralDate(dateString);
-    };
-
-    const formatDurationSeconds = (seconds) => {
-        if (!seconds || seconds <= 0) return '0m';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        if (h > 0) return `${h}h ${m}m`;
-        return `${m}m`;
     };
 
     const handleSaveProgram = async (programData) => {
@@ -258,7 +248,7 @@ const ProgramDetail = () => {
                         try {
                             const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
                             pDayId = attr?.program_context?.day_id;
-                        } catch (e) { /* ignore */ }
+                        } catch { /* ignore */ }
                     }
 
                     if (pDayId !== itemToUnschedule.id) return false;
@@ -293,18 +283,6 @@ const ProgramDetail = () => {
         } catch (err) {
             console.error('Failed to schedule day:', err);
             toast.error('Failed to schedule day: ' + (err.response?.data?.error || err.message));
-        }
-    };
-
-    // Handler for scheduling an existing block day (assigning a date)
-    const handleScheduleBlockDay = async (blockId, dayId, date) => {
-        try {
-            await actions.scheduleBlockDay(blockId, dayId, date);
-            setShowDayViewModal(false);
-            setSelectedDate(null);
-        } catch (err) {
-            console.error('Failed to schedule block day:', err);
-            toast.error('Failed to schedule block day: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -393,7 +371,6 @@ const ProgramDetail = () => {
     };
 
     const handleAddChildGoal = (parentGoal) => {
-        const parentId = parentGoal.id || parentGoal.attributes?.id;
         setSelectedParent(parentGoal);
         setModalMode('create');
         setShowGoalModal(true);
@@ -486,7 +463,7 @@ const ProgramDetail = () => {
             try {
                 const attr = typeof session.attributes === 'string' ? JSON.parse(session.attributes) : session.attributes;
                 pDayId = attr?.program_context?.day_id;
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
         }
 
         const pDayTemplate = pDayId ? programDaysMap.get(pDayId) : null;
@@ -702,7 +679,7 @@ const ProgramDetail = () => {
                 try {
                     const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
                     pDayId = attr?.program_context?.day_id;
-                } catch (e) { /* ignore */ }
+                } catch { /* ignore */ }
             }
             return pDayId && programDaysMap.has(pDayId);
         });
@@ -733,7 +710,7 @@ const ProgramDetail = () => {
                 try {
                     const attr = typeof s.attributes === 'string' ? JSON.parse(s.attributes) : s.attributes;
                     pDayId = attr?.program_context?.day_id;
-                } catch (e) { /* ignore */ }
+                } catch { /* ignore */ }
             }
 
             // Strictly only count sessions linked to a day within this block

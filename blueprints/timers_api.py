@@ -7,6 +7,7 @@ import os
 import models
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
+from pydantic import ValidationError
 from models import get_session, ActivityInstance, Session, ActivityDefinition
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root
@@ -17,10 +18,29 @@ from services.owned_entity_queries import (
     get_owned_session,
 )
 from services.serializers import serialize_activity_instance
+from validators import (
+    validate_request,
+    ActivityInstanceCreateSchema,
+    ActivityTimerStartSchema,
+    TimerActivityInstanceManualUpdateSchema,
+)
 
 # Create blueprint
 timers_bp = Blueprint('timers', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
+
+
+def _validation_error_response(error: ValidationError):
+    errors = []
+    for item in error.errors():
+        field = ".".join(str(loc) for loc in item["loc"])
+        errors.append({
+            "field": field,
+            "message": item["msg"],
+            "type": item["type"],
+        })
+    logger.warning("Validation error: %s", errors)
+    return jsonify({"error": "Validation failed", "details": errors}), 400
 
 
 # ============================================================================
@@ -41,7 +61,11 @@ def activity_instances(current_user, root_id):
         
         if request.method == 'POST':
             # Create new activity instance
-            data = request.get_json() or {}
+            try:
+                validated = ActivityInstanceCreateSchema(**(request.get_json(silent=True) or {}))
+            except ValidationError as error:
+                return _validation_error_response(error)
+            data = validated.model_dump(exclude_unset=True)
             instance_id = data.get('instance_id')
             # Support session_id
             session_id = data.get('session_id')
@@ -143,7 +167,11 @@ def start_activity_timer(current_user, root_id, instance_id):
         
         if not instance:
             # Instance doesn't exist yet - create it
-            data = request.get_json(silent=True) or {}
+            try:
+                validated = ActivityTimerStartSchema(**(request.get_json(silent=True) or {}))
+            except ValidationError as error:
+                return _validation_error_response(error)
+            data = validated.model_dump(exclude_unset=True)
             # Support session_id
             session_id = data.get('session_id')
 
@@ -339,7 +367,8 @@ def parse_iso_datetime(iso_string):
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
 @token_required
-def update_activity_instance(current_user, root_id, instance_id):
+@validate_request(TimerActivityInstanceManualUpdateSchema)
+def update_activity_instance(current_user, root_id, instance_id, validated_data):
     """Update an activity instance manually if owned by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
@@ -349,7 +378,7 @@ def update_activity_instance(current_user, root_id, instance_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        data = request.get_json() or {}
+        data = validated_data
         
         # Get the activity instance
         instance = get_owned_activity_instance(

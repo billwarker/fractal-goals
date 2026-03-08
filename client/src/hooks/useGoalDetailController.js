@@ -1,93 +1,141 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+
+function resolveNextValue(nextValue, currentValue) {
+    return typeof nextValue === 'function' ? nextValue(currentValue) : nextValue;
+}
+
+function buildDefaultControllerState(mode, completed, completedAt) {
+    return {
+        isEditing: mode === 'create' || mode === 'edit',
+        localCompleted: mode === 'create' ? false : (completed || false),
+        localCompletedAt: mode === 'create' ? null : (completedAt || null),
+        targetToEdit: null,
+        viewState: 'goal',
+    };
+}
 
 export function useGoalDetailController({
     goal,
     goalId,
     mode,
-    isOpen,
     onClose,
     onToggleCompletion,
     resetForm,
 }) {
-    const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
-    const [localCompleted, setLocalCompleted] = useState(false);
-    const [localCompletedAt, setLocalCompletedAt] = useState(null);
-    const [targetToEdit, setTargetToEdit] = useState(null);
-    const [viewState, setViewState] = useState('goal');
+    const [controllerStateByKey, setControllerStateByKey] = useState({});
     const [isScrolled, setIsScrolled] = useState(false);
 
     const depGoalIdentity = goal?.attributes?.id || goal?.id;
     const depGoalCompleted = goal?.attributes?.completed;
     const depGoalCompletedAt = goal?.attributes?.completed_at;
+    const controllerKey = `${mode}:${depGoalIdentity || 'new-goal'}`;
+    const defaultState = useMemo(
+        () => buildDefaultControllerState(mode, depGoalCompleted, depGoalCompletedAt),
+        [mode, depGoalCompleted, depGoalCompletedAt]
+    );
+    const controllerState = controllerStateByKey[controllerKey] || defaultState;
 
-    useEffect(() => {
-        if (mode === 'create') {
-            /* eslint-disable-next-line react-hooks/set-state-in-effect */
-            setLocalCompleted(false);
-            setLocalCompletedAt(null);
-            setIsEditing(true);
-            setTargetToEdit(null);
-            setViewState('goal');
-            return;
-        }
+    const updateControllerState = (updater) => {
+        setControllerStateByKey((prev) => {
+            const currentState = prev[controllerKey] || defaultState;
+            const nextState =
+                typeof updater === 'function' ? updater(currentState) : updater;
+            return {
+                ...prev,
+                [controllerKey]: nextState,
+            };
+        });
+    };
 
-        if (!depGoalIdentity) {
-            return;
-        }
+    const clearControllerState = () => {
+        setControllerStateByKey((prev) => {
+            if (!(controllerKey in prev)) {
+                return prev;
+            }
 
-        setLocalCompleted(depGoalCompleted || false);
-        setLocalCompletedAt(depGoalCompletedAt || null);
-        setIsEditing(mode === 'edit');
-        setTargetToEdit(null);
-        setViewState('goal');
-    }, [depGoalIdentity, depGoalCompleted, depGoalCompletedAt, mode, isOpen]);
+            const next = { ...prev };
+            delete next[controllerKey];
+            return next;
+        });
+    };
+
+    const setIsEditing = (nextValue) => {
+        updateControllerState((prev) => ({
+            ...prev,
+            isEditing: resolveNextValue(nextValue, prev.isEditing),
+        }));
+    };
+
+    const setTargetToEdit = (nextValue) => {
+        updateControllerState((prev) => ({
+            ...prev,
+            targetToEdit: resolveNextValue(nextValue, prev.targetToEdit),
+        }));
+    };
+
+    const setViewState = (nextValue) => {
+        updateControllerState((prev) => ({
+            ...prev,
+            viewState: resolveNextValue(nextValue, prev.viewState),
+        }));
+    };
 
     const handleScroll = (event) => {
         setIsScrolled(event.target.scrollTop > 0);
     };
 
+    const handleClose = () => {
+        clearControllerState();
+        if (onClose) {
+            onClose();
+        }
+    };
+
     const handleCancel = () => {
         if (mode === 'create') {
-            if (onClose) {
-                onClose();
-            }
+            handleClose();
             return;
         }
 
         resetForm();
-        if (depGoalIdentity) {
-            setLocalCompleted(depGoalCompleted || false);
-            setLocalCompletedAt(depGoalCompletedAt || null);
-        }
-        setTargetToEdit(null);
-        setIsEditing(false);
+        updateControllerState({
+            ...defaultState,
+            isEditing: false,
+        });
     };
 
     const handleCompletionConfirm = (completionDate) => {
-        setLocalCompleted(true);
-        setLocalCompletedAt(completionDate.toISOString());
+        updateControllerState((prev) => ({
+            ...prev,
+            localCompleted: true,
+            localCompletedAt: completionDate.toISOString(),
+            viewState: 'goal',
+        }));
         onToggleCompletion(goalId, false);
-        setViewState('goal');
     };
 
     const handleUncompletionConfirm = () => {
-        setLocalCompleted(false);
-        setLocalCompletedAt(null);
+        updateControllerState((prev) => ({
+            ...prev,
+            localCompleted: false,
+            localCompletedAt: null,
+            viewState: 'goal',
+        }));
         onToggleCompletion(goalId, true);
-        setViewState('goal');
     };
 
     return {
-        isEditing,
+        isEditing: controllerState.isEditing,
         setIsEditing,
-        localCompletedAt,
-        isCompleted: localCompleted || depGoalCompleted || goal?.completed || false,
-        targetToEdit,
+        localCompletedAt: controllerState.localCompletedAt,
+        isCompleted: controllerState.localCompleted || depGoalCompleted || goal?.completed || false,
+        targetToEdit: controllerState.targetToEdit,
         setTargetToEdit,
-        viewState,
+        viewState: controllerState.viewState,
         setViewState,
         isScrolled,
         handleScroll,
+        handleClose,
         handleCancel,
         handleCompletionConfirm,
         handleUncompletionConfirm,

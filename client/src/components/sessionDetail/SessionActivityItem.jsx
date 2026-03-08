@@ -252,18 +252,20 @@ function SessionActivityItem({
     // Characteristics for goal icons
     const microChars = getLevelByName('MicroGoal');
 
-    const [nanoMode, setNanoMode] = useState(!!activeMicroGoal);
-    useEffect(() => {
-        setNanoMode(!!activeMicroGoal);
-    }, [activeMicroGoal]);
+    const [nanoModeOverrides, setNanoModeOverrides] = useState({});
+    const nanoModeKey = activeMicroGoal?.id || 'none';
+    const nanoMode = nanoModeOverrides[nanoModeKey] ?? Boolean(activeMicroGoal);
 
     const handleToggleNanoMode = useCallback(() => {
-        setNanoMode(prev => !prev);
-    }, []);
+        setNanoModeOverrides((prev) => ({
+            ...prev,
+            [nanoModeKey]: !nanoMode,
+        }));
+    }, [nanoMode, nanoModeKey]);
 
-    // Local state for editing datetime fields
-    const [localStartTime, setLocalStartTime] = useState('');
-    const [localStopTime, setLocalStopTime] = useState('');
+    // Local draft state for editing datetime fields. `null` means "show current query value".
+    const [startTimeDraft, setStartTimeDraft] = useState(null);
+    const [stopTimeDraft, setStopTimeDraft] = useState(null);
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
     const [pendingNanoGoalIds, setPendingNanoGoalIds] = useState(() => new Set());
@@ -495,14 +497,8 @@ function SessionActivityItem({
         }
     }, [toggleGoalCompletion, pendingNanoGoalIds]);
 
-    // Sync local state when exercise times change
-    useEffect(() => {
-        setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
-    }, [exercise.time_start, timezone]);
-
-    useEffect(() => {
-        setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
-    }, [exercise.time_stop, timezone]);
+    const localStartTime = startTimeDraft ?? (exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+    const localStopTime = stopTimeDraft ?? (exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
     // If we don't have definition, we can't render much (maybe just name)
     // But we should have it passed in from parent lookups
     const def = activityDefinition || { name: exercise.name || 'Unknown Activity', metric_definitions: [], split_definitions: [] };
@@ -658,19 +654,20 @@ function SessionActivityItem({
                                         type="text"
                                         placeholder="YYYY-MM-DD HH:MM:SS"
                                         value={localStartTime}
-                                        onChange={(e) => setLocalStartTime(e.target.value)}
+                                        onChange={(e) => setStartTimeDraft(e.target.value)}
                                         onBlur={(e) => {
                                             if (e.target.value) {
                                                 try {
                                                     const isoValue = localToISO(e.target.value, timezone);
                                                     onUpdate('time_start', isoValue);
+                                                    setStartTimeDraft(null);
                                                 } catch (err) {
                                                     console.error('Invalid date format:', err);
-                                                    // Reset to previous value
-                                                    setLocalStartTime(exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
+                                                    setStartTimeDraft(null);
                                                 }
                                             } else {
                                                 onUpdate('time_start', null);
+                                                setStartTimeDraft(null);
                                             }
                                         }}
                                         className={styles.timerInput}
@@ -684,19 +681,20 @@ function SessionActivityItem({
                                         type="text"
                                         placeholder="YYYY-MM-DD HH:MM:SS"
                                         value={localStopTime}
-                                        onChange={(e) => setLocalStopTime(e.target.value)}
+                                        onChange={(e) => setStopTimeDraft(e.target.value)}
                                         onBlur={(e) => {
                                             if (e.target.value) {
                                                 try {
                                                     const isoValue = localToISO(e.target.value, timezone);
                                                     onUpdate('time_stop', isoValue);
+                                                    setStopTimeDraft(null);
                                                 } catch (err) {
                                                     console.error('Invalid date format:', err);
-                                                    // Reset to previous value
-                                                    setLocalStopTime(exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
+                                                    setStopTimeDraft(null);
                                                 }
                                             } else {
                                                 onUpdate('time_stop', null);
+                                                setStopTimeDraft(null);
                                             }
                                         }}
                                         disabled={!exercise.time_start}

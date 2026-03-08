@@ -369,6 +369,47 @@ class GoalUpdateSchema(BaseModel):
             raise ValueError("Invalid deadline format. Use YYYY-MM-DD")
 
 
+class GoalCompletionUpdateSchema(BaseModel):
+    """Schema for toggling or explicitly setting goal completion."""
+    completed: Optional[bool] = None
+
+
+class GoalTargetCreateSchema(BaseModel):
+    """Schema for creating a target on a goal."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    id: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
+    activity_id: Optional[str] = None
+    activity_instance_id: Optional[str] = None
+    type: Optional[str] = None
+    time_scope: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    linked_block_id: Optional[str] = None
+    frequency_days: Optional[int] = Field(None, ge=0)
+    frequency_count: Optional[int] = Field(None, ge=0)
+    metrics: Optional[List[Dict[str, Any]]] = None
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+
+class GoalTargetEvaluationSchema(BaseModel):
+    """Schema for evaluating goal targets against a session."""
+    session_id: str = Field(..., min_length=1)
+
+
+class GoalAssociationBatchSchema(BaseModel):
+    """Schema for replacing both direct activity and group associations for a goal."""
+    activity_ids: List[str] = Field(default_factory=list)
+    group_ids: List[str] = Field(default_factory=list)
+
+
 class FractalCreateSchema(BaseModel):
     """Schema for creating a new fractal (root goal)."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -481,6 +522,7 @@ class SessionGoalAssociationSchema(BaseModel):
 
 class ActivityInstanceCreateSchema(BaseModel):
     """Schema for creating an activity instance in a session."""
+    session_id: str = Field(..., min_length=1)
     activity_definition_id: str = Field(..., min_length=1)
     instance_id: Optional[str] = None
 
@@ -490,6 +532,32 @@ class ActivityInstanceUpdateSchema(BaseModel):
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     completed: Optional[bool] = None
     
+    @field_validator('notes')
+    @classmethod
+    def sanitize_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+
+class ActivityTimerStartSchema(BaseModel):
+    """Schema for starting a timer when creation details may be provided."""
+    session_id: Optional[str] = None
+    activity_definition_id: Optional[str] = None
+
+
+class TimerActivityInstanceManualUpdateSchema(BaseModel):
+    """Schema for manual timer/activity-instance updates."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    session_id: Optional[str] = None
+    activity_definition_id: Optional[str] = None
+    time_start: Optional[str] = None
+    time_stop: Optional[str] = None
+    completed: Optional[bool] = None
+    notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    sets: Optional[List[Dict[str, Any]]] = None
+
     @field_validator('notes')
     @classmethod
     def sanitize_notes(cls, v: Optional[str]) -> Optional[str]:
@@ -822,6 +890,11 @@ class ProgramDayGoalAttachSchema(BaseModel):
     goal_id: str = Field(..., min_length=1)
 
 
+class ProgramDayCopySchema(BaseModel):
+    """Schema for copying a block day across blocks."""
+    target_mode: Optional[str] = Field('all', pattern=r'^(all|selected)$')
+
+
 # =============================================================================
 # TEMPLATE SCHEMAS
 # =============================================================================
@@ -845,3 +918,39 @@ class SessionTemplateUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     template_data: Optional[Dict[str, Any]] = None
+
+
+# =============================================================================
+# ANNOTATION SCHEMAS
+# =============================================================================
+
+class AnnotationCreateSchema(BaseModel):
+    """Schema for creating a visualization annotation."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    visualization_type: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    visualization_context: Optional[Dict[str, Any]] = None
+    selected_points: List[Dict[str, Any]] = Field(..., min_length=1)
+    selection_bounds: Optional[Dict[str, Any]] = None
+    content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
+
+    @field_validator('visualization_type', 'content')
+    @classmethod
+    def sanitize_strings(cls, v: str) -> str:
+        return sanitize_string(v)
+
+
+class AnnotationUpdateSchema(BaseModel):
+    """Schema for updating a visualization annotation."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    content: Optional[str] = Field(None, min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
+    selected_points: Optional[List[Dict[str, Any]]] = None
+    selection_bounds: Optional[Dict[str, Any]] = None
+
+    @field_validator('content')
+    @classmethod
+    def sanitize_content(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)

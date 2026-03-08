@@ -4,46 +4,27 @@
  * Shows previous instances of the selected activity with their metrics.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import styles from './HistoryPanel.module.css';
 
 function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs }) {
-    // Default to selected activity's definition, or first in list
-    const [selectedActivityId, setSelectedActivityId] = useState(
-        selectedActivity?.activity_definition_id || sessionActivityDefs[0]?.id || null
+    const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
+    const availableActivityIds = useMemo(
+        () => sessionActivityDefs.map((definition) => definition.id),
+        [sessionActivityDefs]
     );
-
-    // Update selection when selectedActivity changes
-    useEffect(() => {
-        if (selectedActivity?.activity_definition_id) {
-            setSelectedActivityId(selectedActivity.activity_definition_id);
+    const selectedActivityId = useMemo(() => {
+        const focusedActivityId = selectedActivity?.activity_definition_id;
+        if (focusedActivityId && availableActivityIds.includes(focusedActivityId)) {
+            return focusedActivityId;
         }
-    }, [selectedActivity]);
-
-    // Keep selection valid for current session activity defs.
-    // If the current selection is no longer present (or there are no activities), clear it.
-    useEffect(() => {
-        const availableIds = new Set(sessionActivityDefs.map((def) => def.id));
-        if (availableIds.size === 0) {
-            if (selectedActivityId !== null) {
-                setSelectedActivityId(null);
-            }
-            return;
+        if (manualSelectedActivityId && availableActivityIds.includes(manualSelectedActivityId)) {
+            return manualSelectedActivityId;
         }
-
-        if (selectedActivity?.activity_definition_id && availableIds.has(selectedActivity.activity_definition_id)) {
-            if (selectedActivityId !== selectedActivity.activity_definition_id) {
-                setSelectedActivityId(selectedActivity.activity_definition_id);
-            }
-            return;
-        }
-
-        if (!selectedActivityId || !availableIds.has(selectedActivityId)) {
-            setSelectedActivityId(sessionActivityDefs[0]?.id || null);
-        }
-    }, [sessionActivityDefs, selectedActivity, selectedActivityId]);
+        return availableActivityIds[0] || null;
+    }, [availableActivityIds, manualSelectedActivityId, selectedActivity]);
 
     const { history, loading, error } = useActivityHistory(
         rootId,
@@ -63,7 +44,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                 year: 'numeric',
                 timeZone: timezone
             });
-        } catch (e) {
+        } catch {
             return '';
         }
     };
@@ -78,7 +59,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                 <label>Select Activity:</label>
                 <select
                     value={selectedActivityId || ''}
-                    onChange={(e) => setSelectedActivityId(e.target.value || null)}
+                    onChange={(e) => setManualSelectedActivityId(e.target.value || null)}
                 >
                     {sessionActivityDefs.length === 0 ? (
                         <option value="">No activities in session</option>
@@ -149,7 +130,7 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
                 minute: '2-digit',
                 timeZone: timezone
             });
-        } catch (e) {
+        } catch {
             return '';
         }
     };

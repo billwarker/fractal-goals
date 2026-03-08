@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
@@ -20,8 +20,7 @@ function Programs() {
     const navigate = useNavigate();
     const { setActiveRootId } = useGoals();
     const { getGoalColor } = useGoalLevels();
-    const [showBuilder, setShowBuilder] = useState(false);
-    const [selectedProgram, setSelectedProgram] = useState(null);
+    const [isCreatingProgram, setIsCreatingProgram] = useState(false);
 
     // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -36,6 +35,11 @@ function Programs() {
         loading,
         refetchPrograms
     } = useProgramsPageData(rootId);
+    const selectedProgram = useMemo(
+        () => programs.find((program) => program.id === programId) || null,
+        [programId, programs]
+    );
+    const isBuilderOpen = isCreatingProgram || Boolean(selectedProgram);
 
     useEffect(() => {
         if (rootId) {
@@ -43,17 +47,6 @@ function Programs() {
         }
         return () => setActiveRootId(null);
     }, [rootId, setActiveRootId]);
-
-    // If programId is in URL, fetch and open that program for editing
-    useEffect(() => {
-        if (programId && programs.length > 0) {
-            const program = programs.find(p => p.id === programId);
-            if (program) {
-                setSelectedProgram(program);
-                setShowBuilder(true);
-            }
-        }
-    }, [programId, programs]);
 
     useEffect(() => {
         if (!showAll && !programId && programs.length > 0) {
@@ -91,8 +84,7 @@ function Programs() {
 
             // Navigate to detail view
             navigate(`/${rootId}/programs/${savedProgramId}`);
-            setShowBuilder(false);
-            setSelectedProgram(null);
+            setIsCreatingProgram(false);
         } catch (err) {
             console.error('Failed to save program:', err);
             notify.error('Failed to save program: ' + (err.response?.data?.error || err.message));
@@ -147,7 +139,7 @@ function Programs() {
                 </Heading>
 
                 <button
-                    onClick={() => setShowBuilder(true)}
+                    onClick={() => setIsCreatingProgram(true)}
                     className={styles.newProgramBtn}
                 >
                     <span className={styles.plusIcon}>+</span>
@@ -174,7 +166,7 @@ function Programs() {
                             Create your first training program to organize your sessions into a structured weekly schedule.
                         </Text>
                         <button
-                            onClick={() => setShowBuilder(true)}
+                            onClick={() => setIsCreatingProgram(true)}
                             className={styles.createFirstBtn}
                         >
                             Create Your First Program
@@ -287,10 +279,9 @@ function Programs() {
 
             {/* Program Builder Modal */}
             <ProgramBuilder
-                isOpen={showBuilder}
+                isOpen={isBuilderOpen}
                 onClose={() => {
-                    setShowBuilder(false);
-                    setSelectedProgram(null);
+                    setIsCreatingProgram(false);
                     if (programId) {
                         navigate(`/${rootId}/programs`);
                     }

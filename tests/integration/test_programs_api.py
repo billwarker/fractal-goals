@@ -251,3 +251,40 @@ class TestProgramStructure:
         block_data = data['block']
         goal_ids = block_data['goal_ids']
         assert short_term_goal.id in goal_ids
+
+    def test_copy_block_day_rejects_invalid_target_mode(self, authed_client, sample_ultimate_goal, sample_program):
+        """Copy-day requests should validate target_mode before reaching the service layer."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+
+        program_response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
+        program_data = json.loads(program_response.data)
+        source_block_id = program_data['blocks'][0]['id']
+
+        block_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks',
+            json={
+                'name': 'Second Block',
+                'start_date': datetime.utcnow().strftime('%Y-%m-%d'),
+                'end_date': (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d'),
+            }
+        )
+        assert block_response.status_code == 201
+
+        add_day_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{source_block_id}/days',
+            json={'name': 'Copy Me'}
+        )
+        assert add_day_response.status_code == 201
+
+        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        source_block = next(block for block in refreshed_program['blocks'] if block['id'] == source_block_id)
+        day_id = next(day['id'] for day in source_block['days'] if day.get('name') == 'Copy Me')
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{source_block_id}/days/{day_id}/copy',
+            json={'target_mode': 'bad-mode'}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'

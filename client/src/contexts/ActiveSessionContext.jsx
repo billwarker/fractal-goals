@@ -20,6 +20,84 @@ function formatGoalTypeLabel(type) {
     return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
+function extractDefinitionId(item) {
+    if (typeof item === 'string') return item;
+    if (!item || typeof item !== 'object') return null;
+    const direct = item.activity_id || item.activity_definition_id || item.activityId || item.activityDefinitionId || item.definition_id || item.id;
+    if (direct) return direct;
+    if (item.activity && typeof item.activity === 'object') {
+        return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
+    }
+    return null;
+}
+
+function normalizeSectionActivityIds(data, instances) {
+    if (!data || typeof data !== 'object') return data;
+    const sections = Array.isArray(data.sections) ? data.sections : [];
+    if (sections.length === 0) return data;
+
+    const idsByDef = (instances || []).reduce((acc, inst) => {
+        const defId = inst?.activity_definition_id;
+        if (!defId || !inst?.id) return acc;
+        if (!acc[defId]) acc[defId] = [];
+        acc[defId].push(inst.id);
+        return acc;
+    }, {});
+
+    const allInstanceIds = (instances || []).map((inst) => inst.id).filter(Boolean);
+    const used = new Set();
+
+    const normalizedSections = sections.map((section) => {
+        if (!section || typeof section !== 'object') return section;
+
+        const existing = Array.isArray(section.activity_ids)
+            ? section.activity_ids.filter((id) => allInstanceIds.includes(id) && !used.has(id))
+            : [];
+
+        let activityIds = [...existing];
+
+        if (activityIds.length === 0) {
+            const rawItems = section.exercises || section.activities || [];
+
+            for (const item of rawItems) {
+                if (!item || typeof item !== 'object') continue;
+                const instanceId = item.instance_id;
+                if (instanceId && allInstanceIds.includes(instanceId) && !used.has(instanceId) && !activityIds.includes(instanceId)) {
+                    activityIds.push(instanceId);
+                }
+            }
+
+            if (activityIds.length === 0) {
+                for (const item of rawItems) {
+                    const definitionId = extractDefinitionId(item);
+                    if (!definitionId) continue;
+                    const candidates = idsByDef[definitionId] || [];
+                    const candidate = candidates.find((id) => !used.has(id) && !activityIds.includes(id));
+                    if (candidate) activityIds.push(candidate);
+                }
+            }
+        }
+
+        activityIds.forEach((id) => used.add(id));
+        return {
+            ...section,
+            activity_ids: activityIds
+        };
+    });
+
+    if (normalizedSections.length === 1 && (!normalizedSections[0].activity_ids || normalizedSections[0].activity_ids.length === 0)) {
+        normalizedSections[0] = {
+            ...normalizedSections[0],
+            activity_ids: allInstanceIds
+        };
+    }
+
+    return {
+        ...data,
+        sections: normalizedSections
+    };
+}
+
 export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const queryClient = useQueryClient();
     const { setActiveRootId } = useGoals();
@@ -37,7 +115,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const [showActivitySelector, setShowActivitySelector] = useState({});
     const [autoSaveStatus, setAutoSaveStatus] = useState('');
     const [sidePaneMode, setSidePaneMode] = useState('details');
-    const [localSessionData, setLocalSessionData] = useState(null);
+    const [sessionDataDraft, setSessionDataDraft] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
     const [isDeletingSession, setIsDeletingSession] = useState(false);
     const initializedRef = useRef(false);
@@ -122,6 +200,19 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const microGoals = useMemo(() => sessionGoalsView?.micro_goals || [], [sessionGoalsView]);
+    const normalizedSessionData = useMemo(() => {
+        if (!session) return null;
+        const baseData = session.attributes?.session_data || { sections: [] };
+        return normalizeSectionActivityIds(baseData, activityInstances);
+    }, [session, activityInstances]);
+    const localSessionData = sessionDataDraft ?? normalizedSessionData;
+    const updateSessionDataDraft = useCallback((updater) => {
+        setSessionDataDraft((prev) => {
+            const base = prev ?? normalizedSessionData;
+            if (!base) return prev;
+            return typeof updater === 'function' ? updater(base) : updater;
+        });
+    }, [normalizedSessionData]);
 
     // 2. Mutations
     const updateSessionMutation = useMutation({
@@ -464,42 +555,56 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [activityInstances, queryClient, rootId, sessionActivitiesKey, sessionId, sessionKey]);
 
     const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
-        const updatedData = { ...localSessionData };
-        const activityIds = [...(updatedData.sections[sectionIndex].activity_ids || [])];
-        const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
-        if (newIndex < 0 || newIndex >= activityIds.length) return;
+        updateSessionDataDraft((currentData) => {
+            const updatedData = { ...currentData };
+            const sections = [...(updatedData.sections || [])];
+            const section = sections[sectionIndex];
+            if (!section) return currentData;
 
-        [activityIds[exerciseIndex], activityIds[newIndex]] = [activityIds[newIndex], activityIds[exerciseIndex]];
+            const activityIds = [...(section.activity_ids || [])];
+            const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
+            if (newIndex < 0 || newIndex >= activityIds.length) return currentData;
 
-        updatedData.sections[sectionIndex].activity_ids = activityIds;
-        setLocalSessionData(updatedData);
-    }, [localSessionData]);
+            [activityIds[exerciseIndex], activityIds[newIndex]] = [activityIds[newIndex], activityIds[exerciseIndex]];
+            sections[sectionIndex] = {
+                ...section,
+                activity_ids: activityIds,
+            };
+            updatedData.sections = sections;
+            return updatedData;
+        });
+    }, [updateSessionDataDraft]);
 
     const handleMoveActivity = useCallback((sourceSectionIndex, targetSectionIndex, instanceId) => {
         if (sourceSectionIndex === targetSectionIndex) return;
 
-        const updatedData = { ...localSessionData };
-        const sections = [...updatedData.sections];
+        updateSessionDataDraft((currentData) => {
+            const updatedData = { ...currentData };
+            const sections = [...(updatedData.sections || [])];
 
-        const sourceSection = { ...sections[sourceSectionIndex] };
-        const sourceIds = [...(sourceSection.activity_ids || [])];
-        const activityIndex = sourceIds.indexOf(instanceId);
-        if (activityIndex === -1) return;
+            const sourceSection = sections[sourceSectionIndex];
+            const targetSection = sections[targetSectionIndex];
+            if (!sourceSection || !targetSection) return currentData;
 
-        sourceIds.splice(activityIndex, 1);
-        sourceSection.activity_ids = sourceIds;
+            const nextSource = { ...sourceSection };
+            const sourceIds = [...(nextSource.activity_ids || [])];
+            const activityIndex = sourceIds.indexOf(instanceId);
+            if (activityIndex === -1) return currentData;
 
-        const targetSection = { ...sections[targetSectionIndex] };
-        const targetIds = [...(targetSection.activity_ids || [])];
-        targetIds.push(instanceId);
-        targetSection.activity_ids = targetIds;
+            sourceIds.splice(activityIndex, 1);
+            nextSource.activity_ids = sourceIds;
 
-        sections[sourceSectionIndex] = sourceSection;
-        sections[targetSectionIndex] = targetSection;
-        updatedData.sections = sections;
+            const nextTarget = { ...targetSection };
+            const targetIds = [...(nextTarget.activity_ids || [])];
+            targetIds.push(instanceId);
+            nextTarget.activity_ids = targetIds;
 
-        setLocalSessionData(updatedData);
-    }, [localSessionData]);
+            sections[sourceSectionIndex] = nextSource;
+            sections[targetSectionIndex] = nextTarget;
+            updatedData.sections = sections;
+            return updatedData;
+        });
+    }, [updateSessionDataDraft]);
 
     const handleAddActivity = useCallback(async (sectionIndex, activityId, activityObject = null) => {
         const activityDef = activityObject || activities.find(a => a.id === activityId);
@@ -512,16 +617,18 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             const newInstance = response.data;
 
             // Keep local session UI in sync immediately.
-            if (localSessionData?.sections?.[sectionIndex]) {
-                const updatedData = { ...localSessionData };
-                const section = { ...updatedData.sections[sectionIndex] };
+            updateSessionDataDraft((currentData) => {
+                if (!currentData?.sections?.[sectionIndex]) return currentData;
+                const updatedData = { ...currentData };
+                const sections = [...updatedData.sections];
+                const section = { ...sections[sectionIndex] };
                 const activityIds = [...(section.activity_ids || [])];
                 activityIds.push(newInstance.id);
                 section.activity_ids = activityIds;
-                updatedData.sections = [...updatedData.sections];
-                updatedData.sections[sectionIndex] = section;
-                setLocalSessionData(updatedData);
-            }
+                sections[sectionIndex] = section;
+                updatedData.sections = sections;
+                return updatedData;
+            });
 
             setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
         } catch (err) {
@@ -531,7 +638,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             const message = serverError || (status ? `HTTP ${status}` : err?.message || 'Unknown error');
             notify.error(`Failed to add activity: ${message}`);
         }
-    }, [activities, addActivityMutation, localSessionData]);
+    }, [activities, addActivityMutation, updateSessionDataDraft]);
 
     const handleToggleSessionComplete = useCallback(async () => {
         if (!session) return;
@@ -627,7 +734,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         if (previousSessionKeyRef.current !== sessionKey) {
             previousSessionKeyRef.current = sessionKey;
             initializedRef.current = false;
-            setLocalSessionData(null);
+            setSessionDataDraft(null);
             autoSaveQueue.reset();
             instanceQueuesRef.current.forEach((queue) => queue.reset());
             instanceQueuesRef.current.clear();
@@ -641,94 +748,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [rootId, sessionId, autoSaveQueue]);
 
     useEffect(() => {
-        if (!session) return;
-        if (initializedRef.current && localSessionData) return;
-        const baseData = session.attributes?.session_data || { sections: [] };
-
-        const extractDefinitionId = (item) => {
-            if (typeof item === 'string') return item;
-            if (!item || typeof item !== 'object') return null;
-            const direct = item.activity_id || item.activity_definition_id || item.activityId || item.activityDefinitionId || item.definition_id || item.id;
-            if (direct) return direct;
-            if (item.activity && typeof item.activity === 'object') {
-                return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
-            }
-            return null;
-        };
-
-        const normalizeSectionActivityIds = (data, instances) => {
-            if (!data || typeof data !== 'object') return data;
-            const sections = Array.isArray(data.sections) ? data.sections : [];
-            if (sections.length === 0) return data;
-
-            const idsByDef = (instances || []).reduce((acc, inst) => {
-                const defId = inst?.activity_definition_id;
-                if (!defId || !inst?.id) return acc;
-                if (!acc[defId]) acc[defId] = [];
-                acc[defId].push(inst.id);
-                return acc;
-            }, {});
-
-            const allInstanceIds = (instances || []).map(inst => inst.id).filter(Boolean);
-            const used = new Set();
-
-            const normalizedSections = sections.map((section) => {
-                if (!section || typeof section !== 'object') return section;
-
-                const existing = Array.isArray(section.activity_ids)
-                    ? section.activity_ids.filter((id) => allInstanceIds.includes(id) && !used.has(id))
-                    : [];
-
-                let activityIds = [...existing];
-
-                if (activityIds.length === 0) {
-                    const rawItems = section.exercises || section.activities || [];
-
-                    // Prefer explicit instance IDs from legacy exercise payloads.
-                    for (const item of rawItems) {
-                        if (!item || typeof item !== 'object') continue;
-                        const iid = item.instance_id;
-                        if (iid && allInstanceIds.includes(iid) && !used.has(iid) && !activityIds.includes(iid)) {
-                            activityIds.push(iid);
-                        }
-                    }
-
-                    // Then map definition IDs to first unused instance.
-                    if (activityIds.length === 0) {
-                        for (const item of rawItems) {
-                            const defId = extractDefinitionId(item);
-                            if (!defId) continue;
-                            const candidates = idsByDef[defId] || [];
-                            const candidate = candidates.find((id) => !used.has(id) && !activityIds.includes(id));
-                            if (candidate) activityIds.push(candidate);
-                        }
-                    }
-                }
-
-                activityIds.forEach((id) => used.add(id));
-                return {
-                    ...section,
-                    activity_ids: activityIds
-                };
-            });
-
-            // Last resort: single section gets all remaining instances.
-            if (normalizedSections.length === 1 && (!normalizedSections[0].activity_ids || normalizedSections[0].activity_ids.length === 0)) {
-                normalizedSections[0] = {
-                    ...normalizedSections[0],
-                    activity_ids: allInstanceIds
-                };
-            }
-
-            return {
-                ...data,
-                sections: normalizedSections
-            };
-        };
-
-        const normalizedData = normalizeSectionActivityIds(baseData, activityInstances);
-        setLocalSessionData(normalizedData);
-        autoSaveQueue.seed(normalizedData);
+        if (!normalizedSessionData || initializedRef.current) return;
+        autoSaveQueue.seed(normalizedSessionData);
         initializedRef.current = true;
         setJustInitialized(true);
         if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
@@ -736,15 +757,22 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             setJustInitialized(false);
             initTimeoutRef.current = null;
         }, 500); // Guard window
-    }, [session, sessionId, localSessionData, activityInstances, autoSaveQueue]);
+    }, [normalizedSessionData, autoSaveQueue]);
 
     useEffect(() => {
-        if (!localSessionData || !initializedRef.current || justInitialized) return;
+        if (!sessionDataDraft || !initializedRef.current || justInitialized) return;
         const timeoutId = setTimeout(() => {
-            autoSaveQueue.enqueue(localSessionData);
+            autoSaveQueue.enqueue(sessionDataDraft);
         }, 800);
         return () => clearTimeout(timeoutId);
-    }, [localSessionData, justInitialized, autoSaveQueue]);
+    }, [sessionDataDraft, justInitialized, autoSaveQueue]);
+
+    useEffect(() => {
+        if (!sessionDataDraft || !normalizedSessionData) return;
+        if (JSON.stringify(sessionDataDraft) === JSON.stringify(normalizedSessionData)) {
+            setSessionDataDraft(null);
+        }
+    }, [sessionDataDraft, normalizedSessionData]);
 
     // Notification Effects
     const prevAchievedTargetIdsRef = useRef(new Set());
@@ -842,7 +870,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         immediateGoals,
         microGoals,
         sessionGoalsView,
-        loading: sessionLoading || (session && !localSessionData),
+        loading: sessionLoading || (session && !normalizedSessionData),
         instancesLoading,
         activitiesLoading,
         sessionError,
@@ -867,6 +895,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         sessionLoading,
         instancesLoading,
         activitiesLoading,
+        normalizedSessionData,
         localSessionData,
         sessionError,
         autoSaveStatus,
@@ -891,7 +920,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     ]);
 
     const actionsValue = useMemo(() => ({
-        setLocalSessionData,
+        setLocalSessionData: setSessionDataDraft,
         refreshSession,
         refreshInstances,
         updateSession: updateSessionMutation.mutateAsync,
@@ -910,7 +939,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         toggleSessionComplete: handleToggleSessionComplete,
         calculateTotalDuration
     }), [
-        setLocalSessionData,
+        setSessionDataDraft,
         refreshSession,
         refreshInstances,
         updateSessionMutation.mutateAsync,

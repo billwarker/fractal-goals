@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import models
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from models import (
     get_session,
@@ -10,7 +11,7 @@ from validators import (
     validate_request,
     ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
-    ActivityGoalsSetSchema, GroupReorderSchema
+    ActivityGoalsSetSchema, GoalAssociationBatchSchema, GroupReorderSchema
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, require_owned_root, etag_json_response, internal_error
@@ -75,6 +76,63 @@ def _validate_activity_update_payload(data):
         data['splits'] = splits_data
 
     return data, None
+
+
+def _format_validation_errors(exc):
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        errors.append({
+            "field": field,
+            "message": error["msg"],
+            "type": error["type"],
+        })
+    return errors
+
+
+def _translate_activity_validation_error(exc):
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        if field == "name":
+            return "Name is required"
+        if field == "metrics" and error["type"] == "list_type":
+            return "Metrics must be an array"
+        if field == "splits" and error["type"] == "list_type":
+            return "Splits must be an array"
+    return None
+
+
+def _parse_activity_payload(schema_class):
+    json_data = request.get_json(silent=True)
+    if json_data is None:
+        json_data = {}
+    if not isinstance(json_data, dict):
+        return None, (
+            jsonify({
+                "error": "Validation failed",
+                "details": [{
+                    "field": "",
+                    "message": "Input should be a valid dictionary",
+                    "type": "dict_type",
+                }],
+            }),
+            400,
+        )
+
+    try:
+        validated = schema_class(**json_data)
+        return validated.model_dump(exclude_unset=True), None
+    except ValidationError as exc:
+        translated = _translate_activity_validation_error(exc)
+        if translated:
+            return None, (jsonify({"error": translated}), 400)
+        return None, (
+            jsonify({
+                "error": "Validation failed",
+                "details": _format_validation_errors(exc),
+            }),
+            400,
+        )
 
 # ============================================================================
 # ============================================================================
@@ -181,18 +239,18 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 
 @activities_bp.route('/<root_id>/activity-groups/<group_id>/goals', methods=['POST'])
 @token_required
-def set_activity_group_goals(current_user, root_id, group_id):
+@validate_request(ActivityGoalsSetSchema)
+def set_activity_group_goals(current_user, root_id, group_id, validated_data):
     """Set goals associated with an activity group (replaces existing associations)."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        data = request.get_json(silent=True) or {}
         service = ActivityService(session)
         group, error, status = service.set_activity_group_goals(
             root_id,
             group_id,
             current_user.id,
-            data.get('goal_ids', []),
+            validated_data['goal_ids'],
         )
         if error:
             return jsonify({"error": error}), status
@@ -241,10 +299,11 @@ def create_activity(current_user, root_id):
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        data = request.get_json(silent=True) or {}
-        activity_name = (data.get('name') or '').strip()
-        if not activity_name:
-            return jsonify({"error": "Name is required"}), 400
+        data, validation_error = _parse_activity_payload(ActivityDefinitionCreateSchema)
+        if validation_error:
+            return validation_error
+
+        activity_name = data['name']
 
         group_id = data.get('group_id') or None
         group_err = _validate_activity_group_id(session, root_id, group_id)
@@ -290,7 +349,9 @@ def update_activity(current_user, root_id, activity_id):
         if not activity:
             return jsonify({"error": "Activity not found"}), 404
         
-        data = request.get_json(silent=True) or {}
+        data, validation_error = _parse_activity_payload(ActivityDefinitionUpdateSchema)
+        if validation_error:
+            return validation_error
 
         if 'group_id' in data:
             normalized_group_id = data.get('group_id') or None
@@ -370,18 +431,18 @@ def get_activity_goals(current_user, root_id, activity_id):
 
 @activities_bp.route('/<root_id>/activities/<activity_id>/goals', methods=['POST'])
 @token_required
-def set_activity_goals(current_user, root_id, activity_id):
+@validate_request(ActivityGoalsSetSchema)
+def set_activity_goals(current_user, root_id, activity_id, validated_data):
     """Set goals associated with an activity (replaces existing associations)."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        data = request.get_json() or {}
         service = ActivityService(session)
         activity, error, status = service.set_activity_goals(
             root_id,
             activity_id,
             current_user.id,
-            data.get('goal_ids', []),
+            validated_data['goal_ids'],
         )
         if error:
             return jsonify({"error": error}), status
@@ -459,19 +520,19 @@ def get_goal_activity_groups(current_user, root_id, goal_id):
 
 @activities_bp.route('/<root_id>/goals/<goal_id>/associations/batch', methods=['PUT'])
 @token_required
-def set_goal_associations_batch(current_user, root_id, goal_id):
+@validate_request(GoalAssociationBatchSchema)
+def set_goal_associations_batch(current_user, root_id, goal_id, validated_data):
     """Set both direct activity and activity-group associations for a goal in one request."""
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        data = request.get_json() or {}
         service = ActivityService(session)
         payload, error, status = service.set_goal_associations_batch(
             root_id,
             goal_id,
             current_user.id,
-            data.get("activity_ids", []) or [],
-            data.get("group_ids", []) or [],
+            validated_data["activity_ids"],
+            validated_data["group_ids"],
         )
         if error:
             return jsonify({"error": error}), status

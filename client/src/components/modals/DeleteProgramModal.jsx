@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -9,12 +9,14 @@ import styles from './DeleteProgramModal.module.css';
 
 const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCount, requireMatchingText }) => {
     const [confirmText, setConfirmText] = useState('');
-
-    useEffect(() => {
-        if (isOpen) {
-            setConfirmText('');
-        }
-    }, [isOpen]);
+    const handleClose = () => {
+        setConfirmText('');
+        onClose();
+    };
+    const handleConfirm = () => {
+        setConfirmText('');
+        onConfirm();
+    };
 
     if (!isOpen) return null;
 
@@ -23,7 +25,7 @@ const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCo
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title="Delete Program"
             size="sm"
         >
@@ -63,12 +65,12 @@ const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCo
             </ModalBody>
 
             <ModalFooter>
-                <Button variant="secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={handleClose}>
                     Cancel
                 </Button>
                 <Button
                     variant="danger"
-                    onClick={onConfirm}
+                    onClick={handleConfirm}
                     disabled={isConfirmDisabled}
                 >
                     Delete Program

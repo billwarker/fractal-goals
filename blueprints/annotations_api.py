@@ -11,6 +11,7 @@ from models import (
 from blueprints.auth_api import token_required
 from services.serializers import serialize_visualization_annotation
 import json
+from validators import validate_request, AnnotationCreateSchema, AnnotationUpdateSchema
 
 annotations_bp = Blueprint('annotations_api', __name__)
 
@@ -89,7 +90,8 @@ def get_annotations(current_user, root_id):
 
 @annotations_bp.route('/api/roots/<root_id>/annotations', methods=['POST'])
 @token_required
-def create_annotation(current_user, root_id):
+@validate_request(AnnotationCreateSchema)
+def create_annotation(current_user, root_id, validated_data):
     """Create a new visualization annotation if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
@@ -100,25 +102,13 @@ def create_annotation(current_user, root_id):
         if not root:
             return jsonify({"error": "Root goal not found or access denied"}), 404
         
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Request body required"}), 400
-        
-        # Validate required fields
-        if not data.get('visualization_type'):
-            return jsonify({"error": "visualization_type is required"}), 400
-        if not data.get('selected_points'):
-            return jsonify({"error": "selected_points is required"}), 400
-        if not data.get('content'):
-            return jsonify({"error": "content is required"}), 400
-        
         annotation = VisualizationAnnotation(
             root_id=root_id,
-            visualization_type=data['visualization_type'],
-            visualization_context=json.dumps(data.get('visualization_context')) if data.get('visualization_context') else None,
-            selected_points=json.dumps(data['selected_points']),
-            selection_bounds=json.dumps(data.get('selection_bounds')) if data.get('selection_bounds') else None,
-            content=data['content']
+            visualization_type=validated_data['visualization_type'],
+            visualization_context=json.dumps(validated_data.get('visualization_context')) if validated_data.get('visualization_context') else None,
+            selected_points=json.dumps(validated_data['selected_points']),
+            selection_bounds=json.dumps(validated_data.get('selection_bounds')) if validated_data.get('selection_bounds') else None,
+            content=validated_data['content']
         )
         
         db_session.add(annotation)
@@ -169,7 +159,8 @@ def get_annotation(current_user, root_id, annotation_id):
 
 @annotations_bp.route('/api/roots/<root_id>/annotations/<annotation_id>', methods=['PUT'])
 @token_required
-def update_annotation(current_user, root_id, annotation_id):
+@validate_request(AnnotationUpdateSchema)
+def update_annotation(current_user, root_id, annotation_id, validated_data):
     """Update an existing annotation if owned by user."""
     engine = get_engine()
     db_session = get_session(engine)
@@ -189,17 +180,13 @@ def update_annotation(current_user, root_id, annotation_id):
         if not annotation:
             return jsonify({"error": "Annotation not found"}), 404
         
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Request body required"}), 400
-        
         # Update allowed fields
-        if 'content' in data:
-            annotation.content = data['content']
-        if 'selected_points' in data:
-            annotation.selected_points = json.dumps(data['selected_points'])
-        if 'selection_bounds' in data:
-            annotation.selection_bounds = json.dumps(data['selection_bounds']) if data['selection_bounds'] else None
+        if 'content' in validated_data:
+            annotation.content = validated_data['content']
+        if 'selected_points' in validated_data:
+            annotation.selected_points = json.dumps(validated_data['selected_points'])
+        if 'selection_bounds' in validated_data:
+            annotation.selection_bounds = json.dumps(validated_data['selection_bounds']) if validated_data['selection_bounds'] else None
         
         db_session.commit()
         

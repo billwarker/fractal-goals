@@ -222,6 +222,15 @@ class TestGoalCRUDEndpoints:
             content_type='application/json'
         )
         assert response.status_code == 404
+
+    def test_update_goal_rejects_non_array_targets(self, authed_client, sample_ultimate_goal):
+        """Target payloads must keep their validated list shape."""
+        response = authed_client.put(
+            f'/api/goals/{sample_ultimate_goal.id}',
+            json={'targets': {'name': 'not-a-list'}}
+        )
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
     
     def test_delete_goal(self, authed_client, db_session, sample_goal_hierarchy):
         """Test deleting a goal."""
@@ -289,6 +298,16 @@ class TestGoalCompletionEndpoints:
         response = authed_client.patch('/api/goals/nonexistent-id/complete')
         assert response.status_code == 404
 
+    def test_toggle_completion_rejects_non_boolean_completed(self, authed_client, sample_ultimate_goal):
+        """Completion updates should reject malformed completed payloads."""
+        response = authed_client.patch(
+            f'/api/goals/{sample_ultimate_goal.id}/complete',
+            json={'completed': {'bad': 'shape'}}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
 
 @pytest.mark.integration
 class TestGoalTargetEndpoints:
@@ -309,6 +328,15 @@ class TestGoalTargetEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert 'targets' in data or 'id' in data
+
+    def test_add_target_rejects_non_array_metrics(self, authed_client, sample_ultimate_goal):
+        """Target metrics must be sent as an array of objects."""
+        response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={'name': 'Bad Target', 'metrics': {'metric_id': 'x'}}
+        )
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
     
     def test_remove_target_from_goal(self, authed_client, sample_ultimate_goal):
         """Test removing a target from a goal."""

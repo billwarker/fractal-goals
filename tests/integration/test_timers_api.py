@@ -52,6 +52,15 @@ class TestActivityInstanceCreation:
         )
         assert response.status_code in [400, 422]
 
+    def test_create_instance_rejects_non_string_ids(self, authed_client, sample_ultimate_goal):
+        """Creation payload should reject malformed identifier shapes."""
+        response = authed_client.post(
+            f'/api/{sample_ultimate_goal.id}/activity-instances',
+            json={'session_id': {'bad': 'shape'}, 'activity_definition_id': 'activity-1'}
+        )
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
 
 @pytest.mark.integration
 @pytest.mark.critical
@@ -234,6 +243,21 @@ class TestManualTimeEntry:
         data = json.loads(response.data)
         assert data['time_stop'] is not None
         assert data['duration_seconds'] is not None
+
+    def test_update_instance_rejects_non_array_sets(self, authed_client, db_session, sample_activity_instance):
+        """Manual update payload should reject malformed sets shape."""
+        from models import Session
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'sets': {'bad': 'shape'}}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
 
 
 @pytest.mark.integration

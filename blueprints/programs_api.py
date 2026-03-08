@@ -8,6 +8,7 @@ from validators import (
     ProgramUpdateSchema,
     ProgramDayCreateSchema,
     ProgramDayUpdateSchema,
+    ProgramDayCopySchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
     ProgramBlockGoalAttachSchema,
@@ -312,7 +313,8 @@ def delete_block_day(current_user, root_id, program_id, block_id, day_id):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy', methods=['POST'])
 @token_required
-def copy_block_day(current_user, root_id, program_id, block_id, day_id):
+@validate_request(ProgramDayCopySchema)
+def copy_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Copy a day to other blocks."""
     engine = models.get_engine()
     session = get_session(engine)
@@ -321,8 +323,7 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id):
         if not root:
             return jsonify({"error": "Fractal not found or access denied"}), 404
 
-        data = request.get_json()
-        count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, data)
+        count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data)
         return jsonify({"message": f"Copied to {count} blocks"})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404

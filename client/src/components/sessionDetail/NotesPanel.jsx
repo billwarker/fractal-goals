@@ -9,42 +9,21 @@
  * Note: Activity-level previous notes are shown in HistoryPanel instead.
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
-import Linkify from '../atoms/Linkify';
+import React, { useMemo, useState } from 'react';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './NotesPanel.module.css';
-import useIsMobile from '../../hooks/useIsMobile';
 
 function NotesPanel({
-    rootId,
     sessionId,
-    selectedActivity,
-    selectedActivityDef,
-    selectedSetIndex,
     onNoteAdded,
-    activityInstances,
-    activityDefinitions,
-    refreshTrigger,
     notes,
-    previousNotes,
     previousSessionNotes,
     addNote,
     updateNote,
     deleteNote
 }) {
-    const isMobile = useIsMobile();
-    const [showPreviousSessionNotes, setShowPreviousSessionNotes] = useState(false);
-    const [showSessionNotes, setShowSessionNotes] = useState(!isMobile);
     const [selectedNoteId, setSelectedNoteId] = useState(null);
-
-    useEffect(() => {
-        if (isMobile) {
-            setShowSessionNotes(false);
-            return;
-        }
-        setShowSessionNotes(true);
-    }, [isMobile]);
 
     // Merge notes
     const combinedNotes = useMemo(() => {

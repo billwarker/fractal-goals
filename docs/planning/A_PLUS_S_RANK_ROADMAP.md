@@ -37,7 +37,7 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 25. ~~Replace broad exception handling with narrower failure handling.~~
 26. ~~Standardize soft-delete behavior across the model/service layer.~~
 27. ~~Emit events only after successful commit and do so consistently.~~
-28. Add stricter array/object shape validation for legacy payloads.
+28. ~~Add stricter array/object shape validation for legacy payloads.~~
 29. ~~Reuse helper queries for owned-entity lookups inside a root.~~
 30. ~~Add query-budget tests for high-risk endpoints.~~
 
@@ -111,9 +111,11 @@ Completed in the current workspace:
 - 25: blanket route-level `except Exception` handling has been retired from the main service-backed blueprints in favor of narrower failure handling, with `activities_api.py`, `sessions_api.py`, `templates_api.py`, `programs_api.py`, `notes_api.py`, `timers_api.py`, `goal_levels_api.py`, `annotations_api.py`, `logs_api.py`, `auth_api.py`, and the service-backed/read-heavy portions of `goals_api.py` now using specific DB/error branches; the lone remaining broad catch in `timers_api.py` is the intentional ISO-datetime parser helper that converts arbitrary parse failures into `ValueError`
 - 26: soft-delete behavior is now consistent for the `deleted_at`-backed model surfaces touched by the main app flows; templates, activity groups, activity instances, removed split definitions, goals, and whole fractals now soft-delete through service-backed paths, with fractal deletion also soft-deleting root-scoped sessions, activities, templates, metrics/splits, notes, annotations, and descendant goals instead of leaving active rows behind a deleted root
 - 30: query-budget coverage now guards the session activities, session detail, goal tree, and session goals-view endpoints in `tests/performance/test_query_budgets.py`, with bounded ceilings based on the current eager-loading/query shape so future refactors cannot silently reintroduce N+1 blowups on these read-heavy surfaces
+- 28: legacy payload-shape validation is now enforced across the previously permissive endpoints too; raw activity create/update, program day copy, and manual goal-completion payloads now validate object/array shapes through schema-backed parsing, completing the route inventory so malformed `targets`, `metrics`, `goal_ids`, `activity_ids`, `selected_points`, `sets`, `session_id`, `completed`, and `target_mode` payloads fail fast with regression coverage
+- 31/32 progress: the session-detail surfaces are now shedding prop-mirroring state incrementally; `HistoryPanel`, `NotesPanel`, `ActivityAssociationModal`, `GoalsPanel`, and `SessionActivityItem` no longer depend on sync effects for view-mode/selection defaults, `ActiveSessionContext` now treats `localSessionData` as a draft overlay on top of normalized query data instead of maintaining a permanent mirrored copy, `GoalDetailModal` now reads goal metrics directly from query data, `useGoalDetailController` resets per-goal controller state without an initialization effect, `AnnotationModal` now uses a close-reset draft instead of mirroring `initialContent`, `GoalModal` now mounts with seeded initial state instead of resetting fields in an effect, and `Programs.jsx` now derives the route-selected program instead of syncing it into local state
 
 ## Next Tranche
 
 1. Continue moving remaining low-level business rules out of route modules and into shared service/domain helpers.
-2. Add stricter validation for legacy payload shapes on remaining permissive endpoints.
-3. Normalize remaining frontend state surfaces that still mirror query data into local state.
+2. Normalize remaining frontend state surfaces that still mirror query data into local state.
+3. Remove effects that only mirror props into state on the remaining session and planning surfaces.

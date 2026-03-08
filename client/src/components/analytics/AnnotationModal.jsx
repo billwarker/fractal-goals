@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
 
 /**
@@ -19,28 +19,19 @@ function AnnotationModal({
     visualizationType = 'visualization',
     initialContent = ''
 }) {
-    const [content, setContent] = useState(initialContent);
-    const textareaRef = useRef(null);
+    const [draftContent, setDraftContent] = useState(null);
     const isMobile = useIsMobile();
+    const content = draftContent ?? initialContent;
 
-    // Focus textarea when modal opens
-    useEffect(() => {
-        if (isOpen && textareaRef.current) {
-            setTimeout(() => textareaRef.current?.focus(), 100);
-        }
-    }, [isOpen]);
-
-    // Reset content when modal opens with new data
-    useEffect(() => {
-        if (isOpen) {
-            setContent(initialContent);
-        }
-    }, [initialContent, isOpen]);
+    const handleClose = () => {
+        setDraftContent(null);
+        onClose();
+    };
 
     const handleSave = () => {
         if (content.trim()) {
             onSave(content.trim());
-            setContent('');
+            setDraftContent(null);
         }
     };
 
@@ -50,7 +41,7 @@ function AnnotationModal({
             handleSave();
         }
         if (e.key === 'Escape') {
-            onClose();
+            handleClose();
         }
     };
 
@@ -93,7 +84,7 @@ function AnnotationModal({
                 zIndex: 1000,
                 padding: isMobile ? 0 : '16px'
             }}
-            onClick={onClose}
+            onClick={handleClose}
         >
             <div
                 style={{
@@ -124,7 +115,7 @@ function AnnotationModal({
                         ✏️ Add Annotation
                     </h3>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         style={{
                             background: 'none',
                             border: 'none',
@@ -166,9 +157,9 @@ function AnnotationModal({
 
                 {/* Content textarea */}
                 <textarea
-                    ref={textareaRef}
+                    autoFocus
                     value={content}
-                    onChange={(e) => setContent(e.target.value)}
+                    onChange={(e) => setDraftContent(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Add your insight or note about this data..."
                     style={{
@@ -205,7 +196,7 @@ function AnnotationModal({
                     flexDirection: isMobile ? 'column-reverse' : 'row'
                 }}>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         style={{
                             padding: '10px 20px',
                             background: 'var(--color-bg-surface)',

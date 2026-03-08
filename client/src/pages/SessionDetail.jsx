@@ -250,6 +250,7 @@ function SessionDetailContent() {
             />
 
             <ActivityAssociationModal
+                key={`${associationContext?.activityDefinition?.id || 'none'}:${(associationContext?.initialSelectedGoalIds || []).join(',')}`}
                 isOpen={showAssociationModal}
                 onClose={() => setShowAssociationModal(false)}
                 onAssociate={handleAssociateActivity}

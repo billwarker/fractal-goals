@@ -193,6 +193,20 @@ class TestActivityGroups:
         assert replace_response.status_code == 200
         assert set(replace_response.get_json()['associated_goal_ids']) == {second_goal_id}
 
+    def test_set_activity_group_goals_rejects_non_array_goal_ids(
+        self,
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_group,
+    ):
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(
+            f'/api/{root_id}/activity-groups/{sample_activity_group.id}/goals',
+            json={'goal_ids': {'bad': 'shape'}}
+        )
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
 
 @pytest.mark.integration
 class TestActivities:
@@ -345,6 +359,20 @@ class TestActivities:
         assert response.status_code == 400
         assert 'maximum of 5 splits' in response.get_json()['error'].lower()
 
+    def test_create_activity_rejects_non_array_goal_ids(self, authed_client, sample_ultimate_goal):
+        """Create requests should reject malformed goal association shapes."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={
+                'name': 'Malformed Associations',
+                'goal_ids': {'bad': 'shape'},
+            }
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
     def test_update_activity_rejects_partial_metric_rows(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Partial metric payloads should fail fast instead of deleting existing metrics."""
         root_id = sample_ultimate_goal.id
@@ -436,6 +464,17 @@ class TestActivities:
 
         assert response.status_code == 400
         assert 'maximum of 5 splits' in response.get_json()['error'].lower()
+
+    def test_update_activity_rejects_non_array_goal_ids(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Update requests should reject malformed goal association shapes."""
+        root_id = sample_ultimate_goal.id
+        response = authed_client.put(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}',
+            json={'goal_ids': {'bad': 'shape'}}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
 
     def test_update_activity_metrics(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         """Test updating activity metrics (add, remove, update)."""
@@ -664,6 +703,20 @@ class TestActivityGoalAssociations:
         associated_goal_ids = {goal['id'] for goal in data['associated_goals']}
         assert associated_goal_ids == set(goal_ids)
 
+    def test_set_activity_goals_rejects_non_array_goal_ids(
+        self,
+        authed_client,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        response = authed_client.post(
+            f'/api/{root_id}/activities/{sample_activity_definition.id}/goals',
+            json={'goal_ids': {'bad': 'shape'}}
+        )
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
     def test_remove_activity_goal_deletes_specific_association(self, authed_client, sample_goal_hierarchy, sample_activity_definition):
         root_id = sample_goal_hierarchy['ultimate'].id
         activity_id = sample_activity_definition.id
@@ -710,6 +763,22 @@ class TestActivityGoalAssociations:
         groups_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activity-groups')
         group_ids = {group['id'] for group in groups_response.get_json()}
         assert group_ids == {sample_activity_group.id}
+
+    def test_set_goal_associations_batch_rejects_non_array_ids(
+        self,
+        authed_client,
+        sample_goal_hierarchy,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['ultimate'].id
+
+        response = authed_client.put(
+            f'/api/{root_id}/goals/{goal_id}/associations/batch',
+            json={'activity_ids': {'bad': 'shape'}, 'group_ids': []}
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
 
     def test_get_goal_activities_includes_inherited_child_associations(self, authed_client, sample_goal_hierarchy, sample_activity_definition):
         root_id = sample_goal_hierarchy['ultimate'].id

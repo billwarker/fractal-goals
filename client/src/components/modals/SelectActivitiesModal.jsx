@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
@@ -19,13 +19,6 @@ function SelectActivitiesModal({
 }) {
     const [tempSelectedActivities, setTempSelectedActivities] = useState([]);
     const isMobile = useIsMobile();
-
-    // Reset selection when modal opens/closes
-    useEffect(() => {
-        if (isOpen) {
-            setTempSelectedActivities([]);
-        }
-    }, [isOpen]);
 
     if (!isOpen) return null;
 

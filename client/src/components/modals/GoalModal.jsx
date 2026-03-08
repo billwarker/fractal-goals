@@ -1,80 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
 import { validateDeadlineRange, getDurationInDays } from '../../utils/goalCharacteristics';
-import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import AddTargetModal from '../AddTargetModal';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
 import toast from 'react-hot-toast';
 import styles from './GoalModal.module.css';
 
-const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = [] }) => {
-    const { getGoalColor, getGoalTextColor, getLevelByName, getGoalIcon, getDeadlineConstraints, getLevelCharacteristics } = useGoalLevels();
+function getDefaultDeadline(getLevelCharacteristics, levelType) {
+    const levelChars = getLevelCharacteristics(levelType);
+    if (!levelChars?.default_deadline_offset_value || !levelChars?.default_deadline_offset_unit) {
+        return '';
+    }
+
+    const offsetDays = getDurationInDays(
+        levelChars.default_deadline_offset_value,
+        levelChars.default_deadline_offset_unit
+    );
+    if (!offsetDays) {
+        return '';
+    }
+
+    const nextDeadline = new Date();
+    nextDeadline.setDate(nextDeadline.getDate() + Math.ceil(offsetDays));
+    return nextDeadline.toISOString().split('T')[0];
+}
+
+function buildInitialModalState(parent, getLevelCharacteristics) {
+    if (!parent) {
+        return {
+            goalType: 'UltimateGoal',
+            deadline: getDefaultDeadline(getLevelCharacteristics, 'UltimateGoal'),
+        };
+    }
+
+    const parentType = parent.attributes?.type || parent.type;
+    const childType = getChildType(parentType) || 'UltimateGoal';
+    const parentDeadline = parent.attributes?.deadline || parent.deadline;
+
+    return {
+        goalType: childType,
+        deadline: parentDeadline ? parentDeadline.split('T')[0] : getDefaultDeadline(getLevelCharacteristics, childType),
+    };
+}
+
+function GoalModalInner({ onClose, onSubmit, parent }) {
+    const { getGoalColor, getGoalTextColor, getGoalIcon, getDeadlineConstraints, getLevelCharacteristics } = useGoalLevels();
+    const initialState = buildInitialModalState(parent, getLevelCharacteristics);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [relevanceStatement, setRelevanceStatement] = useState('');
-    const [deadline, setDeadline] = useState('');
-    const [goalType, setGoalType] = useState('UltimateGoal');
-    const [targets, setTargets] = useState([]);
-    const [showTargetModal, setShowTargetModal] = useState(false);
-    const [editingTarget, setEditingTarget] = useState(null);
-
-    // Reset and Initialize state when modal opens or parent changes
-    useEffect(() => {
-        if (isOpen) {
-            setName('');
-            setDescription('');
-            setRelevanceStatement('');
-            setDeadline('');
-            setTargets([]);
-
-            if (!parent) {
-                setGoalType('UltimateGoal');
-            } else {
-                const parentType = parent.attributes?.type || parent.type;
-                const childType = getChildType(parentType);
-                if (childType) {
-                    setGoalType(childType);
-                }
-
-                // Default deadline to parent's deadline if available
-                const parentDeadline = parent.attributes?.deadline || parent.deadline;
-                if (parentDeadline) {
-                    // Extract date part from ISO string
-                    const pDate = parentDeadline.split('T')[0];
-                    setDeadline(pDate);
-                    hasAutoFilledRef.current = true;
-                }
-            }
-        }
-    }, [isOpen, parent]);
+    const [deadline, setDeadline] = useState(initialState.deadline);
+    const [goalType, setGoalType] = useState(initialState.goalType);
+    const [targets] = useState([]);
 
     // Handle initial deadline auto-filling and characteristics sync
     const chars = getLevelCharacteristics(goalType);
     const descriptionRequired = chars?.description_required || false;
-
-    // Auto-fill deadline from level defaults when modal first opens with a new goalType
-    const hasAutoFilledRef = React.useRef(false);
-    useEffect(() => {
-        if (!isOpen) {
-            hasAutoFilledRef.current = false;
-            return;
-        }
-        if (hasAutoFilledRef.current) return;
-        if (chars?.default_deadline_offset_value && chars?.default_deadline_offset_unit) {
-            const offsetDays = getDurationInDays(chars.default_deadline_offset_value, chars.default_deadline_offset_unit);
-            if (offsetDays) {
-                const newDeadline = new Date();
-                newDeadline.setDate(newDeadline.getDate() + Math.ceil(offsetDays));
-                setDeadline(newDeadline.toISOString().split('T')[0]);
-            }
-            hasAutoFilledRef.current = true;
-        }
-    }, [isOpen, goalType, chars?.default_deadline_offset_value, chars?.default_deadline_offset_unit]);
-
-    if (!isOpen) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -100,27 +83,6 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
             parent_id: parent ? (parent.attributes?.id || parent.id) : null,
             targets
         });
-    };
-
-    const handleAddTarget = (target) => {
-        setTargets(prev => [...prev, target]);
-        setShowTargetModal(false);
-        setEditingTarget(null);
-    };
-
-    const handleEditTarget = (target) => {
-        setEditingTarget(target);
-        setShowTargetModal(true);
-    };
-
-    const handleUpdateTarget = (updatedTarget) => {
-        setTargets(prev => prev.map(t => t.id === updatedTarget.id ? updatedTarget : t));
-        setShowTargetModal(false);
-        setEditingTarget(null);
-    };
-
-    const handleRemoveTarget = (targetId) => {
-        setTargets(prev => prev.filter(t => t.id !== targetId));
     };
 
     const themeColor = getGoalColor(goalType);
@@ -261,17 +223,23 @@ const GoalModal = ({ isOpen, onClose, onSubmit, parent, activityDefinitions = []
                 </div>
             </div>
 
-            <AddTargetModal
-                isOpen={showTargetModal}
-                onClose={() => {
-                    setShowTargetModal(false);
-                    setEditingTarget(null);
-                }}
-                onSave={editingTarget ? handleUpdateTarget : handleAddTarget}
-                activityDefinitions={activityDefinitions}
-                existingTarget={editingTarget}
-            />
         </>
+    );
+};
+
+const GoalModal = ({ isOpen, onClose, onSubmit, parent }) => {
+    if (!isOpen) {
+        return null;
+    }
+
+    const modalKey = parent ? (parent.attributes?.id || parent.id || 'parent-goal') : 'fractal-root';
+    return (
+        <GoalModalInner
+            key={modalKey}
+            onClose={onClose}
+            onSubmit={onSubmit}
+            parent={parent}
+        />
     );
 };
 

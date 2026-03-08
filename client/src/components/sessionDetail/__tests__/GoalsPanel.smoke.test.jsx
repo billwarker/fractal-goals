@@ -1,5 +1,5 @@
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import GoalsPanel from '../GoalsPanel';
 
@@ -224,5 +224,57 @@ describe('GoalsPanel smoke', () => {
             expect(screen.getByText('Legacy Micro')).toBeInTheDocument();
             expect(screen.getByText('Nano New')).toBeInTheDocument();
         });
+    });
+
+    it('defaults new activity contexts to activity mode without a sync effect', async () => {
+        const view = renderWithProviders(
+            <GoalsPanel
+                selectedActivity={{
+                    id: 'instance-1',
+                    activity_definition_id: 'activity-1',
+                    name: 'Pull Up'
+                }}
+                onGoalClick={vi.fn()}
+                onGoalCreated={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Activity')).toBeInTheDocument();
+        });
+        expect(screen.getByText('Activity').className).toContain('activeToggleButton');
+
+        fireEvent.click(screen.getByText('Session'));
+        expect(screen.getByText('Session').className).toContain('activeToggleButton');
+
+        view.unmount();
+
+        renderWithProviders(
+            <GoalsPanel
+                selectedActivity={{
+                    id: 'instance-2',
+                    activity_definition_id: 'activity-1',
+                    name: 'Pull Up Variation'
+                }}
+                onGoalClick={vi.fn()}
+                onGoalCreated={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        expect(screen.getByText('Activity').className).toContain('activeToggleButton');
     });
 });

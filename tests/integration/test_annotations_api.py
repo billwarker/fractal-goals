@@ -33,6 +33,21 @@ class TestAnnotationsApi:
         stored = db_session.query(VisualizationAnnotation).filter_by(id=annotation_id).first()
         assert stored is not None
 
+    def test_create_annotation_rejects_non_array_selected_points(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        response = authed_client.post(
+            f"/api/roots/{root_id}/annotations",
+            json={
+                "visualization_type": "goal-analytics",
+                "selected_points": {"x": 1, "y": 2},
+                "content": "Bad payload",
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Validation failed"
+
     def test_update_and_delete_annotation(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         annotation = VisualizationAnnotation(
@@ -56,3 +71,22 @@ class TestAnnotationsApi:
 
         db_session.refresh(annotation)
         assert annotation.deleted_at is not None
+
+    def test_update_annotation_rejects_non_array_selected_points(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        annotation = VisualizationAnnotation(
+            root_id=root_id,
+            visualization_type="goal-analytics",
+            selected_points=[{"x": 3, "y": 4}],
+            content="Original note",
+        )
+        db_session.add(annotation)
+        db_session.commit()
+
+        response = authed_client.put(
+            f"/api/roots/{root_id}/annotations/{annotation.id}",
+            json={"selected_points": {"bad": "shape"}},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Validation failed"

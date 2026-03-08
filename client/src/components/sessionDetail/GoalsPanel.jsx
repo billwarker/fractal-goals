@@ -60,7 +60,7 @@ function GoalsPanel({
     // Micro Goal UX Redesign state
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
     const [targetBuilderGoal, setTargetBuilderGoal] = useState(null); // ImmediateGoal node
-    const [viewMode, setViewMode] = useState('session');
+    const [viewModeOverrides, setViewModeOverrides] = useState({});
 
     const goalLookup = useMemo(() => {
         if (!sessionGoalsView?.goal_tree) return new Map();
@@ -98,10 +98,11 @@ function GoalsPanel({
         };
     }, [selectedActivity, activityDefinitions]);
 
-    useEffect(() => {
-        if (selectedActivity) setViewMode('activity');
-        else setViewMode('session');
-    }, [selectedActivity]);
+    const viewModeKey = selectedActivity?.id || selectedActivity?.activity_definition_id || 'session';
+    const viewMode = viewModeOverrides[viewModeKey] || (selectedActivity ? 'activity' : 'session');
+    const setViewMode = useCallback((nextMode) => {
+        setViewModeOverrides((prev) => ({ ...prev, [viewModeKey]: nextMode }));
+    }, [viewModeKey]);
 
     const {
         sessionHierarchy,
