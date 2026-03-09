@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import GoalSmartSection from './GoalSmartSection';
 import GoalChildrenList from './GoalChildrenList';
 import { formatDurationSeconds as formatDuration } from '../../utils/formatters';
@@ -57,7 +58,7 @@ function GoalViewMode({
                     const isManualAllowed = levelConfig.allow_manual_completion !== false;
                     const canShowManual = allowManualCompletion && isManualAllowed;
                     const isTargetsAllowed = levelConfig.track_activities !== false && goalType !== 'NanoGoal';
-                    const isChildrenAllowed = goalType !== 'MicroGoal' && goalType !== 'NanoGoal';
+                    const isChildrenAllowed = !isExecutionGoalType(goalType);
 
                     return (
                         <button

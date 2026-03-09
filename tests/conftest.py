@@ -19,6 +19,10 @@ import json
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from tests.test_env import bootstrap_test_environment
+
+bootstrap_test_environment()
+
 from flask import Flask
 from flask_cors import CORS
 import models

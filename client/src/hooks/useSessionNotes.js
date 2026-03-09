@@ -69,7 +69,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         mutationFn: (noteData) => fractalApi.createNote(rootId, noteData),
         onSuccess: (response) => {
             const newNote = response.data;
-            // Optimistically update current session notes if applicable
+            // Update the session-notes cache immediately after a confirmed save.
             if (newNote.session_id === sessionId) {
                 queryClient.setQueryData(sessionNotesKey, (old = []) => [newNote, ...old]);
             }

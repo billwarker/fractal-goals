@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 
 /**
  * Modal for selecting existing immediate goals to attach to session
@@ -15,8 +17,6 @@ function SelectExistingGoalModal({
     const { getGoalColor } = useGoalLevels();;
     const [tempSelectedGoals, setTempSelectedGoals] = useState([]);
 
-    if (!isOpen) return null;
-
     const handleConfirm = () => {
         onConfirm(tempSelectedGoals);
         setTempSelectedGoals([]);
@@ -28,10 +28,15 @@ function SelectExistingGoalModal({
     };
 
     return (
-        <div className="modal-overlay" onClick={handleClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+        <Modal
+            isOpen={isOpen}
+            onClose={handleClose}
+            title="Select Existing Immediate Goal(s)"
+            size="md"
+        >
+            <ModalBody>
                 <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
-                    Select Existing Immediate Goal(s)
+                    Existing Immediate Goals
                 </h2>
 
                 {existingImmediateGoals.length === 0 ? (
@@ -65,7 +70,9 @@ function SelectExistingGoalModal({
                     </div>
                 )}
 
-                <div className="actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            </ModalBody>
+
+            <ModalFooter>
                     <button
                         type="button"
                         onClick={handleClose}
@@ -96,14 +103,13 @@ function SelectExistingGoalModal({
                     >
                         Add Selected ({tempSelectedGoals.length})
                     </button>
-                </div>
-            </div>
-        </div>
+            </ModalFooter>
+        </Modal>
     );
 }
 
 function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
     return (
         <div
             onClick={onToggle}

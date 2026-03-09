@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import Input from '../atoms/Input';
 import Checkbox from '../atoms/Checkbox';
 import { isAboveShortTermGoal } from '../../utils/goalHelpers';
+import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
 
 const TargetManager = lazy(() => import('../goalDetail/TargetManager'));
@@ -93,7 +94,7 @@ function GoalEditForm({
                 </div>
             )}
 
-            {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
+            {!isExecutionGoalType(goalType) && (
                 <div className={styles.fieldGroup}>
                     <label className={styles.label} style={{ color: goalColor }}>
                         Deadline

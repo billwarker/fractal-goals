@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { getTypeDisplayName, getChildType } from '../../utils/goalHelpers';
 import { validateDeadlineRange, getDurationInDays } from '../../utils/goalCharacteristics';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
@@ -87,143 +90,132 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
 
     const themeColor = getGoalColor(goalType);
     const textColor = getGoalTextColor(goalType);
+    const modalTitle = parent ? `Add ${getTypeDisplayName(goalType)}` : 'Create New Fractal';
 
     return (
-        <>
-            <div className={styles.modalOverlay}>
-                <div className={styles.modalContent}>
-                    {/* Header */}
-                    <div className={styles.header} style={{ borderBottomColor: themeColor }}>
-                        <div className={styles.title} style={{ color: themeColor }}>
-                            {parent ? `Add ${getTypeDisplayName(goalType)}` : "Create New Fractal"}
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className={styles.closeButton}
-                        >
-                            &times;
-                        </button>
+        <Modal
+            isOpen={true}
+            onClose={onClose}
+            title={modalTitle}
+            size="md"
+        >
+            <form onSubmit={handleSubmit} className={styles.form}>
+                <ModalBody>
+                    <div className={styles.formGroup}>
+                        <label className={styles.label} style={{ color: themeColor }}>
+                            Goal Type
+                        </label>
+                        {parent ? (
+                            <div>
+                                <div
+                                    className={styles.readOnlyType}
+                                    style={{ background: themeColor, color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <GoalIcon
+                                        shape={getGoalIcon(goalType)}
+                                        color={textColor}
+                                        size={18}
+                                    />
+                                    {getTypeDisplayName(goalType)}
+                                </div>
+                            </div>
+                        ) : (
+                            <select
+                                value={goalType}
+                                onChange={e => setGoalType(e.target.value)}
+                                className={styles.select}
+                                style={{ borderLeft: `4px solid ${themeColor}` }}
+                            >
+                                <option value="UltimateGoal">Ultimate Goal</option>
+                                <option value="LongTermGoal">Long Term Goal</option>
+                                <option value="MidTermGoal">Mid Term Goal</option>
+                                <option value="ShortTermGoal">Short Term Goal</option>
+                            </select>
+                        )}
                     </div>
 
-                    <form onSubmit={handleSubmit} className={styles.form}>
+                    <div className={styles.formGroup}>
+                        <Input
+                            label="Name"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            required
+                            autoFocus
+                            placeholder="Enter goal name..."
+                            fullWidth
+                        />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                        <label className={styles.label} style={{ color: themeColor }}>
+                            Description {descriptionRequired && <span style={{ color: 'red' }}>*</span>}
+                        </label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="What is this goal about?"
+                            rows={2}
+                            className={styles.textarea}
+                            required={descriptionRequired}
+                        />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                        <label className={styles.label} style={{ color: themeColor }}>
+                            Relevance (SMART)
+                        </label>
+                        <div className={styles.descriptionLabel}>
+                            {!parent
+                                ? `Why does ${name || 'this goal'} matter?`
+                                : `How does this help achieve "${parent.name}"?`
+                            }
+                        </div>
+                        <textarea
+                            value={relevanceStatement}
+                            onChange={e => setRelevanceStatement(e.target.value)}
+                            placeholder={!parent ? "Explain the significance..." : "Explain the contribution..."}
+                            rows={2}
+                            className={styles.textarea}
+                        />
+                    </div>
+
+                    {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
                         <div className={styles.formGroup}>
                             <label className={styles.label} style={{ color: themeColor }}>
-                                Goal Type
+                                Deadline
                             </label>
-                            {parent ? (
-                                <div>
-                                    <div
-                                        className={styles.readOnlyType}
-                                        style={{ background: themeColor, color: textColor, display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                        <GoalIcon
-                                            shape={getGoalIcon(goalType)}
-                                            color={textColor}
-                                            size={18}
-                                        />
-                                        {getTypeDisplayName(goalType)}
-                                    </div>
-                                </div>
-                            ) : (
-                                <select
-                                    value={goalType}
-                                    onChange={e => setGoalType(e.target.value)}
-                                    className={styles.select}
-                                    style={{ borderLeft: `4px solid ${themeColor}` }}
-                                >
-                                    <option value="UltimateGoal">Ultimate Goal</option>
-                                    <option value="LongTermGoal">Long Term Goal</option>
-                                    <option value="MidTermGoal">Mid Term Goal</option>
-                                    <option value="ShortTermGoal">Short Term Goal</option>
-                                </select>
-                            )}
-                        </div>
-
-                        <div className={styles.formGroup}>
                             <Input
-                                label="Name"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                                required
-                                autoFocus
-                                placeholder="Enter goal name..."
+                                type="date"
+                                value={deadline}
+                                onChange={e => setDeadline(e.target.value)}
+                                max={parent?.attributes?.deadline?.split('T')[0] || parent?.deadline?.split('T')[0]}
                                 fullWidth
-                            // Pass custom style if needed, but atom handles colors best
                             />
                         </div>
+                    )}
+                </ModalBody>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} style={{ color: themeColor }}>
-                                Description {descriptionRequired && <span style={{ color: 'red' }}>*</span>}
-                            </label>
-                            <textarea
-                                value={description}
-                                onChange={e => setDescription(e.target.value)}
-                                placeholder="What is this goal about?"
-                                rows={2}
-                                className={styles.textarea}
-                                required={descriptionRequired}
-                            />
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} style={{ color: themeColor }}>
-                                Relevance (SMART)
-                            </label>
-                            <div className={styles.descriptionLabel}>
-                                {!parent
-                                    ? `Why does ${name || 'this goal'} matter?`
-                                    : `How does this help achieve "${parent.name}"?`
-                                }
-                            </div>
-                            <textarea
-                                value={relevanceStatement}
-                                onChange={e => setRelevanceStatement(e.target.value)}
-                                placeholder={!parent ? "Explain the significance..." : "Explain the contribution..."}
-                                rows={2}
-                                className={styles.textarea}
-                            />
-                        </div>
-
-                        {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
-                            <div className={styles.formGroup}>
-                                <label className={styles.label} style={{ color: themeColor }}>
-                                    Deadline
-                                </label>
-                                <Input
-                                    type="date"
-                                    value={deadline}
-                                    onChange={e => setDeadline(e.target.value)}
-                                    max={parent?.attributes?.deadline?.split('T')[0] || parent?.deadline?.split('T')[0]}
-                                    fullWidth
-                                />
-                            </div>
-                        )}
-
-                        <div className={styles.footer}>
-                            <Button
-                                variant="secondary"
-                                onClick={onClose}
-                                type="button"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                style={{
-                                    background: themeColor,
-                                    color: textColor,
-                                    borderColor: themeColor
-                                }}
-                            >
-                                Create
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-        </>
+                <ModalFooter>
+                    <Button
+                        variant="secondary"
+                        onClick={onClose}
+                        type="button"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        style={{
+                            background: themeColor,
+                            color: textColor,
+                            borderColor: themeColor
+                        }}
+                    >
+                        Create
+                    </Button>
+                </ModalFooter>
+            </form>
+        </Modal>
     );
 };
 

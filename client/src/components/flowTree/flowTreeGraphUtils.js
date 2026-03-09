@@ -2,6 +2,14 @@ import dagre from 'dagre';
 
 import { deriveEvidenceGoalIds, getActiveLineageIds, getInactiveNodeIds, deriveGraphMetrics } from '../../hooks/useFlowTreeMetrics';
 import { getChildType, getTypeDisplayName } from '../../utils/goalHelpers';
+import {
+    getGoalNodeChildren,
+    getGoalNodeId,
+    getGoalNodeName,
+    getGoalNodeType,
+    isExecutionGoalType,
+    normalizeGoalNode,
+} from '../../utils/goalNodeModel';
 import { isSMART } from '../../utils/smartHelpers';
 import { buildTreeMaps, getLineagePath, sortChildren } from './flowTreeTreeUtils';
 
@@ -70,15 +78,15 @@ export const convertTreeToFlow = (
     const traverse = (node, parentId = null) => {
         if (!node) return;
 
-        const rawNodeId = node.id || node.attributes?.id;
-        const nodeId = toId(rawNodeId);
+        const normalizedNode = normalizeGoalNode(node);
+        const nodeId = toId(getGoalNodeId(normalizedNode));
         if (!nodeId) return;
 
         if (addedNodeIds.has(nodeId)) return;
         if (lineagePath && !lineagePath.has(nodeId)) return;
 
-        const nodeType = node.attributes?.type || node.type;
-        if (!showMicroNanoGoals && (nodeType === 'MicroGoal' || nodeType === 'NanoGoal')) {
+        const nodeType = getGoalNodeType(normalizedNode);
+        if (!showMicroNanoGoals && isExecutionGoalType(nodeType)) {
             return;
         }
 
@@ -109,23 +117,24 @@ export const convertTreeToFlow = (
             type: 'custom',
             position: { x: 0, y: 0 },
             data: {
-                label: node.name,
+                label: getGoalNodeName(normalizedNode),
                 type: nodeType,
-                completed: node.attributes?.completed,
-                completed_at: node.attributes?.completed_at,
-                created_at: node.attributes?.created_at,
-                deadline: node.attributes?.deadline,
-                hasChildren: Array.isArray(node.children) && node.children.length > 0,
-                isSmart: node.attributes?.is_smart || isSMART(node),
+                completed: normalizedNode.completed,
+                completed_at: normalizedNode.completed_at,
+                created_at: normalizedNode.created_at,
+                deadline: normalizedNode.deadline,
+                hasChildren: normalizedNode.children.length > 0,
+                isSmart: normalizedNode.is_smart || isSMART(node),
                 onClick: () => onNodeClick(node),
                 onAddChild: childType ? () => onAddChild(node) : null,
                 childTypeName,
             },
         });
 
-        if (Array.isArray(node.children) && node.children.length > 0) {
+        const children = getGoalNodeChildren(node);
+        if (children.length > 0) {
             const sortBy = node.level_characteristics?.sort_children_by || node.attributes?.level_characteristics?.sort_children_by;
-            const sortedChildren = sortChildren(node.children, sortBy);
+            const sortedChildren = sortChildren(children, sortBy);
             sortedChildren.forEach((child) => traverse(child, nodeId));
         }
     };

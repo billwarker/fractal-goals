@@ -1,5 +1,6 @@
 import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
+import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import styles from './GoalsPanel.module.css';
 
 function HierarchySection({
@@ -20,8 +21,8 @@ function HierarchySection({
     // if (flattenedHierarchy.length === 0) return null; // Removed to allow empty state rendering
 
     const canAddChild = (goalType) => {
-        // NanoGoal cannot have children; ImmediateGoal opens target builder instead
-        return goalType !== 'NanoGoal' && goalType !== 'MicroGoal';
+        // Execution goals are handled in the session focus flow, not the structural hierarchy add flow.
+        return !isExecutionGoalType(goalType);
     };
 
     return (

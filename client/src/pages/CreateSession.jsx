@@ -201,7 +201,7 @@ function CreateSession() {
             const createdSession = response.data;
             const createdSessionId = createdSession.id;
 
-            // Optimistically insert into sessions caches for immediate list visibility.
+            // Update the known session lists immediately after the create succeeds.
             queryClient.setQueryData(['sessions', rootId, 'paginated'], (prev) => {
                 if (!prev || !Array.isArray(prev.pages) || prev.pages.length === 0) return prev;
                 const [firstPage, ...restPages] = prev.pages;

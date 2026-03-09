@@ -1,27 +1,10 @@
 import { useMemo } from 'react';
-import { parseTargets } from '../utils/goalUtils';
+import {
+    isExecutionGoalNode,
+    normalizeGoalNode,
+    parseGoalTargets,
+} from '../utils/goalNodeModel';
 import { getGoalStatus, getTargetStatus } from '../utils/sessionGoalStatus';
-
-function toNodeShape(node, depth = 0, isLinked = false, fallbackParentId = null) {
-    if (!node) return null;
-    return {
-        id: node.id,
-        name: node.attributes?.name || node.name,
-        type: node.attributes?.type || node.type,
-        description: node.attributes?.description || node.description,
-        relevance_statement: node.attributes?.relevance_statement,
-        deadline: node.attributes?.deadline || node.deadline,
-        completed: Boolean(node.completed || node.attributes?.completed),
-        is_smart: node.is_smart,
-        depth,
-        isLinked,
-        targets: parseTargets(node),
-        attributes: node.attributes || {},
-        children: node.children || [],
-        parent_id: node.parent_id || node.attributes?.parent_id || fallbackParentId,
-        activity_definition_id: node.activity_definition_id || node.attributes?.activity_definition_id || null,
-    };
-}
 
 /**
  * Iteratively flattens the backend nested tree into a normalized array,
@@ -46,7 +29,11 @@ function buildNormalizedTree(rootNode, sessionGoalIdsSet, microGoals) {
     while (stack.length > 0) {
         const { node, depth, parentId } = stack.pop();
 
-        const shapedNode = toNodeShape(node, depth, sessionGoalIdsSet.has(node.id), parentId);
+        const shapedNode = normalizeGoalNode(node, {
+            depth,
+            isLinked: sessionGoalIdsSet.has(node.id),
+            parentId,
+        });
         result.push(shapedNode);
 
         const children = [...(node.children || [])];
@@ -84,11 +71,6 @@ function buildRelationshipMaps(nodes) {
 
     return { parentMap, childrenMap };
 }
-
-function isExecutionGoalType(type) {
-    return type === 'MicroGoal' || type === 'NanoGoal';
-}
-
 export function useSessionGoalsViewModel({
     sessionGoalsView,
     selectedActivity,
@@ -128,7 +110,7 @@ export function useSessionGoalsViewModel({
 
         const relevantMicroIds = new Set();
         (sessionGoalsView.micro_goals || []).forEach(microGoal => {
-            const microTargets = parseTargets(microGoal);
+            const microTargets = parseGoalTargets(microGoal);
             const instanceBoundTargetIds = microTargets.map(t => t.activity_instance_id).filter(Boolean);
             const isInstanceBound = instanceBoundTargetIds.length > 0;
             const hasInstanceBoundTargetForFocusedActivity = Boolean(
@@ -170,14 +152,14 @@ export function useSessionGoalsViewModel({
                 if (!currentId || visited.has(currentId)) continue;
                 visited.add(currentId);
                 const currentNode = nodeById.get(currentId);
-                const isExecutionGoal = isExecutionGoalType(currentNode?.type);
+                const isExecutionGoal = isExecutionGoalNode(currentNode);
                 if (!isExecutionGoal || includeExecutionGoals) {
                     relevantIds.add(currentId);
                 }
                 const childIds = childrenMap[currentId] || [];
                 childIds.forEach((childId) => {
                     const childNode = nodeById.get(childId);
-                    const childIsExecutionGoal = isExecutionGoalType(childNode?.type);
+                    const childIsExecutionGoal = isExecutionGoalNode(childNode);
                     if (!childIsExecutionGoal || includeExecutionGoals) {
                         stack.push(childId);
                     }
@@ -214,7 +196,7 @@ export function useSessionGoalsViewModel({
         const cards = [];
 
         sourceHierarchy.forEach((goal) => {
-            const goalTargets = parseTargets(goal);
+            const goalTargets = parseGoalTargets(goal);
             goalTargets.forEach((target) => {
                 // Filter targets to just the active activity context if applicable
                 if (activeActivityDefId && target.activity_id !== activeActivityDefId) return;

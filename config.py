@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 
 # Determine which environment to load
-# Priority: ENV environment variable > default to development
-ENV = os.getenv('ENV', 'development')
+# Priority: ENV environment variable > FLASK_ENV > default to development
+ENV = os.getenv('ENV', os.getenv('FLASK_ENV', 'development'))
 
 # Load the appropriate .env file
 env_file = BASE_DIR / f'.env.{ENV}'
@@ -35,7 +35,7 @@ class Config:
     """Base configuration class with environment variables."""
     
     # Application Environment
-    ENV = os.getenv('FLASK_ENV', 'development')
+    ENV = os.getenv('ENV', os.getenv('FLASK_ENV', 'development'))
     DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() in ('true', '1', 'yes')
     
     # Flask Server
@@ -67,6 +67,15 @@ class Config:
 
     # Rate Limiting Storage URL (Redis)
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+
+    @classmethod
+    def should_auto_run_migrations(cls):
+        """Decide whether startup should auto-apply Alembic migrations."""
+        raw_value = os.getenv('AUTO_RUN_DB_MIGRATIONS')
+        if raw_value is not None:
+            return raw_value.lower() in ('true', '1', 'yes', 'on')
+
+        return cls.ENV not in ('production', 'testing')
 
     @classmethod
     def check_production_security(cls):

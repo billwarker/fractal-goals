@@ -14,6 +14,7 @@ import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useAllSessions } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
+import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
 import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
@@ -120,23 +121,8 @@ function FractalGoals() {
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {
         if (!fractalData || !viewingGoal) return;
-
-        // Recursive helper to find goal in tree
-        const findGoal = (node, targetId) => {
-            const nodeId = node.attributes?.id || node.id;
-            if (nodeId === targetId) return node;
-
-            if (node.children) {
-                for (const child of node.children) {
-                    const found = findGoal(child, targetId);
-                    if (found) return found;
-                }
-            }
-            return null;
-        };
-
-        const viewingId = viewingGoal.attributes?.id || viewingGoal.id;
-        const updatedGoal = findGoal(fractalData, viewingId);
+        const viewingId = getGoalNodeId(viewingGoal);
+        const updatedGoal = findGoalNodeById(fractalData, viewingId);
 
         if (updatedGoal && updatedGoal !== viewingGoal) {
             setViewingGoal(updatedGoal);
@@ -229,10 +215,10 @@ function FractalGoals() {
     const isSidebarOpen = showGoalModal || !!sidebarMode;
     const sheetTitle = showGoalModal
         ? 'Create Goal'
-        : (viewingGoal?.name || viewingGoal?.attributes?.name || 'Goal Details');
+        : (getGoalNodeName(viewingGoal) || 'Goal Details');
     const activeGoalType = showGoalModal
-        ? getChildType(selectedParent?.attributes?.type || selectedParent?.type)
-        : (viewingGoal?.attributes?.type || viewingGoal?.type);
+        ? getChildType(getGoalNodeType(selectedParent))
+        : getGoalNodeType(viewingGoal);
     const sheetTitleColor = activeGoalType ? getGoalColor(activeGoalType) : 'var(--color-text-primary)';
     const handleToggleViewSetting = (settingKey) => (event) => {
         setViewSettings((prev) => ({

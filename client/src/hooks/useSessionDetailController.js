@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fractalApi } from '../utils/api';
+import { flattenGoalTree } from '../utils/goalNodeModel';
 import notify from '../utils/notify';
 import { useActiveSession } from '../contexts/ActiveSessionContext';
 import { useFractalTree } from './useGoalQueries';
@@ -34,16 +35,9 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const { data: fullGoalTree } = useFractalTree(rootId);
     const allAvailableGoals = useMemo(() => {
         if (!fullGoalTree) return [];
-        const goals = [];
-        const processGoal = (goal) => {
-            goals.push({
-                ...goal,
-                childrenIds: goal.children ? goal.children.map((child) => child.id) : []
-            });
-            if (goal.children) goal.children.forEach(processGoal);
-        };
-        if (Array.isArray(fullGoalTree)) fullGoalTree.forEach(processGoal);
-        else if (typeof fullGoalTree === 'object') processGoal(fullGoalTree);
+        const goals = Array.isArray(fullGoalTree)
+            ? fullGoalTree.flatMap((goal) => flattenGoalTree(goal))
+            : flattenGoalTree(fullGoalTree);
         return goals.filter((goal) => !goal.completed);
     }, [fullGoalTree]);
 

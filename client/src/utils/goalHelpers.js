@@ -5,6 +5,14 @@
  * Hierarchy is now: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
  */
 
+import {
+    getGoalNodeChildren,
+    getGoalNodeId,
+    getGoalNodeName,
+    getGoalNodeParentId,
+    getGoalNodeType,
+} from './goalNodeModel';
+
 export const getChildType = (parentType) => {
     const map = {
         'UltimateGoal': 'LongTermGoal',
@@ -66,10 +74,11 @@ export const calculateGoalAge = (createdAt) => {
 
 export const findGoalById = (node, id) => {
     if (!node) return null;
-    if ((node.attributes?.id || node.id) === id) return node;
+    if (getGoalNodeId(node) === id) return node;
 
-    if (node.children) {
-        for (let child of node.children) {
+    const children = getGoalNodeChildren(node);
+    if (children.length > 0) {
+        for (const child of children) {
             const found = findGoalById(child, id);
             if (found) return found;
         }
@@ -79,31 +88,33 @@ export const findGoalById = (node, id) => {
 
 export const collectShortTermGoals = (node, collected = []) => {
     if (!node) return collected;
-    const type = node.attributes?.type || node.type;
+    const type = getGoalNodeType(node);
     if (type === 'ShortTermGoal') {
         collected.push({
-            id: node.attributes?.id || node.id,
-            name: node.name
+            id: getGoalNodeId(node),
+            name: getGoalNodeName(node)
         });
     }
-    if (node.children && node.children.length > 0) {
-        node.children.forEach(child => collectShortTermGoals(child, collected));
+    const children = getGoalNodeChildren(node);
+    if (children.length > 0) {
+        children.forEach(child => collectShortTermGoals(child, collected));
     }
     return collected;
 };
 
 export const collectImmediateGoals = (node, collected = []) => {
     if (!node) return collected;
-    const type = node.attributes?.type || node.type;
+    const type = getGoalNodeType(node);
     if (type === 'ImmediateGoal') {
         collected.push({
-            id: node.attributes?.id || node.id,
-            name: node.name,
-            parentId: node.attributes?.parent_id || node.parent_id
+            id: getGoalNodeId(node),
+            name: getGoalNodeName(node),
+            parentId: getGoalNodeParentId(node)
         });
     }
-    if (node.children && node.children.length > 0) {
-        node.children.forEach(child => collectImmediateGoals(child, collected));
+    const children = getGoalNodeChildren(node);
+    if (children.length > 0) {
+        children.forEach(child => collectImmediateGoals(child, collected));
     }
     return collected;
 };
@@ -113,8 +124,9 @@ export const flattenGoals = (nodes, result = []) => {
     nodes.forEach(node => {
         if (!node) return;
         result.push(node);
-        if (node.children && node.children.length > 0) {
-            flattenGoals(node.children, result);
+        const children = getGoalNodeChildren(node);
+        if (children.length > 0) {
+            flattenGoals(children, result);
         }
     });
     return result;

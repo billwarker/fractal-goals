@@ -1,16 +1,9 @@
+import { normalizeGoalNode, parseGoalTargets } from './goalNodeModel';
+
 /**
  * Parses targets from a goal node.
  */
-export const parseTargets = (goal) => {
-    if (!goal) return [];
-    let targets = [];
-    const raw = goal.attributes?.targets || goal.targets;
-    if (raw) {
-        try { targets = typeof raw === 'string' ? JSON.parse(raw) : raw; }
-        catch { targets = []; }
-    }
-    return Array.isArray(targets) ? targets : [];
-};
+export const parseTargets = (goal) => parseGoalTargets(goal);
 
 /**
  * Formats a target description.
@@ -64,21 +57,10 @@ export const buildFlattenedGoalTree = (
     // Include this node if it's a target or has relevant descendants
     if (isTarget || keepCompletedForSession || childrenNodes.length > 0) {
         return [
-            {
-                id: node.id,
-                name: node.attributes?.name || node.name,
-                type: node.attributes?.type || node.type,
-                description: node.attributes?.description || node.description,
-                relevance_statement: node.attributes?.relevance_statement,
-                deadline: node.attributes?.deadline || node.deadline,
-                isLinked: isTarget,
-                completed: nodeCompleted,
-                is_smart: node.is_smart,
+            normalizeGoalNode(node, {
                 depth,
-                targets: parseTargets(node),
-                attributes: node.attributes || {},
-                childrenIds: (node.children || []).map(c => c.id),
-            },
+                isLinked: isTarget,
+            }),
             ...childrenNodes
         ];
     }

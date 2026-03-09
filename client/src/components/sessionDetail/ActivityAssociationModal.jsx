@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import notify from '../../utils/notify';
+import Modal from '../atoms/Modal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
 import GoalIcon from '../atoms/GoalIcon';
 
 import styles from './ActivityAssociationModal.module.css';
@@ -174,8 +177,6 @@ const ActivityAssociationModal = ({
         return cache;
     }, [goals, goalById, selectedGoalIds]);
 
-    if (!isOpen) return null;
-
     // Helper to render section with icon
     const renderSection = (type, typeGoals) => {
         if (!typeGoals || typeGoals.length === 0) return null;
@@ -252,13 +253,13 @@ const ActivityAssociationModal = ({
     };
 
     return (
-        <div className={styles.modalOverlay} onClick={onClose}>
-            <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                <div className={styles.modalHeader}>
-                    <h3>Associate "{initialActivityName}"</h3>
-                    <button className={styles.closeButton} onClick={onClose}>×</button>
-                </div>
-
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={`Associate "${initialActivityName}"`}
+            size="lg"
+        >
+            <ModalBody>
                 <div className={styles.searchContainer}>
                     <input
                         type="text"
@@ -284,26 +285,26 @@ const ActivityAssociationModal = ({
                         <div className={styles.emptyState}>No goals found.</div>
                     )}
                 </div>
-
-                <div className={styles.modalFooter}>
-                    <button className={styles.cancelButton} onClick={onClose}>Cancel</button>
-                    <button
-                        className={styles.confirmButton}
-                        onClick={handleConfirm}
-                        disabled={!canConfirm}
-                    >
-                        {selectedGoalIds.size > 0
-                            ? `Associate ${selectedGoalIds.size} Goal${selectedGoalIds.size !== 1 ? 's' : ''}`
-                            : 'Save Associations'}
-                    </button>
-                </div>
                 {blockedGoalRemovals.length > 0 && (
                     <div className={styles.blockedHint}>
                         Remove targets first for: {blockedGoalRemovals.map(g => g.name).join(', ')}
                     </div>
                 )}
-            </div>
-        </div>
+            </ModalBody>
+
+            <ModalFooter className={styles.modalFooter}>
+                <button className={styles.cancelButton} onClick={onClose}>Cancel</button>
+                <button
+                    className={styles.confirmButton}
+                    onClick={handleConfirm}
+                    disabled={!canConfirm}
+                >
+                    {selectedGoalIds.size > 0
+                        ? `Associate ${selectedGoalIds.size} Goal${selectedGoalIds.size !== 1 ? 's' : ''}`
+                        : 'Save Associations'}
+                </button>
+            </ModalFooter>
+        </Modal>
     );
 };
 

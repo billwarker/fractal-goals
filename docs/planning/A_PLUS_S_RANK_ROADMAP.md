@@ -4,29 +4,19 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 
 ## Current Status
 
-- Completed: `45 / 50` (`90%`)
-- Remaining: `5 / 50` (`10%`)
-- Open items: `11, 35, 36, 37, 40`
+- Completed: `50 / 50` (`100%`)
+- Remaining: `0 / 50` (`0%`)
+- Open items: `none`
 
 ## Active Focus
 
 The roadmap is now concentrated in three areas:
 
-1. Environment-independent backend testing
-   Item `11`
-   The main remaining backend gap is now local test ergonomics: removing the last ambient assumptions from backend test execution.
-
-2. Final frontend correctness/polish pass
-   Items `35`, `36`, `37`, and `40`
-   The remaining work is now concentrated in frontend consistency: optimistic update policy, normalized goal/tree shapes, explicit structural vs execution modeling, and final modal primitive consolidation.
+1. Final frontend correctness/polish pass
+All original roadmap items are now complete. Remaining work, if any, is incremental follow-on cleanup rather than open roadmap debt.
 
 ## Open Item Notes
 
-- `11`: CI and Docker paths are in place; local backend runs still need a more turnkey path that does not rely on environment assumptions.
-- `35`: The codebase now uses invalidation heavily, but optimistic updates still need a formal bar and a small audit to ensure rollback is explicit wherever optimism exists.
-- `36`: Several helpers normalize data, but there is not yet one reusable frontend layer that defines the canonical goal/tree node shape.
-- `37`: The app behavior distinguishes structural and execution goals in practice, but the helpers/model layer still do this implicitly rather than explicitly.
-- `40`: Modal primitives improved a lot, but layout/body/footer/header patterns are still not fully unified across the remaining modal surfaces.
 
 ## Phase 1: Foundation
 
@@ -43,7 +33,7 @@ The roadmap is now concentrated in three areas:
 
 ## Phase 2: Testing And Contracts
 
-11. Make backend tests runnable without relying on ambient machine setup.
+11. ~~Make backend tests runnable without relying on ambient machine setup.~~
 12. ~~Add a `doctor` mode to `run-tests.sh`.~~
 13. ~~Add regression tests for every fixed refactor bug.~~
 14. ~~Add integration tests for cache invalidation-sensitive flows.~~
@@ -73,12 +63,12 @@ The roadmap is now concentrated in three areas:
 32. ~~Remove effects that only mirror props into state.~~
 33. ~~Resolve effect dependency warnings in touched files by restructuring logic.~~
 34. ~~Prefer invalidation-based mutation hooks over local refresh functions.~~
-35. Use optimistic updates only when rollback behavior is explicit.
-36. Normalize tree and goal node shapes in one reusable frontend layer.
-37. Model structural and execution goals explicitly in helpers.
+35. ~~Use optimistic updates only when rollback behavior is explicit.~~
+36. ~~Normalize tree and goal node shapes in one reusable frontend layer.~~
+37. ~~Model structural and execution goals explicitly in helpers.~~
 38. ~~Expand target-card/activity-focus test coverage.~~
 39. ~~Replace oversized multi-mode components with coordinator + subview patterns.~~
-40. Consolidate modal primitives for consistent body/footer/layout behavior.
+40. ~~Consolidate modal primitives for consistent body/footer/layout behavior.~~
 
 ## Phase 5: Tooling And DX
 
@@ -148,6 +138,11 @@ Completed in the current workspace:
 - 1: the frontend data layer is now consistently query-first; `useFractalTree`, `useAllSessions`, and related dedicated hooks own read concerns, `GoalsContext` and `ActivitiesContext` have been reduced to mutation/selection facades, `SessionsContext` was removed, `ManageActivities.jsx` and `FractalGoals.jsx` now read sessions through shared hooks instead of bridge contexts, and `ActivityAssociator.jsx` no longer calls imperative fetch helpers just to refresh group state
 - 2: backend validation/access/transaction invariants now sit behind services across the main business domains; `ActivityService`, `GoalService`, `SessionService`, `ProgramService`, `NoteService`, `TemplateService`, and `GoalLevelService` now own the create/update/delete and access-policy rules that used to live inline in `activities_api.py`, `goals_api.py`, `sessions_api.py`, `programs_api.py`, `templates_api.py`, and `goal_levels_api.py`
 - 10: explicit backend goal-domain rules now live in `services/goal_domain_rules.py`; child-completion policy, manual-completion eligibility, active-target completion checks, and nano-goal activity inheritance now route through shared rules used by `GoalService`, `completion_handlers.py`, and `serializers.py`, with focused unit coverage and a new integration check that per-goal manual-completion blocks are enforced
+- 11: backend pytest now bootstraps `.env.testing` automatically through `tests/test_env.py` and `tests/conftest.py`, `config.py` now resolves `ENV` consistently, and direct `fractal-goals-venv/bin/pytest ...` runs succeed without requiring the user to pre-export `ENV=testing` or a test `DATABASE_URL`
+- 36: canonical frontend goal/tree normalization now lives in `client/src/utils/goalNodeModel.js`; session goal view models, session detail goal flattening, generic goal utilities, `FractalGoals.jsx`, and the FlowTree graph presentation now share one normalized goal-node shape with direct coverage for flattening, target parsing, lineage lookup, and structural vs execution categorization
+- 37: structural vs execution goal modeling is now explicit in `client/src/utils/goalNodeModel.js`, with shared category helpers (`isExecutionGoalType`, `isStructuralGoalType`, `getGoalNodeCategory`) used by session goal view models, hierarchy rendering, goal detail completion rules, edit-form deadline gating, and FlowTree execution-goal visibility instead of repeated raw type checks
+- 40: the remaining standard dialog surfaces now share the same modal shell primitives (`Modal`, `ModalBody`, `ModalFooter`); `GoalModal`, `ActivityAssociationModal`, and `SelectExistingGoalModal` were moved off bespoke overlay/header/footer implementations, while the remaining custom overlays are intentionally specialized fullscreen/graph/image surfaces rather than general-purpose dialogs
+- 35: the true optimistic paths are now explicit and auditable; queued session activity edits capture rollback snapshots through `client/src/utils/optimisticQuery.js` before cache mutation and restore on save failure, the existing nano-goal optimistic path still rolls back on failure, and the surrounding audit removed misleading “optimistic” labeling from success-only cache updates like session-note and session-create cache writes
 
 ## Next Tranche
 

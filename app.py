@@ -39,6 +39,7 @@ from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.pages import pages_bp
 from services import init_services
+from services.db_migration_service import apply_startup_migrations
 
 # Print configuration on startup
 config.print_config()
@@ -151,6 +152,9 @@ app.register_blueprint(pages_bp)
 # Initialize services (event bus, completion handlers, etc.)
 init_services()
 logger.info("Services initialized (event bus, completion handlers)")
+
+# Apply pending database migrations automatically for local development
+apply_startup_migrations()
 
 # Initialize database engine on startup (creates connection pool)
 from models import get_engine, remove_session

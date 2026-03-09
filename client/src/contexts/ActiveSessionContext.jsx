@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { parseTargets } from '../utils/goalUtils';
+import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
@@ -124,6 +125,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const statusTimeoutRef = useRef(null);
     const initTimeoutRef = useRef(null);
     const instanceQueuesRef = useRef(new Map());
+    const instanceRollbackRef = useRef(new Map());
     const autoSyncedGoalStatesRef = useRef(new Map());
     const targetNotificationsInitializedRef = useRef(false);
     const goalNotificationsInitializedRef = useRef(false);
@@ -332,7 +334,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     });
 
     const applyInstanceOptimisticUpdate = useCallback((instanceId, updates) => {
-        queryClient.setQueryData(sessionActivitiesKey, (prev = []) => {
+        const updater = (prev = []) => {
             if (!Array.isArray(prev)) return prev;
             return prev.map((inst) => {
                 if (inst.id !== instanceId) return inst;
@@ -341,7 +343,21 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                     ...updates
                 };
             });
-        });
+        };
+
+        if (!instanceRollbackRef.current.has(instanceId)) {
+            // Capture a pre-edit snapshot the first time an instance enters optimistic state
+            // so a failed autosave can restore authoritative cache state explicitly.
+            const rollback = applyOptimisticQueryUpdate({
+                queryClient,
+                queryKey: sessionActivitiesKey,
+                updater,
+            });
+            instanceRollbackRef.current.set(instanceId, rollback);
+            return;
+        }
+
+        queryClient.setQueryData(sessionActivitiesKey, updater);
     }, [queryClient, sessionActivitiesKey]);
 
     const updateInstanceMutation = useMutation({
@@ -399,6 +415,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             });
         },
         onSuccess: (res, { instanceId }) => {
+            instanceRollbackRef.current.delete(instanceId);
             if (res?.data) {
                 queryClient.setQueryData(sessionActivitiesKey, (prev = []) =>
                     prev.map(inst => inst.id === instanceId ? res.data : inst)
@@ -419,6 +436,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 await updateInstanceMutation.mutateAsync({ instanceId, updates });
             },
             onError: (error) => {
+                const rollback = instanceRollbackRef.current.get(instanceId);
+                if (rollback) {
+                    rollback();
+                    instanceRollbackRef.current.delete(instanceId);
+                }
+                queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+                queryClient.invalidateQueries({ queryKey: sessionKey });
+                queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 console.error('[updateInstance] failed', {
                     instanceId,
                     message: error?.message,
@@ -430,7 +455,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         });
         instanceQueuesRef.current.set(instanceId, queue);
         return queue;
-    }, [updateInstanceMutation]);
+    }, [queryClient, sessionActivitiesKey, sessionGoalsViewKey, sessionKey, updateInstanceMutation]);
 
     const enqueueInstanceUpdate = useCallback((instanceId, updates) => {
         applyInstanceOptimisticUpdate(instanceId, updates);
@@ -738,6 +763,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             autoSaveQueue.reset();
             instanceQueuesRef.current.forEach((queue) => queue.reset());
             instanceQueuesRef.current.clear();
+            instanceRollbackRef.current.clear();
             setAutoSaveStatus('');
             setShowActivitySelector({});
             setDraggedItem(null);
