@@ -28,6 +28,7 @@ function buildInitialBlockFormData(initialData) {
 const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDates = {} }) => {
     const [formData, setFormData] = useState(() => buildInitialBlockFormData(initialData));
     const [errors, setErrors] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
 
     const validate = () => {
         const newErrors = {};
@@ -45,10 +46,16 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = () => {
-        if (validate()) {
-            onSave(formData);
-            onClose();
+    const handleSave = async () => {
+        if (!validate() || isSaving) {
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await onSave(formData);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -118,10 +125,10 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
             </ModalBody>
 
             <ModalFooter>
-                <Button variant="secondary" onClick={onClose}>
+                <Button variant="secondary" onClick={onClose} disabled={isSaving}>
                     Cancel
                 </Button>
-                <Button variant="primary" onClick={handleSave}>
+                <Button variant="primary" onClick={handleSave} isLoading={isSaving}>
                     Save Block
                 </Button>
             </ModalFooter>

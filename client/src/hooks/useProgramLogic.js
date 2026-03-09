@@ -3,6 +3,21 @@ import { fractalApi } from '../utils/api';
 import { getLocalISOString, localToISO } from '../utils/dateUtils';
 
 export function useProgramLogic(rootId, program, refreshData) {
+    const normalizeBlockPayload = useCallback((blockData) => {
+        const payload = {
+            name: blockData.name,
+            start_date: blockData.start_date ?? blockData.startDate ?? null,
+            end_date: blockData.end_date ?? blockData.endDate ?? null,
+            color: blockData.color,
+        };
+
+        const goalIds = blockData.goal_ids ?? blockData.goalIds;
+        if (goalIds !== undefined) {
+            payload.goal_ids = goalIds;
+        }
+
+        return payload;
+    }, []);
 
     // --- Program Updates ---
     const saveProgram = useCallback(async (programData) => {
@@ -20,6 +35,8 @@ export function useProgramLogic(rootId, program, refreshData) {
 
     // --- Block Management ---
     const saveBlock = useCallback(async (blockData) => {
+        const payload = normalizeBlockPayload(blockData);
+
         // If the ID contains a dash, it's a real UUID from the DB (or crypto.randomUUID).
         // If it's short/numeric, it was likely from the legacy Date.now() generator.
         // We'll trust the presence of an ID as an indicator of an existing block,
@@ -31,13 +48,13 @@ export function useProgramLogic(rootId, program, refreshData) {
 
         if (existingBlock) {
             // Update
-            await fractalApi.updateBlock(rootId, program.id, blockData.id, blockData);
+            await fractalApi.updateBlock(rootId, program.id, blockData.id, payload);
         } else {
             // Create
-            await fractalApi.createBlock(rootId, program.id, blockData);
+            await fractalApi.createBlock(rootId, program.id, payload);
         }
         await refreshData();
-    }, [rootId, program, refreshData]);
+    }, [normalizeBlockPayload, rootId, program, refreshData]);
 
     const deleteBlock = useCallback(async (blockId) => {
         await fractalApi.deleteBlock(rootId, program.id, blockId);

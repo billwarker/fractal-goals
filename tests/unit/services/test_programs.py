@@ -100,7 +100,7 @@ def test_program_service_mutations_commit_without_caller_commit(db_session, samp
     finally:
         verify_session.close()
 
-def test_create_block_and_day(db_session, sample_program, sample_goal_hierarchy):
+def test_create_block_starts_empty_and_can_add_day(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
     
     block_data = {
@@ -113,17 +113,28 @@ def test_create_block_and_day(db_session, sample_program, sample_goal_hierarchy)
     assert block_res['name'] == 'Test Block 1'
     block_id = block_res['id']
     
-    # create_block auto-generates 7 days, check them
     block_db = db_session.query(ProgramBlock).get(block_id)
-    assert len(block_db.days) == 7
+    assert len(block_db.days) == 0
     
-    # Add an explicit extra day just to test the logic
     day_res_count = ProgramService.add_block_day(db_session, root_id, sample_program.id, block_id, {
         'name': 'Bonus Day',
         'day_of_week': ['Monday']
     })
     
     assert day_res_count == 1
+
+
+def test_create_block_accepts_camel_case_dates(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
+        'name': 'Camel Case Block',
+        'startDate': date.today().isoformat(),
+        'endDate': (date.today() + timedelta(days=3)).isoformat(),
+    })
+
+    assert block_res['start_date'] == date.today().isoformat()
+    assert block_res['end_date'] == (date.today() + timedelta(days=3)).isoformat()
     
 def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id

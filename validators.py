@@ -810,6 +810,19 @@ class ProgramBlockSchema(BaseModel):
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     goal_ids: Optional[List[str]] = None
 
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_date_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        normalized = dict(data)
+        if 'start_date' not in normalized and 'startDate' in normalized:
+            normalized['start_date'] = normalized['startDate']
+        if 'end_date' not in normalized and 'endDate' in normalized:
+            normalized['end_date'] = normalized['endDate']
+        return normalized
+
 
 class ProgramBlockUpdateSchema(BaseModel):
     """Schema for updating a program block."""
@@ -820,6 +833,19 @@ class ProgramBlockUpdateSchema(BaseModel):
     end_date: Optional[str] = None
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     goal_ids: Optional[List[str]] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_date_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        normalized = dict(data)
+        if 'start_date' not in normalized and 'startDate' in normalized:
+            normalized['start_date'] = normalized['startDate']
+        if 'end_date' not in normalized and 'endDate' in normalized:
+            normalized['end_date'] = normalized['endDate']
+        return normalized
 
 
 

@@ -42,6 +42,19 @@ class ProgramService:
         pending_events.append(event)
 
     @staticmethod
+    def _parse_optional_block_date(data: Dict[str, Any], snake_key: str, camel_key: str):
+        raw_value = data.get(snake_key)
+        if raw_value is None:
+            raw_value = data.get(camel_key)
+        if not raw_value:
+            return None
+
+        try:
+            return datetime.strptime(str(raw_value)[:10], '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError(f"Invalid {snake_key} format")
+
+    @staticmethod
     def _replace_program_goals(session, program_id: str, goal_ids: List[str], root_id: str) -> List[Goal]:
         goal_ids = list(dict.fromkeys(goal_ids or []))
         goals = []
@@ -198,18 +211,8 @@ class ProgramService:
         if not program:
             raise ValueError("Program not found")
 
-        start_date_val = None
-        end_date_val = None
-        if data.get('start_date'):
-            try:
-                start_date_val = datetime.strptime(data['start_date'][:10], '%Y-%m-%d').date()
-            except ValueError:
-                raise ValueError("Invalid start_date format")
-        if data.get('end_date'):
-            try:
-                end_date_val = datetime.strptime(data['end_date'][:10], '%Y-%m-%d').date()
-            except ValueError:
-                raise ValueError("Invalid end_date format")
+        start_date_val = ProgramService._parse_optional_block_date(data, 'start_date', 'startDate')
+        end_date_val = ProgramService._parse_optional_block_date(data, 'end_date', 'endDate')
 
         new_block = ProgramBlock(
             program_id=program.id,
@@ -220,17 +223,6 @@ class ProgramService:
         )
         session.add(new_block)
         session.flush() # Get ID
-
-        # Generate 7 empty days (Monday-Sunday)
-        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        for i, dow in enumerate(days_of_week):
-            new_day = ProgramDay(
-                block_id=new_block.id,
-                day_number=i+1,
-                name=f"Day {i+1}",
-                day_of_week=[dow]
-            )
-            session.add(new_day)
 
         if data.get('goal_ids'):
             ProgramService._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
@@ -253,16 +245,10 @@ class ProgramService:
         if 'color' in data:
             block.color = data['color']
             
-        if 'start_date' in data:
-            try:
-                block.start_date = datetime.strptime(data['start_date'][:10], '%Y-%m-%d').date() if data['start_date'] else None
-            except ValueError:
-                raise ValueError("Invalid start_date format")
-        if 'end_date' in data:
-            try:
-                block.end_date = datetime.strptime(data['end_date'][:10], '%Y-%m-%d').date() if data['end_date'] else None
-            except ValueError:
-                raise ValueError("Invalid end_date format")
+        if 'start_date' in data or 'startDate' in data:
+            block.start_date = ProgramService._parse_optional_block_date(data, 'start_date', 'startDate')
+        if 'end_date' in data or 'endDate' in data:
+            block.end_date = ProgramService._parse_optional_block_date(data, 'end_date', 'endDate')
 
         if 'goal_ids' in data:
             ProgramService._replace_block_goals(session, block.id, data['goal_ids'], root_id)

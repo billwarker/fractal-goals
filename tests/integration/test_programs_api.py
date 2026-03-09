@@ -180,6 +180,29 @@ class TestProgramStructure:
         program_data = json.loads(response.data)
         assert not any(b['id'] == block_id for b in program_data['blocks'])
 
+    def test_block_create_accepts_camel_case_dates_and_starts_empty(self, authed_client, sample_ultimate_goal, sample_program):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=6)
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks',
+            json={
+                'name': 'Dragged Block',
+                'startDate': start_date.strftime('%Y-%m-%d'),
+                'endDate': end_date.strftime('%Y-%m-%d'),
+                'color': '#3366ff',
+            }
+        )
+
+        assert response.status_code == 201
+        block = response.get_json()
+        assert block['start_date'] == start_date.strftime('%Y-%m-%d')
+        assert block['end_date'] == end_date.strftime('%Y-%m-%d')
+        assert block['days'] == []
+
     def test_add_block_day_endpoint(self, authed_client, sample_ultimate_goal, sample_program, sample_session_template):
         """Test adding a day configuration manually (legacy/specific endpoint)."""
         root_id = sample_ultimate_goal.id
