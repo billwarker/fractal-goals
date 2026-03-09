@@ -3,8 +3,24 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import AttachGoalModal from '../AttachGoalModal';
 
+vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useGoalLevels: () => ({
+            getGoalColor: () => '#3b82f6',
+            getGoalSecondaryColor: () => '#0f172a',
+            getGoalIcon: () => 'diamond',
+        }),
+    };
+});
+
+vi.mock('../../atoms/GoalIcon', () => ({
+    default: ({ shape }) => <span data-testid="goal-icon">{shape}</span>,
+}));
+
 describe('AttachGoalModal', () => {
-    it('resets selected goal and deadline when reopened', () => {
+    it('renders goal icons and resets selected goal and deadline when reopened', () => {
         const goals = [
             { id: 'goal-1', name: 'Goal One', attributes: { type: 'MidTermGoal' } },
         ];
@@ -24,6 +40,8 @@ describe('AttachGoalModal', () => {
                 block={block}
             />
         );
+
+        expect(screen.getByTestId('goal-icon')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('radio'));
         fireEvent.change(screen.getByDisplayValue(''), {

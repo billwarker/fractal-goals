@@ -37,6 +37,17 @@
 .goalInfo {
     display: flex;
     flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.goalIconWrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
 }
 
 .goalType {

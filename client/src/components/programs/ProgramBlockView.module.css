@@ -61,30 +61,44 @@
     gap: 6px;
 }
 
-.goalBadgesRow {
+.goalList {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px 16px;
     margin-top: 12px;
 }
 
-.goalBadge {
+.goalListItem {
+    appearance: none;
     background: transparent;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
+    border: 0;
+    padding: 0;
+    color: var(--color-text-primary);
+    font: inherit;
     display: flex;
     align-items: center;
-    gap: 6px;
-    white-space: nowrap;
+    gap: 8px;
     cursor: pointer;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s ease;
+    min-width: 0;
 }
 
-.goalBadgeCompleted {
+.goalListItem:hover {
+    opacity: 0.85;
+}
+
+.goalListItemCompleted {
+    opacity: 0.75;
+}
+
+.goalListItemName {
+    font-size: 14px;
+    line-height: 1.35;
+    text-align: left;
+}
+
+.goalListItemCompleted .goalListItemName {
     text-decoration: line-through;
-    opacity: 0.7;
 }
 
 .daysGrid {

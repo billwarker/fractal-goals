@@ -5,7 +5,7 @@ import moment from 'moment';
 import { useProgramDetailViewModel } from '../useProgramDetailViewModel';
 
 describe('useProgramDetailViewModel', () => {
-    it('derives sorted blocks, active block metrics, and attached goal calendar events', () => {
+    it('derives sorted blocks, explicit block-goal state, active block metrics, and attached goal calendar events', () => {
         const today = moment().format('YYYY-MM-DD');
         const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
         const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
@@ -97,13 +97,14 @@ describe('useProgramDetailViewModel', () => {
         expect(result.current.sortedBlocks.map((block) => block.id)).toEqual(['block-active', 'block-late']);
         expect(result.current.activeBlock?.id).toBe('block-active');
         expect(result.current.attachBlock?.id).toBe('block-active');
+        expect(result.current.blockGoalsByBlockId.get('block-active').map((goal) => goal.id)).toEqual(['goal-parent']);
         expect(result.current.programMetrics).toMatchObject({
             completedSessions: 1,
             scheduledSessions: 1,
             totalGoals: 2,
         });
         expect(result.current.blockMetrics).toMatchObject({
-            totalGoals: 2,
+            totalGoals: 1,
             completedSessions: 1,
         });
         expect(result.current.calendarEvents.some((event) => event.id === 'block-bg-block-active')).toBe(true);

@@ -1,7 +1,7 @@
 import React from 'react';
 import moment from 'moment';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import GoalIcon from '../atoms/GoalIcon';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
 import Card from '../atoms/Card';
 import Button from '../atoms/Button';
@@ -16,16 +16,16 @@ import { formatDateInTimezone } from '../../utils/dateUtils';
 
 function ProgramBlockView({
     blocks, // sortedBlocks
+    blockGoalsByBlockId,
     sessions,
-    goals,
     onEditDay,
     onAttachGoal,
     onEditBlock,
     onDeleteBlock,
     onAddDay,
-    onGoalClick
+    onGoalClick,
 }) {
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { timezone } = useTimezone();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [blockToDelete, setBlockToDelete] = useState(null);
@@ -94,52 +94,47 @@ function ProgramBlockView({
                                     </div>
                                 </div>
 
-                                {/* Row 2: Goal Badges */}
-                                <div className={styles.goalBadgesRow}>
-                                    {(() => {
-                                        const blockStart = moment(block.start_date).startOf('day');
-                                        const blockEnd = moment(block.end_date).endOf('day');
+                                {(() => {
+                                    const associatedGoals = blockGoalsByBlockId?.get(block.id) || [];
+                                    if (associatedGoals.length === 0) {
+                                        return null;
+                                    }
 
-                                        const associatedGoals = goals.filter(g => {
-                                            if (block.goal_ids?.includes(g.id)) return true;
-                                            if (g.deadline) {
-                                                const d = moment(g.deadline);
-                                                return d.isSameOrAfter(blockStart) && d.isSameOrBefore(blockEnd);
-                                            }
-                                            return false;
-                                        });
+                                    return (
+                                        <div className={styles.goalList}>
+                                            {associatedGoals.map((goal) => {
+                                                const goalType = goal.attributes?.type || goal.type;
+                                                const isCompleted = goal.completed || goal.attributes?.completed;
+                                                const goalColor = isCompleted ? 'var(--color-brand-success)' : getGoalColor(goalType);
+                                                const goalSecondaryColor = isCompleted
+                                                    ? 'var(--color-brand-success)'
+                                                    : getGoalSecondaryColor(goalType);
 
-                                        associatedGoals.sort((a, b) => {
-                                            if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
-                                            if (a.deadline) return -1;
-                                            if (b.deadline) return 1;
-                                            return a.name.localeCompare(b.name);
-                                        });
-
-                                        return associatedGoals.map(g => {
-                                            const goalType = g.attributes?.type || g.type;
-                                            const goalColor = getGoalColor(goalType);
-                                            const isCompleted = g.completed || g.attributes?.completed;
-                                            return (
-                                                <div key={g.id}
-                                                    className={`${styles.goalBadge} ${isCompleted ? styles.goalBadgeCompleted : ''}`}
-                                                    style={{
-                                                        border: `1px solid ${goalColor}`,
-                                                        color: goalColor,
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onGoalClick(g);
-                                                    }}
-                                                    title={g.name}
-                                                >
-                                                    {isCompleted && <span>✓</span>}
-                                                    <span>{g.name}</span>
-                                                </div>
-                                            );
-                                        });
-                                    })()}
-                                </div>
+                                                return (
+                                                    <button
+                                                        key={goal.id}
+                                                        type="button"
+                                                        className={`${styles.goalListItem} ${isCompleted ? styles.goalListItemCompleted : ''}`}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            onGoalClick(goal);
+                                                        }}
+                                                        title={goal.name}
+                                                    >
+                                                        <GoalIcon
+                                                            shape={getGoalIcon(goalType)}
+                                                            color={goalColor}
+                                                            secondaryColor={goalSecondaryColor}
+                                                            isSmart={goal.is_smart}
+                                                            size={16}
+                                                        />
+                                                        <span className={styles.goalListItemName}>{goal.name}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Days Grid Section */}

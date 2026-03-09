@@ -514,7 +514,8 @@ def serialize_program_block(block):
         "end_date": format_utc(block.end_date),
         "color": block.color,
         "is_completed": block.is_completed,
-        "goal_ids": block_goal_ids or program_goal_ids,
+        "goal_ids": block_goal_ids,
+        "program_goal_ids": program_goal_ids,
         "days": [serialize_program_day(d) for d in block.days]
     }
 

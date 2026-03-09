@@ -13,6 +13,19 @@ describe('useProgramGoalSets', () => {
                     id: 'shared-child',
                     type: 'MidTermGoal',
                     name: 'Shared Child',
+                    children: [
+                        {
+                            id: 'grandchild',
+                            type: 'ShortTermGoal',
+                            name: 'Grandchild',
+                            children: [],
+                        },
+                    ],
+                },
+                {
+                    id: 'sibling-child',
+                    type: 'MidTermGoal',
+                    name: 'Sibling Child',
                     children: [],
                 },
             ],
@@ -21,6 +34,25 @@ describe('useProgramGoalSets', () => {
             id: 'shared-child',
             type: 'MidTermGoal',
             name: 'Shared Child',
+            children: [
+                {
+                    id: 'grandchild',
+                    type: 'ShortTermGoal',
+                    name: 'Grandchild',
+                    children: [],
+                },
+            ],
+        },
+        {
+            id: 'sibling-child',
+            type: 'MidTermGoal',
+            name: 'Sibling Child',
+            children: [],
+        },
+        {
+            id: 'grandchild',
+            type: 'ShortTermGoal',
+            name: 'Grandchild',
             children: [],
         },
         {
@@ -47,8 +79,10 @@ describe('useProgramGoalSets', () => {
         }));
 
         expect(result.current.directAssociatedGoalIds).toEqual(['program-root', 'shared-child', 'block-only']);
-        expect(Array.from(result.current.attachedGoalIds)).toEqual(['program-root', 'shared-child', 'block-only']);
+        expect(Array.from(result.current.attachedGoalIds)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
         expect(result.current.hierarchySeedIds).toEqual(['program-root', 'block-only']);
+        expect(result.current.attachableBlockGoalIds).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
+        expect(result.current.attachableBlockGoals.map((goal) => goal.id)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
     });
 
     it('expands descendants for block-specific metrics and other consumers from one helper', () => {
@@ -61,6 +95,6 @@ describe('useProgramGoalSets', () => {
             getGoalDetails: (goalId) => byId[goalId] || null,
         }));
 
-        expect(result.current.expandAssociatedGoalIds(['program-root'])).toEqual(['program-root', 'shared-child']);
+        expect(result.current.expandAssociatedGoalIds(['program-root'])).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child']);
     });
 });

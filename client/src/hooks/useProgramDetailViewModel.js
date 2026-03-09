@@ -52,7 +52,6 @@ export function useProgramDetailViewModel({
     attachBlockId,
     attachedGoalIds,
     hierarchyGoalSeeds,
-    expandAssociatedGoalIds,
 }) {
     const sortedBlocks = useMemo(() => {
         return [...(program?.blocks || [])].sort((left, right) => {
@@ -350,13 +349,41 @@ export function useProgramDetailViewModel({
         return program?.blocks?.find((block) => isBlockActive(block)) || null;
     }, [program?.blocks]);
 
+    const blockGoalsByBlockId = useMemo(() => {
+        const entries = sortedBlocks.map((block) => {
+            const seenGoalIds = new Set();
+            const blockGoals = (block.goal_ids || [])
+                .map((goalId) => getGoalDetails(goalId))
+                .filter((goal) => {
+                    if (!goal || seenGoalIds.has(goal.id)) {
+                        return false;
+                    }
+                    seenGoalIds.add(goal.id);
+                    return true;
+                })
+                .sort((left, right) => {
+                    if (left.deadline && right.deadline) {
+                        return new Date(left.deadline) - new Date(right.deadline);
+                    }
+                    if (left.deadline) {
+                        return -1;
+                    }
+                    if (right.deadline) {
+                        return 1;
+                    }
+                    return left.name.localeCompare(right.name);
+                });
+
+            return [block.id, blockGoals];
+        });
+
+        return new Map(entries);
+    }, [getGoalDetails, sortedBlocks]);
+
     const blockMetrics = useMemo(() => {
         if (!activeBlock) {
             return null;
         }
-
-        const blockStart = moment(activeBlock.start_date).startOf('day');
-        const blockEnd = moment(activeBlock.end_date).endOf('day');
 
         const blockSessions = sessions.filter((session) => {
             const programDayId = getSessionProgramDayId(session);
@@ -367,22 +394,7 @@ export function useProgramDetailViewModel({
             return programDaysMap.get(programDayId)?.blockId === activeBlock.id;
         });
 
-        let blockGoalIds = [];
-        const activeBlockGoalIds = activeBlock.goal_ids || [];
-
-        if (activeBlockGoalIds.length > 0) {
-            blockGoalIds = expandAssociatedGoalIds(activeBlockGoalIds);
-        } else {
-            blockGoalIds = Array.from(attachedGoalIds).filter((goalId) => {
-                const goal = getGoalDetails(goalId);
-                if (!goal?.deadline) {
-                    return false;
-                }
-
-                const deadline = moment(goal.deadline);
-                return deadline.isSameOrAfter(blockStart) && deadline.isSameOrBefore(blockEnd);
-            });
-        }
+        const blockGoalIds = Array.from(new Set(activeBlock.goal_ids || []));
 
         return {
             name: activeBlock.name,
@@ -397,7 +409,7 @@ export function useProgramDetailViewModel({
             totalDuration: blockSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
             daysRemaining: Math.max(0, moment(activeBlock.end_date).startOf('day').diff(moment().startOf('day'), 'days')),
         };
-    }, [activeBlock, attachedGoalIds, expandAssociatedGoalIds, getGoalDetails, programDaysMap, sessions]);
+    }, [activeBlock, getGoalDetails, programDaysMap, sessions]);
 
     const attachBlock = useMemo(() => {
         return sortedBlocks.find((block) => block.id === attachBlockId) || null;
@@ -411,6 +423,7 @@ export function useProgramDetailViewModel({
         blockMetrics,
         attachBlock,
         programDaysMap,
+        blockGoalsByBlockId,
         hierarchyGoalSeeds,
     };
 }

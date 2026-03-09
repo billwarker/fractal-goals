@@ -643,7 +643,7 @@ class ProgramService:
                                     "block_name": block.name,
                                     "block_color": block.color,
                                     "program_goal_ids": [g.id for g in program.goals],
-                                    "block_goal_ids": [g.id for g in block.goals] or [g.id for g in program.goals],  # compatibility alias
+                                    "block_goal_ids": [g.id for g in block.goals],
                                     "day_id": day.id,
                                     "day_name": day.name,
                                     "day_number": day.day_number,

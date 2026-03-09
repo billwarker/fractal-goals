@@ -57,6 +57,7 @@ function deriveHierarchySeedIds(goalIds = [], childrenById) {
 
 export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
     const blocks = program?.blocks || [];
+    const programGoalIds = program?.goal_ids || [];
 
     const childrenById = useMemo(() => buildChildrenMap(goals), [goals]);
 
@@ -65,9 +66,13 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
     }, [childrenById]);
 
     const directAssociatedGoalIds = useMemo(() => uniqueIds([
-        ...(program?.goal_ids || []),
+        ...programGoalIds,
         ...blocks.flatMap((block) => block.goal_ids || []),
-    ]), [blocks, program?.goal_ids]);
+    ]), [blocks, programGoalIds]);
+
+    const programScopeGoalIds = useMemo(() => {
+        return deriveHierarchySeedIds(programGoalIds, childrenById);
+    }, [childrenById, programGoalIds]);
 
     const hierarchySeedIds = useMemo(() => {
         return deriveHierarchySeedIds(directAssociatedGoalIds, childrenById);
@@ -81,6 +86,20 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
         return directAssociatedGoalIds.map((goalId) => getGoalDetails(goalId)).filter(Boolean);
     }, [directAssociatedGoalIds, getGoalDetails]);
 
+    const attachableBlockGoalIds = useMemo(() => {
+        const scopedGoalIds = expandAssociatedGoalIds(programScopeGoalIds);
+        const directBlockGoalIds = uniqueIds(blocks.flatMap((block) => block.goal_ids || []));
+
+        return uniqueIds([
+            ...scopedGoalIds,
+            ...directBlockGoalIds,
+        ]);
+    }, [blocks, expandAssociatedGoalIds, programScopeGoalIds]);
+
+    const attachableBlockGoals = useMemo(() => {
+        return attachableBlockGoalIds.map((goalId) => getGoalDetails(goalId)).filter(Boolean);
+    }, [attachableBlockGoalIds, getGoalDetails]);
+
     const hierarchyGoalSeeds = useMemo(() => {
         return hierarchySeedIds.map((goalId) => getGoalDetails(goalId)).filter(Boolean);
     }, [getGoalDetails, hierarchySeedIds]);
@@ -92,10 +111,13 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
     return {
         attachedGoalIds,
         attachedGoals,
+        attachableBlockGoalIds,
+        attachableBlockGoals,
         directAssociatedGoalIds,
         directAssociatedGoals,
         hierarchyGoalSeeds,
         hierarchySeedIds,
+        programScopeGoalIds,
         expandAssociatedGoalIds,
     };
 }

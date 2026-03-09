@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import moment from 'moment';
 import notify from '../../utils/notify';
+import GoalIcon from '../atoms/GoalIcon';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './AttachGoalModal.module.css';
 
 const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [deadline, setDeadline] = useState('');
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
 
     const handleSubmit = () => {
         if (!selectedGoalId) {
@@ -53,10 +56,19 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
                                         onChange={() => setSelectedGoalId(g.id)}
                                         className={styles.radioInput}
                                     />
+                                    <div className={styles.goalIconWrap}>
+                                        <GoalIcon
+                                            shape={getGoalIcon(g.attributes?.type || g.type)}
+                                            color={getGoalColor(g.attributes?.type || g.type)}
+                                            secondaryColor={getGoalSecondaryColor(g.attributes?.type || g.type)}
+                                            isSmart={g.is_smart}
+                                            size={18}
+                                        />
+                                    </div>
                                     <div className={styles.goalInfo}>
                                         <Text weight="medium">{g.name}</Text>
                                         <span className={styles.goalType}>
-                                            {g.attributes?.type?.replace(/([A-Z])/g, ' $1').trim()}
+                                            {(g.attributes?.type || g.type || '').replace(/([A-Z])/g, ' $1').trim()}
                                         </span>
                                     </div>
                                 </label>

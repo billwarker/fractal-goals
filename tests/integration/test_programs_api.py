@@ -90,6 +90,28 @@ class TestProgramCRUD:
         assert data['id'] == program_id
         assert data['name'] == sample_program['name']
 
+    def test_program_goals_do_not_auto_populate_block_goal_ids(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        """Program-level goals should not appear as direct block associations."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        goal_id = sample_goal_hierarchy['mid_term'].id
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            data=json.dumps({'selectedGoals': [goal_id]}),
+            content_type='application/json'
+        )
+        assert update_response.status_code == 200
+
+        program_response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
+        assert program_response.status_code == 200
+
+        program_data = program_response.get_json()
+        assert program_data['goal_ids'] == [goal_id]
+        assert len(program_data['blocks']) >= 1
+        assert all(block['goal_ids'] == [] for block in program_data['blocks'])
+        assert all(goal_id in block.get('program_goal_ids', []) for block in program_data['blocks'])
+
     def test_update_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test updating a program."""
         root_id = sample_ultimate_goal.id

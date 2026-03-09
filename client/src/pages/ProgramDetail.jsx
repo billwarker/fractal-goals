@@ -45,9 +45,8 @@ const ProgramDetail = () => {
     const {
         attachedGoalIds,
         attachedGoals,
-        directAssociatedGoals,
+        attachableBlockGoals,
         hierarchyGoalSeeds,
-        expandAssociatedGoalIds,
     } = useProgramGoalSets({
         program,
         goals,
@@ -113,6 +112,7 @@ const ProgramDetail = () => {
         activeBlock,
         blockMetrics,
         attachBlock,
+        blockGoalsByBlockId,
     } = useProgramDetailViewModel({
         program,
         goals,
@@ -124,7 +124,6 @@ const ProgramDetail = () => {
         attachBlockId,
         attachedGoalIds,
         hierarchyGoalSeeds,
-        expandAssociatedGoalIds,
     });
 
     const {
@@ -193,8 +192,8 @@ const ProgramDetail = () => {
             ) : (
                 <ProgramBlockView
                     blocks={sortedBlocks}
+                    blockGoalsByBlockId={blockGoalsByBlockId}
                     sessions={sessions}
-                    goals={goals}
                     onEditDay={handleEditDay}
                     onAttachGoal={handleAttachGoalClick}
                     onEditBlock={handleEditBlockClick}
@@ -291,7 +290,7 @@ const ProgramDetail = () => {
                 isOpen={showAttachModal}
                 onClose={closeAttachModal}
                 onSave={saveAttachedGoal}
-                goals={directAssociatedGoals}
+                goals={attachableBlockGoals}
                 block={attachBlock}
             />
             <DayViewModal
