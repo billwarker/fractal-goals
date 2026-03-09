@@ -157,7 +157,7 @@ describe('GoalsPanel smoke', () => {
         });
     });
 
-    it('renders nano children in activity mode even when micro has no activity_definition_id', async () => {
+    it('does not leak legacy micro goals into activity mode when they are only descendants of an associated parent', async () => {
         activeSessionMock = {
             ...activeSessionMock,
             microGoals: [
@@ -203,8 +203,8 @@ describe('GoalsPanel smoke', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Legacy Micro')).toBeInTheDocument();
-            expect(screen.getByText('Nano New')).toBeInTheDocument();
+            expect(screen.queryByText('Legacy Micro')).not.toBeInTheDocument();
+            expect(screen.queryByText('Nano New')).not.toBeInTheDocument();
         });
     });
 
