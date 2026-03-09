@@ -80,7 +80,7 @@ class Config:
     @classmethod
     def check_production_security(cls):
         """Verify critical security settings in production/staging environments."""
-        if cls.ENV not in ('development', 'testing'):
+        if cls.ENV not in ('development', 'testing', 'local'):
             if cls.JWT_SECRET_KEY == 'default-jwt-secret-keep-it-safe':
                 raise ValueError(f"CRITICAL: JWT_SECRET_KEY must be set in {cls.ENV} environment!")
             
