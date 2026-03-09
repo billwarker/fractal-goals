@@ -20,9 +20,6 @@
 }
 
 .deleteButton {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     background: transparent;
     border: none;
     color: #f44336;
@@ -42,7 +39,7 @@
 .header {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 8px;
 }
 
@@ -50,6 +47,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 12px;
     width: 100%;
 }
 
@@ -59,10 +57,11 @@
     color: var(--target-card-accent, var(--color-text-primary));
 }
 
-.iconRow {
+.headerControls {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .iconWrap {
@@ -75,12 +74,6 @@
 .description {
     font-size: 12px;
     color: var(--color-text-muted);
-}
-
-.editActions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
 .editButton {

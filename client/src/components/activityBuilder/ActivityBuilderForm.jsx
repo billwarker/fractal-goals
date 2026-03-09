@@ -349,6 +349,7 @@ function ActivityBuilderForm({
 
             {showAssociationModal && (
                 <ActivityAssociationModal
+                    key={`${editingActivity?.id || 'new'}:${selectedGoalIds.join(',')}`}
                     isOpen={showAssociationModal}
                     onClose={() => setShowAssociationModal(false)}
                     onAssociate={(newGoalIds) => {

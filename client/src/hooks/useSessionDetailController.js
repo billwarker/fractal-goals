@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { flattenGoalTree } from '../utils/goalNodeModel';
+import { queryKeys } from './queryKeys';
 import notify from '../utils/notify';
 import { useActiveSession } from '../contexts/ActiveSessionContext';
 import { useFractalTree } from './useGoalQueries';
 import useSessionNotes from './useSessionNotes';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
+    const queryClient = useQueryClient();
     const {
         session,
         activities,
@@ -33,6 +36,9 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
 
     const { data: fullGoalTree } = useFractalTree(rootId);
+    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const activitiesKey = queryKeys.activities(rootId);
+    const fractalTreeKey = queryKeys.fractalTree(rootId);
     const allAvailableGoals = useMemo(() => {
         if (!fullGoalTree) return [];
         const goals = Array.isArray(fullGoalTree)
@@ -82,10 +88,38 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         const idsToAssociate = Array.isArray(goalIds) ? goalIds : [goalIds];
         try {
             await fractalApi.setActivityGoals(rootId, activityDef.id, idsToAssociate);
+            queryClient.setQueryData(activitiesKey, (previous) => {
+                if (!Array.isArray(previous)) return previous;
+                return previous.map((activity) => (
+                    activity.id === activityDef.id
+                        ? { ...activity, associated_goal_ids: idsToAssociate }
+                        : activity
+                ));
+            });
+            queryClient.setQueryData(sessionGoalsViewKey, (previous) => {
+                if (!previous) return previous;
+                return {
+                    ...previous,
+                    activity_goal_ids_by_activity: {
+                        ...(previous.activity_goal_ids_by_activity || {}),
+                        [activityDef.id]: idsToAssociate,
+                    },
+                };
+            });
+            setAssociationContext((previous) => (
+                previous
+                    ? { ...previous, initialSelectedGoalIds: idsToAssociate }
+                    : previous
+            ));
+            queryClient.invalidateQueries({ queryKey: activitiesKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             notify.success('Activity associated successfully');
             refreshSession();
+            return true;
         } catch {
             notify.error('Failed to associate activity');
+            return false;
         }
     };
 
@@ -136,7 +170,13 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     };
 
     useEffect(() => {
-        if (!isMobile) setIsMobilePaneOpen(false);
+        if (isMobile) return undefined;
+
+        const timeoutId = window.setTimeout(() => {
+            setIsMobilePaneOpen(false);
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, [isMobile]);
 
     return {

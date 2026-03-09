@@ -62,7 +62,6 @@ vi.mock('../../../utils/api', () => ({
 }));
 
 vi.mock('../TargetsSection', () => ({ default: () => <div>Targets</div> }));
-vi.mock('../SessionFocusSection', () => ({ default: () => <div /> }));
 vi.mock('../GoalRow', () => ({ default: () => <div /> }));
 
 describe('GoalsPanel smoke', () => {
@@ -133,6 +132,7 @@ describe('GoalsPanel smoke', () => {
         await waitFor(() => {
             expect(screen.getByText('Session')).toBeInTheDocument();
         });
+        expect(screen.queryByText('Session Focus')).not.toBeInTheDocument();
     });
 
     it('renders micro and nano goals in session hierarchy', async () => {

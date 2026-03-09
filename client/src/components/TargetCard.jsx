@@ -65,26 +65,16 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
             className={`${styles.card} ${onClick ? styles.clickable : ''}`}
             style={cardStyleVars}
         >
-            {onDelete && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete();
-                    }}
-                    className={styles.deleteButton}
-                    title="Delete Target"
-                >
-                    ×
-                </button>
-            )}
-
             <div className={styles.header}>
                 <div className={styles.titleRow}>
                     <div className={styles.title}>
                         {activityDef.name}
                     </div>
-                    {isEditMode && onEdit && (
-                        <div className={styles.editActions}>
+                    <div className={styles.headerControls}>
+                        <span className={styles.iconWrap}>
+                            {statusObj.icon}
+                        </span>
+                        {isEditMode && onEdit && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -94,20 +84,27 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                             >
                                 Edit
                             </button>
-                        </div>
-                    )}
+                        )}
+                        {onDelete && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete();
+                                }}
+                                className={styles.deleteButton}
+                                title="Delete Target"
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                <div className={styles.iconRow}>
-                    <span className={styles.iconWrap}>
-                        {statusObj.icon}
-                    </span>
-                    {target.description && (
-                        <div className={styles.description}>
-                            {target.description}
-                        </div>
-                    )}
-                </div>
+                {target.description && (
+                    <div className={styles.description}>
+                        {target.description}
+                    </div>
+                )}
             </div>
 
             {target.type === 'completion' && (

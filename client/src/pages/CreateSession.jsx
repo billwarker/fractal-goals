@@ -41,10 +41,8 @@ function CreateSession() {
     const [creating, setCreating] = useState(false);
     const {
         templates,
-        allGoals,
         programDays,
         programsByName,
-        activityDefinitions,
         loading,
     } = useCreateSessionPageData(rootId);
 
@@ -329,8 +327,6 @@ function CreateSession() {
                     selectedProgramDay={selectedProgramDay}
                     creating={creating}
                     onCreateSession={handleCreateSession}
-                    activityDefinitions={activityDefinitions}
-                    goals={allGoals}
                 />
             </div>
         </div>

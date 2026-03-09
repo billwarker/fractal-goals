@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import notify from '../../utils/notify';
 import Modal from '../atoms/Modal';
@@ -93,7 +93,7 @@ const ActivityAssociationModal = ({
 
     const canConfirm = hasSelectionChanged && blockedGoalRemovals.length === 0;
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (blockedGoalRemovals.length > 0) {
             const goalNames = blockedGoalRemovals.map(g => `"${g.name}"`).join(', ');
             notify.error(`Cannot remove goals with targets on this activity: ${goalNames}`);
@@ -101,11 +101,9 @@ const ActivityAssociationModal = ({
         }
 
         if (hasSelectionChanged) {
-            onAssociate(Array.from(selectedGoalIds));
+            const saved = await onAssociate(Array.from(selectedGoalIds));
+            if (saved === false) return;
             onClose();
-            // Reset state
-            setSelectedGoalIds(new Set());
-            setSearchTerm('');
         }
     };
 

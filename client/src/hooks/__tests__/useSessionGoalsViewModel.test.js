@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { useSessionGoalsViewModel } from '../useSessionGoalsViewModel';
 
 describe('useSessionGoalsViewModel', () => {
-    it('preserves ancestor lineage in activity hierarchy', () => {
+    it('preserves ancestor lineage for directly relevant micro goals and keeps nano descendants tied to that micro', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -55,7 +55,7 @@ describe('useSessionGoalsViewModel', () => {
         expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG', 'IG', 'Micro', 'Nano']);
     });
 
-    it('preserves structural descendants when an ancestor goal is associated to the activity', () => {
+    it('does not pull structural descendants into activity hierarchy when only an ancestor goal is associated', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -92,7 +92,7 @@ describe('useSessionGoalsViewModel', () => {
             achievedTargetIds: new Set(),
         }));
 
-        expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG', 'IG']);
+        expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG']);
     });
 
     it('marks target cards complete when owning goal is completed via computed status', () => {

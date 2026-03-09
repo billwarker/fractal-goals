@@ -59,7 +59,6 @@ function buildRelationshipMaps(nodes) {
         if (!childrenMap[node.id]) {
             childrenMap[node.id] = [];
         }
-
         if (node.parent_id) {
             parentMap[node.id] = node.parent_id;
             if (!childrenMap[node.parent_id]) {
@@ -126,8 +125,7 @@ export function useSessionGoalsViewModel({
                 if (microGoal.activity_definition_id === activeActivityDefId) relevantMicroIds.add(microGoal.id);
                 else if (hasDefinitionScopedTargetForFocusedActivity) relevantMicroIds.add(microGoal.id);
                 else {
-                    const pid = microGoal.parent_id || microGoal.attributes?.parent_id;
-                    if (associatedGoalIds.has(microGoal.id) || associatedGoalIds.has(pid)) {
+                    if (associatedGoalIds.has(microGoal.id)) {
                         relevantMicroIds.add(microGoal.id);
                     }
                 }
@@ -144,37 +142,34 @@ export function useSessionGoalsViewModel({
             }
         };
 
-        const markDescendants = (id, { includeExecutionGoals = false } = {}) => {
-            const stack = [id];
+        const markExecutionDescendants = (id) => {
+            const stack = [...(childrenMap[id] || [])];
             const visited = new Set();
             while (stack.length > 0) {
                 const currentId = stack.pop();
                 if (!currentId || visited.has(currentId)) continue;
                 visited.add(currentId);
+
                 const currentNode = nodeById.get(currentId);
-                const isExecutionGoal = isExecutionGoalNode(currentNode);
-                if (!isExecutionGoal || includeExecutionGoals) {
+                if (!currentNode) continue;
+
+                if (isExecutionGoalNode(currentNode)) {
                     relevantIds.add(currentId);
                 }
-                const childIds = childrenMap[currentId] || [];
-                childIds.forEach((childId) => {
-                    const childNode = nodeById.get(childId);
-                    const childIsExecutionGoal = isExecutionGoalNode(childNode);
-                    if (!childIsExecutionGoal || includeExecutionGoals) {
-                        stack.push(childId);
-                    }
+
+                (childrenMap[currentId] || []).forEach((childId) => {
+                    stack.push(childId);
                 });
             }
         };
 
         associatedGoalIds.forEach((id) => {
             markAncestors(id);
-            markDescendants(id);
         });
 
         relevantMicroIds.forEach((id) => {
             markAncestors(id);
-            markDescendants(id, { includeExecutionGoals: true });
+            markExecutionDescendants(id);
         });
 
         if (normalizedTree[0]) {

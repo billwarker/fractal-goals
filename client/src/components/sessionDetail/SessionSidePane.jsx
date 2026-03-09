@@ -31,14 +31,10 @@ function SessionSidePane({
     updateNote,
     deleteNote,
     // Control Props
-    onCancel,
     onSave,
     onDelete,              // Trigger for confirmation modal
-    onSessionChange,
     mode = 'details',      // Controlled mode
     onModeChange,          // Callback for mode change
-    createMicroTrigger,     // Trigger for auto-creation
-    goalCreationContext,
     onOpenGoals,
     showModeTabs = true,
     embedded = false
@@ -50,8 +46,6 @@ function SessionSidePane({
         session,
         activityInstances,
         activities: activityDefinitions,
-        targetAchievements,
-        achievedTargetIds,
         toggleSessionComplete: onToggleComplete,
         pauseSession,
         resumeSession,
@@ -177,8 +171,6 @@ function SessionSidePane({
                         selectedActivity={selectedActivity}
                         onGoalClick={onGoalClick}
                         onGoalCreated={onGoalCreated}
-                        createMicroTrigger={createMicroTrigger}
-                        goalCreationContext={goalCreationContext}
                         onOpenGoals={onOpenGoals}
                     />
                 ) : (
