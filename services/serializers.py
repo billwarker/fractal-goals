@@ -2,6 +2,7 @@ from datetime import datetime, timezone, date
 import json
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
+from .goal_domain_rules import goal_uses_child_completion
 
 def format_utc(dt):
     """Format a datetime or date object to ISO string with UTC indicator."""
@@ -24,8 +25,9 @@ def calculate_smart_status(goal):
     if goal.track_activities:
         has_activities = len(goal.associated_activities) > 0 if goal.associated_activities else False
         has_groups = len(goal.associated_activity_groups) > 0 if goal.associated_activity_groups else False
-        is_achievable = has_activities or has_groups or goal.completed_via_children
-        is_measurable = len(targets) > 0 or goal.completed_via_children
+        uses_child_completion = goal_uses_child_completion(goal)
+        is_achievable = has_activities or has_groups or uses_child_completion
+        is_measurable = len(targets) > 0 or uses_child_completion
     else:
         is_achievable = True
         is_measurable = True

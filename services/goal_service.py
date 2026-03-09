@@ -25,6 +25,14 @@ from models import (
     validate_root_goal,
 )
 from services.goal_target_rules import check_metrics_meet_target
+from services.goal_domain_rules import (
+    goal_allows_manual_completion,
+    goal_requires_smart_validation,
+    is_micro_goal,
+    is_nano_goal,
+    resolve_completed_via_children,
+    should_inherit_parent_activities,
+)
 from services.metrics import GoalMetricsService
 from services.payload_normalizers import normalize_goal_payload
 from services.service_types import JsonDict, JsonList, ServiceResult
@@ -434,7 +442,7 @@ class GoalService:
         if 'name' in data and data['name'] is not None:
             goal.name = data['name']
         if 'description' in data and data['description'] is not None:
-            if goal.level and goal.level.name == 'Nano Goal' and data['description'].strip():
+            if is_nano_goal(goal) and data['description'].strip():
                 return None, ("NanoGoal cannot have a description", 400)
             goal.description = data['description']
 
@@ -621,17 +629,15 @@ class GoalService:
             if not parent:
                 new_goal.root_id = new_goal.id
 
-            if getattr(new_goal, 'level', None) and new_goal.level.name == 'Nano Goal' and new_goal.parent_id:
-                if parent and parent.associated_activities:
-                    for activity in parent.associated_activities:
-                        new_goal.associated_activities.append(activity)
+            if should_inherit_parent_activities(new_goal, parent):
+                for activity in parent.associated_activities:
+                    new_goal.associated_activities.append(activity)
 
             if data.get('targets'):
                 self.sync_targets(self.db_session, new_goal, data['targets'])
                 new_goal.targets = None
 
-            is_micro = getattr(new_goal, 'level', None) and new_goal.level.name == 'Micro Goal'
-            if data.get('session_id') and (data.get('type') == 'MicroGoal' or is_micro):
+            if data.get('session_id') and (data.get('type') == 'MicroGoal' or is_micro_goal(new_goal)):
                 self.db_session.execute(session_goals.insert().values(
                     **session_goal_insert_values(
                         self.db_session,
@@ -675,9 +681,7 @@ class GoalService:
             if parent_capacity_error:
                 return None, parent_capacity_error, 400
 
-        completed_via_children = data.get('completed_via_children', False)
-        if not completed_via_children and level_obj and getattr(level_obj, 'auto_complete_when_children_done', False):
-            completed_via_children = True
+        completed_via_children = resolve_completed_via_children(data, level_obj)
 
         with self.db_session.begin_nested():
             new_goal = Goal(
@@ -702,7 +706,7 @@ class GoalService:
                 self.sync_targets(self.db_session, new_goal, data['targets'])
                 new_goal.targets = None
 
-            if data.get('session_id') and data.get('type') == 'MicroGoal':
+            if data.get('session_id') and (data.get('type') == 'MicroGoal' or is_micro_goal(new_goal)):
                 self.db_session.execute(session_goals.insert().values(
                     **session_goal_insert_values(
                         self.db_session,
@@ -916,9 +920,9 @@ class GoalService:
 
         if goal.completed:
             level = getattr(goal, 'level', None)
-            if level and level.allow_manual_completion is False:
+            if not goal_allows_manual_completion(goal):
                 return None, "Manual completion is not allowed for this goal level", 403
-            if level and getattr(level, 'requires_smart', False):
+            if goal_requires_smart_validation(goal):
                 smart_status = calculate_smart_status(goal)
                 if not all(smart_status.values()):
                     return None, {

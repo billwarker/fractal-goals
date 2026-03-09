@@ -320,6 +320,20 @@ class TestGoalCompletionEndpoints:
         response = authed_client.patch('/api/goals/nonexistent-id/complete')
         assert response.status_code == 404
 
+    def test_toggle_completion_rejects_goal_level_manual_completion_block(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+    ):
+        sample_ultimate_goal.allow_manual_completion = False
+        db_session.commit()
+
+        response = authed_client.patch(f'/api/goals/{sample_ultimate_goal.id}/complete')
+
+        assert response.status_code == 403
+        assert response.get_json()['error'] == 'Manual completion is not allowed for this goal level'
+
     def test_toggle_completion_rejects_non_boolean_completed(self, authed_client, sample_ultimate_goal):
         """Completion updates should reject malformed completed payloads."""
         response = authed_client.patch(

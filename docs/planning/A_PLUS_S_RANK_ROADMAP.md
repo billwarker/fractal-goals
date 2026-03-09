@@ -4,30 +4,24 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 
 ## Current Status
 
-- Completed: `44 / 50` (`88%`)
-- Remaining: `6 / 50` (`12%`)
-- Open items: `10, 11, 35, 36, 37, 40`
+- Completed: `45 / 50` (`90%`)
+- Remaining: `5 / 50` (`10%`)
+- Open items: `11, 35, 36, 37, 40`
 
 ## Active Focus
 
 The roadmap is now concentrated in three areas:
 
-1. Backend domain tightening
-   Item `10`
-   The main remaining backend gap is not endpoint coverage anymore; it is finishing the small domain-rules layer for completion, targets, and inheritance semantics.
-
-2. Environment-independent backend testing
+1. Environment-independent backend testing
    Item `11`
-   The repo now has reproducible DB bootstrap and CI coverage, but the remaining step is making local backend test runs fully ambient-free in all supported environments.
+   The main remaining backend gap is now local test ergonomics: removing the last ambient assumptions from backend test execution.
 
-3. Final frontend correctness/polish pass
-   Items `35`, `36`, `37`, `40`
-   These are now about consistency and model quality:
-   optimistic updates only where rollback is explicit, normalized goal/tree shapes, explicit structural vs execution goal modeling, and modal primitive consolidation.
+2. Final frontend correctness/polish pass
+   Items `35`, `36`, `37`, and `40`
+   The remaining work is now concentrated in frontend consistency: optimistic update policy, normalized goal/tree shapes, explicit structural vs execution modeling, and final modal primitive consolidation.
 
 ## Open Item Notes
 
-- `10`: Partial completion already exists via `goal_target_rules.py`, but it is not yet the full small domain-rules layer originally intended.
 - `11`: CI and Docker paths are in place; local backend runs still need a more turnkey path that does not rely on environment assumptions.
 - `35`: The codebase now uses invalidation heavily, but optimistic updates still need a formal bar and a small audit to ensure rollback is explicit wherever optimism exists.
 - `36`: Several helpers normalize data, but there is not yet one reusable frontend layer that defines the canonical goal/tree node shape.
@@ -45,7 +39,7 @@ The roadmap is now concentrated in three areas:
 7. ~~Expand application service coverage across goals, sessions, notes, and programs.~~
 8. ~~Shrink oversized blueprints, especially `goals_api.py`.~~
 9. ~~Isolate serialization from business logic.~~
-10. Build a small domain-rules layer for completion, targets, and inheritance.
+10. ~~Build a small domain-rules layer for completion, targets, and inheritance.~~
 
 ## Phase 2: Testing And Contracts
 
@@ -153,6 +147,7 @@ Completed in the current workspace:
 - 31: remaining major fetched-data mirrors have now been removed from `CreateSession.jsx`, `Analytics.jsx`, `ProgramDayModal.jsx`, `ProgramBuilder.jsx`, `AnnotatedHeatmap.jsx`, `AnnotatedChartWrapper.jsx`, `ActivitiesContext.jsx`, and `FractalGoals.jsx`; query-backed hooks and canonical keys now own those remote datasets instead of local component/context caches
 - 1: the frontend data layer is now consistently query-first; `useFractalTree`, `useAllSessions`, and related dedicated hooks own read concerns, `GoalsContext` and `ActivitiesContext` have been reduced to mutation/selection facades, `SessionsContext` was removed, `ManageActivities.jsx` and `FractalGoals.jsx` now read sessions through shared hooks instead of bridge contexts, and `ActivityAssociator.jsx` no longer calls imperative fetch helpers just to refresh group state
 - 2: backend validation/access/transaction invariants now sit behind services across the main business domains; `ActivityService`, `GoalService`, `SessionService`, `ProgramService`, `NoteService`, `TemplateService`, and `GoalLevelService` now own the create/update/delete and access-policy rules that used to live inline in `activities_api.py`, `goals_api.py`, `sessions_api.py`, `programs_api.py`, `templates_api.py`, and `goal_levels_api.py`
+- 10: explicit backend goal-domain rules now live in `services/goal_domain_rules.py`; child-completion policy, manual-completion eligibility, active-target completion checks, and nano-goal activity inheritance now route through shared rules used by `GoalService`, `completion_handlers.py`, and `serializers.py`, with focused unit coverage and a new integration check that per-goal manual-completion blocks are enforced
 
 ## Next Tranche
 

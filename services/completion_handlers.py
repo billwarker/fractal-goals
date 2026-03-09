@@ -18,6 +18,10 @@ from services.goal_target_rules import (
     check_metric_value as _check_metric_value,
     check_metrics_meet_target as _check_metrics_meet_target,
 )
+from services.goal_domain_rules import (
+    all_active_targets_completed,
+    goal_uses_child_completion,
+)
 import models
 from models import (
     get_session, Goal, Session, ActivityInstance, Target,
@@ -328,13 +332,10 @@ def _evaluate_threshold_targets_for_activity(
     # No need to persist JSON - Target model updates are tracked by SQLAlchemy
     
     # Check if all targets are now complete → auto-complete goal
-    all_targets = [t for t in goal.targets_rel if t.deleted_at is None]
-    all_completed = all(t.completed for t in all_targets) if all_targets else False
-    
-    if all_completed and not goal.completed:
+    if all_active_targets_completed(goal) and not goal.completed:
         goal.completed = True
         goal.completed_at = completed_at
-        logger.info(f"Auto-completing goal {goal.id} - all {len(all_targets)} targets met")
+        logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Track for API response
         _track_goal_completion({
@@ -426,13 +427,10 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
     # No need to persist JSON - Target model updates are tracked by SQLAlchemy
     
     # Check if all targets are now complete → auto-complete goal
-    all_targets = [t for t in goal.targets_rel if t.deleted_at is None]
-    all_completed = all(t.completed for t in all_targets) if all_targets else False
-    
-    if all_completed and not goal.completed:
+    if all_active_targets_completed(goal) and not goal.completed:
         goal.completed = True
         goal.completed_at = now
-        logger.info(f"Auto-completing goal {goal.id} - all {len(all_targets)} targets met")
+        logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Emit goal completed event
         _queue_event(pending_events, Event(Events.GOAL_COMPLETED, {
@@ -827,10 +825,7 @@ def handle_goal_completed(event: Event):
         if goal.parent_id:
             parent = db_session.query(Goal).filter_by(id=goal.parent_id).first()
             if parent:
-                auto_complete = parent.completed_via_children
-                if not auto_complete and getattr(parent, 'level', None):
-                    auto_complete = getattr(parent.level, 'auto_complete_when_children_done', False)
-                if auto_complete:
+                if goal_uses_child_completion(parent):
                     _check_parent_completion(db_session, parent, pending_events=pending_events)
         
         # Update any programs this goal is part of
