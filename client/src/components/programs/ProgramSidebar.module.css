@@ -83,115 +83,10 @@
     font-size: 16px;
 }
 
-.goalsList {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    /* Space between families - stripes will not span this */
-}
-
 .emptyState {
     color: var(--color-text-muted);
     font-style: italic;
     font-size: 13px;
-}
-
-/* Goal Item Styles */
-.goalItemWrapper {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    /* Space between card and children - spanned by absolute stripes */
-}
-
-.lineageStripes {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    pointer-events: none;
-    z-index: 5;
-}
-
-.connectingStripe {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-}
-
-.goalCard {
-    padding: 0;
-    border-radius: 0 4px 4px 0;
-    /* Flat left for seamless stripe integration */
-    position: relative;
-    cursor: pointer;
-    transition: transform 0.1s ease-in-out;
-    background: var(--color-bg-card-alt);
-    display: flex;
-    flex-direction: column;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.cardContent {
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    min-height: 50px;
-    justify-content: center;
-}
-
-.goalCard:hover {
-    transform: translateX(4px);
-}
-
-.goalCardCompleted {
-    background: var(--color-bg-card-alt) !important;
-}
-
-.childrenContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    /* Space between siblings - spanned by parent lineage stripes */
-}
-
-.checkIcon {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: var(--color-brand-success);
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    color: white;
-}
-
-.goalType {
-    font-size: 10px;
-    font-weight: 600;
-    margin-bottom: 2px;
-}
-
-.goalName {
-    font-size: 13px;
-    font-weight: 400;
-}
-
-.goalNameCompleted {
-    text-decoration: line-through;
-    opacity: 0.7;
-}
-
-.goalDeadline {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    margin-top: 2px;
 }
 
 @media (max-width: 768px) {
@@ -231,9 +126,5 @@
 
     .metricLabel {
         font-size: 11px;
-    }
-
-    .goalsList {
-        gap: 12px;
     }
 }

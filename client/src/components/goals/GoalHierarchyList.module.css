@@ -1,0 +1,164 @@
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.sessionList {
+    gap: 0;
+}
+
+.programList {
+    gap: 24px;
+}
+
+.emptyState {
+    color: var(--color-text-muted, var(--text-tertiary));
+    font-style: italic;
+    font-size: 13px;
+}
+
+.sessionNode {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    position: relative;
+    min-height: 28px;
+    width: 100%;
+}
+
+.sessionNodeActive {
+    opacity: 1;
+}
+
+.sessionNodeContent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 16px;
+    margin-top: 1px;
+}
+
+.sessionNodeName {
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.sessionNodeNameActive {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.addSubGoalBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+
+.sessionNode:hover .addSubGoalBtn {
+    opacity: 1;
+}
+
+.addSubGoalBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+}
+
+.programNodeWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.programLineageStripes {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.programConnectingStripe {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.programCard {
+    padding: 0;
+    border-radius: 0 4px 4px 0;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.1s ease-in-out;
+    background: var(--color-bg-card-alt);
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.programCard:hover {
+    transform: translateX(4px);
+}
+
+.programCardCompleted {
+    background: var(--color-bg-card-alt);
+}
+
+.programCardContent {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 50px;
+    justify-content: center;
+}
+
+.programGoalType {
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.programGoalName {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--color-text-primary);
+}
+
+.programGoalNameCompleted {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.programGoalDeadline {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.programCheckIcon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--color-brand-success);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: white;
+}
