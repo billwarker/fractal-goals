@@ -20,9 +20,10 @@ vi.mock('../../atoms/GoalIcon', () => ({
 }));
 
 describe('AttachGoalModal', () => {
-    it('renders goal icons and resets selected goal and deadline when reopened', () => {
+    it('renders associated goals with icons and resets selected goal and deadline when reopened', () => {
         const goals = [
-            { id: 'goal-1', name: 'Goal One', attributes: { type: 'MidTermGoal' } },
+            { id: 'goal-1', name: 'Goal One', deadline: '2026-03-08', attributes: { type: 'MidTermGoal' } },
+            { id: 'goal-2', name: 'Goal Two', attributes: { type: 'ShortTermGoal' } },
         ];
         const block = {
             id: 'block-1',
@@ -38,15 +39,20 @@ describe('AttachGoalModal', () => {
                 onSave={vi.fn()}
                 goals={goals}
                 block={block}
+                associatedGoalIds={['goal-1']}
             />
         );
 
-        expect(screen.getByTestId('goal-icon')).toBeInTheDocument();
+        expect(screen.getAllByTestId('goal-icon')).toHaveLength(2);
+        expect(screen.getByText('Attached')).toBeInTheDocument();
+        expect(screen.getByText('Current deadline: Mar 8, 2026')).toBeInTheDocument();
+        expect(screen.getAllByRole('radio')[0]).not.toBeChecked();
 
-        fireEvent.click(screen.getByRole('radio'));
-        fireEvent.change(screen.getByDisplayValue(''), {
-            target: { value: '2026-03-10' },
-        });
+        fireEvent.click(screen.getAllByRole('radio')[0]);
+        expect(screen.getByDisplayValue('2026-03-08')).toBeInTheDocument();
+
+        fireEvent.click(screen.getAllByRole('radio')[1]);
+        fireEvent.change(screen.getByDisplayValue(''), { target: { value: '2026-03-10' } });
 
         rerender(
             <AttachGoalModal
@@ -55,6 +61,7 @@ describe('AttachGoalModal', () => {
                 onSave={vi.fn()}
                 goals={goals}
                 block={block}
+                associatedGoalIds={['goal-1']}
             />
         );
 
@@ -65,10 +72,11 @@ describe('AttachGoalModal', () => {
                 onSave={vi.fn()}
                 goals={goals}
                 block={block}
+                associatedGoalIds={['goal-1']}
             />
         );
 
-        expect(screen.getByRole('radio')).not.toBeChecked();
+        expect(screen.getAllByRole('radio')[0]).not.toBeChecked();
         expect(screen.queryByDisplayValue('2026-03-10')).not.toBeInTheDocument();
     });
 });

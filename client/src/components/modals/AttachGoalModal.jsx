@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import moment from 'moment';
 import notify from '../../utils/notify';
 import GoalIcon from '../atoms/GoalIcon';
@@ -11,10 +11,30 @@ import { Text } from '../atoms/Typography';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './AttachGoalModal.module.css';
 
-const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
+function normalizeDateValue(value) {
+    if (!value) {
+        return '';
+    }
+    return String(value).slice(0, 10);
+}
+
+const AttachGoalModalInner = ({ onClose, onSave, goals = [], block, associatedGoalIds = [] }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [deadline, setDeadline] = useState('');
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    const associatedGoalIdSet = useMemo(() => new Set(associatedGoalIds), [associatedGoalIds]);
+    const orderedGoals = useMemo(() => {
+        return [...goals].sort((left, right) => {
+            const leftAttached = associatedGoalIdSet.has(left.id);
+            const rightAttached = associatedGoalIdSet.has(right.id);
+
+            if (leftAttached !== rightAttached) {
+                return leftAttached ? -1 : 1;
+            }
+
+            return left.name.localeCompare(right.name);
+        });
+    }, [associatedGoalIdSet, goals]);
 
     const handleSubmit = () => {
         if (!selectedGoalId) {
@@ -26,6 +46,15 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
             return;
         }
         onSave({ goal_id: selectedGoalId, deadline });
+    };
+
+    const handleGoalSelect = (goal) => {
+        setSelectedGoalId(goal.id);
+        if (associatedGoalIdSet.has(goal.id)) {
+            setDeadline(normalizeDateValue(goal.deadline));
+            return;
+        }
+        setDeadline('');
     };
 
     return (
@@ -47,13 +76,16 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
                                 No goals available in this program. Add goals to the program first.
                             </div>
                         ) : (
-                            goals.map(g => (
-                                <label key={g.id} className={styles.goalItem}>
+                            orderedGoals.map(g => (
+                                <label
+                                    key={g.id}
+                                    className={`${styles.goalItem} ${associatedGoalIdSet.has(g.id) ? styles.goalItemAssociated : ''}`}
+                                >
                                     <input
                                         type="radio"
                                         name="goal"
                                         checked={selectedGoalId === g.id}
-                                        onChange={() => setSelectedGoalId(g.id)}
+                                        onChange={() => handleGoalSelect(g)}
                                         className={styles.radioInput}
                                     />
                                     <div className={styles.goalIconWrap}>
@@ -66,10 +98,20 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
                                         />
                                     </div>
                                     <div className={styles.goalInfo}>
-                                        <Text weight="medium">{g.name}</Text>
+                                        <div className={styles.goalNameRow}>
+                                            <Text weight="medium">{g.name}</Text>
+                                            {associatedGoalIdSet.has(g.id) && (
+                                                <span className={styles.associatedBadge}>Attached</span>
+                                            )}
+                                        </div>
                                         <span className={styles.goalType}>
                                             {(g.attributes?.type || g.type || '').replace(/([A-Z])/g, ' $1').trim()}
                                         </span>
+                                        {associatedGoalIdSet.has(g.id) && normalizeDateValue(g.deadline) && (
+                                            <span className={styles.goalMeta}>
+                                                Current deadline: {moment(g.deadline).format('MMM D, YYYY')}
+                                            </span>
+                                        )}
                                     </div>
                                 </label>
                             ))
@@ -113,7 +155,7 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block }) => {
     );
 };
 
-const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
+const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block, associatedGoalIds = [] }) => {
     if (!isOpen) {
         return null;
     }
@@ -126,6 +168,7 @@ const AttachGoalModal = ({ isOpen, onClose, onSave, goals = [], block }) => {
             onSave={onSave}
             goals={goals}
             block={block}
+            associatedGoalIds={associatedGoalIds}
         />
     );
 };

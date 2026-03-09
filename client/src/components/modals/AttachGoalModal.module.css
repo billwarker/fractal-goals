@@ -18,6 +18,10 @@
     transition: background-color 0.2s;
 }
 
+.goalItemAssociated {
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
+}
+
 .goalItem:last-child {
     border-bottom: none;
 }
@@ -41,6 +45,13 @@
     min-width: 0;
 }
 
+.goalNameRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .goalIconWrap {
     display: flex;
     align-items: center;
@@ -54,6 +65,22 @@
     font-size: 11px;
     color: var(--color-brand-primary);
     text-transform: capitalize;
+}
+
+.goalMeta {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.associatedBadge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-brand-success);
+    border: 1px solid color-mix(in srgb, var(--color-brand-success) 70%, transparent);
+    border-radius: 999px;
+    padding: 2px 6px;
 }
 
 .radioInput {
