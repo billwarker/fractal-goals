@@ -18,6 +18,27 @@ from services.service_types import JsonDict, JsonList, ServiceResult
 logger = logging.getLogger(__name__)
 
 
+def _validate_and_normalize_metrics(metrics_data):
+    """Require metrics to include both name and unit if provided."""
+    if metrics_data is None:
+        return [], None
+    if not isinstance(metrics_data, list):
+        return None, "Metrics must be an array"
+
+    normalized = []
+    for idx, metric in enumerate(metrics_data):
+        if not isinstance(metric, dict):
+            return None, f"Metric at index {idx} must be an object"
+        name = (metric.get('name') or '').strip()
+        unit = (metric.get('unit') or '').strip()
+        if not name and not unit:
+            continue
+        if not name or not unit:
+            return None, f"Metric at index {idx} must include both name and unit"
+        normalized.append({**metric, 'name': name, 'unit': unit})
+    return normalized, None
+
+
 def validate_activity_group_parent(db_session, root_id, group_id, parent_id):
     """Validate parent assignment to avoid missing refs and cycles."""
     if parent_id in (None, ''):
@@ -85,6 +106,46 @@ def validate_activity_group_id(db_session, root_id, group_id):
 class ActivityService:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def _validate_activity_definition_payload(
+        self,
+        root_id,
+        data,
+        *,
+        partial=False,
+    ) -> tuple[dict | None, tuple[str, int] | None]:
+        data = normalize_activity_payload(data, partial=partial)
+
+        if 'name' in data:
+            next_name = (data.get('name') or '').strip()
+            if not next_name:
+                return None, ("Name is required", 400)
+            data['name'] = next_name
+
+        if 'group_id' in data:
+            normalized_group_id = data.get('group_id') or None
+            group_err = validate_activity_group_id(self.db_session, root_id, normalized_group_id)
+            if group_err:
+                return None, (group_err, 400)
+            data['group_id'] = normalized_group_id
+
+        if 'metrics' in data:
+            metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics'))
+            if metrics_err:
+                return None, (metrics_err, 400)
+            if len(metrics_data) > 3:
+                return None, ("Maximum of 3 metrics allowed per activity.", 400)
+            data['metrics'] = metrics_data
+
+        if 'splits' in data:
+            splits_data = data.get('splits') or []
+            if not isinstance(splits_data, list):
+                return None, ("Splits must be an array", 400)
+            if len(splits_data) > 5:
+                return None, ("Maximum of 5 splits allowed per activity.", 400)
+            data['splits'] = splits_data
+
+        return data, None
 
     def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -766,6 +827,53 @@ class ActivityService:
         }, source='activity_service.update_activity'))
         
         return activity
+
+    def create_activity_definition(self, root_id, current_user_id, data) -> ServiceResult[ActivityDefinition]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        validated_data, validation_error = self._validate_activity_definition_payload(
+            root_id,
+            data,
+            partial=False,
+        )
+        if validation_error:
+            return None, *validation_error
+
+        activity_name = validated_data['name']
+        new_activity = self.create_activity(root_id, activity_name, validated_data)
+        return new_activity, None, 201
+
+    def update_activity_definition(
+        self,
+        root_id,
+        activity_id,
+        current_user_id,
+        data,
+    ) -> ServiceResult[ActivityDefinition]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        activity = self.db_session.query(ActivityDefinition).filter(
+            ActivityDefinition.id == activity_id,
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+        ).first()
+        if not activity:
+            return None, "Activity not found", 404
+
+        validated_data, validation_error = self._validate_activity_definition_payload(
+            root_id,
+            data,
+            partial=True,
+        )
+        if validation_error:
+            return None, *validation_error
+
+        updated_activity = self.update_activity(root_id, activity, validated_data)
+        return updated_activity, None, 200
 
     def delete_activity(self, root_id, activity) -> None:
         act_id = activity.id

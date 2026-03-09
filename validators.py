@@ -522,7 +522,7 @@ class SessionGoalAssociationSchema(BaseModel):
 
 class ActivityInstanceCreateSchema(BaseModel):
     """Schema for creating an activity instance in a session."""
-    session_id: str = Field(..., min_length=1)
+    session_id: Optional[str] = None
     activity_definition_id: str = Field(..., min_length=1)
     instance_id: Optional[str] = None
 

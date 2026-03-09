@@ -4,17 +4,17 @@ This roadmap turns the 50 quality recommendations into an execution plan.
 
 ## Current Status
 
-- Completed: `43 / 50` (`86%`)
-- Remaining: `7 / 50` (`14%`)
-- Open items: `2, 10, 11, 35, 36, 37, 40`
+- Completed: `44 / 50` (`88%`)
+- Remaining: `6 / 50` (`12%`)
+- Open items: `10, 11, 35, 36, 37, 40`
 
 ## Active Focus
 
 The roadmap is now concentrated in three areas:
 
-1. Backend service/domain tightening
-   Items `2` and `10`
-   The main gap is not endpoint coverage anymore; it is finishing the move of validation/transaction/domain rules into clean backend service and domain helper boundaries.
+1. Backend domain tightening
+   Item `10`
+   The main remaining backend gap is not endpoint coverage anymore; it is finishing the small domain-rules layer for completion, targets, and inheritance semantics.
 
 2. Environment-independent backend testing
    Item `11`
@@ -27,7 +27,6 @@ The roadmap is now concentrated in three areas:
 
 ## Open Item Notes
 
-- `2`: Service boundaries are substantially improved. Remaining work is to make services the undisputed source of validation and transaction invariants everywhere, not just on the main refactored routes.
 - `10`: Partial completion already exists via `goal_target_rules.py`, but it is not yet the full small domain-rules layer originally intended.
 - `11`: CI and Docker paths are in place; local backend runs still need a more turnkey path that does not rely on environment assumptions.
 - `35`: The codebase now uses invalidation heavily, but optimistic updates still need a formal bar and a small audit to ensure rollback is explicit wherever optimism exists.
@@ -38,7 +37,7 @@ The roadmap is now concentrated in three areas:
 ## Phase 1: Foundation
 
 1. ~~Finish migration to a single frontend data-fetching model.~~
-2. Make backend services the canonical boundary for validation and transaction invariants.
+2. ~~Make backend services the canonical boundary for validation and transaction invariants.~~
 3. ~~Continue decomposing `GoalDetailModal.jsx` into orchestration hooks and view components.~~
 4. ~~Move goal association persistence into dedicated mutation hooks.~~
 5. ~~Move goal duration/chart loading into a dedicated hook.~~
@@ -153,6 +152,7 @@ Completed in the current workspace:
 - 31 progress: `LogsModal.jsx` now derives paged log rows from shared `logs` query caches instead of holding its own fetched log list/loading state, and it resets via mount-seeded pagination while clear-log flows update shared query state directly
 - 31: remaining major fetched-data mirrors have now been removed from `CreateSession.jsx`, `Analytics.jsx`, `ProgramDayModal.jsx`, `ProgramBuilder.jsx`, `AnnotatedHeatmap.jsx`, `AnnotatedChartWrapper.jsx`, `ActivitiesContext.jsx`, and `FractalGoals.jsx`; query-backed hooks and canonical keys now own those remote datasets instead of local component/context caches
 - 1: the frontend data layer is now consistently query-first; `useFractalTree`, `useAllSessions`, and related dedicated hooks own read concerns, `GoalsContext` and `ActivitiesContext` have been reduced to mutation/selection facades, `SessionsContext` was removed, `ManageActivities.jsx` and `FractalGoals.jsx` now read sessions through shared hooks instead of bridge contexts, and `ActivityAssociator.jsx` no longer calls imperative fetch helpers just to refresh group state
+- 2: backend validation/access/transaction invariants now sit behind services across the main business domains; `ActivityService`, `GoalService`, `SessionService`, `ProgramService`, `NoteService`, `TemplateService`, and `GoalLevelService` now own the create/update/delete and access-policy rules that used to live inline in `activities_api.py`, `goals_api.py`, `sessions_api.py`, `programs_api.py`, `templates_api.py`, and `goal_levels_api.py`
 
 ## Next Tranche
 

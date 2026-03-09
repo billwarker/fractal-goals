@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
-from models import get_session, validate_root_goal
+from models import get_session
 from validators import (
     ProgramCreateSchema,
     ProgramUpdateSchema,
@@ -36,15 +36,13 @@ def get_programs(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-             
-        programs = ProgramService.get_programs(session, root_id)
+        programs = ProgramService.get_programs(session, root_id, current_user.id)
         limit, offset = parse_optional_pagination(request, max_limit=200)
         if limit is not None:
             programs = programs[offset: offset + limit]
         return etag_json_response(programs)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting programs")
@@ -60,14 +58,12 @@ def get_program(current_user, root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        program = ProgramService.get_program(session, root_id, program_id)
+        program = ProgramService.get_program(session, root_id, program_id, current_user.id)
         if program is None:
             return jsonify({"error": "Program not found"}), 404
         return jsonify(program)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting program")
@@ -84,14 +80,10 @@ def create_program(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        result = ProgramService.create_program(session, root_id, validated_data)
+        result = ProgramService.create_program(session, root_id, validated_data, current_user.id)
         return jsonify(result), 201
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating program")
@@ -108,14 +100,12 @@ def update_program(current_user, root_id, program_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        result = ProgramService.update_program(session, root_id, program_id, validated_data)
+        result = ProgramService.update_program(session, root_id, program_id, validated_data, current_user.id)
         if not result:
             return jsonify({"error": "Program not found"}), 404
         return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating program")
@@ -131,11 +121,7 @@ def delete_program(current_user, root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        result = ProgramService.delete_program(session, root_id, program_id)
+        result = ProgramService.delete_program(session, root_id, program_id, current_user.id)
         return jsonify({
             "message": "Program deleted successfully",
             "affected_sessions": result["affected_sessions"]
@@ -156,11 +142,7 @@ def get_program_session_count(current_user, root_id, program_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        count = ProgramService.get_program_session_count(session, root_id, program_id)
+        count = ProgramService.get_program_session_count(session, root_id, program_id, current_user.id)
         return jsonify({"session_count": count})
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
@@ -183,14 +165,10 @@ def create_block(current_user, root_id, program_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        block_dict = ProgramService.create_block(session, root_id, program_id, validated_data)
+        block_dict = ProgramService.create_block(session, root_id, program_id, validated_data, current_user.id)
         return jsonify(block_dict), 201
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating program block")
@@ -206,14 +184,10 @@ def update_block(current_user, root_id, program_id, block_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data)
+        block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify(block_dict)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating program block")
@@ -228,14 +202,10 @@ def delete_block(current_user, root_id, program_id, block_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        ProgramService.delete_block(session, root_id, program_id, block_id)
+        ProgramService.delete_block(session, root_id, program_id, block_id, current_user.id)
         return jsonify({"message": "Block deleted"})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error deleting program block")
@@ -251,14 +221,10 @@ def add_block_day(current_user, root_id, program_id, block_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        count = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data)
+        count = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify({"message": f"Added {count} days/sessions"}), 201
     except ValueError as e:
-         return jsonify({"error": str(e)}), 404 if "not found" in str(e) else 400
+         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error adding block day")
@@ -274,14 +240,10 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id, valida
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data)
+        ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify({"message": "Day updated successfully"})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error updating block day")
@@ -296,14 +258,10 @@ def delete_block_day(current_user, root_id, program_id, block_id, day_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id)
+        ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id, current_user.id)
         return jsonify({"message": "Day deleted"})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error deleting block day")
@@ -319,14 +277,10 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id, validate
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data)
+        count = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify({"message": f"Copied to {count} blocks"})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error copying block day")
@@ -341,12 +295,10 @@ def get_active_program_days(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        days = ProgramService.get_active_program_days(session, root_id)
+        days = ProgramService.get_active_program_days(session, root_id, current_user.id)
         return jsonify(days or [])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting active program days")
@@ -362,14 +314,10 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data)
+        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify({"message": "Goal attached and updated", "block": block_dict})
     except ValueError as e:
-         return jsonify({"error": str(e)}), 400
+         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error attaching goal to block")
@@ -385,14 +333,10 @@ def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, vali
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = validate_root_goal(session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data)
+        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
     except ValueError as e:
-         return jsonify({"error": str(e)}), 400
+         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error attaching goal to day")

@@ -12,9 +12,9 @@ from sqlalchemy import select, or_
 logger = logging.getLogger(__name__)
 from models import (
     get_session,
-    Goal, Session, Target, GoalLevel,
-    get_all_root_goals, get_goal_by_id, get_session_by_id,
-    validate_root_goal, session_goals, ActivityDefinition
+    Goal, Session,
+    get_goal_by_id,
+    session_goals,
 )
 from validators import (
     validate_request,
@@ -23,7 +23,6 @@ from validators import (
     GoalTargetCreateSchema, GoalTargetEvaluationSchema,
     GoalAssociationBatchSchema,
     FractalCreateSchema,
-    parse_date_string
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import (
@@ -37,22 +36,14 @@ from services import event_bus, Event, Events
 from services.serializers import (
     serialize_goal,
     serialize_target,
-    serialize_activity_instance,
-    calculate_smart_status,
-    format_utc,
 )
 from extensions import limiter
-from services.metrics import GoalMetricsService
 from services.analytics_cache import get_analytics, set_analytics
 from services.goal_analytics_service import GoalAnalyticsService
 from services.goal_service import (
     GoalService,
-    authorize_goal_access as _authorize_goal_access,
-    resolve_level_id as _resolve_level_id,
-    session_goal_insert_values as _session_goal_insert_values,
     sync_goal_targets as _sync_targets,
 )
-from services.session_service import SessionService
 from services.goal_type_utils import get_canonical_goal_type
 
 # Create blueprint
@@ -212,24 +203,13 @@ def delete_goal_endpoint(current_user, goal_id: str):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        goal = get_goal_by_id(db_session, goal_id)
-        if not goal:
-            logger.warning(f"Goal {goal_id} not found")
-            return jsonify({"error": "Goal not found"}), 404
-
-        if not _authorize_goal_access(db_session, current_user.id, goal):
-            return jsonify({"error": "Goal not found or access denied"}), 404
-
-        is_root = goal.parent_id is None
-        goal_name = goal.name
-        root_id = goal.root_id
         service = GoalService(db_session, sync_targets=_sync_targets)
-        if is_root:
-            _, error, status = service.delete_fractal(goal_id, current_user.id)
-        else:
-            _, error, status = service.delete_fractal_goal(root_id, goal_id, current_user.id)
+        payload, error, status = service.delete_global_goal(goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
+        is_root = payload["is_root"]
+        goal_name = payload["goal_name"]
+        root_id = payload["root_id"]
 
         logger.info(f"Deleted {'root ' if is_root else ''}goal {goal_id}")
 
@@ -257,13 +237,11 @@ def get_goal_endpoint(current_user, goal_id: str):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        goal = get_goal_by_id(db_session, goal_id)
-        if goal:
-            if not _authorize_goal_access(db_session, current_user.id, goal):
-                return jsonify({"error": "Goal not found or access denied"}), 404
-            return jsonify(serialize_goal(goal, include_children=False))
-            
-        return jsonify({"error": "Goal not found"}), 404
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.get_global_goal(goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal, include_children=False))
     finally:
         db_session.close()
 
@@ -278,83 +256,26 @@ def update_goal_endpoint(current_user, goal_id: str, validated_data):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        # Parse deadline if provided
-        deadline = None
-        if 'deadline' in data and data['deadline']:
-            try:
-                d_str = data['deadline']
-                if 'T' in d_str: d_str = d_str.split('T')[0]
-                deadline = datetime.strptime(d_str, '%Y-%m-%d').date()
-            except ValueError:
-                return jsonify({"error": "Invalid deadline format. Use YYYY-MM-DD"}), 400
-        
-        goal = get_goal_by_id(db_session, goal_id)
-        if goal:
-            if not _authorize_goal_access(db_session, current_user.id, goal):
-                return jsonify({"error": "Goal not found or access denied"}), 404
-                
-            if 'deadline' in data:
-                # Parent deadline enforcement
-                if deadline and goal.parent_id:
-                    parent = get_goal_by_id(db_session, goal.parent_id)
-                    if parent and parent.deadline:
-                        p_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
-                        if deadline > p_deadline:
-                            return jsonify({
-                                "error": "Child deadline cannot be later than parent deadline",
-                                "parent_deadline": p_deadline.isoformat()
-                            }), 400
-                
-                # Auto-cascade if shortening
-                # Ensure we compare dates
-                old_deadline = goal.deadline
-                if isinstance(old_deadline, datetime):
-                    old_deadline = old_deadline.date()
-                
-                goal.deadline = deadline
-                
-                if deadline and (not old_deadline or deadline < old_deadline):
-                    # Recursive cascade to children
-                    def cascade_deadline(parent_goal, new_max):
-                        for child in (parent_goal.children or []):
-                            if child.deadline:
-                                c_deadline = child.deadline.date() if isinstance(child.deadline, datetime) else child.deadline
-                                if c_deadline > new_max:
-                                    child.deadline = new_max
-                                    logger.info(f"Cascaded deadline update to child goal {child.id}")
-                                    cascade_deadline(child, new_max)
-                    
-                    cascade_deadline(goal, deadline)
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.update_global_goal(goal_id, current_user.id, data)
+        if error:
+            if isinstance(error, dict):
+                return jsonify(error), status
+            return jsonify({"error": error}), status
 
-            if 'name' in data and data['name'] is not None:
-                goal.name = data['name']
-            if 'description' in data and data['description'] is not None:
-                # Nano goal description restriction (also handled by validator, but safe to guard here)
-                if goal.level and goal.level.name == 'Nano Goal' and data['description'].strip():
-                    return jsonify({"error": "NanoGoal cannot have a description"}), 400
-                goal.description = data['description']
-            if 'targets' in data:
-                logger.debug(f"Received targets data: {data['targets']}")
-                # Sync relational targets
-                _sync_targets(db_session, goal, data['targets'] or [])
-            if 'completed_via_children' in data:
-                goal.completed_via_children = data['completed_via_children']
-            
-            db_session.commit()
-            db_session.refresh(goal)
-            logger.debug(f"Committed changes. Goal has {len([t for t in goal.targets_rel if t.deleted_at is None])} active targets")
-            
-            # Emit goal updated event
-            event_bus.emit(Event(Events.GOAL_UPDATED, {
-                'goal_id': goal.id,
-                'goal_name': goal.name,
-                'root_id': goal.root_id or goal.id, # For root goals, root_id is None, so use id
-                'updated_fields': list(data.keys())
-            }, source='goals_api.update_goal'))
-            
-            return jsonify(serialize_goal(goal, include_children=False))
-        
-        return jsonify({"error": "Goal not found"}), 404
+        logger.debug(
+            "Committed changes. Goal has %s active targets",
+            len([t for t in goal.targets_rel if t.deleted_at is None])
+        )
+
+        event_bus.emit(Event(Events.GOAL_UPDATED, {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal.id,
+            'updated_fields': list(data.keys())
+        }, source='goals_api.update_goal'))
+
+        return jsonify(serialize_goal(goal, include_children=False)), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -440,22 +361,11 @@ def get_goal_metrics(current_user, goal_id: str):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        goal = get_goal_by_id(db_session, goal_id, load_associations=False)
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-
-        authorized_root_id = goal.root_id or goal.id
-        root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        service = GoalMetricsService(db_session)
-        metrics = service.get_metrics_for_goal(goal_id)
-        
-        if not metrics:
-            return jsonify({"error": "Goal not found"}), 404
-            
-        return jsonify(metrics)
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.get_goal_metrics(goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error fetching goal metrics")
@@ -471,22 +381,11 @@ def get_goal_daily_durations(current_user, goal_id: str):
     engine = models.get_engine()
     db_session = get_session(engine)
     try:
-        goal = get_goal_by_id(db_session, goal_id, load_associations=False)
-        if not goal:
-            return jsonify({"error": "Goal not found"}), 404
-
-        authorized_root_id = goal.root_id or goal.id
-        root = validate_root_goal(db_session, authorized_root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        service = GoalMetricsService(db_session)
-        metrics = service.get_goal_daily_durations(goal_id)
-        
-        if metrics is None:
-            return jsonify({"error": "Goal not found"}), 404
-            
-        return jsonify(metrics)
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.get_goal_daily_durations(goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error fetching goal daily durations")

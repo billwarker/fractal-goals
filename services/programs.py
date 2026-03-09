@@ -21,6 +21,13 @@ class ProgramService:
     """
 
     @staticmethod
+    def _require_root_access(session, root_id: str, current_user_id: str | None = None):
+        root = validate_root_goal(session, root_id, owner_id=current_user_id) if current_user_id else validate_root_goal(session, root_id)
+        if not root:
+            raise ValueError("Fractal not found or access denied")
+        return root
+
+    @staticmethod
     def _commit(session, *instances):
         session.commit()
         for instance in instances:
@@ -152,11 +159,9 @@ class ProgramService:
                 session.delete(blk)
 
     @staticmethod
-    def get_programs(session, root_id: str) -> List[Dict]:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return None
-        
+    def get_programs(session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+        ProgramService._require_root_access(session, root_id, current_user_id)
+
         from sqlalchemy.orm import selectinload
         programs = session.query(Program).options(
             selectinload(Program.blocks)
@@ -169,11 +174,9 @@ class ProgramService:
         return [serialize_program(program) for program in programs]
 
     @staticmethod
-    def get_program(session, root_id: str, program_id: str) -> Optional[Dict]:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            return None
-        
+    def get_program(session, root_id: str, program_id: str, current_user_id: str | None = None) -> Optional[Dict]:
+        ProgramService._require_root_access(session, root_id, current_user_id)
+
         from sqlalchemy.orm import selectinload
         program = session.query(Program).options(
             selectinload(Program.blocks)
@@ -189,10 +192,8 @@ class ProgramService:
         return serialize_program(program)
 
     @staticmethod
-    def create_block(session, root_id: str, program_id: str, data: Dict) -> Dict:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            raise ValueError("Fractal not found")
+    def create_block(session, root_id: str, program_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
@@ -238,10 +239,8 @@ class ProgramService:
         return serialize_program_block(new_block)
 
     @staticmethod
-    def update_block(session, root_id: str, program_id: str, block_id: str, data: Dict) -> Dict:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            raise ValueError("Fractal not found")
+    def update_block(session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
@@ -273,10 +272,8 @@ class ProgramService:
         return serialize_program_block(block)
 
     @staticmethod
-    def delete_block(session, root_id: str, program_id: str, block_id: str):
-        root = validate_root_goal(session, root_id)
-        if not root:
-            raise ValueError("Fractal not found")
+    def delete_block(session, root_id: str, program_id: str, block_id: str, current_user_id: str | None = None):
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
@@ -288,10 +285,8 @@ class ProgramService:
         ProgramService._commit(session)
 
     @staticmethod
-    def create_program(session, root_id: str, validated_data: Dict) -> Dict:
-        root = validate_root_goal(session, root_id)
-        if not root:
-            raise ValueError("Fractal not found")
+    def create_program(session, root_id: str, validated_data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         
         # Parse dates
         start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
@@ -338,7 +333,8 @@ class ProgramService:
         return serialize_program(new_program)
 
     @staticmethod
-    def update_program(session, root_id: str, program_id: str, validated_data: Dict) -> Optional[Dict]:
+    def update_program(session, root_id: str, program_id: str, validated_data: Dict, current_user_id: str | None = None) -> Optional[Dict]:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
             return None
@@ -380,7 +376,8 @@ class ProgramService:
         return serialize_program(program)
 
     @staticmethod
-    def delete_program(session, root_id: str, program_id: str) -> Dict:
+    def delete_program(session, root_id: str, program_id: str, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
             raise ValueError("Program not found")
@@ -404,7 +401,8 @@ class ProgramService:
         return {"affected_sessions": affected_sessions_count}
 
     @staticmethod
-    def get_program_session_count(session, root_id: str, program_id: str) -> int:
+    def get_program_session_count(session, root_id: str, program_id: str, current_user_id: str | None = None) -> int:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
              raise ValueError("Program not found")
@@ -416,7 +414,8 @@ class ProgramService:
         return count
 
     @staticmethod
-    def add_block_day(session, root_id: str, program_id: str, block_id: str, data: Dict) -> int:
+    def add_block_day(session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> int:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
             raise ValueError("Block not found")
@@ -490,7 +489,8 @@ class ProgramService:
         return created_count
 
     @staticmethod
-    def update_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict):
+    def update_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None):
+        ProgramService._require_root_access(session, root_id, current_user_id)
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day:
              raise ValueError("Day not found")
@@ -559,7 +559,8 @@ class ProgramService:
         }, source='ProgramService.update_block_day'))
 
     @staticmethod
-    def delete_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str):
+    def delete_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, current_user_id: str | None = None):
+        ProgramService._require_root_access(session, root_id, current_user_id)
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day:
             raise ValueError("Day not found")
@@ -577,7 +578,8 @@ class ProgramService:
         }, source='ProgramService.delete_block_day'))
 
     @staticmethod
-    def copy_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict) -> int:
+    def copy_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> int:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         source_day = session.query(ProgramDay).filter_by(id=day_id).first()
         if not source_day:
             raise ValueError("Source day not found")
@@ -617,7 +619,8 @@ class ProgramService:
         return copied_count
 
     @staticmethod
-    def get_active_program_days(session, root_id: str) -> List[Dict]:
+    def get_active_program_days(session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         today = date.today()
         
         from sqlalchemy.orm import selectinload
@@ -666,8 +669,9 @@ class ProgramService:
         return result
 
     @staticmethod
-    def attach_goal_to_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict) -> Dict:
+    def attach_goal_to_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
         """Attach a single goal to a specific program day."""
+        ProgramService._require_root_access(session, root_id, current_user_id)
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day or day.block.program_id != program_id:
             raise ValueError("Program Day not found")
@@ -729,7 +733,8 @@ class ProgramService:
         return serialize_program_day(day)
 
     @staticmethod
-    def attach_goal_to_block(session, root_id: str, program_id: str, block_id: str, data: Dict) -> Dict:
+    def attach_goal_to_block(session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
             raise ValueError("Block not found")

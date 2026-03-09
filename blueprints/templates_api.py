@@ -1,19 +1,17 @@
 from flask import Blueprint, request, jsonify
-import json
-import uuid
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
-from models import get_session, SessionTemplate
+from models import get_session
 from validators import (
     validate_request,
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, internal_error, require_owned_root, etag_json_response
+from blueprints.api_utils import parse_optional_pagination, internal_error, etag_json_response
 from services.events import event_bus, Event, Events
-from services.owned_entity_queries import get_owned_session_template
 from services.serializers import serialize_session_template
+from services.template_service import TemplateService
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
@@ -29,18 +27,16 @@ def get_session_templates(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        templates_q = session.query(SessionTemplate).filter(
-            SessionTemplate.root_id == root_id,
-            SessionTemplate.deleted_at.is_(None),
-        )
         limit, offset = parse_optional_pagination(request, max_limit=500)
-        if limit is not None:
-            templates_q = templates_q.offset(offset).limit(limit)
-        templates = templates_q.all()
+        service = TemplateService(session)
+        templates, error, status = service.list_templates(
+            root_id,
+            current_user.id,
+            limit=limit,
+            offset=offset,
+        )
+        if error:
+            return jsonify({"error": error}), status
         result = [serialize_session_template(template) for template in templates]
         return etag_json_response(result)
         
@@ -55,14 +51,10 @@ def get_session_template(current_user, root_id, template_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        template = get_owned_session_template(session, root_id, template_id)
-        if not template:
-            return jsonify({"error": "Template not found"}), 404
-        
+        service = TemplateService(session)
+        template, error, status = service.get_template(root_id, template_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
         return etag_json_response(serialize_session_template(template))
         
     finally:
@@ -77,24 +69,10 @@ def create_session_template(current_user, root_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # template_data is optional now - validation ensures name is present
-        template_data = validated_data.get('template_data')
-        
-        # Create new template
-        new_template = SessionTemplate(
-            id=str(uuid.uuid4()),
-            name=validated_data['name'],  # Already sanitized
-            description=validated_data.get('description', ''),
-            root_id=root_id,
-            template_data=json.dumps(template_data) if template_data else None
-        )
-        
-        session.add(new_template)
-        session.commit()
+        service = TemplateService(session)
+        new_template, error, status = service.create_template(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
         
         event_bus.emit(Event(Events.SESSION_TEMPLATE_CREATED, {
             'template_id': new_template.id,
@@ -102,7 +80,7 @@ def create_session_template(current_user, root_id, validated_data):
             'root_id': root_id
         }, source='templates_api.create_session_template'))
         
-        return jsonify(serialize_session_template(new_template)), 201
+        return jsonify(serialize_session_template(new_template)), status
         
     except SQLAlchemyError:
         session.rollback()
@@ -120,23 +98,10 @@ def update_session_template(current_user, root_id, template_id, validated_data):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        template = get_owned_session_template(session, root_id, template_id)
-        if not template:
-            return jsonify({"error": "Template not found"}), 404
-        
-        # Update fields
-        if 'name' in validated_data:
-            template.name = validated_data['name']
-        if 'description' in validated_data:
-            template.description = validated_data['description']
-        if 'template_data' in validated_data:
-            template.template_data = json.dumps(validated_data['template_data'])
-        
-        session.commit()
+        service = TemplateService(session)
+        template, error, status = service.update_template(root_id, template_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
         
         event_bus.emit(Event(Events.SESSION_TEMPLATE_UPDATED, {
             'template_id': template.id,
@@ -145,7 +110,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
             'updated_fields': list(validated_data.keys())
         }, source='templates_api.update_session_template'))
         
-        return jsonify(serialize_session_template(template))
+        return jsonify(serialize_session_template(template)), status
         
     except SQLAlchemyError:
         session.rollback()
@@ -162,18 +127,11 @@ def delete_session_template(current_user, root_id, template_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        template = get_owned_session_template(session, root_id, template_id)
-        if not template:
-            return jsonify({"error": "Template not found"}), 404
-        
-        template.deleted_at = models.utc_now()
-        session.commit()
-        
-        return jsonify({"message": "Template deleted successfully"})
+        service = TemplateService(session)
+        payload, error, status = service.delete_template(root_id, template_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
         
     except SQLAlchemyError:
         session.rollback()

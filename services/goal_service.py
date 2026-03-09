@@ -25,6 +25,7 @@ from models import (
     validate_root_goal,
 )
 from services.goal_target_rules import check_metrics_meet_target
+from services.metrics import GoalMetricsService
 from services.payload_normalizers import normalize_goal_payload
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import (
@@ -264,6 +265,20 @@ class GoalService:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
+    def _get_authorized_goal(
+        self,
+        goal_id: str,
+        current_user_id,
+        *,
+        load_associations: bool = True,
+    ) -> tuple[Goal | None, tuple[str, int] | None]:
+        goal = get_goal_by_id(self.db_session, goal_id, load_associations=load_associations)
+        if not goal:
+            return None, ("Goal not found", 404)
+        if not self._authorize_goal_access(current_user_id, goal):
+            return None, ("Goal not found or access denied", 404)
+        return goal, None
+
     def _collect_goal_subtree(self, goal: Goal) -> list[Goal]:
         root_scope_id = goal.root_id or goal.id
         active_goals = self.db_session.query(Goal).filter(
@@ -372,6 +387,87 @@ class GoalService:
         if current_children >= parent_max:
             return f"{error_prefix} '{parent_goal.level.name}' allows a maximum of {parent_max} children."
         return None
+
+    def _cascade_child_deadlines(self, parent_goal, new_max) -> None:
+        for child in (parent_goal.children or []):
+            if child.deadline:
+                child_deadline = child.deadline.date() if isinstance(child.deadline, datetime) else child.deadline
+                if child_deadline > new_max:
+                    child.deadline = new_max
+                    logger.info("Cascaded deadline update to child goal %s", child.id)
+                    self._cascade_child_deadlines(child, new_max)
+
+    def _apply_goal_updates(
+        self,
+        goal,
+        data,
+        *,
+        root_id,
+        allow_parent_update=False,
+        allow_extended_fields=False,
+    ) -> tuple[Goal | None, tuple[str | dict, int] | None]:
+        next_description = data['description'] if 'description' in data else goal.description
+        level_error = self._validate_description_required(getattr(goal, 'level', None), next_description)
+        if level_error:
+            return None, (level_error, 400)
+
+        if 'deadline' in data:
+            deadline, deadline_error = self._parse_deadline(data['deadline'])
+            if deadline_error:
+                return None, (deadline_error, 400)
+
+            if deadline and goal.parent_id:
+                parent = get_goal_by_id(self.db_session, goal.parent_id)
+                if parent and parent.deadline:
+                    parent_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
+                    if deadline > parent_deadline:
+                        return None, ({
+                            "error": "Child deadline cannot be later than parent deadline",
+                            "parent_deadline": parent_deadline.isoformat(),
+                        }, 400)
+
+            old_deadline = goal.deadline.date() if isinstance(goal.deadline, datetime) else goal.deadline
+            goal.deadline = deadline
+            if deadline and (not old_deadline or deadline < old_deadline):
+                self._cascade_child_deadlines(goal, deadline)
+
+        if 'name' in data and data['name'] is not None:
+            goal.name = data['name']
+        if 'description' in data and data['description'] is not None:
+            if goal.level and goal.level.name == 'Nano Goal' and data['description'].strip():
+                return None, ("NanoGoal cannot have a description", 400)
+            goal.description = data['description']
+
+        if 'targets' in data:
+            self.sync_targets(self.db_session, goal, data['targets'] or [])
+            goal.targets = None
+
+        if 'completed_via_children' in data:
+            goal.completed_via_children = data['completed_via_children']
+
+        if allow_parent_update and 'parent_id' in data:
+            new_parent_id = data['parent_id']
+            if new_parent_id and new_parent_id != goal.parent_id:
+                new_parent = self.db_session.query(Goal).filter_by(id=new_parent_id, root_id=root_id).first()
+                if not new_parent:
+                    return None, ("New parent goal not found in this fractal.", 400)
+                parent_capacity_error = self._validate_parent_capacity(
+                    new_parent,
+                    error_prefix="Cannot move goal: New parent level",
+                )
+                if parent_capacity_error:
+                    return None, (parent_capacity_error, 400)
+            goal.parent_id = new_parent_id
+
+        if allow_extended_fields:
+            if 'relevance_statement' in data:
+                goal.relevance_statement = data['relevance_statement']
+            if 'allow_manual_completion' in data:
+                goal.allow_manual_completion = data['allow_manual_completion']
+            if 'track_activities' in data:
+                goal.track_activities = data['track_activities']
+
+        return goal, None
 
     def _find_max_updated(self, goal, current_max):
         if goal.updated_at and (not current_max or goal.updated_at > current_max):
@@ -631,6 +727,12 @@ class GoalService:
             return None, "Goal not found", 404
         return goal, None, 200
 
+    def get_global_goal(self, goal_id, current_user_id) -> ServiceResult[Goal]:
+        goal, error = self._get_authorized_goal(goal_id, current_user_id)
+        if error:
+            return None, *error
+        return goal, None, 200
+
     def update_fractal_goal(self, root_id, goal_id, current_user_id, data) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data, partial=True)
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -643,53 +745,85 @@ class GoalService:
         if goal.root_id != root_id:
             return None, "Goal not found in this fractal", 404
 
-        next_description = data['description'] if 'description' in data else goal.description
-        level_error = self._validate_description_required(getattr(goal, 'level', None), next_description)
-        if level_error:
-            return None, level_error, 400
-
-        if 'name' in data:
-            goal.name = data['name']
-        if 'description' in data:
-            goal.description = data['description']
-
-        if 'deadline' in data:
-            deadline, deadline_error = self._parse_deadline(data['deadline'])
-            if deadline_error:
-                return None, deadline_error, 400
-            goal.deadline = deadline
-
-        # Target updates are replace-by-presence: omit to preserve, include to replace.
-        if 'targets' in data:
-            self.sync_targets(self.db_session, goal, data['targets'] or [])
-            goal.targets = None
-
-        if 'parent_id' in data:
-            new_parent_id = data['parent_id']
-            if new_parent_id and new_parent_id != goal.parent_id:
-                new_parent = self.db_session.query(Goal).filter_by(id=new_parent_id, root_id=root_id).first()
-                if not new_parent:
-                    return None, "New parent goal not found in this fractal.", 400
-                parent_capacity_error = self._validate_parent_capacity(
-                    new_parent,
-                    error_prefix="Cannot move goal: New parent level",
-                )
-                if parent_capacity_error:
-                    return None, parent_capacity_error, 400
-            goal.parent_id = new_parent_id
-
-        if 'relevance_statement' in data:
-            goal.relevance_statement = data['relevance_statement']
-        if 'completed_via_children' in data:
-            goal.completed_via_children = data['completed_via_children']
-        if 'allow_manual_completion' in data:
-            goal.allow_manual_completion = data['allow_manual_completion']
-        if 'track_activities' in data:
-            goal.track_activities = data['track_activities']
+        goal, update_error = self._apply_goal_updates(
+            goal,
+            data,
+            root_id=root_id,
+            allow_parent_update=True,
+            allow_extended_fields=True,
+        )
+        if update_error:
+            return None, *update_error
 
         self.db_session.commit()
         self.db_session.refresh(goal)
         return goal, None, 200
+
+    def update_global_goal(self, goal_id, current_user_id, data) -> ServiceResult[Goal]:
+        data = normalize_goal_payload(data, partial=True)
+        goal, error = self._get_authorized_goal(goal_id, current_user_id)
+        if error:
+            return None, *error
+
+        root_id = goal.root_id or goal.id
+        goal, update_error = self._apply_goal_updates(
+            goal,
+            data,
+            root_id=root_id,
+            allow_parent_update=False,
+            allow_extended_fields=False,
+        )
+        if update_error:
+            return None, *update_error
+
+        self.db_session.commit()
+        self.db_session.refresh(goal)
+        return goal, None, 200
+
+    def delete_global_goal(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:
+        goal, error = self._get_authorized_goal(goal_id, current_user_id)
+        if error:
+            return None, *error
+
+        is_root = goal.parent_id is None
+        goal_name = goal.name
+        root_id = goal.root_id or goal.id
+
+        if is_root:
+            _, error, status = self.delete_fractal(goal_id, current_user_id)
+            if error:
+                return None, error, status
+        else:
+            _, error, status = self.delete_fractal_goal(root_id, goal_id, current_user_id)
+            if error:
+                return None, error, status
+
+        return {
+            "goal_id": goal_id,
+            "goal_name": goal_name,
+            "root_id": root_id,
+            "is_root": is_root,
+        }, None, 200
+
+    def get_goal_metrics(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:
+        goal, error = self._get_authorized_goal(goal_id, current_user_id, load_associations=False)
+        if error:
+            return None, *error
+
+        metrics = GoalMetricsService(self.db_session).get_metrics_for_goal(goal.id)
+        if not metrics:
+            return None, "Goal not found", 404
+        return metrics, None, 200
+
+    def get_goal_daily_durations(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:
+        goal, error = self._get_authorized_goal(goal_id, current_user_id, load_associations=False)
+        if error:
+            return None, *error
+
+        metrics = GoalMetricsService(self.db_session).get_goal_daily_durations(goal.id)
+        if metrics is None:
+            return None, "Goal not found", 404
+        return metrics, None, 200
 
     def delete_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)

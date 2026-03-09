@@ -22,61 +22,12 @@ from services.goal_type_utils import get_canonical_goal_type
 from services.owned_entity_queries import get_owned_activity_definition
 from services.activity_service import (
     ActivityService,
-    validate_activity_group_id as _validate_activity_group_id,
 )
 
 logger = logging.getLogger(__name__)
 
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
-
-def _validate_and_normalize_metrics(metrics_data):
-    """Require metrics to include both name and unit if provided."""
-    if metrics_data is None:
-        return [], None
-    if not isinstance(metrics_data, list):
-        return None, "Metrics must be an array"
-
-    normalized = []
-    for idx, metric in enumerate(metrics_data):
-        if not isinstance(metric, dict):
-            return None, f"Metric at index {idx} must be an object"
-        name = (metric.get('name') or '').strip()
-        unit = (metric.get('unit') or '').strip()
-        if not name and not unit:
-            continue
-        if not name or not unit:
-            return None, f"Metric at index {idx} must include both name and unit"
-        normalized.append({**metric, 'name': name, 'unit': unit})
-    return normalized, None
-
-
-def _validate_activity_update_payload(data):
-    """Preserve the stricter pre-refactor validation contract for updates."""
-    if 'name' in data:
-        next_name = (data.get('name') or '').strip()
-        if not next_name:
-            return None, "Name is required"
-        data['name'] = next_name
-
-    if 'metrics' in data:
-        metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics'))
-        if metrics_err:
-            return None, metrics_err
-        if len(metrics_data) > 3:
-            return None, "Maximum of 3 metrics allowed per activity."
-        data['metrics'] = metrics_data
-
-    if 'splits' in data:
-        splits_data = data.get('splits') or []
-        if not isinstance(splits_data, list):
-            return None, "Splits must be an array"
-        if len(splits_data) > 5:
-            return None, "Maximum of 5 splits allowed per activity."
-        data['splits'] = splits_data
-
-    return data, None
-
 
 def _format_validation_errors(exc):
     errors = []
@@ -295,36 +246,16 @@ def create_activity(current_user, root_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
-        
         data, validation_error = _parse_activity_payload(ActivityDefinitionCreateSchema)
         if validation_error:
             return validation_error
 
-        activity_name = data['name']
-
-        group_id = data.get('group_id') or None
-        group_err = _validate_activity_group_id(session, root_id, group_id)
-        if group_err:
-            return jsonify({"error": group_err}), 400
-
-        metrics_data, metrics_err = _validate_and_normalize_metrics(data.get('metrics', []))
-        if metrics_err:
-            return jsonify({"error": metrics_err}), 400
-        if len(metrics_data) > 3:
-             return jsonify({"error": "Maximum of 3 metrics allowed per activity."}), 400
-
-        splits_data = data.get('splits', [])
-        if len(splits_data) > 5:
-             return jsonify({"error": "Maximum of 5 splits allowed per activity."}), 400
-        
-        # Create Activity via service
         service = ActivityService(session)
-        new_activity = service.create_activity(root_id, activity_name, data)
+        new_activity, error, status = service.create_activity_definition(root_id, current_user.id, data)
+        if error:
+            return jsonify({"error": error}), status
         
-        return jsonify(serialize_activity_definition(new_activity)), 201
+        return jsonify(serialize_activity_definition(new_activity)), status
 
     except SQLAlchemyError:
         session.rollback()
@@ -340,34 +271,21 @@ def update_activity(current_user, root_id, activity_id):
     engine = models.get_engine()
     session = get_session(engine)
     try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Find the activity
-        activity = get_owned_activity_definition(session, root_id, activity_id)
-        if not activity:
-            return jsonify({"error": "Activity not found"}), 404
-        
         data, validation_error = _parse_activity_payload(ActivityDefinitionUpdateSchema)
         if validation_error:
             return validation_error
 
-        if 'group_id' in data:
-            normalized_group_id = data.get('group_id') or None
-            group_err = _validate_activity_group_id(session, root_id, normalized_group_id)
-            if group_err:
-                return jsonify({"error": group_err}), 400
-            data['group_id'] = normalized_group_id
-
-        data, payload_err = _validate_activity_update_payload(data)
-        if payload_err:
-            return jsonify({"error": payload_err}), 400
-        
         service = ActivityService(session)
-        activity = service.update_activity(root_id, activity, data)
+        activity, error, status = service.update_activity_definition(
+            root_id,
+            activity_id,
+            current_user.id,
+            data,
+        )
+        if error:
+            return jsonify({"error": error}), status
         
-        return jsonify(serialize_activity_definition(activity)), 200
+        return jsonify(serialize_activity_definition(activity)), status
     
     except SQLAlchemyError:
         session.rollback()

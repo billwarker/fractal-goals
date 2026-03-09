@@ -231,6 +231,28 @@ class TestGoalCRUDEndpoints:
         )
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+    def test_update_goal_rejects_child_deadline_after_parent(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+    ):
+        """Global goal updates should still enforce parent deadline rules via the service."""
+        parent_goal = sample_goal_hierarchy['mid_term']
+        child_goal = sample_goal_hierarchy['short_term']
+        parent_goal.deadline = datetime(2026, 3, 20, tzinfo=timezone.utc)
+        db_session.commit()
+
+        response = authed_client.put(
+            f'/api/goals/{child_goal.id}',
+            json={'deadline': '2026-03-25'}
+        )
+
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['error'] == 'Child deadline cannot be later than parent deadline'
+        assert payload['parent_deadline'] == '2026-03-20'
     
     def test_delete_goal(self, authed_client, db_session, sample_goal_hierarchy):
         """Test deleting a goal."""

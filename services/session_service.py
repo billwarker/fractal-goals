@@ -4,15 +4,20 @@ import uuid
 from sqlalchemy import text, inspect
 from sqlalchemy.orm import selectinload, joinedload
 from models import (
-    Session, Goal, ActivityInstance, MetricValue, session_goals,
+    Session, Goal, ActivityInstance, MetricDefinition, MetricValue, session_goals,
     ActivityDefinition, ProgramDay, ProgramBlock,
     validate_root_goal, get_session_by_id
 )
 import models
 from services import event_bus, Event, Events
 from services.payload_normalizers import normalize_session_payload
+from services.owned_entity_queries import (
+    get_owned_activity_definition,
+    get_owned_activity_instance,
+    get_owned_session,
+)
 from services.service_types import JsonDict, ServiceResult
-from services.serializers import serialize_session
+from services.serializers import serialize_activity_instance, serialize_session
 from services.goal_type_utils import get_canonical_goal_type
 logger = logging.getLogger(__name__)
 
@@ -190,6 +195,221 @@ class SessionService:
                 session._derived_goals = derived_goals
 
         return serialize_session(session, include_image_data=True), None, 200
+
+    def add_activity_to_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        activity_definition_id = data.get('activity_definition_id')
+        if not activity_definition_id:
+            return None, "activity_definition_id required", 400
+
+        activity_def = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
+        if not activity_def:
+            return None, "Activity definition not found in this fractal", 404
+
+        instance = ActivityInstance(
+            id=data.get('instance_id') or str(uuid.uuid4()),
+            session_id=session_id,
+            activity_definition_id=activity_definition_id,
+            root_id=root_id,
+        )
+        self.db_session.add(instance)
+
+        associated_goals = [goal for goal in (activity_def.associated_goals or []) if not goal.deleted_at]
+        program_goal_ids = set()
+        if session.program_day_id:
+            raw_program_goals = self.db_session.execute(
+                text(
+                    "SELECT goal_id FROM program_days "
+                    "JOIN program_blocks ON program_blocks.id = program_days.block_id "
+                    "JOIN programs ON programs.id = program_blocks.program_id "
+                    "JOIN program_goals ON program_goals.program_id = programs.id "
+                    "WHERE program_days.id = :day_id AND programs.root_id = :root_id"
+                ),
+                {"day_id": session.program_day_id, "root_id": root_id},
+            ).scalars().all()
+            program_goal_ids = set(raw_program_goals)
+
+        for goal in associated_goals:
+            if goal.root_id != root_id:
+                continue
+            if program_goal_ids and goal.id not in program_goal_ids:
+                continue
+            existing = self.db_session.execute(
+                text("SELECT 1 FROM session_goals WHERE session_id = :session_id AND goal_id = :goal_id LIMIT 1"),
+                {"session_id": session_id, "goal_id": goal.id},
+            ).first()
+            if existing:
+                continue
+            self.db_session.execute(
+                session_goals.insert().values(
+                    **self._session_goal_insert_values(
+                        session_id,
+                        goal.id,
+                        get_canonical_goal_type(goal),
+                        'activity',
+                    )
+                )
+            )
+
+        self.db_session.commit()
+        self.db_session.refresh(instance)
+        return {
+            "instance": instance,
+            "activity_name": activity_def.name if activity_def else 'Unknown',
+        }, None, 201
+
+    def reorder_activities(self, root_id, session_id, current_user_id, activity_ids) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        for idx, instance_id in enumerate(activity_ids):
+            instance = self.db_session.query(ActivityInstance).filter_by(
+                id=instance_id,
+                session_id=session_id,
+                deleted_at=None,
+            ).first()
+            if instance:
+                instance.sort_order = idx
+
+        self.db_session.commit()
+        return {"status": "success"}, None, 200
+
+    def update_activity_instance(self, root_id, session_id, instance_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        instance = get_owned_activity_instance(
+            self.db_session,
+            root_id,
+            instance_id,
+            session_id=session_id,
+            query_options=(joinedload(ActivityInstance.definition),),
+        )
+        if not instance:
+            return None, "Instance not found", 404
+
+        if 'notes' in data:
+            instance.notes = data['notes']
+        if 'completed' in data:
+            instance.completed = data.get('completed')
+
+        self.db_session.commit()
+        self.db_session.refresh(instance)
+        return {
+            "instance": instance,
+            "activity_name": instance.definition.name if instance.definition else 'Unknown',
+        }, None, 200
+
+    def remove_activity_from_session(self, root_id, session_id, instance_id, current_user_id) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        instance = get_owned_activity_instance(
+            self.db_session,
+            root_id,
+            instance_id,
+            session_id=session_id,
+            query_options=(joinedload(ActivityInstance.definition),),
+        )
+        if not instance:
+            return None, "Activity instance not found", 404
+
+        instance.deleted_at = models.utc_now()
+        self.db_session.commit()
+        return {
+            "instance": instance,
+            "activity_name": instance.definition.name if instance.definition else 'Unknown',
+        }, None, 200
+
+    def update_activity_metrics(self, root_id, session_id, instance_id, current_user_id, metric_data_list) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        instance = get_owned_activity_instance(
+            self.db_session,
+            root_id,
+            instance_id,
+            session_id=session_id,
+            query_options=(joinedload(ActivityInstance.definition),),
+        )
+        if not instance:
+            return None, "Instance not found", 404
+
+        valid_metric_ids = {
+            metric_id
+            for (metric_id,) in self.db_session.query(MetricDefinition.id).filter_by(
+                activity_id=instance.activity_definition_id
+            ).all()
+        }
+        for metric_data in metric_data_list:
+            metric_id = metric_data.get('metric_id')
+            if metric_id not in valid_metric_ids:
+                return None, {
+                    "error": "Invalid metric_id",
+                    "details": f"Metric {metric_id} does not belong to activity {instance.activity_definition_id}",
+                }, 400
+
+        existing_metrics = self.db_session.query(MetricValue).filter_by(
+            activity_instance_id=instance_id
+        ).all()
+        existing_dict = {(metric.metric_definition_id, metric.split_definition_id): metric for metric in existing_metrics}
+        updated_keys = set()
+
+        for metric_data in metric_data_list:
+            metric_id = metric_data.get('metric_id')
+            split_id = metric_data.get('split_id')
+            value = metric_data.get('value')
+            key = (metric_id, split_id)
+            updated_keys.add(key)
+
+            if key in existing_dict:
+                existing_dict[key].value = value
+            else:
+                self.db_session.add(MetricValue(
+                    activity_instance_id=instance_id,
+                    metric_definition_id=metric_id,
+                    split_definition_id=split_id,
+                    value=value,
+                ))
+
+        for key, existing_metric in existing_dict.items():
+            if key not in updated_keys:
+                self.db_session.delete(existing_metric)
+
+        self.db_session.commit()
+        self.db_session.refresh(instance)
+        return {
+            "instance": instance,
+            "activity_name": instance.definition.name if instance.definition else 'Unknown',
+            "serialized": serialize_activity_instance(instance),
+        }, None, 200
 
     def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         """Create a new session with automatic goal inheritance."""
