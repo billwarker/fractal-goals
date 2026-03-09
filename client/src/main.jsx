@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as Sentry from "@sentry/react";
 import { BrowserRouter } from 'react-router-dom'
@@ -28,9 +28,12 @@ import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DebugProvider } from './contexts/DebugContext.jsx'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-
 import { useDebug } from './contexts/DebugContext.jsx'
+const ReactQueryDevtools = lazy(() =>
+  import('@tanstack/react-query-devtools').then((module) => ({
+    default: module.ReactQueryDevtools,
+  }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,7 +50,11 @@ const queryClient = new QueryClient({
 const QueryDevtools = () => {
   const { debugMode } = useDebug();
   if (!debugMode) return null;
-  return <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />;
+  return (
+    <Suspense fallback={null}>
+      <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+    </Suspense>
+  );
 };
 
 import { Toaster } from 'react-hot-toast';

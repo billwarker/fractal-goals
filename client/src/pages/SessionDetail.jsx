@@ -1,13 +1,10 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SessionSection from '../components/sessionDetail/SessionSection';
 import ConfirmationModal from '../components/ConfirmationModal';
-import ActivityBuilder from '../components/ActivityBuilder';
-import GoalDetailModal from '../components/GoalDetailModal';
 import { SessionSidePane } from '../components/sessionDetail';
 import styles from './SessionDetail.module.css';
 import '../App.css';
-import ActivityAssociationModal from '../components/sessionDetail/ActivityAssociationModal';
 import StatusState from '../components/common/StatusState';
 import useIsMobile from '../hooks/useIsMobile';
 import { formatClockDuration } from '../utils/sessionTime';
@@ -15,6 +12,10 @@ import { useSessionDetailController } from '../hooks/useSessionDetailController'
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+
+const ActivityBuilder = lazy(() => import('../components/ActivityBuilder'));
+const GoalDetailModal = lazy(() => import('../components/GoalDetailModal'));
+const ActivityAssociationModal = lazy(() => import('../components/sessionDetail/ActivityAssociationModal'));
 
 /**
  * Session Detail Page Wrapper
@@ -232,32 +233,40 @@ function SessionDetailContent() {
                 confirmText="Delete"
             />
 
-            <ActivityBuilder
-                isOpen={showBuilder}
-                onClose={() => setShowBuilder(false)}
-                rootId={rootId}
-                onSave={handleActivityCreated}
-            />
+            <Suspense fallback={null}>
+                {(showBuilder || !!selectedGoal || showAssociationModal) && (
+                    <>
+                        <ActivityBuilder
+                            isOpen={showBuilder}
+                            onClose={() => setShowBuilder(false)}
+                            rootId={rootId}
+                            onSave={handleActivityCreated}
+                        />
 
-            <GoalDetailModal
-                isOpen={!!selectedGoal}
-                onClose={() => setSelectedGoal(null)}
-                goal={selectedGoal}
-                onUpdate={(goalId, updates) => updateGoal({ goalId, updates })}
-                activityDefinitions={activities}
-                rootId={rootId}
-                onAssociationsChanged={refreshSession}
-            />
+                        {!!selectedGoal && (
+                            <GoalDetailModal
+                                isOpen={!!selectedGoal}
+                                onClose={() => setSelectedGoal(null)}
+                                goal={selectedGoal}
+                                onUpdate={(goalId, updates) => updateGoal({ goalId, updates })}
+                                activityDefinitions={activities}
+                                rootId={rootId}
+                                onAssociationsChanged={refreshSession}
+                            />
+                        )}
 
-            <ActivityAssociationModal
-                key={`${associationContext?.activityDefinition?.id || 'none'}:${(associationContext?.initialSelectedGoalIds || []).join(',')}`}
-                isOpen={showAssociationModal}
-                onClose={() => setShowAssociationModal(false)}
-                onAssociate={handleAssociateActivity}
-                initialActivityName={associationContext?.activityDefinition?.name}
-                initialSelectedGoalIds={associationContext?.initialSelectedGoalIds || []}
-                goals={allAvailableGoals}
-            />
+                        <ActivityAssociationModal
+                            key={`${associationContext?.activityDefinition?.id || 'none'}:${(associationContext?.initialSelectedGoalIds || []).join(',')}`}
+                            isOpen={showAssociationModal}
+                            onClose={() => setShowAssociationModal(false)}
+                            onAssociate={handleAssociateActivity}
+                            initialActivityName={associationContext?.activityDefinition?.name}
+                            initialSelectedGoalIds={associationContext?.initialSelectedGoalIds || []}
+                            goals={allAvailableGoals}
+                        />
+                    </>
+                )}
+            </Suspense>
 
             {autoSaveStatus && (
                 <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>

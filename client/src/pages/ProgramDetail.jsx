@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -7,13 +7,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
-import ProgramBuilder from '../components/modals/ProgramBuilder';
-import ProgramBlockModal from '../components/modals/ProgramBlockModal';
-import ProgramDayModal from '../components/modals/ProgramDayModal';
-import AttachGoalModal from '../components/modals/AttachGoalModal';
-import DayViewModal from '../components/modals/DayViewModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import GoalDetailModal from '../components/GoalDetailModal';
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { useProgramDetailController } from '../hooks/useProgramDetailController';
@@ -21,6 +15,13 @@ import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
+
+const ProgramBuilder = lazy(() => import('../components/modals/ProgramBuilder'));
+const ProgramBlockModal = lazy(() => import('../components/modals/ProgramBlockModal'));
+const ProgramDayModal = lazy(() => import('../components/modals/ProgramDayModal'));
+const AttachGoalModal = lazy(() => import('../components/modals/AttachGoalModal'));
+const DayViewModal = lazy(() => import('../components/modals/DayViewModal'));
+const GoalDetailModal = lazy(() => import('../components/GoalDetailModal'));
 
 const ProgramDetail = () => {
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
@@ -277,39 +278,45 @@ const ProgramDetail = () => {
                 )}
             </div>
 
-            <ProgramBuilder isOpen={showEditBuilder} onClose={() => setShowEditBuilder(false)} onSave={saveProgram} initialData={program} />
-            <ProgramBlockModal isOpen={showBlockModal} onClose={closeBlockModal} onSave={saveBlock} initialData={blockModalData} programDates={{ start: program.start_date, end: program.end_date }} />
-            <ProgramDayModal
-                isOpen={showDayModal}
-                onClose={closeDayModal}
-                onSave={saveDay}
-                onCopy={copyDay}
-                onDelete={deleteDay}
-                rootId={rootId}
-                blockId={selectedBlockId}
-                initialData={dayModalInitialData}
-            />
-            <AttachGoalModal
-                isOpen={showAttachModal}
-                onClose={closeAttachModal}
-                onSave={saveAttachedGoal}
-                goals={attachableBlockGoals}
-                block={attachBlock}
-                associatedGoalIds={attachBlock?.goal_ids || []}
-            />
-            <DayViewModal
-                isOpen={showDayViewModal}
-                onClose={closeDayViewModal}
-                date={selectedDate}
-                program={program}
-                goals={attachedGoals}
-                onSetGoalDeadline={setGoalDeadline}
-                blocks={sortedBlocks}
-                onScheduleDay={scheduleDay}
-                onCreateDayForDate={handleCreateDayForDate}
-                onUnscheduleDay={handleUnscheduleDay}
-                sessions={sessions}
-            />
+            <Suspense fallback={null}>
+                {(showEditBuilder || showBlockModal || showDayModal || showAttachModal || showDayViewModal || showGoalModal) && (
+                    <>
+                        <ProgramBuilder isOpen={showEditBuilder} onClose={() => setShowEditBuilder(false)} onSave={saveProgram} initialData={program} />
+                        <ProgramBlockModal isOpen={showBlockModal} onClose={closeBlockModal} onSave={saveBlock} initialData={blockModalData} programDates={{ start: program.start_date, end: program.end_date }} />
+                        <ProgramDayModal
+                            isOpen={showDayModal}
+                            onClose={closeDayModal}
+                            onSave={saveDay}
+                            onCopy={copyDay}
+                            onDelete={deleteDay}
+                            rootId={rootId}
+                            blockId={selectedBlockId}
+                            initialData={dayModalInitialData}
+                        />
+                        <AttachGoalModal
+                            isOpen={showAttachModal}
+                            onClose={closeAttachModal}
+                            onSave={saveAttachedGoal}
+                            goals={attachableBlockGoals}
+                            block={attachBlock}
+                            associatedGoalIds={attachBlock?.goal_ids || []}
+                        />
+                        <DayViewModal
+                            isOpen={showDayViewModal}
+                            onClose={closeDayViewModal}
+                            date={selectedDate}
+                            program={program}
+                            goals={attachedGoals}
+                            onSetGoalDeadline={setGoalDeadline}
+                            blocks={sortedBlocks}
+                            onScheduleDay={scheduleDay}
+                            onCreateDayForDate={handleCreateDayForDate}
+                            onUnscheduleDay={handleUnscheduleDay}
+                            sessions={sessions}
+                        />
+                    </>
+                )}
+            </Suspense>
 
             <ConfirmationModal
                 isOpen={unscheduleConfirmOpen}
@@ -324,26 +331,29 @@ const ProgramDetail = () => {
                 confirmText="Unschedule"
             />
 
-
-            <GoalDetailModal
-                isOpen={showGoalModal}
-                onClose={closeGoalModal}
-                goal={selectedGoal}
-                onUpdate={updateGoal}
-                onToggleCompletion={toggleGoalCompletion}
-                onDelete={deleteGoal}
-                onAddChild={handleAddChildGoal}
-                rootId={rootId}
-                treeData={treeData}
-                sessions={sessions}
-                programs={[program]}
-                activityDefinitions={activities}
-                activityGroups={activityGroups}
-                displayMode="modal"
-                mode={modalMode}
-                onCreate={createGoal}
-                parentGoal={selectedParent}
-            />
+            <Suspense fallback={null}>
+                {showGoalModal && (
+                    <GoalDetailModal
+                        isOpen={showGoalModal}
+                        onClose={closeGoalModal}
+                        goal={selectedGoal}
+                        onUpdate={updateGoal}
+                        onToggleCompletion={toggleGoalCompletion}
+                        onDelete={deleteGoal}
+                        onAddChild={handleAddChildGoal}
+                        rootId={rootId}
+                        treeData={treeData}
+                        sessions={sessions}
+                        programs={[program]}
+                        activityDefinitions={activities}
+                        activityGroups={activityGroups}
+                        displayMode="modal"
+                        mode={modalMode}
+                        onCreate={createGoal}
+                        parentGoal={selectedParent}
+                    />
+                )}
+            </Suspense>
         </div >
     );
 };

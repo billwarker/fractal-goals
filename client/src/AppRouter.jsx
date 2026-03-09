@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
-import { globalApi, fractalApi } from './utils/api';
+import { fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './context/HeaderContext';
 import useIsMobile from './hooks/useIsMobile';
 import styles from './AppRouter.module.css';
@@ -9,72 +8,22 @@ import './App.css';
 
 // Import page components
 import Selection from './pages/Selection';
-import FractalGoals from './pages/FractalGoals';
-import CreateSession from './pages/CreateSession';
 
 // Lazy load non-critical pages
+const FractalGoals = lazy(() => import('./pages/FractalGoals'));
 const Programs = lazy(() => import('./pages/Programs'));
 const ProgramDetail = lazy(() => import('./pages/ProgramDetail'));
 const Sessions = lazy(() => import('./pages/Sessions'));
 const SessionDetail = lazy(() => import('./pages/SessionDetail'));
+const CreateSession = lazy(() => import('./pages/CreateSession'));
 const CreateSessionTemplate = lazy(() => import('./pages/CreateSessionTemplate'));
 const ManageActivities = lazy(() => import('./pages/ManageActivities'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Logs = lazy(() => import('./pages/Logs'));
+const SettingsModal = lazy(() => import('./components/modals/SettingsModal'));
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
-
-const API_URL = 'http://localhost:8000/api/goals';
-
-// Helper functions (from original App.jsx)
-const getChildType = (parentType) => {
-    const map = {
-        'UltimateGoal': 'LongTermGoal',
-        'LongTermGoal': 'MidTermGoal',
-        'MidTermGoal': 'ShortTermGoal',
-        'ShortTermGoal': 'ImmediateGoal',  // Sessions are now separate
-        'ImmediateGoal': 'MicroGoal',
-        'MicroGoal': 'NanoGoal',
-        'NanoGoal': null
-    };
-    return map[parentType];
-};
-
-const getTypeDisplayName = (type) => {
-    const names = {
-        'UltimateGoal': 'Ultimate Goal',
-        'LongTermGoal': 'Long Term Goal',
-        'MidTermGoal': 'Mid Term Goal',
-        'ShortTermGoal': 'Short Term Goal',
-        'ImmediateGoal': 'Immediate Goal',
-        'MicroGoal': 'Micro Goal',
-        'NanoGoal': 'Nano Goal',
-        'Session': 'Session'  // For display purposes
-    };
-    return names[type] || type;
-};
-
-const calculateGoalAge = (createdAt) => {
-    if (!createdAt) return null;
-
-    const created = new Date(createdAt);
-    const now = new Date();
-    const diffMs = now - created;
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-    if (diffDays >= 365) {
-        return `${(diffDays / 365).toFixed(1)}y`;
-    } else if (diffDays >= 30 || diffDays > 7) {
-        return `${(diffDays / 30.44).toFixed(1)}mo`;
-    } else if (diffDays > 6) {
-        return `${(diffDays / 7).toFixed(1)}w`;
-    } else {
-        return `${Math.floor(diffDays)}d`;
-    }
-};
-
-import SettingsModal from './components/modals/SettingsModal';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings }) => {
@@ -252,7 +201,13 @@ function App() {
                         <Routes>
                             <Route
                                 path="/:rootId/goals"
-                                element={<ComponentErrorBoundary><FractalGoals /></ComponentErrorBoundary>}
+                                element={
+                                    <ComponentErrorBoundary>
+                                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                            <FractalGoals />
+                                        </Suspense>
+                                    </ComponentErrorBoundary>
+                                }
                             />
                             <Route path="/:rootId/programs" element={
                                 <ComponentErrorBoundary>
@@ -296,7 +251,13 @@ function App() {
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
-                            <Route path="/:rootId/create-session" element={<ComponentErrorBoundary><CreateSession /></ComponentErrorBoundary>} />
+                            <Route path="/:rootId/create-session" element={
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <CreateSession />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
+                            } />
                             <Route path="/:rootId/manage-session-templates" element={
                                 <ComponentErrorBoundary>
                                     <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
@@ -317,7 +278,11 @@ function App() {
                 </div>
 
                 {/* Settings Modal */}
-                <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+                <Suspense fallback={null}>
+                    {isSettingsOpen && (
+                        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+                    )}
+                </Suspense>
 
                 {/* Environment Indicator */}
                 <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>

@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
-import GoalDetailModal from '../components/GoalDetailModal';
 import AlertModal from '../components/modals/AlertModal';
 import Checkbox from '../components/atoms/Checkbox';
 import { useGoals } from '../contexts/GoalsContext';
@@ -19,6 +18,8 @@ import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile from '../hooks/useIsMobile';
 import '../App.css';
 import './FractalGoals.css';
+
+const GoalDetailModal = lazy(() => import('../components/GoalDetailModal'));
 
 /**
  * FractalGoals Page - FlowTree visualization with sidebar
@@ -337,18 +338,20 @@ function FractalGoals() {
                         {(!isMobile || !isMobilePanelCollapsed) && (
                             <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                                 {showGoalModal ? (
-                                    <GoalDetailModal
-                                        isOpen={true}
-                                        onClose={() => setShowGoalModal(false)}
-                                        mode="create"
-                                        onCreate={handleCreateGoal}
-                                        parentGoal={selectedParent}
-                                        activityDefinitions={activities}
-                                        activityGroups={activityGroups}
-                                        rootId={rootId}
-                                        displayMode="panel"
-                                        onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
-                                    />
+                                    <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
+                                        <GoalDetailModal
+                                            isOpen={true}
+                                            onClose={() => setShowGoalModal(false)}
+                                            mode="create"
+                                            onCreate={handleCreateGoal}
+                                            parentGoal={selectedParent}
+                                            activityDefinitions={activities}
+                                            activityGroups={activityGroups}
+                                            rootId={rootId}
+                                            displayMode="panel"
+                                            onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
+                                        />
+                                    </Suspense>
                                 ) : (
                                     <ErrorBoundary>
                                         <Sidebar
