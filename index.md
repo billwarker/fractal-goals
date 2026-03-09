@@ -163,6 +163,13 @@ Programs model longer planning structures:
 - attached goals
 - attached session templates
 
+Important program-domain rules now enforced in the backend service layer:
+
+- program scope is defined by the program's selected long-term / mid-term goals
+- block goal attachments must stay within that scope and within the block date range
+- scheduling and unscheduling program-day occurrences run through `ProgramService`
+- calendar-day goal deadline changes on the programs page go through the programs API instead of generic client-side goal mutation assembly
+
 Templates model reusable session structures.
 
 Key backend pieces:
@@ -171,6 +178,8 @@ Key backend pieces:
 - `services/template_service.py`
 - `blueprints/programs_api.py`
 - `blueprints/templates_api.py`
+
+Program-day scheduling now goes through the programs service/API as a validated backend write path, rather than constructing program session linkage in the client.
 
 Key frontend pieces:
 
@@ -216,6 +225,13 @@ Most write paths now follow this pattern:
 4. Commit inside the service boundary.
 5. Emit events only after persistence succeeds.
 6. Return serialized response data.
+
+Programs now follow this more strictly for:
+
+- block-day scheduling
+- recurring occurrence unscheduling
+- program-calendar goal deadline updates
+- block goal attachment validation
 
 Shared backend infrastructure to know:
 

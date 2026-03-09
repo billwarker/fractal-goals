@@ -121,7 +121,8 @@ def test_create_block_starts_empty_and_can_add_day(db_session, sample_program, s
         'day_of_week': ['Monday']
     })
     
-    assert day_res_count == 1
+    assert day_res_count['count'] == 1
+    assert day_res_count['days'][0]['name'] == 'Bonus Day'
 
 
 def test_create_block_accepts_camel_case_dates(db_session, sample_program, sample_goal_hierarchy):
@@ -154,6 +155,54 @@ def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     day_db = db_session.query(ProgramDay).get(day.id)
     assert len(day_db.goals) == 1
     assert day_db.goals[0].id == goal_id
+
+
+def test_attach_goal_to_block_preserves_program_scope_and_requires_descendant(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    mid_term_goal = sample_goal_hierarchy['mid_term']
+    short_term_goal = sample_goal_hierarchy['short_term']
+
+    ProgramService._replace_program_goals(db_session, sample_program.id, [mid_term_goal.id], root_id)
+
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name="Scoped Block",
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=7),
+    )
+    db_session.add(block)
+    db_session.commit()
+
+    result = ProgramService.attach_goal_to_block(
+        db_session,
+        root_id,
+        sample_program.id,
+        block.id,
+        {'goal_id': short_term_goal.id, 'deadline': (date.today() + timedelta(days=1)).isoformat()},
+    )
+
+    assert result['goal_ids'] == [short_term_goal.id]
+    db_session.refresh(sample_program)
+    assert [goal.id for goal in sample_program.goals] == [mid_term_goal.id]
+
+
+def test_set_goal_deadline_for_program_date_enforces_program_range(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    mid_term_goal = sample_goal_hierarchy['mid_term']
+    short_term_goal = sample_goal_hierarchy['short_term']
+
+    ProgramService._replace_program_goals(db_session, sample_program.id, [mid_term_goal.id], root_id)
+
+    with pytest.raises(ValueError, match="Goal deadline must be within the program date range"):
+        ProgramService.set_goal_deadline_for_program_date(
+            db_session,
+            root_id,
+            sample_program.id,
+            {
+                'goal_id': short_term_goal.id,
+                'deadline': (date.today() + timedelta(days=45)).isoformat(),
+            },
+        )
 
 def test_check_program_day_completion(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id

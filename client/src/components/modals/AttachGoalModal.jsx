@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import moment from 'moment';
 import notify from '../../utils/notify';
-import GoalIcon from '../atoms/GoalIcon';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import GoalAssociationPicker from '../goals/GoalAssociationPicker';
 import styles from './AttachGoalModal.module.css';
 
 function normalizeDateValue(value) {
@@ -21,20 +20,7 @@ function normalizeDateValue(value) {
 const AttachGoalModalInner = ({ onClose, onSave, goals = [], block, associatedGoalIds = [] }) => {
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [deadline, setDeadline] = useState('');
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const associatedGoalIdSet = useMemo(() => new Set(associatedGoalIds), [associatedGoalIds]);
-    const orderedGoals = useMemo(() => {
-        return [...goals].sort((left, right) => {
-            const leftAttached = associatedGoalIdSet.has(left.id);
-            const rightAttached = associatedGoalIdSet.has(right.id);
-
-            if (leftAttached !== rightAttached) {
-                return leftAttached ? -1 : 1;
-            }
-
-            return left.name.localeCompare(right.name);
-        });
-    }, [associatedGoalIdSet, goals]);
 
     const handleSubmit = () => {
         if (!selectedGoalId) {
@@ -70,53 +56,20 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block, associatedGo
                         SELECT GOAL
                     </Text>
 
-                    <div className={styles.goalList}>
-                        {goals.length === 0 ? (
-                            <div className={styles.emptyState}>
-                                No goals available in this program. Add goals to the program first.
-                            </div>
-                        ) : (
-                            orderedGoals.map(g => (
-                                <label
-                                    key={g.id}
-                                    className={`${styles.goalItem} ${associatedGoalIdSet.has(g.id) ? styles.goalItemAssociated : ''}`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="goal"
-                                        checked={selectedGoalId === g.id}
-                                        onChange={() => handleGoalSelect(g)}
-                                        className={styles.radioInput}
-                                    />
-                                    <div className={styles.goalIconWrap}>
-                                        <GoalIcon
-                                            shape={getGoalIcon(g.attributes?.type || g.type)}
-                                            color={getGoalColor(g.attributes?.type || g.type)}
-                                            secondaryColor={getGoalSecondaryColor(g.attributes?.type || g.type)}
-                                            isSmart={g.is_smart}
-                                            size={18}
-                                        />
-                                    </div>
-                                    <div className={styles.goalInfo}>
-                                        <div className={styles.goalNameRow}>
-                                            <Text weight="medium">{g.name}</Text>
-                                            {associatedGoalIdSet.has(g.id) && (
-                                                <span className={styles.associatedBadge}>Attached</span>
-                                            )}
-                                        </div>
-                                        <span className={styles.goalType}>
-                                            {(g.attributes?.type || g.type || '').replace(/([A-Z])/g, ' $1').trim()}
-                                        </span>
-                                        {associatedGoalIdSet.has(g.id) && normalizeDateValue(g.deadline) && (
-                                            <span className={styles.goalMeta}>
-                                                Current deadline: {moment(g.deadline).format('MMM D, YYYY')}
-                                            </span>
-                                        )}
-                                    </div>
-                                </label>
-                            ))
+                    <GoalAssociationPicker
+                        goals={goals}
+                        selectedGoalId={selectedGoalId}
+                        onSelectGoal={handleGoalSelect}
+                        associatedGoalIds={associatedGoalIds}
+                        associationLabel="Attached"
+                        getAssociationMeta={(goal) => (
+                            normalizeDateValue(goal.deadline)
+                                ? `Current deadline: ${moment(goal.deadline).format('MMM D, YYYY')}`
+                                : null
                         )}
-                    </div>
+                        emptyState="No goals available in this program. Add goals to the program first."
+                        inputName="attach-goal"
+                    />
                 </div>
 
                 {selectedGoalId && block && (

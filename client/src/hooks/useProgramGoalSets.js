@@ -58,6 +58,7 @@ function deriveHierarchySeedIds(goalIds = [], childrenById) {
 export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
     const blocks = program?.blocks || [];
     const programGoalIds = program?.goal_ids || [];
+    const blockGoalIds = useMemo(() => uniqueIds(blocks.flatMap((block) => block.goal_ids || [])), [blocks]);
 
     const childrenById = useMemo(() => buildChildrenMap(goals), [goals]);
 
@@ -67,20 +68,23 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
 
     const directAssociatedGoalIds = useMemo(() => uniqueIds([
         ...programGoalIds,
-        ...blocks.flatMap((block) => block.goal_ids || []),
-    ]), [blocks, programGoalIds]);
+        ...blockGoalIds,
+    ]), [blockGoalIds, programGoalIds]);
 
     const programScopeGoalIds = useMemo(() => {
         return deriveHierarchySeedIds(programGoalIds, childrenById);
     }, [childrenById, programGoalIds]);
 
     const hierarchySeedIds = useMemo(() => {
-        return deriveHierarchySeedIds(directAssociatedGoalIds, childrenById);
-    }, [childrenById, directAssociatedGoalIds]);
+        return deriveHierarchySeedIds(programGoalIds, childrenById);
+    }, [childrenById, programGoalIds]);
 
     const attachedGoalIds = useMemo(() => {
-        return new Set(expandAssociatedGoalIds(directAssociatedGoalIds));
-    }, [directAssociatedGoalIds, expandAssociatedGoalIds]);
+        return new Set(uniqueIds([
+            ...expandAssociatedGoalIds(programGoalIds),
+            ...blockGoalIds,
+        ]));
+    }, [blockGoalIds, expandAssociatedGoalIds, programGoalIds]);
 
     const directAssociatedGoals = useMemo(() => {
         return directAssociatedGoalIds.map((goalId) => getGoalDetails(goalId)).filter(Boolean);
@@ -88,13 +92,12 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
 
     const attachableBlockGoalIds = useMemo(() => {
         const scopedGoalIds = expandAssociatedGoalIds(programScopeGoalIds);
-        const directBlockGoalIds = uniqueIds(blocks.flatMap((block) => block.goal_ids || []));
 
         return uniqueIds([
             ...scopedGoalIds,
-            ...directBlockGoalIds,
+            ...blockGoalIds,
         ]);
-    }, [blocks, expandAssociatedGoalIds, programScopeGoalIds]);
+    }, [blockGoalIds, expandAssociatedGoalIds, programScopeGoalIds]);
 
     const attachableBlockGoals = useMemo(() => {
         return attachableBlockGoalIds.map((goalId) => getGoalDetails(goalId)).filter(Boolean);
@@ -113,6 +116,7 @@ export function useProgramGoalSets({ program, goals = [], getGoalDetails }) {
         attachedGoals,
         attachableBlockGoalIds,
         attachableBlockGoals,
+        blockGoalIds,
         directAssociatedGoalIds,
         directAssociatedGoals,
         hierarchyGoalSeeds,

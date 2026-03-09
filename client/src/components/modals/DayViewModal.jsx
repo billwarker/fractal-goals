@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { getISOYMDInTimezone, getDatePart, formatLiteralDate } from '../../utils/dateUtils';
+import { formatLiteralDate, getDatePart, getISOYMDInTimezone } from '../../utils/dateUtils';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import GoalAssociationPicker from '../goals/GoalAssociationPicker';
+import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
 import styles from './DayViewModal.module.css';
 import moment from 'moment';
 
@@ -13,23 +15,48 @@ import moment from 'moment';
  * DayViewModal - Modal for viewing and managing program days on a specific date
  * Shows all program days scheduled for the selected date and allows adding new ones
  */
-const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline, onScheduleDay, onUnscheduleDay, blocks, sessions }) => {
+const DayViewModal = ({
+    isOpen,
+    onClose,
+    date,
+    program,
+    goals,
+    onSetGoalDeadline,
+    onScheduleDay,
+    onCreateDayForDate,
+    onUnscheduleDay,
+    blocks,
+    sessions,
+}) => {
     const { getGoalColor } = useGoalLevels();
     const { timezone } = useTimezone();
     const [selectedGoalId, setSelectedGoalId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);
     const [selectedBlockId, setSelectedBlockId] = useState('');
-    const isPastDate = moment(date).isBefore(moment().startOf('day'), 'day');
-
-    // Find which blocks contain this date
-    const blocksContainingDate = blocks ? blocks.filter(block => {
-        if (!block.start_date || !block.end_date) return false;
-        const start = getDatePart(block.start_date);
-        const end = getDatePart(block.end_date);
-        return date >= start && date <= end;
-    }) : [];
-    const effectiveBlockId = selectedBlockId || (blocksContainingDate.length === 1 ? blocksContainingDate[0].id : '');
+    const {
+        isPastDate,
+        blocksContainingDate,
+        effectiveBlockId,
+        scheduledProgramDayData,
+        looseScheduledSessions,
+        looseCompletedSessions,
+        scheduledSessionCount,
+        completedSessionCount,
+        goalsDueOnDate,
+        goalsCompletedOnDate,
+        eligibleGoalsForDate,
+        availableScheduleDays,
+        formatDate,
+    } = useProgramDayViewModel({
+        date,
+        program,
+        goals,
+        blocks,
+        sessions,
+        timezone,
+        selectedBlockId,
+    });
     const resetLocalState = () => {
         setSelectedBlockId('');
         setShowAddDaySection(false);
@@ -40,122 +67,9 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
         resetLocalState();
         onClose();
     };
+    const getLocalDateString = (dateTimeStr) => getISOYMDInTimezone(dateTimeStr, timezone);
 
     if (!isOpen || !date || !program) return null;
-
-    // 1. Program Days (Legacy Days / Instance Copies & Recurring Days)
-    const scheduledProgramDays = [];
-    if (program.blocks) {
-        program.blocks.forEach(block => {
-            if (block.days) {
-                block.days.forEach(day => {
-                    let isScheduledForDate = false;
-
-                    if (day.date && getDatePart(day.date) === date) {
-                        isScheduledForDate = true;
-                    } else if (day.day_of_week && block.start_date && block.end_date) {
-                        const start = getDatePart(block.start_date);
-                        const end = getDatePart(block.end_date);
-                        if (date >= start && date <= end) {
-                            const dows = Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week];
-                            if (dows.length > 0) {
-                                const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-                                const activeDays = dows.map(d => dayMap[d]).filter(d => d !== undefined);
-                                const targetDayOfWeek = moment(date).day();
-                                if (activeDays.includes(targetDayOfWeek)) {
-                                    isScheduledForDate = true;
-                                }
-                            }
-                        }
-                    }
-
-                    if (isScheduledForDate) {
-                        scheduledProgramDays.push({
-                            ...day,
-                            blockName: block.name,
-                            blockId: block.id,
-                            blockColor: block.color,
-                            isRecurringTemplate: !day.date && !!day.day_of_week && day.day_of_week.length > 0,
-                            type: 'program_day'
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    // Sessions for this date
-    const scheduledSessions = [];
-    const completedSessions = [];
-
-    // Helper to get local date string from a datetime in the selected timezone
-    const getLocalDateString = (dateTimeStr) => {
-        return getISOYMDInTimezone(dateTimeStr, timezone);
-    };
-
-    if (sessions) {
-        sessions.forEach(session => {
-            const start = session.session_start || session.start_time;
-            const sessionLocalDate = getLocalDateString(start);
-
-            if (sessionLocalDate === date) {
-                const isCompleted = session.completed || session.attributes?.completed;
-                if (isCompleted) {
-                    completedSessions.push(session);
-                } else {
-                    scheduledSessions.push(session);
-                }
-            }
-        });
-    }
-
-    const claimedSessionIds = new Set();
-    const scheduledProgramDayData = scheduledProgramDays.map(pDay => {
-        const templates = pDay.templates || [];
-        const daySessions = [];
-
-        [...scheduledSessions, ...completedSessions].forEach(s => {
-            if (claimedSessionIds.has(s.id)) return;
-
-            const isPreciseMatch = s.program_day_id === pDay.id;
-            const isFuzzyMatch = templates.some(t => t.name === s.name);
-
-            if (isPreciseMatch || isFuzzyMatch) {
-                daySessions.push(s);
-                claimedSessionIds.add(s.id);
-            }
-        });
-
-        return { ...pDay, sessions: daySessions };
-    });
-
-    const looseScheduledSessions = scheduledSessions.filter(s => !claimedSessionIds.has(s.id));
-    const looseCompletedSessions = completedSessions.filter(s => !claimedSessionIds.has(s.id));
-    const scheduledTemplateCount = scheduledProgramDayData.reduce((sum, day) => sum + (day.templates?.length || 0), 0);
-    const scheduledSessionCount = scheduledTemplateCount + looseScheduledSessions.length;
-    const completedSessionCount = completedSessions.length;
-
-    // Find goals due on this date
-    // Note: Goal deadlines are likely just YYYY-MM-DD or ISO.
-    // If ISO, we need to check timezone. If YYYY-MM-DD, it's date only.
-    // Assuming deadlines are date-only for now or standardized.
-    const goalsDueOnDate = goals ? goals.filter(g => {
-        if (!g.deadline) return false;
-        // Deadlines are literal dates (YYYY-MM-DD or ISO)
-        return getDatePart(g.deadline) === date;
-    }) : [];
-
-    // Find goals completed on this date
-    const goalsCompletedOnDate = goals ? goals.filter(g => {
-        const isCompleted = g.completed || g.attributes?.completed;
-        const completionDate = g.completed_at || g.attributes?.completed_at;
-        if (!isCompleted || !completionDate) return false;
-        return getLocalDateString(completionDate) === date;
-    }) : [];
-
-    const formatDate = (dateString) => {
-        return formatLiteralDate(dateString, 'dddd, MMMM D, YYYY');
-    };
 
     const formatSessionCount = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`;
 
@@ -439,21 +353,19 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                         <label className={styles.label}>
                                             Select Goal
                                         </label>
-                                        <select
-                                            value={selectedGoalId}
-                                            onChange={(e) => setSelectedGoalId(e.target.value)}
-                                            className={styles.select}
-                                        >
-                                            <option value="">Choose a goal...</option>
-                                            {goals && goals.map(goal => {
-                                                const goalType = goal.attributes?.type || goal.type || '';
-                                                return (
-                                                    <option key={goal.id} value={goal.id}>
-                                                        {goal.name}{goalType ? ` (${goalType})` : ''}
-                                                    </option>
-                                                );
-                                            })}
-                                        </select>
+                                        <GoalAssociationPicker
+                                            goals={eligibleGoalsForDate}
+                                            selectedGoalId={selectedGoalId}
+                                            onSelectGoal={(goal) => setSelectedGoalId(goal.id)}
+                                            associatedGoalIds={goalsDueOnDate.map((goal) => goal.id)}
+                                            associationLabel="Due Today"
+                                            getAssociationMeta={(goal) => {
+                                                const deadline = getDatePart(goal.deadline);
+                                                return deadline ? `Current deadline: ${formatLiteralDate(deadline, { month: 'short', day: 'numeric', year: 'numeric' })}` : null;
+                                            }}
+                                            emptyState="No program goals can take this deadline. Check parent deadlines first."
+                                            inputName="day-deadline-goal"
+                                        />
                                     </div>
                                     <button
                                         onClick={() => {
@@ -538,44 +450,17 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                     Select a Day to Schedule:
                                                 </div>
                                                 <div className={styles.dayListContainer}>
-                                                    {(() => {
-                                                        const blockId = effectiveBlockId || null;
-                                                        const block = blocks?.find(b => b.id === blockId);
-                                                        const allDays = block?.days || [];
-
-                                                        // Deduplicate days by Name to return unique "Templates"
-                                                        const uniqueDays = [];
-                                                        const seenNames = new Set();
-                                                        // Prefer days without dates (Masters) first
-                                                        const sortedDays = [...allDays].sort((a, b) => {
-                                                            if (!a.date && b.date) return -1;
-                                                            if (a.date && !b.date) return 1;
-                                                            return 0;
-                                                        });
-
-                                                        sortedDays.forEach(day => {
-                                                            const name = day.name || `Day ${day.day_number}`;
-                                                            if (!seenNames.has(name)) {
-                                                                seenNames.add(name);
-                                                                uniqueDays.push(day);
-                                                            }
-                                                        });
-
-                                                        if (uniqueDays.length === 0) {
-                                                            return (
-                                                                <div className={styles.emptyDaysHint}>
-                                                                    No days defined in this block.
-                                                                </div>
-                                                            );
-                                                        }
-
-                                                        return uniqueDays.map(day => (
+                                                    {availableScheduleDays.length === 0 ? (
+                                                        <div className={styles.emptyDaysHint}>
+                                                            No days defined in this block.
+                                                        </div>
+                                                    ) : (
+                                                        availableScheduleDays.map(day => (
                                                             <button
                                                                 key={day.id}
                                                                 onClick={() => {
-                                                                    if (blockId) {
-                                                                        // Always COPY (Add new instance)
-                                                                        if (onScheduleDay) onScheduleDay(blockId, date, day);
+                                                                    if (effectiveBlockId) {
+                                                                        if (onScheduleDay) onScheduleDay(effectiveBlockId, date, day);
                                                                         setShowAddDaySection(false);
                                                                     }
                                                                 }}
@@ -586,15 +471,19 @@ const DayViewModal = ({ isOpen, onClose, date, program, goals, onSetGoalDeadline
                                                                     {day.notes && <div className={styles.dayOptionNotes}>{day.notes}</div>}
                                                                 </div>
                                                             </button>
-                                                        ));
-                                                    })()}
+                                                        ))
+                                                    )}
                                                 </div>
 
                                                 <button
                                                     onClick={() => {
                                                         const blockId = effectiveBlockId || null;
                                                         if (blockId) {
-                                                            onScheduleDay(blockId, date, null); // Null means create blank
+                                                            if (onCreateDayForDate) {
+                                                                onCreateDayForDate(blockId, date);
+                                                            } else {
+                                                                onScheduleDay(blockId, date, null);
+                                                            }
                                                             setShowAddDaySection(false);
                                                         }
                                                     }}

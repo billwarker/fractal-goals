@@ -8,6 +8,12 @@ import { queryKeys } from './queryKeys';
 export function useProgramData(rootId, programId) {
     const queryClient = useQueryClient();
 
+    const invalidateQueryList = useCallback((queryKeyFactories) => {
+        return Promise.all(
+            queryKeyFactories.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+        );
+    }, [queryClient]);
+
     // 1. Program Query
     const programQuery = useQuery({
         queryKey: queryKeys.program(rootId, programId),
@@ -80,18 +86,44 @@ export function useProgramData(rootId, programId) {
         sessionsQuery.isError;
 
     // Refresh Function (invalidates all queries)
-    const refreshData = useCallback(async () => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: queryKeys.program(rootId, programId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalsTree(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.activityGroups(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsAll(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.activeProgramDays(rootId) }),
+    const refreshProgramQueries = useCallback(async () => {
+        await invalidateQueryList([
+            queryKeys.program(rootId, programId),
+            queryKeys.programs(rootId),
+            queryKeys.activeProgramDays(rootId),
         ]);
-    }, [queryClient, rootId, programId]);
+    }, [invalidateQueryList, programId, rootId]);
+
+    const refreshGoalQueries = useCallback(async () => {
+        await invalidateQueryList([
+            queryKeys.goalsTree(rootId),
+            queryKeys.program(rootId, programId),
+            queryKeys.programs(rootId),
+        ]);
+    }, [invalidateQueryList, programId, rootId]);
+
+    const refreshSchedulingQueries = useCallback(async () => {
+        await invalidateQueryList([
+            queryKeys.program(rootId, programId),
+            queryKeys.programs(rootId),
+            queryKeys.sessions(rootId),
+            queryKeys.sessionsAll(rootId),
+            queryKeys.activeProgramDays(rootId),
+        ]);
+    }, [invalidateQueryList, programId, rootId]);
+
+    const refreshData = useCallback(async () => {
+        await invalidateQueryList([
+            queryKeys.program(rootId, programId),
+            queryKeys.programs(rootId),
+            queryKeys.goalsTree(rootId),
+            queryKeys.activities(rootId),
+            queryKeys.activityGroups(rootId),
+            queryKeys.sessions(rootId),
+            queryKeys.sessionsAll(rootId),
+            queryKeys.activeProgramDays(rootId),
+        ]);
+    }, [invalidateQueryList, rootId, programId]);
 
     // Helper: Get Goal Details
     const getGoalDetails = useCallback((goalId) => {
@@ -114,6 +146,13 @@ export function useProgramData(rootId, programId) {
 
         // Actions
         refreshData,
+        refreshers: {
+            all: refreshData,
+            program: refreshProgramQueries,
+            goals: refreshGoalQueries,
+            programGoals: async () => Promise.all([refreshProgramQueries(), refreshGoalQueries()]),
+            scheduling: refreshSchedulingQueries,
+        },
         getGoalDetails,
 
         // Export raw queries if needed for fine-grained loading states

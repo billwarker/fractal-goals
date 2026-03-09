@@ -5,7 +5,6 @@ import { useProgramDetailMutations } from '../useProgramDetailMutations';
 
 const {
     mockActions,
-    deleteSession,
     updateGoal,
     toggleGoalCompletion,
     deleteGoal,
@@ -24,11 +23,12 @@ const {
             saveDay: vi.fn(),
             copyDay: vi.fn(),
             deleteDay: vi.fn(),
+            unscheduleRecurringDay: vi.fn(),
             unscheduleDay: vi.fn(),
             scheduleDay: vi.fn(),
             attachGoal: vi.fn(),
+            setProgramGoalDeadline: vi.fn(),
         },
-        deleteSession: vi.fn(),
         updateGoal: vi.fn(),
         toggleGoalCompletion: vi.fn(),
         deleteGoal: vi.fn(),
@@ -44,7 +44,6 @@ vi.mock('../useProgramLogic', () => ({
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
-        deleteSession: (...args) => deleteSession(...args),
         updateGoal: (...args) => updateGoal(...args),
         toggleGoalCompletion: (...args) => toggleGoalCompletion(...args),
         deleteGoal: (...args) => deleteGoal(...args),
@@ -57,6 +56,13 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 describe('useProgramDetailMutations', () => {
+    const refreshers = {
+        all: vi.fn(),
+        program: vi.fn(),
+        programGoals: vi.fn(),
+        scheduling: vi.fn(),
+    };
+
     const callbacks = {
         onProgramSaved: vi.fn(),
         onBlockSaved: vi.fn(),
@@ -71,11 +77,11 @@ describe('useProgramDetailMutations', () => {
         vi.clearAllMocks();
         Object.values(mockActions).forEach((mockFn) => mockFn.mockResolvedValue(undefined));
         refreshData.mockResolvedValue(undefined);
-        deleteSession.mockResolvedValue(undefined);
         updateGoal.mockResolvedValue(undefined);
         toggleGoalCompletion.mockResolvedValue(undefined);
         deleteGoal.mockResolvedValue(undefined);
         createGoal.mockResolvedValue(undefined);
+        Object.values(refreshers).forEach((mockFn) => mockFn.mockResolvedValue(undefined));
     });
 
     function renderMutations(overrides = {}) {
@@ -83,8 +89,8 @@ describe('useProgramDetailMutations', () => {
             rootId: 'root-1',
             program: { id: 'program-1', blocks: [], goal_ids: [] },
             refreshData,
+            refreshers,
             timezone: 'UTC',
-            sessions: [],
             selectedBlockId: 'block-1',
             dayModalInitialData: { id: 'day-1' },
             attachBlockId: 'block-2',
@@ -106,32 +112,11 @@ describe('useProgramDetailMutations', () => {
         expect(callbacks.onDaySaved).toHaveBeenCalledTimes(1);
     });
 
-    it('unschedules only matching recurring sessions for the selected date and always clears the confirmation state', async () => {
-        const sessions = [
-            {
-                id: 'session-match',
-                session_start: '2026-03-10T15:00:00Z',
-                completed: false,
-                program_day_id: 'day-template',
-            },
-            {
-                id: 'session-other-date',
-                session_start: '2026-03-11T15:00:00Z',
-                completed: false,
-                program_day_id: 'day-template',
-            },
-            {
-                id: 'session-complete',
-                session_start: '2026-03-10T18:00:00Z',
-                completed: true,
-                program_day_id: 'day-template',
-            },
-        ];
-
+    it('delegates recurring unschedule to the program service path and always clears the confirmation state', async () => {
         const { result } = renderMutations({
-            sessions,
             itemToUnschedule: {
                 id: 'day-template',
+                blockId: 'block-9',
                 type: 'program_day',
                 isRecurringTemplate: true,
                 name: 'Template Day',
@@ -142,9 +127,12 @@ describe('useProgramDetailMutations', () => {
             await result.current.unscheduleDay();
         });
 
-        expect(deleteSession).toHaveBeenCalledTimes(1);
-        expect(deleteSession).toHaveBeenCalledWith('root-1', 'session-match');
-        expect(refreshData).toHaveBeenCalledTimes(1);
+        expect(mockActions.unscheduleRecurringDay).toHaveBeenCalledWith({
+            blockId: 'block-9',
+            dayId: 'day-template',
+            date: '2026-03-10',
+            timezone: 'UTC',
+        });
         expect(mockActions.unscheduleDay).not.toHaveBeenCalled();
         expect(callbacks.onUnscheduleFinished).toHaveBeenCalledTimes(1);
     });
@@ -161,8 +149,31 @@ describe('useProgramDetailMutations', () => {
         expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete "Goal 1" and all its children?');
         expect(deleteGoal).toHaveBeenCalledWith('root-1', 'goal-1');
         expect(callbacks.onGoalEditorClosed).toHaveBeenCalledTimes(1);
-        expect(refreshData).toHaveBeenCalledTimes(1);
+        expect(refreshers.programGoals).toHaveBeenCalledTimes(1);
 
         confirmSpy.mockRestore();
+    });
+
+    it('formats structured deadline update errors into a readable toast message', async () => {
+        mockActions.setProgramGoalDeadline.mockRejectedValueOnce({
+            response: {
+                data: {
+                    error: {
+                        error: 'Child deadline cannot be later than parent deadline',
+                        parent_deadline: '2026-03-13',
+                    },
+                },
+            },
+        });
+
+        const { result } = renderMutations();
+
+        await act(async () => {
+            await result.current.setGoalDeadline('goal-1', '2026-03-16');
+        });
+
+        expect(toast.error).toHaveBeenCalledWith(
+            'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
+        );
     });
 });

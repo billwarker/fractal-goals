@@ -1,8 +1,9 @@
 
 import uuid
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import List, Dict, Any, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from services.serializers import format_utc
 from models import (
@@ -11,9 +12,22 @@ from models import (
 )
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
-from services.serializers import serialize_program, serialize_program_block, serialize_program_day
+from services.serializers import serialize_program, serialize_program_block, serialize_program_day, serialize_goal
+from services.session_service import SessionService
+from services.goal_service import GoalService, sync_goal_targets
 
 logger = logging.getLogger(__name__)
+
+
+class ProgramServiceValidationError(ValueError):
+    def __init__(self, payload: Any, status_code: int = 400):
+        self.payload = payload
+        self.status_code = status_code
+        if isinstance(payload, dict):
+            message = payload.get('error') or payload.get('message') or str(payload)
+        else:
+            message = str(payload)
+        super().__init__(message)
 
 class ProgramService:
     """
@@ -53,6 +67,96 @@ class ProgramService:
             return datetime.strptime(str(raw_value)[:10], '%Y-%m-%d').date()
         except ValueError:
             raise ValueError(f"Invalid {snake_key} format")
+
+    @staticmethod
+    def _parse_required_date(raw_value: Any, field_name: str = 'date') -> date:
+        if not raw_value:
+            raise ValueError(f"{field_name} is required")
+
+        try:
+            return datetime.strptime(str(raw_value)[:10], '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError(f"Invalid {field_name} format")
+
+    @staticmethod
+    def _normalize_deadline_value(raw_value: Any) -> str:
+        if not raw_value:
+            raise ValueError("deadline is required")
+        return str(raw_value)[:10]
+
+    @staticmethod
+    def _normalize_goal_date(value: Any) -> date | None:
+        if value is None:
+            return None
+        return value.date() if isinstance(value, datetime) else value
+
+    @staticmethod
+    def _collect_goal_descendant_ids(session, root_id: str, seed_goal_ids: List[str]) -> set[str]:
+        normalized_seed_ids = list(dict.fromkeys(seed_goal_ids or []))
+        if not normalized_seed_ids:
+            return set()
+
+        goal_rows = session.query(Goal.id, Goal.parent_id).filter(
+            Goal.root_id == root_id,
+            Goal.deleted_at == None
+        ).all()
+
+        children_by_parent: Dict[str | None, List[str]] = {}
+        for goal_id, parent_id in goal_rows:
+            children_by_parent.setdefault(parent_id, []).append(goal_id)
+
+        visited: set[str] = set()
+        stack = list(normalized_seed_ids)
+        while stack:
+            goal_id = stack.pop()
+            if not goal_id or goal_id in visited:
+                continue
+            visited.add(goal_id)
+            stack.extend(children_by_parent.get(goal_id, []))
+
+        return visited
+
+    @staticmethod
+    def _program_scope_goal_ids(session, program: Program, root_id: str) -> set[str]:
+        return ProgramService._collect_goal_descendant_ids(
+            session,
+            root_id,
+            [goal.id for goal in (program.goals or [])],
+        )
+
+    @staticmethod
+    def _program_allowed_goal_ids(session, program: Program, root_id: str) -> set[str]:
+        scope_goal_ids = ProgramService._program_scope_goal_ids(session, program, root_id)
+        block_goal_ids = {
+            goal.id
+            for block in (program.blocks or [])
+            for goal in (block.goals or [])
+        }
+        return scope_goal_ids | block_goal_ids
+
+    @staticmethod
+    def _validate_goal_in_program_scope(session, program: Program, root_id: str, goal_id: str):
+        allowed_goal_ids = ProgramService._program_allowed_goal_ids(session, program, root_id)
+        if not allowed_goal_ids:
+            raise ValueError("Program scope is empty. Select medium or long term goals on the program first.")
+        if goal_id not in allowed_goal_ids:
+            raise ValueError("Goal must be within the configured program scope")
+
+    @staticmethod
+    def _apply_goal_deadline_with_program_rules(session, root_id: str, current_user_id: str | None, goal: Goal, deadline_value: str):
+        goal_service = GoalService(session, sync_targets=sync_goal_targets)
+        _, update_error = goal_service._apply_goal_updates(
+            goal,
+            {'deadline': deadline_value},
+            root_id=root_id,
+            allow_parent_update=False,
+            allow_extended_fields=False,
+        )
+        if update_error:
+            error_payload, status_code = update_error
+            raise ProgramServiceValidationError(error_payload, status_code)
+
+        session.add(goal)
 
     @staticmethod
     def _replace_program_goals(session, program_id: str, goal_ids: List[str], root_id: str) -> List[Goal]:
@@ -400,7 +504,7 @@ class ProgramService:
         return count
 
     @staticmethod
-    def add_block_day(session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> int:
+    def add_block_day(session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         ProgramService._require_root_access(session, root_id, current_user_id)
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
@@ -427,6 +531,7 @@ class ProgramService:
 
         created_count = 0
         emitted_days = []
+        touched_days: List[ProgramDay] = []
         
         # Determine the date if provided
         target_date = None
@@ -461,6 +566,7 @@ class ProgramService:
                 day.templates = templates
             
             created_count += 1
+            touched_days.append(day)
             emitted_days.append({
                 'day_id': day.id,
                 'day_name': day.name or f"Day {day.day_number}",
@@ -472,10 +578,13 @@ class ProgramService:
         ProgramService._commit(session)
         for event_payload in emitted_days:
             event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, event_payload, source='ProgramService.add_block_day'))
-        return created_count
+        return {
+            "days": [serialize_program_day(day) for day in touched_days],
+            "count": created_count,
+        }
 
     @staticmethod
-    def update_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None):
+    def update_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
         ProgramService._require_root_access(session, root_id, current_user_id)
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day:
@@ -544,6 +653,8 @@ class ProgramService:
             'updated_fields': list(data.keys())
         }, source='ProgramService.update_block_day'))
 
+        return serialize_program_day(day)
+
     @staticmethod
     def delete_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, current_user_id: str | None = None):
         ProgramService._require_root_access(session, root_id, current_user_id)
@@ -564,7 +675,7 @@ class ProgramService:
         }, source='ProgramService.delete_block_day'))
 
     @staticmethod
-    def copy_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> int:
+    def copy_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         ProgramService._require_root_access(session, root_id, current_user_id)
         source_day = session.query(ProgramDay).filter_by(id=day_id).first()
         if not source_day:
@@ -578,6 +689,7 @@ class ProgramService:
         
         target_blocks = query.all()
         copied_count = 0
+        copied_days: List[ProgramDay] = []
         
         for target in target_blocks:
              target_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=source_day.day_number).first()
@@ -600,9 +712,176 @@ class ProgramService:
                   target_day.templates = []
              
              copied_count += 1
+             copied_days.append(target_day)
         
         ProgramService._commit(session)
-        return copied_count
+        return {
+            "days": [serialize_program_day(day) for day in copied_days],
+            "count": copied_count,
+        }
+
+    @staticmethod
+    def schedule_block_day(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
+
+        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
+        if not block:
+            raise ValueError("Block not found")
+
+        program = get_owned_program(session, root_id, program_id)
+        if not program:
+            raise ValueError("Program not found")
+
+        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        if not day:
+            raise ValueError("Day not found")
+
+        session_start = data.get('session_start')
+        if not session_start:
+            raise ValueError("session_start is required")
+        try:
+            normalized_session_start = datetime.fromisoformat(str(session_start).replace('Z', '+00:00'))
+        except ValueError:
+            raise ValueError("Invalid session_start format")
+
+        scheduled_date = normalized_session_start.date()
+        if (
+            block.start_date is not None and scheduled_date < block.start_date
+        ) or (
+            block.end_date is not None and scheduled_date > block.end_date
+        ):
+            raise ValueError("Scheduled date must be within the selected block date range")
+
+        parent_ids = list(dict.fromkeys([
+            *[goal.id for goal in (block.goals or [])],
+            *[goal.id for goal in (program.goals or [])],
+        ]))
+        if not parent_ids:
+            parent_ids = [root_id]
+
+        session_payload = {
+            'name': day.name or f'Day {day.day_number or 1}',
+            'session_start': session_start,
+            'parent_ids': parent_ids,
+            'session_data': {
+                'program_context': {
+                    'day_id': day.id,
+                    'block_id': block.id,
+                    'program_id': program.id,
+                }
+            }
+        }
+
+        scheduled_session, error_message, status_code = SessionService(session).create_session(
+            root_id,
+            current_user_id,
+            session_payload,
+        )
+        if error_message:
+            raise ValueError(error_message)
+
+        if status_code != 201 or scheduled_session is None:
+            raise ValueError("Failed to schedule program day")
+
+        return scheduled_session
+
+    @staticmethod
+    def unschedule_block_day_occurrence(session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
+        ProgramService._require_root_access(session, root_id, current_user_id)
+
+        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
+        if not block:
+            raise ValueError("Block not found")
+
+        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        if not day:
+            raise ValueError("Day not found")
+
+        target_date = ProgramService._parse_required_date(data.get('date'), 'date')
+        timezone_name = data.get('timezone') or 'UTC'
+        try:
+            zone = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError:
+            raise ValueError("Invalid timezone")
+
+        def get_session_program_day_id(session_obj: Session) -> str | None:
+            if session_obj.program_day_id:
+                return session_obj.program_day_id
+            attrs = _safe_load_json(getattr(session_obj, 'attributes', None), {})
+            return attrs.get('program_context', {}).get('day_id')
+
+        candidate_sessions = session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+            Session.completed == False,
+        ).all()
+
+        removed_session_ids: List[str] = []
+        removed_session_names: Dict[str, str] = {}
+        for scheduled_session in candidate_sessions:
+            if get_session_program_day_id(scheduled_session) != day_id:
+                continue
+
+            session_dt = scheduled_session.session_start or scheduled_session.created_at
+            if session_dt is None:
+                continue
+            if session_dt.tzinfo is None:
+                session_dt = session_dt.replace(tzinfo=timezone.utc)
+
+            if session_dt.astimezone(zone).date() != target_date:
+                continue
+
+            scheduled_session.deleted_at = datetime.now(timezone.utc)
+            removed_session_ids.append(scheduled_session.id)
+            removed_session_names[scheduled_session.id] = scheduled_session.name
+
+        ProgramService._commit(session)
+
+        for session_id in removed_session_ids:
+            event_bus.emit(Event(Events.SESSION_DELETED, {
+                'session_id': session_id,
+                'session_name': removed_session_names.get(session_id),
+                'root_id': root_id
+            }, source='ProgramService.unschedule_block_day_occurrence'))
+
+        return {
+            "day": serialize_program_day(day),
+            "removed_session_ids": removed_session_ids,
+            "removed_count": len(removed_session_ids),
+        }
+
+    @staticmethod
+    def set_goal_deadline_for_program_date(session, root_id: str, program_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+        ProgramService._require_root_access(session, root_id, current_user_id)
+
+        program = get_owned_program(session, root_id, program_id)
+        if not program:
+            raise ValueError("Program not found")
+
+        goal_id = data.get('goal_id')
+        if not goal_id:
+            raise ValueError("Goal ID required")
+
+        deadline_value = ProgramService._normalize_deadline_value(data.get('deadline'))
+        deadline_date = ProgramService._parse_required_date(deadline_value, 'deadline')
+        program_start = ProgramService._normalize_goal_date(program.start_date)
+        program_end = ProgramService._normalize_goal_date(program.end_date)
+        if program_start and deadline_date < program_start or program_end and deadline_date > program_end:
+            raise ValueError("Goal deadline must be within the program date range")
+
+        goal = session.query(Goal).filter(
+            Goal.id == goal_id,
+            Goal.root_id == root_id,
+            Goal.deleted_at == None
+        ).first()
+        if not goal:
+            raise ValueError("Goal not found in this fractal")
+
+        ProgramService._validate_goal_in_program_scope(session, program, root_id, goal_id)
+        ProgramService._apply_goal_deadline_with_program_rules(session, root_id, current_user_id, goal, deadline_value)
+
+        ProgramService._commit(session, goal)
+        return serialize_goal(goal, include_children=False)
 
     @staticmethod
     def get_active_program_days(session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
@@ -729,7 +1008,8 @@ class ProgramService:
             raise ValueError("Program not found in this fractal")
         
         goal_id = data.get('goal_id')
-        deadline_str = data.get('deadline')
+        deadline_str = ProgramService._normalize_deadline_value(data.get('deadline'))
+        deadline_date = ProgramService._parse_required_date(deadline_str, 'deadline')
         
         if not goal_id:
              raise ValueError("Goal ID required")
@@ -742,26 +1022,25 @@ class ProgramService:
         if not goal:
             raise ValueError("Goal not found in this fractal")
 
-        current_program_goal_ids = [g.id for g in (program.goals or [])]
-        if goal.id not in current_program_goal_ids:
-            ProgramService._replace_program_goals(
-                session, program.id, current_program_goal_ids + [goal.id], root_id
-            )
+        if block.start_date is None or block.end_date is None:
+            raise ValueError("Block must have a start and end date before goals can be attached")
+
+        if deadline_date < block.start_date or deadline_date > block.end_date:
+            raise ValueError("Goal deadline must be within the selected block date range")
 
         current_block_goal_ids = [g.id for g in (block.goals or [])]
+        scope_goal_ids = ProgramService._program_scope_goal_ids(session, program, root_id)
+        if not scope_goal_ids:
+            raise ValueError("Program scope is empty. Select medium or long term goals on the program first.")
+        if goal.id not in scope_goal_ids and goal.id not in current_block_goal_ids:
+            raise ValueError("Goal must be within the configured program scope")
         if goal.id not in current_block_goal_ids:
             ProgramService._replace_block_goals(
                 session, block.id, current_block_goal_ids + [goal.id], root_id
             )
             session.expire(block, ['goals'])
-            
-        if deadline_str:
-            try:
-                if len(deadline_str) > 10: deadline_str = deadline_str[:10]
-                goal.deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date()
-                session.add(goal)
-            except ValueError:
-                raise ValueError("Invalid date format")
+
+        ProgramService._apply_goal_deadline_with_program_rules(session, root_id, current_user_id, goal, deadline_str)
 
         ProgramService._commit(session, block)
         

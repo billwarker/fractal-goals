@@ -39,6 +39,7 @@ const ProgramDetail = () => {
         sessions,
         treeData,
         refreshData,
+        refreshers,
         getGoalDetails
     } = useProgramData(rootId, programId);
 
@@ -85,6 +86,7 @@ const ProgramDetail = () => {
         closeBlockModal,
         handleBlockSaveSuccess,
         handleAddDayClick,
+        handleCreateDayForDate,
         handleEditDay,
         closeDayModal,
         handleDaySaveSuccess,
@@ -145,6 +147,7 @@ const ProgramDetail = () => {
         rootId,
         program,
         refreshData,
+        refreshers,
         timezone,
         sessions,
         selectedBlockId,
@@ -303,6 +306,7 @@ const ProgramDetail = () => {
                 onSetGoalDeadline={setGoalDeadline}
                 blocks={sortedBlocks}
                 onScheduleDay={scheduleDay}
+                onCreateDayForDate={handleCreateDayForDate}
                 onUnscheduleDay={handleUnscheduleDay}
                 sessions={sessions}
             />

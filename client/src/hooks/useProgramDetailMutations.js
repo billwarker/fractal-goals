@@ -2,19 +2,55 @@ import { useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 
 import { fractalApi } from '../utils/api';
-import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { useProgramLogic } from './useProgramLogic';
 
+function formatStructuredError(value) {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((entry) => formatStructuredError(entry)).filter(Boolean).join(', ');
+    }
+
+    if (typeof value === 'object') {
+        if (typeof value.error === 'string' && typeof value.parent_deadline === 'string') {
+            return `${value.error} (parent deadline: ${value.parent_deadline})`;
+        }
+        if (typeof value.error === 'string') {
+            return value.error;
+        }
+        if (typeof value.message === 'string') {
+            return value.message;
+        }
+        return Object.values(value)
+            .map((entry) => formatStructuredError(entry))
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    return String(value);
+}
+
 function getErrorMessage(error, fallbackMessage) {
-    return error?.response?.data?.error || error?.message || fallbackMessage;
+    return (
+        formatStructuredError(error?.response?.data?.error)
+        || formatStructuredError(error?.response?.data)
+        || error?.message
+        || fallbackMessage
+    );
 }
 
 export function useProgramDetailMutations({
     rootId,
     program,
     refreshData,
+    refreshers,
     timezone,
-    sessions = [],
     selectedBlockId,
     dayModalInitialData,
     attachBlockId,
@@ -28,7 +64,13 @@ export function useProgramDetailMutations({
     onUnscheduleFinished,
     onGoalEditorClosed,
 }) {
-    const actions = useProgramLogic(rootId, program, refreshData);
+    const resolvedRefreshers = refreshers || {
+        all: refreshData,
+        program: refreshData,
+        programGoals: refreshData,
+        scheduling: refreshData,
+    };
+    const actions = useProgramLogic(rootId, program, resolvedRefreshers);
 
     const saveProgram = useCallback(async (programData) => {
         try {
@@ -96,43 +138,12 @@ export function useProgramDetailMutations({
                 Boolean(selectedDate);
 
             if (isRecurringTemplateUnschedule) {
-                const matchingScheduledSessions = sessions.filter((session) => {
-                    const isCompleted = session.completed || session.attributes?.completed;
-                    if (isCompleted) {
-                        return false;
-                    }
-
-                    let programDayId = session.program_day_id;
-                    if (!programDayId && session.attributes) {
-                        try {
-                            const attributes = typeof session.attributes === 'string'
-                                ? JSON.parse(session.attributes)
-                                : session.attributes;
-                            programDayId = attributes?.program_context?.day_id;
-                        } catch {
-                            return false;
-                        }
-                    }
-
-                    if (programDayId !== itemToUnschedule.id) {
-                        return false;
-                    }
-
-                    const localDate = getISOYMDInTimezone(
-                        session.session_start || session.start_time || session.created_at,
-                        timezone
-                    );
-                    return localDate === selectedDate;
+                await actions.unscheduleRecurringDay({
+                    blockId: itemToUnschedule.blockId,
+                    dayId: itemToUnschedule.id,
+                    date: selectedDate,
+                    timezone,
                 });
-
-                if (matchingScheduledSessions.length === 0) {
-                    toast('No scheduled sessions to remove on this date.');
-                } else {
-                    await Promise.all(
-                        matchingScheduledSessions.map((session) => fractalApi.deleteSession(rootId, session.id))
-                    );
-                    await refreshData();
-                }
             } else {
                 await actions.unscheduleDay(itemToUnschedule);
             }
@@ -146,10 +157,7 @@ export function useProgramDetailMutations({
         actions,
         itemToUnschedule,
         onUnscheduleFinished,
-        refreshData,
-        rootId,
         selectedDate,
-        sessions,
         timezone,
     ]);
 
@@ -175,33 +183,32 @@ export function useProgramDetailMutations({
 
     const setGoalDeadline = useCallback(async (goalId, deadline) => {
         try {
-            await fractalApi.updateGoal(rootId, goalId, { deadline });
-            await refreshData();
+            await actions.setProgramGoalDeadline({ goal_id: goalId, deadline });
         } catch (error) {
             console.error('Failed to set goal deadline:', error);
             toast.error(`Failed to set goal deadline: ${getErrorMessage(error, 'Unknown error')}`);
         }
-    }, [refreshData, rootId]);
+    }, [actions]);
 
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
             await fractalApi.updateGoal(rootId, goalId, payload);
-            await refreshData();
+            await resolvedRefreshers.programGoals();
         } catch (error) {
             console.error('Failed to update goal:', error);
             toast.error(`Failed to update goal: ${getErrorMessage(error, 'Unknown error')}`);
         }
-    }, [refreshData, rootId]);
+    }, [resolvedRefreshers, rootId]);
 
     const toggleGoalCompletion = useCallback(async (goalId, currentStatus) => {
         try {
             await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
-            await refreshData();
+            await resolvedRefreshers.programGoals();
         } catch (error) {
             console.error('Failed to toggle goal completion:', error);
             toast.error(`Failed to toggle goal completion: ${getErrorMessage(error, 'Unknown error')}`);
         }
-    }, [refreshData, rootId]);
+    }, [resolvedRefreshers, rootId]);
 
     const deleteGoal = useCallback(async (goal) => {
         if (!window.confirm(`Are you sure you want to delete "${goal.name}" and all its children?`)) {
@@ -211,23 +218,23 @@ export function useProgramDetailMutations({
         try {
             await fractalApi.deleteGoal(rootId, goal.id);
             onGoalEditorClosed?.();
-            await refreshData();
+            await resolvedRefreshers.programGoals();
         } catch (error) {
             console.error('Failed to delete goal:', error);
             toast.error(`Failed to delete goal: ${getErrorMessage(error, 'Unknown error')}`);
         }
-    }, [onGoalEditorClosed, refreshData, rootId]);
+    }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
 
     const createGoal = useCallback(async (payload) => {
         try {
             await fractalApi.createGoal(rootId, payload);
             onGoalEditorClosed?.();
-            await refreshData();
+            await resolvedRefreshers.programGoals();
         } catch (error) {
             console.error('Failed to create goal:', error);
             toast.error(`Failed to create goal: ${getErrorMessage(error, 'Unknown error')}`);
         }
-    }, [onGoalEditorClosed, refreshData, rootId]);
+    }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
 
     return {
         saveProgram,

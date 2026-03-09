@@ -76,4 +76,28 @@ describe('useProgramDetailController', () => {
         expect(result.current.showGoalModal).toBe(false);
         expect(result.current.modalMode).toBe('view');
     });
+
+    it('opens a dated program day draft from the calendar day modal flow', () => {
+        const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
+
+        act(() => {
+            result.current.handleDateClick({ dateStr: '2026-03-09' });
+        });
+
+        expect(result.current.showDayViewModal).toBe(true);
+        expect(result.current.selectedDate).toBe('2026-03-09');
+
+        act(() => {
+            result.current.handleCreateDayForDate('block-1', '2026-03-09');
+        });
+
+        expect(result.current.showDayViewModal).toBe(false);
+        expect(result.current.selectedDate).toBe(null);
+        expect(result.current.showDayModal).toBe(true);
+        expect(result.current.selectedBlockId).toBe('block-1');
+        expect(result.current.dayModalInitialData).toMatchObject({
+            date: '2026-03-09',
+            day_of_week: [],
+        });
+    });
 });

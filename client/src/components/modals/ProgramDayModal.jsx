@@ -37,10 +37,6 @@ function getInitialSelectedDaysOfWeek(initialData) {
         }
     }
 
-    if (initialData.date) {
-        return [moment(initialData.date).format('dddd')];
-    }
-
     return [];
 }
 
@@ -72,7 +68,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    const isEdit = !!initialData;
+    const isEdit = Boolean(initialData?.id);
+    const fixedDate = initialData?.date ? moment(initialData.date).format('YYYY-MM-DD') : '';
 
     const { data: sessionTemplates = [] } = useQuery({
         queryKey: queryKeys.sessionTemplates(rootId),
@@ -124,7 +121,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
         onSave({
             name,
             template_ids: selectedTemplates,
-            day_of_week: selectedDaysOfWeek // Sending an array now
+            day_of_week: fixedDate ? [] : selectedDaysOfWeek,
+            ...(fixedDate ? { date: fixedDate } : {}),
         });
     };
 
@@ -188,6 +186,15 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                             fullWidth
                         />
 
+                        {fixedDate && (
+                            <Input
+                                label="Scheduled Date"
+                                value={moment(fixedDate).format('MMM D, YYYY')}
+                                readOnly
+                                fullWidth
+                            />
+                        )}
+
                         <div className={styles.field}>
                             <label className={styles.label}>Sessions</label>
                             <div className={styles.sessionList}>
@@ -242,36 +249,38 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                             </div>
                         </div>
 
-                        <div className={styles.field}>
-                            <label className={styles.label}>Optional Day of Week</label>
-                            <div className={styles.dayGrid}>
-                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => {
-                                    const isSelected = selectedDaysOfWeek.includes(d);
-                                    return (
-                                        <div
-                                            key={d}
-                                            onClick={() => handleToggleDay(d)}
-                                            className={`${styles.dayBtn} ${isSelected ? styles.dayBtnSelected : ''}`}
-                                        >
-                                            {d.substring(0, 3)}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            {selectedDaysOfWeek.length > 0 && (
-                                <div className={styles.hint}>
-                                    Scheduled for every {
-                                        (() => {
-                                            const sorter = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
-                                            const sorted = [...selectedDaysOfWeek].sort((a, b) => sorter[a] - sorter[b]);
-                                            if (sorted.length === 0) return '';
-                                            if (sorted.length === 1) return sorted[0];
-                                            return sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-                                        })()
-                                    } in the block.
+                        {!fixedDate && (
+                            <div className={styles.field}>
+                                <label className={styles.label}>Optional Day of Week</label>
+                                <div className={styles.dayGrid}>
+                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => {
+                                        const isSelected = selectedDaysOfWeek.includes(d);
+                                        return (
+                                            <div
+                                                key={d}
+                                                onClick={() => handleToggleDay(d)}
+                                                className={`${styles.dayBtn} ${isSelected ? styles.dayBtnSelected : ''}`}
+                                            >
+                                                {d.substring(0, 3)}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            )}
-                        </div>
+                                {selectedDaysOfWeek.length > 0 && (
+                                    <div className={styles.hint}>
+                                        Scheduled for every {
+                                            (() => {
+                                                const sorter = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+                                                const sorted = [...selectedDaysOfWeek].sort((a, b) => sorter[a] - sorter[b]);
+                                                if (sorted.length === 0) return '';
+                                                if (sorted.length === 1) return sorted[0];
+                                                return sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+                                            })()
+                                        } in the block.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {isEdit && (
                             <div className={styles.copyArea}>

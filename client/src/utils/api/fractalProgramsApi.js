@@ -21,8 +21,14 @@ export const fractalProgramsApi = {
         axios.put(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`, data),
     copyBlockDay: (rootId, programId, blockId, dayId, data) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/copy`, data),
+    scheduleBlockDay: (rootId, programId, blockId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/schedule`, data),
+    unscheduleBlockDayOccurrence: (rootId, programId, blockId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/unschedule`, data),
     attachGoalToBlock: (rootId, programId, blockId, data) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/goals`, data),
+    setProgramGoalDeadline: (rootId, programId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
     getActiveProgramDays: (rootId) => axios.get(`${API_BASE}/${rootId}/programs/active-days`),

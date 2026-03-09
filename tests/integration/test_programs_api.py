@@ -247,6 +247,9 @@ class TestProgramStructure:
         )
         
         assert response.status_code == 201
+        payload = response.get_json()
+        assert payload['count'] == 1
+        assert payload['days'][0]['name'] == 'Heavy Day'
         
         # Verify day added
         response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
@@ -269,13 +272,22 @@ class TestProgramStructure:
         """Test attaching a goal to a specific block."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
         short_term_goal = sample_goal_hierarchy['short_term']
+
+        program_update = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        assert program_update.status_code == 200
         
         response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         program_data = json.loads(response.data)
-        block_id = program_data['blocks'][0]['id']
-        
-        deadline = (datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d')
+        block = program_data['blocks'][0]
+        block_id = block['id']
+        deadline = (
+            datetime.strptime(block['start_date'], '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
         
         payload = {
             'goal_id': short_term_goal.id,
@@ -296,6 +308,226 @@ class TestProgramStructure:
         block_data = data['block']
         goal_ids = block_data['goal_ids']
         assert short_term_goal.id in goal_ids
+        assert data['block']['program_goal_ids'] == [mid_term_goal.id]
+
+    def test_attach_goal_to_block_rejects_goals_outside_program_scope(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        long_term_goal = sample_goal_hierarchy['long_term']
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        assert update_response.status_code == 200
+
+        block = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()['blocks'][0]
+        block_id = block['id']
+        deadline = (
+            datetime.strptime(block['start_date'], '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
+            json={
+                'goal_id': long_term_goal.id,
+                'deadline': deadline,
+            }
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Goal must be within the configured program scope'
+
+    def test_attach_goal_to_block_requires_deadline_within_block_range(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        assert update_response.status_code == 200
+
+        program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block = program_data['blocks'][0]
+        block_id = block['id']
+        invalid_deadline = (datetime.strptime(block['end_date'], '%Y-%m-%d') + timedelta(days=2)).strftime('%Y-%m-%d')
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': invalid_deadline,
+            }
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Goal deadline must be within the selected block date range'
+
+    def test_schedule_block_day_endpoint_creates_program_session(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        """Scheduling a program day should be owned by the programs service/API, not assembled in the client."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        assert update_response.status_code == 200
+
+        program_response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
+        program_data = program_response.get_json()
+        block_id = program_data['blocks'][0]['id']
+        block_start_date = program_data['blocks'][0]['start_date']
+        scoped_deadline = (
+            datetime.strptime(block_start_date, '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
+
+        attach_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': scoped_deadline,
+            }
+        )
+        assert attach_response.status_code == 200
+
+        add_day_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
+            json={'name': 'Schedule Me'}
+        )
+        assert add_day_response.status_code == 201
+
+        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block = next(entry for entry in refreshed_program['blocks'] if entry['id'] == block_id)
+        day_id = next(day['id'] for day in block['days'] if day.get('name') == 'Schedule Me')
+        scheduled_date = block['start_date']
+
+        schedule_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/schedule',
+            json={'session_start': f'{scheduled_date}T12:00:00Z'}
+        )
+        assert schedule_response.status_code == 201
+
+        scheduled_session = schedule_response.get_json()
+        assert scheduled_session['program_day_id'] == day_id
+        assert scheduled_session['program_info']['program_id'] == program_id
+        assert any(goal['id'] == short_term_goal.id for goal in scheduled_session['short_term_goals'])
+
+    def test_unschedule_block_day_occurrence_soft_deletes_matching_session(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+
+        program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block_id = program_data['blocks'][0]['id']
+        scoped_deadline = (
+            datetime.strptime(program_data['blocks'][0]['start_date'], '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
+
+        authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': scoped_deadline,
+            }
+        )
+        authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
+            json={'name': 'Recurring Day'}
+        )
+
+        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block = next(entry for entry in refreshed_program['blocks'] if entry['id'] == block_id)
+        day_id = next(day['id'] for day in block['days'] if day.get('name') == 'Recurring Day')
+        scheduled_date = block['start_date']
+
+        schedule_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/schedule',
+            json={'session_start': f'{scheduled_date}T12:00:00Z'}
+        )
+        assert schedule_response.status_code == 201
+        session_id = schedule_response.get_json()['id']
+
+        unschedule_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/unschedule',
+            json={'date': scheduled_date, 'timezone': 'UTC'}
+        )
+        assert unschedule_response.status_code == 200
+        payload = unschedule_response.get_json()
+        assert payload['removed_count'] == 1
+        assert payload['removed_session_ids'] == [session_id]
+
+    def test_set_goal_deadline_for_program_date_enforces_scope_and_returns_goal(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        assert update_response.status_code == 200
+        program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        deadline_date = (
+            datetime.strptime(program_data['start_date'][:10], '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/goal-deadlines',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': deadline_date,
+            }
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['id'] == short_term_goal.id
+        assert payload['deadline'][:10] == deadline_date
+
+    def test_set_goal_deadline_for_program_date_returns_structured_parent_deadline_error(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+        program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        start_date = datetime.strptime(program_data['start_date'][:10], '%Y-%m-%d')
+        parent_deadline = (start_date + timedelta(days=4)).strftime('%Y-%m-%d')
+        child_deadline = (start_date + timedelta(days=5)).strftime('%Y-%m-%d')
+        authed_client.put(
+            f'/api/{root_id}/goals/{mid_term_goal.id}',
+            json={'deadline': parent_deadline}
+        )
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/goal-deadlines',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': child_deadline,
+            }
+        )
+
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['error'] == 'Child deadline cannot be later than parent deadline'
+        assert payload['parent_deadline'] == parent_deadline
 
     def test_copy_block_day_rejects_invalid_target_mode(self, authed_client, sample_ultimate_goal, sample_program):
         """Copy-day requests should validate target_mode before reaching the service layer."""

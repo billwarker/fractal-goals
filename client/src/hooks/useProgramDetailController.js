@@ -113,6 +113,19 @@ export function useProgramDetailController({ goals = [] }) {
         setShowDayModal(true);
     }, []);
 
+    const handleCreateDayForDate = useCallback((blockId, date) => {
+        setSelectedBlockId(blockId);
+        setDayModalInitialData({
+            name: '',
+            date,
+            day_of_week: [],
+            templates: [],
+        });
+        setShowDayViewModal(false);
+        setSelectedDate(null);
+        setShowDayModal(true);
+    }, []);
+
     const handleEditDay = useCallback((blockId, day) => {
         setSelectedBlockId(blockId);
         setDayModalInitialData(day);
@@ -218,6 +231,7 @@ export function useProgramDetailController({ goals = [] }) {
         closeBlockModal,
         handleBlockSaveSuccess,
         handleAddDayClick,
+        handleCreateDayForDate,
         handleEditDay,
         closeDayModal,
         handleDaySaveSuccess,

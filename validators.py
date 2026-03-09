@@ -921,6 +921,41 @@ class ProgramDayCopySchema(BaseModel):
     target_mode: Optional[str] = Field('all', pattern=r'^(all|selected)$')
 
 
+class ProgramDayScheduleSchema(BaseModel):
+    """Schema for scheduling an existing program day onto the calendar."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    session_start: str = Field(..., min_length=1)
+
+
+class ProgramDayOccurrenceUnscheduleSchema(BaseModel):
+    """Schema for unscheduling a program day occurrence on a specific local date."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    date: str = Field(..., min_length=1)
+    timezone: Optional[str] = None
+
+    @field_validator('date')
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        parse_date_string(v)
+        return v
+
+
+class ProgramGoalDeadlineSchema(BaseModel):
+    """Schema for setting a goal deadline through program calendar semantics."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    goal_id: str = Field(..., min_length=1)
+    deadline: str = Field(..., min_length=1)
+
+    @field_validator('deadline')
+    @classmethod
+    def validate_deadline(cls, v: str) -> str:
+        parse_date_string(v)
+        return v
+
+
 # =============================================================================
 # TEMPLATE SCHEMAS
 # =============================================================================
