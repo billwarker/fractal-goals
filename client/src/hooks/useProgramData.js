@@ -83,10 +83,13 @@ export function useProgramData(rootId, programId) {
     const refreshData = useCallback(async () => {
         await Promise.all([
             queryClient.invalidateQueries({ queryKey: queryKeys.program(rootId, programId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.goalsTree(rootId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.activityGroups(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) })
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsAll(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.activeProgramDays(rootId) }),
         ]);
     }, [queryClient, rootId, programId]);
 
