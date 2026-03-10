@@ -15,7 +15,7 @@ import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
 import styles from './SessionSidePane.module.css';
 
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 
 function SessionSidePane({
     selectedActivity,     // Currently focused activity instance (for context)
@@ -46,10 +46,12 @@ function SessionSidePane({
         session,
         activityInstances,
         activities: activityDefinitions,
+    } = useActiveSessionData();
+    const {
         toggleSessionComplete: onToggleComplete,
         pauseSession,
         resumeSession,
-    } = useActiveSession();
+    } = useActiveSessionActions();
 
     // Derived values
     const isCompleted = session?.attributes?.completed;

@@ -4,8 +4,8 @@ import { fractalApi } from '../utils/api';
 import { flattenGoalTree } from '../utils/goalNodeModel';
 import { queryKeys } from './queryKeys';
 import notify from '../utils/notify';
-import { useActiveSession } from '../contexts/ActiveSessionContext';
-import { useFractalTree } from './useGoalQueries';
+import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
+import { useGoalsForSelection } from './useGoalQueries';
 import useSessionNotes from './useSessionNotes';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
@@ -15,15 +15,16 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         activities,
         loading,
         autoSaveStatus,
-        sidePaneMode,
-        setSidePaneMode,
-        refreshSession,
         localSessionData,
+        calculateTotalDuration,
+        sessionGoalsView,
+    } = useActiveSessionData();
+    const {
+        updateGoal,
         addActivity,
         deleteSession,
-        updateGoal,
-        calculateTotalDuration
-    } = useActiveSession();
+    } = useActiveSessionActions();
+    const { sidePaneMode, setSidePaneMode: setSidePaneModeUi } = useActiveSessionUi();
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
@@ -35,18 +36,39 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const [associationContext, setAssociationContext] = useState(null);
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
 
-    const { data: fullGoalTree } = useFractalTree(rootId, { enabled: showAssociationModal });
+    const { goals: selectionGoals = [] } = useGoalsForSelection(rootId, { enabled: showAssociationModal });
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
     const sessionKey = queryKeys.session(rootId, sessionId);
     const activitiesKey = queryKeys.activities(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const allAvailableGoals = useMemo(() => {
-        if (!fullGoalTree) return [];
-        const goals = Array.isArray(fullGoalTree)
-            ? fullGoalTree.flatMap((goal) => flattenGoalTree(goal))
-            : flattenGoalTree(fullGoalTree);
-        return goals.filter((goal) => !goal.completed);
-    }, [fullGoalTree]);
+        const availableMicroGoals = Array.isArray(sessionGoalsView?.micro_goals)
+            ? sessionGoalsView.micro_goals
+            : [];
+
+        const microByParent = availableMicroGoals.reduce((acc, goal) => {
+            const parentId = goal?.parent_id || goal?.attributes?.parent_id;
+            if (!parentId) return acc;
+            if (!acc.has(parentId)) acc.set(parentId, []);
+            acc.get(parentId).push(goal);
+            return acc;
+        }, new Map());
+
+        const roots = (selectionGoals || []).map((shortTermGoal) => {
+            const immediateGoals = Array.isArray(shortTermGoal.immediateGoals) ? shortTermGoal.immediateGoals : [];
+            return {
+                ...shortTermGoal,
+                type: shortTermGoal.type || 'ShortTermGoal',
+                children: immediateGoals.map((immediateGoal) => ({
+                    ...immediateGoal,
+                    children: microByParent.get(immediateGoal.id) || [],
+                })),
+            };
+        });
+
+        const flattened = roots.flatMap((goal) => flattenGoalTree(goal, { includeRoot: true }));
+        return flattened.filter((goal) => !goal.completed);
+    }, [selectionGoals, sessionGoalsView]);
 
     const {
         notes: sessionNotes,
@@ -79,7 +101,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         }
         setSelectedActivity(instance);
         setSelectedSetIndex(null);
-        setSidePaneMode('goals');
+        setSidePaneModeUi('goals');
         if (isMobile) setIsMobilePaneOpen(true);
     };
 
@@ -196,8 +218,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         loading,
         autoSaveStatus,
         sidePaneMode,
-        setSidePaneMode,
-        refreshSession,
+        setSidePaneMode: setSidePaneModeUi,
         localSessionData,
         updateGoal,
         calculateTotalDuration,

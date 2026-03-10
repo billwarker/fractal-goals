@@ -17,7 +17,10 @@ let activeSessionMock = {
 };
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
-    useActiveSession: () => activeSessionMock
+    useActiveSessionData: () => activeSessionMock,
+    useActiveSessionActions: () => ({
+        createGoal: activeSessionMock.createGoal,
+    }),
 }));
 
 vi.mock('../../../contexts/ThemeContext', async (importOriginal) => {

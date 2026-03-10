@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import notify from '../../utils/notify';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import MicroGoalModal from '../MicroGoalModal';
@@ -27,9 +27,9 @@ function GoalsPanel({
         activities: activityDefinitions,
         targetAchievements,
         achievedTargetIds,
-        createGoal,
         sessionGoalsView,
-    } = useActiveSession();
+    } = useActiveSessionData();
+    const { createGoal } = useActiveSessionActions();
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);

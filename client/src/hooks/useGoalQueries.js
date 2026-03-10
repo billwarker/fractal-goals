@@ -76,8 +76,10 @@ export function useGoalDailyDurations(goalId, enabled = false) {
     });
 }
 
-export function useGoalsForSelection(rootId) {
+export function useGoalsForSelection(rootId, options = {}) {
     const isReady = Boolean(rootId);
+    const enabled = options.enabled ?? true;
+    const staleTime = options.staleTime ?? 5 * 60 * 1000;
 
     const { data: goals = [], isLoading, error } = useQuery({
         queryKey: queryKeys.goalsForSelection(rootId),
@@ -85,8 +87,8 @@ export function useGoalsForSelection(rootId) {
             const res = await fractalApi.getGoalsForSelection(rootId);
             return res.data || [];
         },
-        enabled: isReady,
-        staleTime: 5 * 60 * 1000,
+        enabled: isReady && enabled,
+        staleTime,
     });
 
     return { goals, isLoading, error };

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import useSessionAchievementNotifications from '../hooks/useSessionAchievementNotifications';
+import useSessionDraftAutosave from '../hooks/useSessionDraftAutosave';
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
@@ -116,18 +118,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const [showActivitySelector, setShowActivitySelector] = useState({});
     const [autoSaveStatus, setAutoSaveStatus] = useState('');
     const [sidePaneMode, setSidePaneMode] = useState('details');
-    const [sessionDataDraft, setSessionDataDraft] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
     const [isDeletingSession, setIsDeletingSession] = useState(false);
-    const initializedRef = useRef(false);
-    const [justInitialized, setJustInitialized] = useState(false);
-    const previousSessionKeyRef = useRef(null);
     const statusTimeoutRef = useRef(null);
-    const initTimeoutRef = useRef(null);
     const instanceQueuesRef = useRef(new Map());
     const instanceRollbackRef = useRef(new Map());
-    const targetNotificationsInitializedRef = useRef(false);
-    const goalNotificationsInitializedRef = useRef(false);
 
     const scheduleStatusClear = useCallback((delayMs) => {
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
@@ -213,14 +208,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         const baseData = session.attributes?.session_data || { sections: [] };
         return normalizeSectionActivityIds(baseData, activityInstances);
     }, [session, activityInstances]);
-    const localSessionData = sessionDataDraft ?? normalizedSessionData;
-    const updateSessionDataDraft = useCallback((updater) => {
-        setSessionDataDraft((prev) => {
-            const base = prev ?? normalizedSessionData;
-            if (!base) return prev;
-            return typeof updater === 'function' ? updater(base) : updater;
-        });
-    }, [normalizedSessionData]);
 
     // 2. Mutations
     const updateSessionMutation = useMutation({
@@ -727,17 +714,24 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         }
     }, [activitiesKey, fractalTreeKey, rootId, sessionGoalsViewKey, sessionKey, queryClient]);
 
-    // The queue is intentionally memoized once per mutation callback identity so it can retain
-    // its dedupe state across renders without re-enqueuing unchanged session payloads.
-    /* eslint-disable react-hooks/refs, react-hooks/exhaustive-deps */
-    const autoSaveQueue = useMemo(() => createAutoSaveQueue({
-        save: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
-        onError: () => {
-            setAutoSaveStatus('error');
-            scheduleStatusClear(3000);
-        },
-    }), [scheduleStatusClear, updateSessionMutation.mutateAsync]);
-    /* eslint-enable react-hooks/refs, react-hooks/exhaustive-deps */
+    const {
+        sessionDataDraft,
+        setSessionDataDraft,
+        localSessionData,
+        updateSessionDataDraft,
+    } = useSessionDraftAutosave({
+        rootId,
+        sessionId,
+        normalizedSessionData,
+        saveSessionData: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
+        setAutoSaveStatus,
+        scheduleStatusClear,
+        instanceQueuesRef,
+        instanceRollbackRef,
+        setShowActivitySelector,
+        setDraggedItem,
+        setSidePaneMode,
+    });
 
     // 5. Effects
     useEffect(() => {
@@ -746,134 +740,20 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         return () => setActiveRootId(null);
     }, [rootId, setActiveRootId]);
 
-    useEffect(() => {
-        const sessionKey = `${rootId || ''}:${sessionId || ''}`;
-        if (previousSessionKeyRef.current !== sessionKey) {
-            previousSessionKeyRef.current = sessionKey;
-            initializedRef.current = false;
-            setSessionDataDraft(null);
-            autoSaveQueue.reset();
-            instanceQueuesRef.current.forEach((queue) => queue.reset());
-            instanceQueuesRef.current.clear();
-            instanceRollbackRef.current.clear();
-            setAutoSaveStatus('');
-            setShowActivitySelector({});
-            setDraggedItem(null);
-            setSidePaneMode('details');
-            targetNotificationsInitializedRef.current = false;
-            goalNotificationsInitializedRef.current = false;
-        }
-    }, [rootId, sessionId, autoSaveQueue]);
+    useSessionAchievementNotifications({
+        rootId,
+        sessionId,
+        achievedTargetIds,
+        targetAchievements,
+        goalAchievements,
+        sessionLoading,
+        instancesLoading,
+        sessionGoalsViewLoading,
+    });
 
     useEffect(() => {
-        if (!normalizedSessionData || initializedRef.current) return;
-        autoSaveQueue.seed(normalizedSessionData);
-        initializedRef.current = true;
-        setJustInitialized(true);
-        if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
-        initTimeoutRef.current = setTimeout(() => {
-            setJustInitialized(false);
-            initTimeoutRef.current = null;
-        }, 500); // Guard window
-    }, [normalizedSessionData, autoSaveQueue]);
-
-    useEffect(() => {
-        if (!sessionDataDraft || !initializedRef.current || justInitialized) return;
-        const timeoutId = setTimeout(() => {
-            autoSaveQueue.enqueue(sessionDataDraft);
-        }, 800);
-        return () => clearTimeout(timeoutId);
-    }, [sessionDataDraft, justInitialized, autoSaveQueue]);
-
-    useEffect(() => {
-        if (!sessionDataDraft || !normalizedSessionData) return;
-        if (JSON.stringify(sessionDataDraft) === JSON.stringify(normalizedSessionData)) {
-            setSessionDataDraft(null);
-        }
-    }, [sessionDataDraft, normalizedSessionData]);
-
-    // Notification Effects
-    const prevAchievedTargetIdsRef = useRef(new Set());
-    useEffect(() => {
-        if (!achievedTargetIds || !targetAchievements) return;
-        if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
-        if (!targetNotificationsInitializedRef.current) {
-            prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-            targetNotificationsInitializedRef.current = true;
-            return;
-        }
-        const prevAchieved = prevAchievedTargetIdsRef.current;
-        const newlyAchieved = [];
-        for (const targetId of achievedTargetIds) {
-            if (!prevAchieved.has(targetId)) {
-                const status = targetAchievements.get(targetId);
-                if (status && !status.wasAlreadyCompleted) newlyAchieved.push(status);
-            }
-        }
-        if (newlyAchieved.length > 0) {
-            const names = newlyAchieved.map(s => s.target.name || 'Target').join(', ');
-            notify.success(`Target achieved: ${names}`, { duration: 5000 });
-        }
-        const newlyReverted = [];
-        for (const targetId of prevAchieved) {
-            if (!achievedTargetIds.has(targetId)) {
-                const status = targetAchievements.get(targetId);
-                if (status) newlyReverted.push(status);
-            }
-        }
-        if (newlyReverted.length > 0) {
-            const names = newlyReverted.map(s => s.target.name || 'Target').join(', ');
-            notify.success(`Target reverted: ${names}`, { duration: 5000 });
-        }
-        prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-    }, [achievedTargetIds, targetAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);
-
-    const prevCompletedIdsRef = useRef(new Set());
-    useEffect(() => {
-        if (!goalAchievements) return;
-        if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
-        const currentCompleteds = new Set();
-        goalAchievements.forEach((status, goalId) => {
-            if (status.allAchieved) currentCompleteds.add(goalId);
-        });
-        if (!goalNotificationsInitializedRef.current) {
-            prevCompletedIdsRef.current = currentCompleteds;
-            goalNotificationsInitializedRef.current = true;
-            return;
-        }
-        const prevCompleted = prevCompletedIdsRef.current;
-        const newlyCompleted = [];
-        for (const goalId of currentCompleteds) {
-            if (!prevCompleted.has(goalId)) {
-                const status = goalAchievements.get(goalId);
-                if (status && !status.wasAlreadyCompleted) newlyCompleted.push(status);
-            }
-        }
-        if (newlyCompleted.length > 0) {
-            const messages = newlyCompleted.map((status) => `${status.goalType || 'Goal'} Completed: ${status.goalName}`);
-            notify.success(messages.join(', '), { duration: 6000 });
-        }
-        const newlyUncompleted = [];
-        for (const goalId of prevCompleted) {
-            if (!currentCompleteds.has(goalId)) {
-                const status = goalAchievements.get(goalId);
-                if (status) newlyUncompleted.push(status);
-            }
-        }
-        if (newlyUncompleted.length > 0) {
-            const messages = newlyUncompleted.map((status) => `${status.goalType || 'Goal'} Uncompleted: ${status.goalName}`);
-            notify.success(messages.join(', '), { duration: 6000 });
-        }
-        prevCompletedIdsRef.current = currentCompleteds;
-    }, [goalAchievements, sessionLoading, instancesLoading, sessionGoalsViewLoading]);
-
-    useEffect(() => {
-        const instanceQueues = instanceQueuesRef.current;
         return () => {
             if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current);
-            if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
-            instanceQueues.forEach((queue) => queue.reset());
-            instanceQueues.clear();
         };
     }, []);
 

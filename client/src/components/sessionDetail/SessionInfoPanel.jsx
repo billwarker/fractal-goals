@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useActiveSession } from '../../contexts/ActiveSessionContext';
+import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useLiveSessionDuration } from '../../hooks/useSessionDuration';
 import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
@@ -14,14 +14,13 @@ import { formatClockDuration } from '../../utils/sessionTime';
 import styles from './SessionInfoPanel.module.css';
 
 function SessionInfoPanel() {
-    // Context
     const {
         rootId,
         session,
         localSessionData: sessionData,
-        updateSession,
         calculateTotalDuration
-    } = useActiveSession();
+    } = useActiveSessionData();
+    const { updateSession } = useActiveSessionActions();
 
     const totalDuration = calculateTotalDuration();
     const liveDuration = useLiveSessionDuration(session);
