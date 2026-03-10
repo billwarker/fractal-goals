@@ -59,7 +59,13 @@ function GoalDetailModal({
     initialActivities = [], // Initial associated activities for create mode
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
-    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon, getLevelByName } = useGoalLevels();
+    const {
+        getGoalColor = () => '#4caf50',
+        getGoalTextColor = () => '#ffffff',
+        getGoalSecondaryColor = () => '#2e7d32',
+        getGoalIcon = () => 'circle',
+        getLevelByName = () => null,
+    } = useGoalLevels() || {};
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
     // Normalize programs to always be an array (handles null case)

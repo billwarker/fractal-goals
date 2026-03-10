@@ -24,7 +24,11 @@ const GenericGraphModal = ({
     options = {},
     type = 'line'
 }) => {
-    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
+    const {
+        getGoalColor = () => '#4caf50',
+        getGoalIcon = () => 'circle',
+        getGoalSecondaryColor = () => '#2e7d32',
+    } = useGoalLevels() || {};
 
     // Theme-aware options
     const baseOptions = useChartOptions({
