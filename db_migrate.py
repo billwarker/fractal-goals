@@ -7,6 +7,7 @@ Run from project root: python db_migrate.py <command>
 
 Commands:
     init        - Initialize/update an existing SQLite database (stamp current revision)
+    stamp       - Mark the database as a specific revision without running migrations
     upgrade     - Apply all pending migrations
     downgrade   - Revert the last migration
     current     - Show current database revision
@@ -15,6 +16,8 @@ Commands:
 
 Examples:
     python db_migrate.py init
+    python db_migrate.py stamp head
+    python db_migrate.py stamp 5d02309afbcb
     python db_migrate.py upgrade
     python db_migrate.py downgrade
     python db_migrate.py create "Add user preferences table"
@@ -43,6 +46,15 @@ def main():
         # Use this for existing SQLite databases
         print("Stamping database with current migration revision...")
         return run_alembic('stamp', 'head')
+
+    elif command == 'stamp':
+        if len(sys.argv) < 3:
+            print("Error: Revision required")
+            print("Usage: python db_migrate.py stamp <revision>")
+            sys.exit(1)
+        revision = sys.argv[2]
+        print(f"Stamping database as revision: {revision}")
+        return run_alembic('stamp', revision)
     
     elif command == 'upgrade':
         # Apply all pending migrations
