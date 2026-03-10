@@ -191,7 +191,7 @@ def health_check():
         "status": "healthy",
         "message": "Fractal Goals Flask Server",
         "environment": config.ENV,
-        "database_type": "PostgreSQL",
+        "database_type": config.get_database_provider(),
         "database_url": db_display
     }
 

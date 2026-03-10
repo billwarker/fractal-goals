@@ -11,7 +11,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "🚀 Starting Flask Server in $ENV mode..."
-echo "📊 Database: goals_${ENV:0:4}.db"
+if [ -f "$PROJECT_ROOT/.env.$ENV" ]; then
+    source "$PROJECT_ROOT/.env.$ENV"
+    if [[ -n "${SUPABASE_DATABASE_URL:-}" ]]; then
+        echo "📊 Database: Supabase Postgres"
+    elif [[ -n "${DATABASE_URL:-}" ]]; then
+        echo "📊 Database: ${DATABASE_URL%%@*}:***"
+    fi
+fi
 
 cd "$PROJECT_ROOT"
 export ENV=$ENV

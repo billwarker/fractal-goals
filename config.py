@@ -1,12 +1,11 @@
 """
 Configuration module for Fractal Goals application.
 Loads environment-specific settings from .env files.
-
-Supports both SQLite (development) and PostgreSQL (production).
 """
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from dotenv import load_dotenv
 
 # Determine the base directory (project root)
@@ -43,8 +42,11 @@ class Config:
     PORT = int(os.getenv('FLASK_PORT', '8001'))
     
     # Database Configuration
-    # Strictly requires DATABASE_URL (full connection string)
+    # Use DATABASE_URL for local/test environments.
+    # In production/staging, prefer SUPABASE_DATABASE_URL so deployment config
+    # can switch providers without overloading the generic local variable.
     DATABASE_URL = os.getenv('DATABASE_URL', None)
+    SUPABASE_DATABASE_URL = os.getenv('SUPABASE_DATABASE_URL', None)
     
     # CORS
     # Support comma or semicolon or space as delimiters for flexibility
@@ -92,25 +94,58 @@ class Config:
         """
         Get the database connection URL.
         
-        Strictly requires DATABASE_URL to be set.
+        Strictly requires a PostgreSQL connection URL to be set.
         Only supports PostgreSQL.
         
         Returns:
             str: SQLAlchemy-compatible database URL
         """
-        if not cls.DATABASE_URL:
-            raise ValueError("CRITICAL: DATABASE_URL must be set! SQLite is no longer supported.")
+        url = cls._select_database_url()
+        if not url:
+            raise ValueError(
+                "CRITICAL: DATABASE_URL must be set, or SUPABASE_DATABASE_URL must be set in production-like environments."
+            )
 
         # Handle Heroku-style postgres:// URLs
-        url = cls.DATABASE_URL
         if url.startswith('postgres://'):
             url = url.replace('postgres://', 'postgresql://', 1)
-        return url
+        return cls._normalize_database_url(url)
     
     @classmethod
     def is_postgres(cls):
         """Check if the database is PostgreSQL."""
         return True
+
+    @classmethod
+    def get_database_provider(cls):
+        """Return the current production database provider label."""
+        url = cls.get_database_url()
+        hostname = urlparse(url).hostname or ""
+        if "supabase" in hostname:
+            return "Supabase Postgres"
+        return "PostgreSQL"
+
+    @classmethod
+    def _select_database_url(cls):
+        """Select the appropriate database URL for the current environment."""
+        if cls.ENV in ('production', 'staging'):
+            return cls.SUPABASE_DATABASE_URL or cls.DATABASE_URL
+        return cls.DATABASE_URL
+
+    @classmethod
+    def _normalize_database_url(cls, url):
+        """Apply provider-specific connection defaults."""
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+
+        if "supabase" not in hostname:
+            return url
+
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query.setdefault("sslmode", "require")
+
+        normalized = parsed._replace(query=urlencode(query))
+        return urlunparse(normalized)
     
     @classmethod
     def get_log_path(cls):
@@ -142,7 +177,7 @@ class Config:
         print(f"Host:           {cls.HOST}")
         print(f"Port:           {cls.PORT}")
         print(f"Database:       {db_display}")
-        print(f"Database Type:  PostgreSQL")
+        print(f"Database Type:  {cls.get_database_provider()}")
         print(f"Log File:       {cls.get_log_path()}")
         print(f"Log Level:      {cls.LOG_LEVEL}")
         print(f"CORS Origins:   {', '.join(cls.CORS_ORIGINS)}")
