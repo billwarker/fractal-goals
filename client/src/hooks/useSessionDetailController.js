@@ -3,6 +3,7 @@ import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } fro
 import useSessionDetailGoalAssociations from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
 import useSessionDetailUiState from './useSessionDetailUiState';
+import useSessionSidePaneViewModel from './useSessionSidePaneViewModel';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
     const {
@@ -87,6 +88,25 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         navigate(`/${rootId}/sessions`);
     };
 
+    const sidePaneModel = useSessionSidePaneViewModel({
+        selectedActivity,
+        selectedSetIndex,
+        onNoteAdded: refreshNotes,
+        onGoalClick: setSelectedGoal,
+        onGoalCreated: handleGoalHierarchyChanged,
+        notes: sessionNotes,
+        previousNotes,
+        previousSessionNotes,
+        addNote,
+        updateNote,
+        deleteNote,
+        onSave: handleSaveSession,
+        onDelete: () => setShowDeleteConfirm(true),
+        onOpenGoals: handleOpenGoals,
+        mode: sidePaneMode,
+        onModeChange: setSidePaneModeUi,
+    });
+
     return {
         session,
         activities,
@@ -114,6 +134,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         sessionNotes,
         previousNotes,
         previousSessionNotes,
+        sidePaneModel,
         addNote,
         updateNote,
         deleteNote,

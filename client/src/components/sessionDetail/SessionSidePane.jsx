@@ -7,7 +7,7 @@
  * - History: View previous activity instance metrics
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import GoalsPanel from './GoalsPanel';
@@ -15,62 +15,16 @@ import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
 import styles from './SessionSidePane.module.css';
 
-import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
-
 function SessionSidePane({
-    selectedActivity,     // Currently focused activity instance (for context)
-    selectedSetIndex,     // Currently focused set index (null = whole activity)
-    onNoteAdded,          // Callback when note is added
-    onGoalClick,          // Callback when goal badge is clicked
-    onGoalCreated,        // Callback when goal is created
-    refreshTrigger,       // Counter to trigger notes refresh
-    notes,
-    previousNotes,
-    previousSessionNotes,
-    addNote,
-    updateNote,
-    deleteNote,
-    // Control Props
-    onSave,
-    onDelete,              // Trigger for confirmation modal
-    mode = 'details',      // Controlled mode
-    onModeChange,          // Callback for mode change
-    onOpenGoals,
+    model,
     showModeTabs = true,
     embedded = false
 }) {
-    // Context
-    const {
-        rootId,
-        sessionId,
-        session,
-        activityInstances,
-        activities: activityDefinitions,
-    } = useActiveSessionData();
-    const {
-        toggleSessionComplete: onToggleComplete,
-        pauseSession,
-        resumeSession,
-    } = useActiveSessionActions();
-
-    // Derived values
-    const isCompleted = session?.attributes?.completed;
-
-    // mode state lifted to parent (SessionDetail)
-
-    // Get unique activity definitions from current session
-    const sessionActivityDefs = useMemo(() => {
-        if (!activityInstances || !activityDefinitions) return [];
-
-        const defIds = new Set(activityInstances.map(i => i.activity_definition_id));
-        return activityDefinitions.filter(d => defIds.has(d.id));
-    }, [activityInstances, activityDefinitions]);
-
-    // Get the activity definition for the selected activity
-    const selectedActivityDef = useMemo(() => {
-        if (!selectedActivity || !activityDefinitions) return null;
-        return activityDefinitions.find(d => d.id === selectedActivity.activity_definition_id);
-    }, [selectedActivity, activityDefinitions]);
+    const mode = model?.mode || 'details';
+    const onModeChange = model?.onModeChange;
+    const details = model?.details;
+    const goals = model?.goals;
+    const history = model?.history;
 
     return (
         <div className={`${styles.sessionSidepane} ${embedded ? styles.sessionSidepaneEmbedded : ''}`}>
@@ -116,29 +70,29 @@ function SessionSidePane({
                         {/* Session Controls */}
                         <div className={styles.sidebarActions}>
                             <Button
-                                onClick={onToggleComplete}
-                                variant={isCompleted ? 'success' : 'secondary'}
+                                onClick={details?.onToggleComplete}
+                                variant={details?.isCompleted ? 'success' : 'secondary'}
                                 title="Mark Session Complete"
                             >
-                                {isCompleted ? '✓ Done' : 'Complete'}
+                                {details?.isCompleted ? '✓ Done' : 'Complete'}
                             </Button>
                             <Button
-                                onClick={onSave}
+                                onClick={details?.onSave}
                                 variant="primary" // Blue
                                 title="Save & Exit"
                             >
                                 Save
                             </Button>
                             <Button
-                                onClick={() => session?.is_paused ? resumeSession() : pauseSession()}
+                                onClick={details?.onPauseResume}
                                 variant="secondary"
-                                title={session?.is_paused ? "Resume Session" : "Pause Session"}
-                                disabled={isCompleted}
+                                title={details?.isPaused ? "Resume Session" : "Pause Session"}
+                                disabled={details?.isCompleted}
                             >
-                                {session?.is_paused ? "Resume" : "Pause"}
+                                {details?.isPaused ? "Resume" : "Pause"}
                             </Button>
                             <Button
-                                onClick={onDelete}
+                                onClick={details?.onDelete}
                                 variant="danger" // Red
                                 title="Delete Session"
                             >
@@ -151,36 +105,22 @@ function SessionSidePane({
 
                         {/* Notes Management */}
                         <NotesPanel
-                            rootId={rootId}
-                            sessionId={sessionId}
-                            selectedActivity={selectedActivity}
-                            selectedActivityDef={selectedActivityDef}
-                            selectedSetIndex={selectedSetIndex}
-                            onNoteAdded={onNoteAdded}
-                            activityInstances={activityInstances}
-                            activityDefinitions={activityDefinitions}
-                            refreshTrigger={refreshTrigger}
-                            notes={notes}
-                            previousNotes={previousNotes}
-                            previousSessionNotes={previousSessionNotes}
-                            addNote={addNote}
-                            updateNote={updateNote}
-                            deleteNote={deleteNote}
+                            {...details?.notesPanelProps}
                         />
                     </div>
                 ) : mode === 'goals' ? (
                     <GoalsPanel
-                        selectedActivity={selectedActivity}
-                        onGoalClick={onGoalClick}
-                        onGoalCreated={onGoalCreated}
-                        onOpenGoals={onOpenGoals}
+                        selectedActivity={goals?.selectedActivity}
+                        onGoalClick={goals?.onGoalClick}
+                        onGoalCreated={goals?.onGoalCreated}
+                        onOpenGoals={goals?.onOpenGoals}
                     />
                 ) : (
                     <HistoryPanel
-                        rootId={rootId}
-                        sessionId={sessionId}
-                        selectedActivity={selectedActivity}
-                        sessionActivityDefs={sessionActivityDefs}
+                        rootId={history?.rootId}
+                        sessionId={history?.sessionId}
+                        selectedActivity={history?.selectedActivity}
+                        sessionActivityDefs={history?.sessionActivityDefs}
                     />
                 )}
             </div>
