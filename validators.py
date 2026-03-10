@@ -712,6 +712,24 @@ class NoteUpdateSchema(BaseModel):
         return sanitize_string(v)
 
 
+class NanoGoalNoteCreateSchema(BaseModel):
+    """Schema for atomically creating a nano goal and note entry for a session activity."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    parent_id: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+    activity_instance_id: str = Field(..., min_length=1)
+    activity_definition_id: Optional[str] = None
+    set_index: Optional[int] = Field(None, ge=0)
+    image_data: Optional[str] = None
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: str) -> str:
+        return sanitize_string(v)
+
+
 # =============================================================================
 # PROGRAM SCHEMAS
 # =============================================================================

@@ -44,7 +44,6 @@ function SessionDetailContent() {
         autoSaveStatus,
         sidePaneMode,
         setSidePaneMode,
-        refreshSession,
         localSessionData,
         updateGoal,
         calculateTotalDuration,
@@ -72,6 +71,8 @@ function SessionDetailContent() {
         handleActivityFocus,
         handleOpenGoals,
         handleAssociateActivity,
+        handleGoalHierarchyChanged,
+        handleGoalAssociationsChanged,
         handleOpenActivityBuilder,
         handleActivityCreated,
         handleConfirmDelete,
@@ -168,7 +169,7 @@ function SessionDetailContent() {
                         deleteNote={deleteNote}
                         onDelete={() => setShowDeleteConfirm(true)}
                         onCancel={() => navigate(`/${rootId}/sessions`)}
-                        onGoalCreated={refreshSession}
+                        onGoalCreated={handleGoalHierarchyChanged}
                         onSave={handleSaveSession}
                         onOpenGoals={handleOpenGoals}
                         mode={sidePaneMode}
@@ -212,7 +213,7 @@ function SessionDetailContent() {
                             deleteNote={deleteNote}
                             onDelete={() => setShowDeleteConfirm(true)}
                             onCancel={() => navigate(`/${rootId}/sessions`)}
-                            onGoalCreated={refreshSession}
+                            onGoalCreated={handleGoalHierarchyChanged}
                             onSave={handleSaveSession}
                             onOpenGoals={handleOpenGoals}
                             mode={sidePaneMode}
@@ -251,7 +252,7 @@ function SessionDetailContent() {
                                 onUpdate={(goalId, updates) => updateGoal({ goalId, updates })}
                                 activityDefinitions={activities}
                                 rootId={rootId}
-                                onAssociationsChanged={refreshSession}
+                                onAssociationsChanged={handleGoalAssociationsChanged}
                             />
                         )}
 

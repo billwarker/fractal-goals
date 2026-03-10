@@ -61,7 +61,6 @@ function SessionActivityItem({
         updateInstance,
         updateTimer,
         removeActivity,
-        createGoal,
         toggleGoalCompletion,
     } = useActiveSessionActions();
 
@@ -80,6 +79,7 @@ function SessionActivityItem({
     const { timezone } = useTimezone();
     const queryClient = useQueryClient();
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
     const sessionKey = queryKeys.session(rootId, sessionId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
@@ -240,15 +240,6 @@ function SessionActivityItem({
         )
         : false;
 
-    const onCreateNanoGoal = async (parentId, name) => {
-        return await createGoal({
-            name,
-            type: 'NanoGoal',
-            parent_id: parentId,
-            session_id: sessionId
-        });
-    };
-
     // Characteristics for goal icons
     const microChars = getLevelByName('MicroGoal');
 
@@ -373,103 +364,52 @@ function SessionActivityItem({
 
     const handleAddNanoNote = async (content, imageData = null) => {
         if (!content.trim() && !imageData) return;
-
-        let newNanoGoalId = null;
-        let newNanoGoal = null;
-        let appliedOptimisticNano = false;
         try {
-            // 1. Create the NanoGoal (goal hierarchy)
-            if (onCreateNanoGoal && content.trim()) {
-                // Expect onCreateNanoGoal to return the created goal object
-                const res = await onCreateNanoGoal(activeMicroGoal.id, content.trim(), activityDefinition?.id);
-                if (res && res.id) {
-                    newNanoGoalId = res.id;
-                    newNanoGoal = res;
+            const response = await fractalApi.createNanoGoalNote(rootId, {
+                name: content.trim(),
+                parent_id: activeMicroGoal.id,
+                session_id: sessionId || exercise.session_id,
+                activity_instance_id: exercise.id,
+                activity_definition_id: activityDefinition?.id,
+                set_index: selectedSetIndex,
+                image_data: imageData,
+            });
+            const createdGoal = response?.data?.goal;
+            const createdNote = response?.data?.note;
 
-                    // Optimistically add the nano to the canonical session-goals payload.
-                    queryClient.setQueryData(sessionGoalsViewKey, (old) => {
-                        if (!old || !Array.isArray(old.micro_goals)) return old;
-                        return {
-                            ...old,
-                            micro_goals: old.micro_goals.map((micro) => {
-                                if (micro.id !== activeMicroGoal.id) return micro;
-                                return {
-                                    ...micro,
-                                    children: [...(micro.children || []), {
-                                        id: newNanoGoalId,
-                                        name: res.name || content.trim(),
-                                        type: 'NanoGoal',
-                                        completed: false,
-                                        attributes: res.attributes || {}
-                                    }]
-                                };
-                            })
-                        };
-                    });
-                    appliedOptimisticNano = true;
-                }
-            }
-
-            // Replace optimistic children with authoritative parent children payload.
-            if (newNanoGoalId && rootId && activeMicroGoal?.id) {
-                try {
-                    const parentRes = await fractalApi.getGoal(rootId, activeMicroGoal.id);
-                    const parentChildren = parentRes?.data?.children || [];
-                    queryClient.setQueryData(sessionGoalsViewKey, (old) => {
-                        if (!old || !Array.isArray(old.micro_goals)) return old;
-                        return {
-                            ...old,
-                            micro_goals: old.micro_goals.map((micro) => {
-                                if (micro.id !== activeMicroGoal.id) return micro;
-                                return { ...micro, children: parentChildren };
-                            })
-                        };
-                    });
-                } catch (parentRefreshErr) {
-                    console.warn("Failed to refresh parent micro goal children", parentRefreshErr);
-                }
-            }
-
-            if (newNanoGoal) notify.success(`Created Nano Goal: ${newNanoGoal.name || content.trim()}`);
-
-            // 2. Create the Note (timeline/log) independently.
-            try {
-                await onAddNote({
-                    context_type: 'activity_instance',
-                    context_id: exercise.id,
-                    session_id: sessionId || exercise.session_id,
-                    activity_instance_id: exercise.id,
-                    activity_definition_id: activityDefinition?.id,
-                    set_index: selectedSetIndex,
-                    content: content.trim() || (imageData ? '[Nano Image]' : ''),
-                    image_data: imageData,
-                    nano_goal_id: newNanoGoalId,
-                    is_nano_goal: true
-                });
-                if (onNoteCreated) onNoteCreated();
-            } catch (noteErr) {
-                console.warn("Nano goal note entry failed after goal creation", noteErr);
-            }
-
-            await queryClient.refetchQueries({ queryKey: sessionGoalsViewKey, type: 'active' });
-            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-            queryClient.invalidateQueries({ queryKey: sessionKey });
-        } catch (err) {
-            if (appliedOptimisticNano) {
+            if (createdGoal?.id) {
                 queryClient.setQueryData(sessionGoalsViewKey, (old) => {
                     if (!old || !Array.isArray(old.micro_goals)) return old;
                     return {
                         ...old,
                         micro_goals: old.micro_goals.map((micro) => {
-                            if (micro.id !== activeMicroGoal?.id) return micro;
+                            if (micro.id !== activeMicroGoal.id) return micro;
+                            if ((micro.children || []).some((child) => child.id === createdGoal.id)) {
+                                return micro;
+                            }
                             return {
                                 ...micro,
-                                children: (micro.children || []).filter((child) => child.id !== newNanoGoalId)
+                                children: [...(micro.children || []), createdGoal],
                             };
-                        })
+                        }),
                     };
                 });
+                notify.success(`Created Nano Goal: ${createdGoal.name || content.trim()}`);
             }
+
+            if (createdNote?.id) {
+                queryClient.setQueryData(sessionNotesKey, (old = []) => {
+                    if (!Array.isArray(old)) return old;
+                    if (old.some((note) => note.id === createdNote.id)) return old;
+                    return [createdNote, ...old];
+                });
+            }
+
+            if (onNoteCreated) onNoteCreated();
+            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+            queryClient.invalidateQueries({ queryKey: sessionKey });
+            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+        } catch (err) {
             console.error("Failed to create nano goal", err);
             notify.error(err?.response?.data?.error || "Failed to create nano goal");
         }

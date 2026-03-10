@@ -12,8 +12,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from blueprints.api_utils import internal_error
 from blueprints.auth_api import token_required
 from models import get_engine, get_session
+from services import Event, Events, event_bus
 from services.note_service import NoteService
-from validators import NoteCreateSchema, NoteUpdateSchema, validate_request
+from validators import NanoGoalNoteCreateSchema, NoteCreateSchema, NoteUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,34 @@ def create_note(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating note")
         return internal_error(logger, "Error creating note")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/nano-goal-notes', methods=['POST'])
+@token_required
+@validate_request(NanoGoalNoteCreateSchema)
+def create_nano_goal_note(current_user, root_id, validated_data):
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.create_nano_goal_note(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+
+        goal = payload["goal"]
+        event_bus.emit(Event(Events.GOAL_CREATED, {
+            'goal_id': goal['id'],
+            'goal_name': goal['name'],
+            'goal_type': goal['attributes'].get('type', 'NanoGoal'),
+            'parent_id': goal['attributes'].get('parent_id'),
+            'root_id': root_id,
+        }, source='notes_api.create_nano_goal_note'))
+
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error creating nano goal note")
+        return internal_error(logger, "Error creating nano goal note")
     finally:
         db_session.close()
 

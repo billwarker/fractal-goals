@@ -11,10 +11,11 @@ from models import (
     session_goals,
     validate_root_goal,
 )
+from services.goal_service import GoalService, sync_goal_targets
 from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import serialize_note
+from services.serializers import serialize_goal, serialize_note
 from services.view_serializers import (
     serialize_activity_history_entry,
     serialize_note_with_session,
@@ -174,6 +175,17 @@ class NoteService:
             if not session_obj:
                 return "Session not found in this fractal", 400
 
+        if activity_instance_id:
+            instance = self.db_session.query(ActivityInstance).filter(
+                ActivityInstance.id == activity_instance_id,
+                ActivityInstance.root_id == root_id,
+                ActivityInstance.deleted_at.is_(None),
+            ).first()
+            if not instance:
+                return "Activity instance not found in this fractal", 400
+            if session_id and instance.session_id != session_id:
+                return "Activity instance does not belong to the provided session", 400
+
         if not nano_goal_id:
             return None
 
@@ -189,17 +201,6 @@ class NoteService:
 
         if not session_id:
             return None
-
-        if activity_instance_id:
-            instance = self.db_session.query(ActivityInstance).filter(
-                ActivityInstance.id == activity_instance_id,
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.deleted_at.is_(None),
-            ).first()
-            if not instance:
-                return "Activity instance not found in this fractal", 400
-            if instance.session_id != session_id:
-                return "Activity instance does not belong to the provided session", 400
 
         ancestor_ids = []
         current = nano_goal
@@ -259,6 +260,64 @@ class NoteService:
         self.db_session.commit()
         logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
         return serialize_note(note), None, 201
+
+    def create_nano_goal_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        goal_service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+        new_goal, goal_error, goal_status = goal_service.create_fractal_goal_record(
+            root_id,
+            current_user_id,
+            {
+                "name": data["name"],
+                "type": "NanoGoal",
+                "parent_id": data["parent_id"],
+                "session_id": data["session_id"],
+            },
+        )
+        if goal_error:
+            return None, goal_error, goal_status
+
+        relation_error = self._validate_note_creation_relations(
+            root_id,
+            data["session_id"],
+            new_goal.id,
+            data["activity_instance_id"],
+        )
+        if relation_error:
+            self.db_session.rollback()
+            return None, *relation_error
+
+        note = Note(
+            id=str(uuid.uuid4()),
+            root_id=root_id,
+            context_type='activity_instance',
+            context_id=data["activity_instance_id"],
+            session_id=data["session_id"],
+            activity_instance_id=data["activity_instance_id"],
+            activity_definition_id=data.get("activity_definition_id"),
+            set_index=data.get("set_index"),
+            content=data["name"],
+            image_data=data.get("image_data"),
+            nano_goal_id=new_goal.id,
+        )
+        self.db_session.add(note)
+        self.db_session.commit()
+        self.db_session.refresh(new_goal)
+        self.db_session.refresh(note)
+
+        logger.info(
+            "Created nano goal %s with note %s for activity instance %s",
+            new_goal.id,
+            note.id,
+            data["activity_instance_id"],
+        )
+        return {
+            "goal": serialize_goal(new_goal, include_children=False),
+            "note": serialize_note(note),
+        }, None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)

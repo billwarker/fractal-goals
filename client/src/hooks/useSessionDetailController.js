@@ -37,6 +37,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
 
     const { data: fullGoalTree } = useFractalTree(rootId, { enabled: showAssociationModal });
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
+    const sessionKey = queryKeys.session(rootId, sessionId);
     const activitiesKey = queryKeys.activities(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const allAvailableGoals = useMemo(() => {
@@ -120,6 +121,17 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
             notify.error('Failed to associate activity');
             return false;
         }
+    };
+
+    const handleGoalHierarchyChanged = () => {
+        queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+        queryClient.invalidateQueries({ queryKey: sessionKey });
+        queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+    };
+
+    const handleGoalAssociationsChanged = () => {
+        queryClient.invalidateQueries({ queryKey: activitiesKey });
+        handleGoalHierarchyChanged();
     };
 
     const handleOpenActivityBuilder = (sectionIndex) => {
@@ -213,6 +225,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleActivityFocus,
         handleOpenGoals,
         handleAssociateActivity,
+        handleGoalHierarchyChanged,
+        handleGoalAssociationsChanged,
         handleOpenActivityBuilder,
         handleActivityCreated,
         handleConfirmDelete,

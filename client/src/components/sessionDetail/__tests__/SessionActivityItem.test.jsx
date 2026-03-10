@@ -4,23 +4,34 @@ import { renderWithProviders } from '../../../test/test-utils';
 import SessionActivityItem from '../SessionActivityItem';
 
 const {
-    createGoal,
-    onAddNote,
     updateInstance,
     updateTimer,
     removeActivity,
     toggleGoalCompletion,
     deleteGoal,
-    getGoal
+    createNanoGoalNote
 } = vi.hoisted(() => ({
-    createGoal: vi.fn(() => Promise.resolve({ id: 'nano-1' })),
-    onAddNote: vi.fn(() => Promise.resolve()),
     updateInstance: vi.fn(() => Promise.resolve()),
     updateTimer: vi.fn(),
     removeActivity: vi.fn(),
     toggleGoalCompletion: vi.fn(() => Promise.resolve()),
     deleteGoal: vi.fn(() => Promise.resolve()),
-    getGoal: vi.fn(() => Promise.resolve({ data: { id: 'micro-1', children: [] } }))
+    createNanoGoalNote: vi.fn(() => Promise.resolve({
+        data: {
+            goal: {
+                id: 'nano-1',
+                name: 'Do one strict rep',
+                attributes: { type: 'NanoGoal' }
+            },
+            note: {
+                id: 'note-1',
+                session_id: 'session-1',
+                content: 'Do one strict rep',
+                nano_goal_id: 'nano-1',
+                is_nano_goal: true
+            }
+        }
+    }))
 }));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
@@ -55,7 +66,6 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         updateInstance,
         updateTimer,
         removeActivity,
-        createGoal,
         toggleGoalCompletion
     })
 }));
@@ -63,7 +73,7 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         deleteGoal,
-        getGoal
+        createNanoGoalNote
     }
 }));
 
@@ -110,14 +120,12 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
 
 describe('SessionActivityItem nano note flow', () => {
     beforeEach(() => {
-        createGoal.mockClear();
-        onAddNote.mockClear();
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
         toggleGoalCompletion.mockClear();
         deleteGoal.mockClear();
-        getGoal.mockClear();
+        createNanoGoalNote.mockClear();
     });
 
     it('creates a nano goal note without runtime errors', async () => {
@@ -141,7 +149,7 @@ describe('SessionActivityItem nano note flow', () => {
                 showReorderButtons={false}
                 onNoteCreated={vi.fn()}
                 allNotes={[]}
-                onAddNote={onAddNote}
+                onAddNote={vi.fn()}
                 onUpdateNote={vi.fn()}
                 onDeleteNote={vi.fn()}
                 onOpenGoals={vi.fn()}
@@ -160,19 +168,21 @@ describe('SessionActivityItem nano note flow', () => {
         fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
 
         await waitFor(() => {
-            expect(createGoal).toHaveBeenCalledTimes(1);
-            expect(onAddNote).toHaveBeenCalledTimes(1);
+            expect(createNanoGoalNote).toHaveBeenCalledTimes(1);
         });
-        expect(createGoal).toHaveBeenCalledWith({
+        expect(createNanoGoalNote).toHaveBeenCalledWith('root-1', {
             name: 'Do one strict rep',
-            type: 'NanoGoal',
             parent_id: 'micro-1',
-            session_id: 'session-1'
+            session_id: 'session-1',
+            activity_instance_id: 'instance-1',
+            activity_definition_id: 'activity-1',
+            set_index: null,
+            image_data: null
         });
     });
 
-    it('keeps the nano goal when note creation fails', async () => {
-        onAddNote.mockImplementationOnce(() => Promise.reject(new Error('note failed')));
+    it('shows a single failure when nano goal creation fails', async () => {
+        createNanoGoalNote.mockImplementationOnce(() => Promise.reject(new Error('nano failed')));
 
         renderWithProviders(
             <SessionActivityItem
@@ -194,7 +204,7 @@ describe('SessionActivityItem nano note flow', () => {
                 showReorderButtons={false}
                 onNoteCreated={vi.fn()}
                 allNotes={[]}
-                onAddNote={onAddNote}
+                onAddNote={vi.fn()}
                 onUpdateNote={vi.fn()}
                 onDeleteNote={vi.fn()}
                 onOpenGoals={vi.fn()}
@@ -213,11 +223,14 @@ describe('SessionActivityItem nano note flow', () => {
         fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
 
         await waitFor(() => {
-            expect(createGoal).toHaveBeenCalledWith({
+            expect(createNanoGoalNote).toHaveBeenCalledWith('root-1', {
                 name: 'Do one strict rep',
-                type: 'NanoGoal',
                 parent_id: 'micro-1',
-                session_id: 'session-1'
+                session_id: 'session-1',
+                activity_instance_id: 'instance-1',
+                activity_definition_id: 'activity-1',
+                set_index: null,
+                image_data: null
             });
         });
         expect(deleteGoal).not.toHaveBeenCalled();
@@ -245,7 +258,7 @@ describe('SessionActivityItem nano note flow', () => {
                 showReorderButtons={false}
                 onNoteCreated={vi.fn()}
                 allNotes={[]}
-                onAddNote={onAddNote}
+                onAddNote={vi.fn()}
                 onUpdateNote={vi.fn()}
                 onDeleteNote={vi.fn()}
                 onOpenGoals={vi.fn()}
@@ -301,7 +314,7 @@ describe('SessionActivityItem nano note flow', () => {
                 showReorderButtons={false}
                 onNoteCreated={vi.fn()}
                 allNotes={[]}
-                onAddNote={onAddNote}
+                onAddNote={vi.fn()}
                 onUpdateNote={vi.fn()}
                 onDeleteNote={vi.fn()}
                 onOpenGoals={vi.fn()}

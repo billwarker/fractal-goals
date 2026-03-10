@@ -697,6 +697,15 @@ class GoalService:
         return new_goal, None, 201
 
     def create_fractal_goal(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
+        new_goal, error, status = self.create_fractal_goal_record(root_id, current_user_id, data)
+        if error:
+            return None, error, status
+
+        self.db_session.commit()
+        self.db_session.refresh(new_goal)
+        return new_goal, None, 201
+
+    def create_fractal_goal_record(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -771,8 +780,6 @@ class GoalService:
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
 
-        self.db_session.commit()
-        self.db_session.refresh(new_goal)
         return new_goal, None, 201
 
     def get_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
