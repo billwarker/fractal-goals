@@ -44,7 +44,7 @@ MAX_RELEVANCE_LENGTH = 2000
 # VALIDATION DECORATOR
 # =============================================================================
 
-def validate_request(schema_class):
+def validate_request(schema_class, *, allow_empty_json: bool = False):
     """
     Decorator that validates request JSON against a Pydantic schema.
     
@@ -61,10 +61,23 @@ def validate_request(schema_class):
         def wrapper(*args, **kwargs):
             try:
                 json_data = request.get_json(silent=True)
+                if json_data is None and allow_empty_json:
+                    json_data = {}
+
                 if json_data is None:
                     return jsonify({
                         "error": "Invalid or missing JSON body",
                         "details": "Request must include a valid JSON body"
+                    }), 400
+
+                if not isinstance(json_data, dict):
+                    return jsonify({
+                        "error": "Validation failed",
+                        "details": [{
+                            "field": "",
+                            "message": "Input should be a valid dictionary",
+                            "type": "dict_type",
+                        }],
                     }), 400
                 
                 # Validate using Pydantic

@@ -372,6 +372,17 @@ class TestGoalCompletionEndpoints:
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
 
+    def test_toggle_completion_rejects_non_object_json_body(self, authed_client, sample_ultimate_goal):
+        response = authed_client.patch(
+            f'/api/goals/{sample_ultimate_goal.id}/complete',
+            json=['bad', 'shape']
+        )
+
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['error'] == 'Validation failed'
+        assert payload['details'][0]['type'] == 'dict_type'
+
 
 @pytest.mark.integration
 class TestGoalTargetEndpoints:

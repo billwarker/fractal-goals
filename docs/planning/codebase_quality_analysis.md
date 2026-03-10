@@ -301,11 +301,23 @@ Wave 2 verification completed:
 
 ### Wave 3 — Goals Blueprint Slimming
 
-- [ ] Move session micro-goal query logic out of [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) into goal services.
-- [ ] Replace inline goal-completion validation with the standard request validation pattern.
-- [ ] Reduce blueprint-owned event orchestration in [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py).
-- [ ] Push post-commit event ownership toward service boundaries where feasible.
-- [ ] Add regression tests for the moved goal query/completion paths.
+- [x] Move session micro-goal query logic out of [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) into goal services.
+- [x] Replace inline goal-completion validation with the standard request validation pattern.
+- [x] Reduce blueprint-owned event orchestration in [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) for goal completion updates.
+- [x] Push post-commit event ownership toward service boundaries where feasible.
+- [x] Add regression tests for the moved goal query/completion paths.
+
+Wave 3 progress completed so far:
+- `GoalService.get_session_micro_goals(...)` now owns the session micro-goal query path.
+- `validate_request(..., allow_empty_json=True)` now covers the goal completion toggle path without custom inline validation.
+- Manual goal completion now emits its completion/uncompletion event from `GoalService` after commit.
+- Goal create/update/delete and target create/delete event emission now lives in `GoalService` rather than `goals_api.py`.
+- Global `/api/goals` listing now delegates to `GoalService` instead of running an inline ORM query in the blueprint.
+
+Wave 3 verification completed so far:
+- `tests/integration/test_goals_api.py`
+- `tests/integration/test_micro_goals.py`
+- `tests/integration/test_phase1_confidence.py`
 
 ### Wave 4 — Auth And User Services
 

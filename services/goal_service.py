@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import logging
 import uuid
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, or_
 from sqlalchemy.orm import selectinload
 
 from models import (
@@ -26,6 +26,7 @@ from models import (
     validate_root_goal,
 )
 from services.goal_target_rules import check_metrics_meet_target
+from services.events import event_bus, Event, Events
 from services.goal_domain_rules import (
     goal_allows_manual_completion,
     goal_requires_smart_validation,
@@ -532,6 +533,19 @@ class GoalService:
             fractals.append(serialize_fractal_summary(root, last_activity))
         return fractals, None, 200
 
+    def list_global_goals(self, current_user_id, limit=None, offset=0) -> ServiceResult[JsonList]:
+        roots_q = self.db_session.query(Goal).filter(
+            Goal.parent_id == None,
+            Goal.deleted_at == None,
+            Goal.owner_id == current_user_id,
+        ).order_by(Goal.created_at.desc())
+        if limit is not None:
+            roots_q = roots_q.offset(offset).limit(limit)
+        roots = roots_q.all()
+        if not roots:
+            return None, "No goals found", 404
+        return [serialize_goal(root) for root in roots], None, 200
+
     def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
         level = self.db_session.query(GoalLevel).filter_by(name="Ultimate Goal").first()
         if not level:
@@ -694,6 +708,13 @@ class GoalService:
 
         self.db_session.commit()
         self.db_session.refresh(new_goal)
+        event_bus.emit(Event(Events.GOAL_CREATED, {
+            'goal_id': new_goal.id,
+            'goal_name': new_goal.name,
+            'goal_type': data.get('type', 'Goal'),
+            'parent_id': new_goal.parent_id,
+            'root_id': new_goal.root_id,
+        }, source='goal_service.create_global_goal'))
         return new_goal, None, 201
 
     def create_fractal_goal(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
@@ -703,6 +724,13 @@ class GoalService:
 
         self.db_session.commit()
         self.db_session.refresh(new_goal)
+        event_bus.emit(Event(Events.GOAL_CREATED, {
+            'goal_id': new_goal.id,
+            'goal_name': new_goal.name,
+            'goal_type': data.get('type', 'Goal'),
+            'parent_id': new_goal.parent_id,
+            'root_id': new_goal.root_id,
+        }, source='goal_service.create_fractal_goal'))
         return new_goal, None, 201
 
     def create_fractal_goal_record(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
@@ -822,6 +850,12 @@ class GoalService:
 
         self.db_session.commit()
         self.db_session.refresh(goal)
+        event_bus.emit(Event(Events.GOAL_UPDATED, {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal.id,
+            'updated_fields': list(data.keys()),
+        }, source='goal_service.update_fractal_goal'))
         return goal, None, 200
 
     def update_global_goal(self, goal_id, current_user_id, data) -> ServiceResult[Goal]:
@@ -843,6 +877,12 @@ class GoalService:
 
         self.db_session.commit()
         self.db_session.refresh(goal)
+        event_bus.emit(Event(Events.GOAL_UPDATED, {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal.id,
+            'updated_fields': list(data.keys()),
+        }, source='goal_service.update_global_goal'))
         return goal, None, 200
 
     def delete_global_goal(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -859,9 +899,16 @@ class GoalService:
             if error:
                 return None, error, status
         else:
-            _, error, status = self.delete_fractal_goal(root_id, goal_id, current_user_id)
+            _, error, status = self.delete_fractal_goal(root_id, goal_id, current_user_id, emit_event=False)
             if error:
                 return None, error, status
+
+        event_bus.emit(Event(Events.GOAL_DELETED, {
+            'goal_id': goal_id,
+            'goal_name': goal_name,
+            'root_id': root_id,
+            'was_root': is_root,
+        }, source='goal_service.delete_global_goal'))
 
         return {
             "goal_id": goal_id,
@@ -890,7 +937,39 @@ class GoalService:
             return None, "Goal not found", 404
         return metrics, None, 200
 
-    def delete_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
+    def get_session_micro_goals(self, root_id, session_id, current_user_id) -> ServiceResult[list[Goal]]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        session_obj = self.db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+        ).first()
+        if not session_obj:
+            return None, "Session not found in this fractal", 404
+
+        micro_goals = (
+            self.db_session.query(Goal)
+            .join(session_goals, Goal.id == session_goals.c.goal_id)
+            .outerjoin(GoalLevel, Goal.level_id == GoalLevel.id)
+            .filter(
+                session_goals.c.session_id == session_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at == None,
+                or_(
+                    GoalLevel.name == 'Micro Goal',
+                    session_goals.c.goal_type == 'MicroGoal',
+                ),
+            )
+            .options(selectinload(Goal.children))
+            .all()
+        )
+
+        return micro_goals, None, 200
+
+    def delete_fractal_goal(self, root_id, goal_id, current_user_id, *, emit_event=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -904,6 +983,13 @@ class GoalService:
         deleted_at = datetime.now(timezone.utc)
         self._soft_delete_goal_subtree(goal, deleted_at)
         self.db_session.commit()
+        if emit_event:
+            event_bus.emit(Event(Events.GOAL_DELETED, {
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'root_id': goal.root_id,
+                'was_root': False,
+            }, source='goal_service.delete_fractal_goal'))
         return goal, None, 200
 
     def add_goal_target(self, goal_id, current_user_id, data) -> ServiceResult[JsonDict]:
@@ -944,6 +1030,13 @@ class GoalService:
 
         self.db_session.commit()
         self.db_session.refresh(new_target)
+        event_bus.emit(Event(Events.TARGET_CREATED, {
+            'target_id': new_target.id,
+            'target_name': new_target.name,
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal_id,
+        }, source='goal_service.add_goal_target'))
         return {"goal": goal, "target": new_target}, None, 201
 
     def remove_goal_target(self, goal_id, target_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -963,6 +1056,13 @@ class GoalService:
 
         target.deleted_at = datetime.now(timezone.utc)
         self.db_session.commit()
+        event_bus.emit(Event(Events.TARGET_DELETED, {
+            'target_id': target.id,
+            'target_name': target.name,
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal_id,
+        }, source='goal_service.remove_goal_target'))
         return {"goal": goal, "target": target}, None, 200
 
     def update_goal_completion(self, goal_id, current_user_id, data, root_id=None) -> ServiceResult[Goal]:
@@ -994,6 +1094,16 @@ class GoalService:
         goal.completed_at = datetime.now(timezone.utc) if goal.completed else None
         self.db_session.commit()
         self.db_session.refresh(goal)
+        event_name = Events.GOAL_COMPLETED if goal.completed else Events.GOAL_UNCOMPLETED
+        event_payload = {
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'root_id': goal.root_id or goal.id,
+        }
+        if goal.completed:
+            event_payload['auto_completed'] = False
+            event_payload['reason'] = 'manual'
+        event_bus.emit(Event(event_name, event_payload, source='goal_service.update_goal_completion'))
         return goal, None, 200
 
     def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:
