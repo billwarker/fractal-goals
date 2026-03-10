@@ -6,7 +6,7 @@ import SessionInfoPanel from '../SessionInfoPanel';
 const updateSession = vi.fn(() => Promise.resolve());
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
-    useActiveSession: () => ({
+    useActiveSessionData: () => ({
         rootId: 'root-1',
         session: {
             id: 's1',
@@ -19,8 +19,10 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
             session_end: null,
             total_duration_minutes: 30
         },
-        updateSession,
         calculateTotalDuration: () => 120
+    }),
+    useActiveSessionActions: () => ({
+        updateSession
     })
 }));
 
