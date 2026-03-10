@@ -1,6 +1,14 @@
-import sys, os, traceback
+"""Exercise the signup blueprint directly against a temporary test app."""
+
+import json
+import os
+import sys
+import traceback
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 print("Script started")
-os.environ['ENV'] = 'testing'
+os.environ["ENV"] = "testing"
 
 try:
     print("Importing config")
@@ -33,17 +41,20 @@ try:
     client = test_app.test_client()
     
     print("Sending POST request to /api/auth/signup")
-    import json
     payload = {
-        'username': 'newuser',
-        'email': 'newuser@example.com',
-        'password': 'Securepassword123'
+        "username": "newuser",
+        "email": "newuser@example.com",
+        "password": "Securepassword123",
     }
-    response = client.post('/api/auth/signup', data=json.dumps(payload), content_type='application/json')
+    response = client.post(
+        "/api/auth/signup",
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
     
     print("Response received:", response.status_code)
     print(response.data)
-except Exception as e:
+except Exception:
     print("Exception!")
     traceback.print_exc()
 

@@ -1,4 +1,12 @@
+"""Hit the local goal-levels API with an auth token from the first user."""
+
+import os
+import sys
+
 import requests
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from app import app
 from models import get_engine, get_session, User
 from blueprints.auth_api import encode_auth_token

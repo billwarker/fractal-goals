@@ -1,8 +1,13 @@
+"""List root goals and inspect their serialized summary fields."""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from app import app
 from models import get_engine, get_session, Goal
-from sqlalchemy.orm import selectinload
 from services.serializers import serialize_goal
-import json
 
 with app.app_context():
     engine = get_engine()
