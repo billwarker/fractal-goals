@@ -182,6 +182,34 @@ class TestGoalCRUDEndpoints:
         assert data['name'] == 'New Long Term Goal'
         assert data['attributes']['type'] == 'LongTermGoal'
         assert data['attributes']['parent_id'] == sample_ultimate_goal.id
+
+    def test_create_goal_can_associate_activity_atomically(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        sample_activity_definition,
+    ):
+        payload = {
+            'name': 'Associated Immediate Goal',
+            'description': 'Created from session detail',
+            'type': 'ImmediateGoal',
+            'parent_id': sample_ultimate_goal.id,
+            'activity_definition_id': sample_activity_definition.id,
+        }
+        response = authed_client.post(
+            f'/api/{sample_ultimate_goal.id}/goals',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 201
+        data = json.loads(response.data)
+
+        db_session.expire_all()
+        activity = db_session.query(ActivityDefinition).filter_by(id=sample_activity_definition.id).first()
+        associated_goal_ids = {goal.id for goal in activity.associated_goals}
+        assert data['id'] in associated_goal_ids
     
     def test_create_goal_missing_fields(self, authed_client):
         """Test creating goal with missing required fields."""

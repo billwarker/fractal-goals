@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import logging
 import uuid
 from sqlalchemy import text, inspect
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria
 from models import (
     Session, Goal, ActivityInstance, MetricDefinition, MetricValue, session_goals,
     ActivityDefinition, ProgramDay, ProgramBlock,
@@ -155,7 +155,8 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
+            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
+            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
         result = [serialize_session(s, include_image_data=False) for s in sessions]
@@ -182,7 +183,8 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program)
+            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
+            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
         
         if not session:

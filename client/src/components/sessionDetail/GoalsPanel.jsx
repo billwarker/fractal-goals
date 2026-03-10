@@ -1,11 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSession } from '../../contexts/ActiveSessionContext';
-import { queryKeys } from '../../hooks/queryKeys';
-import { fractalApi } from '../../utils/api';
 import notify from '../../utils/notify';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import MicroGoalModal from '../MicroGoalModal';
@@ -31,12 +28,8 @@ function GoalsPanel({
         targetAchievements,
         achievedTargetIds,
         createGoal,
-        refreshSession,
         sessionGoalsView,
     } = useActiveSession();
-    const queryClient = useQueryClient();
-    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
-    const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
@@ -92,27 +85,15 @@ function GoalsPanel({
                 enrichedTarget.activity_instance_id = selectedActivity.id;
             }
 
-            const newGoal = await createGoal({
+            await createGoal({
                 name: goalName,
                 type: 'MicroGoal',
                 parent_id: parentId,
                 session_id: sessionId,
+                activity_definition_id: activeActivityDef?.id || undefined,
                 targets: [enrichedTarget],
                 description: description || '',
             });
-
-            if (activeActivityDef) {
-                try {
-                    const currentIds = activeActivityDef.associated_goal_ids || [];
-                    await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentIds, newGoal.id]);
-                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-                } catch (assocErr) {
-                    console.warn('Could not associate micro goal with activity', assocErr);
-                }
-            }
-
-            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-            refreshSession?.();
             notify.success(`Micro goal created: ${goalName}`);
             if (onGoalCreated) onGoalCreated(goalName);
         } catch (err) {
@@ -122,7 +103,7 @@ function GoalsPanel({
 
         setShowMicroTargetBuilder(false);
         setTargetBuilderGoal(null);
-    }, [targetBuilderGoal, rootId, activeActivityDef, selectedActivity, createGoal, sessionId, queryClient, sessionGoalsViewKey, fractalTreeKey, refreshSession, onGoalCreated]);
+    }, [targetBuilderGoal, rootId, activeActivityDef, selectedActivity, createGoal, sessionId, onGoalCreated]);
 
     const handleStartSubGoalCreation = useCallback((node) => {
         setCreateSubGoalParent(node);
@@ -130,17 +111,12 @@ function GoalsPanel({
 
     const handleSubGoalCreated = useCallback(async (payload) => {
         try {
-            const newGoalData = await createGoal(payload);
-            if (viewMode === 'activity' && activeActivityDef && newGoalData?.id) {
-                try {
-                    const currentGoalIds = activeActivityDef.associated_goal_ids || [];
-                    await fractalApi.setActivityGoals(rootId, activeActivityDef.id, [...currentGoalIds, newGoalData.id]);
-                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-                } catch (assocErr) {
-                    console.error('Failed to associate new sub-goal with activity', assocErr);
-                }
-            }
-            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+            const payloadWithAssociation = (
+                viewMode === 'activity' && activeActivityDef
+                    ? { ...payload, activity_definition_id: activeActivityDef.id }
+                    : payload
+            );
+            const newGoalData = await createGoal(payloadWithAssociation);
             setCreateSubGoalParent(null);
             if (onGoalCreated) onGoalCreated(newGoalData?.name);
             return newGoalData;
@@ -148,7 +124,7 @@ function GoalsPanel({
             console.error('Failed to create sub goal', err);
             throw err;
         }
-    }, [viewMode, activeActivityDef, createGoal, rootId, queryClient, sessionGoalsViewKey, fractalTreeKey, onGoalCreated]);
+    }, [viewMode, activeActivityDef, createGoal, onGoalCreated]);
 
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');

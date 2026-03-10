@@ -108,6 +108,9 @@ def normalize_goal_payload(data, *, partial=False):
     if 'session_id' in normalized or not partial:
         normalized['session_id'] = _normalize_optional_string(normalized.get('session_id'))
 
+    if 'activity_definition_id' in normalized or not partial:
+        normalized['activity_definition_id'] = _normalize_optional_string(normalized.get('activity_definition_id'))
+
     if 'deadline' in normalized:
         normalized['deadline'] = _normalize_optional_string(normalized.get('deadline'))
 

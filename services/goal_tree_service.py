@@ -1,9 +1,9 @@
 import logging
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlalchemy import select, or_
 
 import models
-from models import Goal, Session, session_goals, ActivityDefinition, get_session
+from models import Goal, Session, ActivityInstance, session_goals, ActivityDefinition, get_session
 from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
@@ -66,7 +66,8 @@ class GoalTreeService:
 
         session_obj = self.db_session.query(Session).options(
             selectinload(Session.goals),
-            selectinload(Session.activity_instances)
+            selectinload(Session.activity_instances),
+            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         ).filter(
             Session.id == session_id,
             Session.root_id == root_id,
@@ -105,7 +106,11 @@ class GoalTreeService:
             session_goal_ids = [goal.id for goal in derived_goals]
             session_goal_sources = {goal.id: 'activity-derived' for goal in derived_goals}
 
-        session_activity_instances = list(session_obj.activity_instances or [])
+        session_activity_instances = [
+            instance
+            for instance in (session_obj.activity_instances or [])
+            if instance.deleted_at is None
+        ]
         session_activity_ids = sorted({
             inst.activity_definition_id
             for inst in session_activity_instances
@@ -156,6 +161,7 @@ class GoalTreeService:
             .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
             .where(session_goals.c.session_id == session_id)
             .where(Goal.root_id == root_id)
+            .where(Goal.deleted_at == None)
             .where(
                 or_(
                     models.GoalLevel.name == 'Micro Goal',

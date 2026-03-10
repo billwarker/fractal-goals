@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-export function useFractalTree(rootId) {
+export function useFractalTree(rootId, options = {}) {
     const isReady = Boolean(rootId);
+    const enabled = options.enabled ?? true;
+    const staleTime = options.staleTime ?? 5 * 60 * 1000;
 
     return useQuery({
         queryKey: queryKeys.fractalTree(rootId),
@@ -11,8 +13,8 @@ export function useFractalTree(rootId) {
             const res = await fractalApi.getGoals(rootId);
             return res.data;
         },
-        enabled: isReady,
-        staleTime: 5 * 60 * 1000,
+        enabled: isReady && enabled,
+        staleTime,
     });
 }
 

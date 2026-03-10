@@ -458,16 +458,29 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
         activity_name = instance.definition.name if instance.definition else 'Unknown'
         db_session.commit()
         
-        # Emit event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
-            'instance_id': instance.id,
-            'activity_definition_id': instance.activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': instance.session_id,
-            'root_id': root_id,
-            'updated_fields': list(data.keys())
-        }, source='timers_api.update_activity_instance'))
-        
+        updated_fields = list(data.keys())
+        non_metric_fields = [field for field in updated_fields if field != 'sets']
+
+        if 'sets' in data:
+            event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': activity_name,
+                'session_id': instance.session_id,
+                'root_id': root_id,
+                'updated_fields': ['sets'],
+            }, source='timers_api.update_activity_instance'))
+
+        if non_metric_fields:
+            event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': activity_name,
+                'session_id': instance.session_id,
+                'root_id': root_id,
+                'updated_fields': non_metric_fields,
+            }, source='timers_api.update_activity_instance'))
+
         return jsonify(serialize_activity_instance(instance))
         
     except SQLAlchemyError:

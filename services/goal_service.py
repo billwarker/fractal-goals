@@ -19,6 +19,7 @@ from models import (
     Target,
     TargetMetricCondition,
     VisualizationAnnotation,
+    activity_goal_associations,
     get_goal_by_id,
     get_session_by_id,
     session_goals,
@@ -272,6 +273,36 @@ class GoalService:
         if not root:
             return None, ("Fractal not found or access denied", 404)
         return root, None
+
+    def _get_activity_for_goal_association(self, root_id, activity_definition_id):
+        if not activity_definition_id:
+            return None, None
+
+        activity = self.db_session.query(ActivityDefinition).filter(
+            ActivityDefinition.id == activity_definition_id,
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+        ).first()
+        if not activity:
+            return None, ("Activity not found in this fractal", 400)
+        return activity, None
+
+    def _associate_goal_with_activity(self, goal_id, activity_id) -> None:
+        existing = self.db_session.execute(
+            activity_goal_associations.select().where(
+                activity_goal_associations.c.activity_id == activity_id,
+                activity_goal_associations.c.goal_id == goal_id,
+            )
+        ).first()
+        if existing:
+            return
+
+        self.db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=activity_id,
+                goal_id=goal_id,
+            )
+        )
 
     def _get_authorized_goal(
         self,
@@ -590,6 +621,16 @@ class GoalService:
             if not self._authorize_goal_access(current_user_id, parent):
                 return None, "Parent not found or access denied", 404
 
+        target_root_id = parent.root_id or parent.id if parent else None
+        activity_definition_id = data.get('activity_definition_id')
+        activity = None
+        if activity_definition_id and not target_root_id:
+            return None, "Activity association requires a parent goal within a fractal", 400
+        if activity_definition_id and target_root_id:
+            activity, activity_error = self._get_activity_for_goal_association(target_root_id, activity_definition_id)
+            if activity_error:
+                return None, *activity_error
+
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
             return None, deadline_error, 400
@@ -648,6 +689,9 @@ class GoalService:
                     )
                 ))
 
+            if activity:
+                self._associate_goal_with_activity(new_goal.id, activity.id)
+
         self.db_session.commit()
         self.db_session.refresh(new_goal)
         return new_goal, None, 201
@@ -657,6 +701,13 @@ class GoalService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+
+        activity_definition_id = data.get('activity_definition_id')
+        activity = None
+        if activity_definition_id:
+            activity, activity_error = self._get_activity_for_goal_association(root_id, activity_definition_id)
+            if activity_error:
+                return None, *activity_error
 
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
@@ -716,6 +767,9 @@ class GoalService:
                         'micro_goal',
                     )
                 ))
+
+            if activity:
+                self._associate_goal_with_activity(new_goal.id, activity.id)
 
         self.db_session.commit()
         self.db_session.refresh(new_goal)

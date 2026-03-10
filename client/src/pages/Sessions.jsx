@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
-import { useTheme } from '../contexts/ThemeContext'
-import { useGoalLevels } from '../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { queryKeys } from '../hooks/queryKeys';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { SessionNotesSidebar, SessionCardExpanded } from '../components/sessions';
 import useIsMobile from '../hooks/useIsMobile';
@@ -17,7 +17,7 @@ import { useGoals } from '../contexts/GoalsContext';
  * Displays all practice sessions for the current fractal in card format with horizontal sections
  */
 function Sessions() {
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
     const { rootId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
@@ -59,7 +59,7 @@ function Sessions() {
         hasNextPage,
         isFetchingNextPage,
     } = useInfiniteQuery({
-        queryKey: ['sessions', rootId, 'paginated'],
+        queryKey: queryKeys.sessionsPaginated(rootId),
         queryFn: async ({ pageParam = 0 }) => {
             const res = await fractalApi.getSessions(rootId, {
                 limit: SESSIONS_PER_PAGE,
@@ -76,12 +76,13 @@ function Sessions() {
     });
 
     const { data: activities = [], isLoading: activitiesLoading } = useQuery({
-        queryKey: ['activities', rootId],
+        queryKey: queryKeys.activities(rootId),
         queryFn: async () => {
             const res = await fractalApi.getActivities(rootId);
             return res.data || [];
         },
-        enabled: !!rootId
+        enabled: !!rootId,
+        staleTime: 60 * 1000,
     });
 
     const sessions = useMemo(() => {

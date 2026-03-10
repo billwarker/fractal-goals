@@ -448,8 +448,7 @@ function SessionActivityItem({
                 });
                 if (onNoteCreated) onNoteCreated();
             } catch (noteErr) {
-                console.error("Failed to create nano note entry", noteErr);
-                notify.error(noteErr?.response?.data?.error || "Nano goal created, but note log failed");
+                console.warn("Nano goal note entry failed after goal creation", noteErr);
             }
 
             await queryClient.refetchQueries({ queryKey: sessionGoalsViewKey, type: 'active' });

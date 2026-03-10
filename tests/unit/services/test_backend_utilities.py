@@ -119,3 +119,31 @@ def test_event_logger_get_event_description_known_and_fallback_events():
 
     unknown = Event("unknown.event", {"name": "Something"})
     assert _get_event_description(unknown) == "Event unknown.event occurred"
+
+
+def test_event_bus_reports_handler_failures_and_continues():
+    bus = EventBus()
+    calls = []
+    failures = []
+
+    @bus.on("goal.updated")
+    def failing_handler(event):
+        calls.append(("failing", event.name))
+        raise RuntimeError("boom")
+
+    @bus.on("goal.updated")
+    def succeeding_handler(event):
+        calls.append(("succeeding", event.name))
+
+    bus.subscribe_failures(lambda failure: failures.append(failure))
+
+    bus.emit(Event("goal.updated", {"root_id": "root-1", "goal_id": "goal-1"}))
+
+    assert calls == [
+        ("failing", "goal.updated"),
+        ("succeeding", "goal.updated"),
+    ]
+    assert len(failures) == 1
+    assert failures[0].handler_name == "failing_handler"
+    assert failures[0].event.name == "goal.updated"
+    assert str(failures[0].error) == "boom"

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { queryKeys } from '../hooks/queryKeys';
 import { getLocalISOString } from '../utils/dateUtils';
 import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
@@ -200,7 +201,7 @@ function CreateSession() {
             const createdSessionId = createdSession.id;
 
             // Update the known session lists immediately after the create succeeds.
-            queryClient.setQueryData(['sessions', rootId, 'paginated'], (prev) => {
+            queryClient.setQueryData(queryKeys.sessionsPaginated(rootId), (prev) => {
                 if (!prev || !Array.isArray(prev.pages) || prev.pages.length === 0) return prev;
                 const [firstPage, ...restPages] = prev.pages;
                 const existing = (firstPage.sessions || []).some((session) => session.id === createdSession.id);
@@ -225,21 +226,21 @@ function CreateSession() {
                 };
             });
 
-            queryClient.setQueryData(['sessions', rootId], (prev) => {
+            queryClient.setQueryData(queryKeys.sessions(rootId), (prev) => {
                 if (!Array.isArray(prev)) return prev;
                 if (prev.some((session) => session.id === createdSession.id)) return prev;
                 return [createdSession, ...prev];
             });
 
-            queryClient.setQueryData(['sessions', rootId, 'all'], (prev) => {
+            queryClient.setQueryData(queryKeys.sessionsAll(rootId), (prev) => {
                 if (!Array.isArray(prev)) return prev;
                 if (prev.some((session) => session.id === createdSession.id)) return prev;
                 return [createdSession, ...prev];
             });
 
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId], refetchType: 'inactive' });
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'all'], refetchType: 'inactive' });
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId, 'paginated'], refetchType: 'inactive' });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId), refetchType: 'inactive' });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsAll(rootId), refetchType: 'inactive' });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsPaginated(rootId), refetchType: 'inactive' });
 
             navigate(`/${rootId}/session/${createdSessionId}`);
         } catch (err) {

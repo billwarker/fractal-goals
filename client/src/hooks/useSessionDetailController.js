@@ -35,7 +35,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const [associationContext, setAssociationContext] = useState(null);
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
 
-    const { data: fullGoalTree } = useFractalTree(rootId);
+    const { data: fullGoalTree } = useFractalTree(rootId, { enabled: showAssociationModal });
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
     const activitiesKey = queryKeys.activities(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
@@ -115,7 +115,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             notify.success('Activity associated successfully');
-            refreshSession();
             return true;
         } catch {
             notify.error('Failed to associate activity');

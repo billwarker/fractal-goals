@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useTargetAchievements } from '../hooks/useTargetAchievements';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
-import { parseTargets } from '../utils/goalUtils';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
@@ -108,6 +107,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
     const sessionsKey = queryKeys.sessions(rootId);
     const sessionsAllKey = queryKeys.sessionsAll(rootId);
+    const sessionsPaginatedKey = queryKeys.sessionsPaginated(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const activitiesKey = queryKeys.activities(rootId);
     const activityGroupsKey = queryKeys.activityGroups(rootId);
@@ -126,7 +126,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const initTimeoutRef = useRef(null);
     const instanceQueuesRef = useRef(new Map());
     const instanceRollbackRef = useRef(new Map());
-    const autoSyncedGoalStatesRef = useRef(new Map());
     const targetNotificationsInitializedRef = useRef(false);
     const goalNotificationsInitializedRef = useRef(false);
 
@@ -137,6 +136,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             statusTimeoutRef.current = null;
         }, delayMs);
     }, []);
+
+    const invalidateSessionListQueries = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: sessionsKey });
+        queryClient.invalidateQueries({ queryKey: sessionsAllKey });
+        queryClient.invalidateQueries({ queryKey: sessionsPaginatedKey });
+    }, [queryClient, sessionsAllKey, sessionsKey, sessionsPaginatedKey]);
 
     // 1. Queries
     const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refreshSession } = useQuery({
@@ -174,7 +179,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             const res = await fractalApi.getActivities(rootId);
             return res.data;
         },
-        enabled: !!rootId
+        enabled: !!rootId,
+        staleTime: 60 * 1000,
     });
 
     const activities = useMemo(() => {
@@ -222,8 +228,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onMutate: () => setAutoSaveStatus('saving'),
         onSuccess: (res) => {
             queryClient.setQueryData(sessionKey, res.data);
-            queryClient.invalidateQueries({ queryKey: sessionsKey });
-            queryClient.invalidateQueries({ queryKey: sessionsAllKey });
+            invalidateSessionListQueries();
             setAutoSaveStatus('saved');
             scheduleStatusClear(2000);
         },
@@ -235,10 +240,18 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const addActivityMutation = useMutation({
         mutationFn: (data) => fractalApi.addActivityToSession(rootId, sessionId, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+        onSuccess: (response) => {
+            const createdInstance = response?.data;
+            if (createdInstance) {
+                queryClient.setQueryData(sessionActivitiesKey, (previous = []) => {
+                    if (!Array.isArray(previous)) return previous;
+                    if (previous.some((instance) => instance.id === createdInstance.id)) return previous;
+                    return [...previous, createdInstance];
+                });
+            }
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            invalidateSessionListQueries();
         },
         onError: (err) => {
             const status = err?.response?.status;
@@ -254,10 +267,24 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const removeActivityMutation = useMutation({
         mutationFn: (instanceId) => fractalApi.removeActivityFromSession(rootId, sessionId, instanceId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+        onSuccess: (_, instanceId) => {
+            queryClient.setQueryData(sessionActivitiesKey, (previous = []) => {
+                if (!Array.isArray(previous)) return previous;
+                return previous.filter((instance) => instance.id !== instanceId);
+            });
+            setSessionDataDraft((previous) => {
+                if (!previous?.sections) return previous;
+                return {
+                    ...previous,
+                    sections: previous.sections.map((section) => ({
+                        ...section,
+                        activity_ids: (section.activity_ids || []).filter((id) => id !== instanceId),
+                    })),
+                };
+            });
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            invalidateSessionListQueries();
         }
     });
 
@@ -269,8 +296,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             await queryClient.cancelQueries({ queryKey: sessionActivitiesKey });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: sessionsKey });
-            queryClient.invalidateQueries({ queryKey: sessionsAllKey });
+            invalidateSessionListQueries();
             queryClient.removeQueries({ queryKey: sessionKey });
             queryClient.removeQueries({ queryKey: sessionActivitiesKey });
             notify.success('Session deleted successfully');
@@ -387,12 +413,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                             }
                         }
                         return {
+                            ...(value == null ? {} : { value }),
                             metric_id: metricId,
                             split_id: m?.split_id || m?.split_definition_id || null,
-                            value
                         };
                     })
-                    .filter(Boolean);
+                    .filter((metric) => metric && metric.value != null);
                 try {
                     return await fractalApi.updateActivityMetrics(rootId, sessionId, instanceId, { metrics: metricsPayload });
                 } catch (error) {
@@ -414,7 +440,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 ...updates
             });
         },
-        onSuccess: (res, { instanceId }) => {
+        onSuccess: (res, { instanceId, updates }) => {
             instanceRollbackRef.current.delete(instanceId);
             if (res?.data) {
                 queryClient.setQueryData(sessionActivitiesKey, (prev = []) =>
@@ -422,6 +448,17 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
                 );
             } else {
                 queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            }
+
+            if (
+                updates?.completed !== undefined
+                || updates?.sets !== undefined
+                || updates?.metrics !== undefined
+                || updates?.time_start !== undefined
+                || updates?.time_stop !== undefined
+            ) {
+                queryClient.invalidateQueries({ queryKey: sessionKey });
+                queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             }
         }
     });
@@ -496,51 +533,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         achievedTargetIds,
         goalAchievements,
     } = useTargetAchievements(activityInstances, allGoalsForTargets, sessionId);
-
-    useEffect(() => {
-        if (!rootId || !sessionId || !goalAchievements) return;
-
-        const targetDrivenGoals = allGoalsForTargets.filter((goal) => parseTargets(goal).length > 0);
-        targetDrivenGoals.forEach((goal) => {
-            const goalId = goal?.id;
-            const achievement = goalAchievements.get(goalId);
-            if (!goalId || !achievement) return;
-
-            const desiredCompleted = achievement.allAchieved;
-            const persistedCompleted = Boolean(goal.completed || goal.attributes?.completed);
-            const inflightDesired = autoSyncedGoalStatesRef.current.get(goalId);
-
-            if (persistedCompleted === desiredCompleted || inflightDesired === desiredCompleted) {
-                return;
-            }
-
-            autoSyncedGoalStatesRef.current.set(goalId, desiredCompleted);
-
-            fractalApi.toggleGoalCompletion(rootId, goalId, desiredCompleted)
-                .then(() => {
-                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-                    queryClient.invalidateQueries({ queryKey: sessionKey });
-                    queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-                })
-                .catch((error) => {
-                    console.error('[autoSyncGoalCompletion] failed', {
-                        goalId,
-                        desiredCompleted,
-                        message: error?.message,
-                        status: error?.response?.status,
-                        data: error?.response?.data
-                    });
-                    queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-                    queryClient.invalidateQueries({ queryKey: sessionKey });
-                    queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-                })
-                .finally(() => {
-                    if (autoSyncedGoalStatesRef.current.get(goalId) === desiredCompleted) {
-                        autoSyncedGoalStatesRef.current.delete(goalId);
-                    }
-                });
-        });
-    }, [allGoalsForTargets, fractalTreeKey, goalAchievements, queryClient, rootId, sessionGoalsViewKey, sessionId, sessionKey]);
 
     // 4. Handlers
     const handleUpdateTimer = useCallback(async (instanceId, action) => {
@@ -726,14 +718,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             queryClient.invalidateQueries({ queryKey: sessionKey });
-            queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: activitiesKey });
 
             return res.data;
         } catch (err) {
             console.error("Failed to create goal", err);
             throw err;
         }
-    }, [fractalTreeKey, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionKey, queryClient]);
+    }, [activitiesKey, fractalTreeKey, rootId, sessionGoalsViewKey, sessionKey, queryClient]);
 
     // The queue is intentionally memoized once per mutation callback identity so it can retain
     // its dedupe state across renders without re-enqueuing unchanged session payloads.

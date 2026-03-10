@@ -1,7 +1,7 @@
 import logging
 import models
 from models import EventLog, get_session
-from services.events import event_bus, Event, Events
+from services.events import event_bus, Event, EventHandlerFailure, Events
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,57 @@ def setup_event_logging():
         except RuntimeError:
             # If executor is shutting down, execute inline as a safe fallback.
             worker(event)
+
+    def log_event_handler_failure(failure: EventHandlerFailure):
+        root_id = failure.root_id
+        if not root_id:
+            logger.error(
+                "Event handler failed without root context: event=%s handler=%s error=%s",
+                failure.event.name,
+                failure.handler_name,
+                failure.error,
+            )
+            return
+
+        def worker():
+            db_session = _get_db_session()
+            try:
+                entity_type, entity_id = _get_entity_info(failure.event)
+                log_entry = EventLog(
+                    root_id=root_id,
+                    event_type=Events.EVENT_HANDLER_FAILED,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    description=f"Event handler failed: {failure.handler_name} for {failure.event.name}",
+                    payload={
+                        "event_id": failure.event.id,
+                        "event_name": failure.event.name,
+                        "event_source": failure.event.source,
+                        "handler_name": failure.handler_name,
+                        "error": str(failure.error),
+                        "event_data": failure.event.data,
+                    },
+                    source=failure.event.source or "system",
+                    timestamp=failure.event.timestamp,
+                )
+                db_session.add(log_entry)
+                db_session.commit()
+            except Exception as error:
+                db_session.rollback()
+                logger.error(
+                    "Failed to log event handler failure for %s: %s",
+                    failure.event.name,
+                    error,
+                )
+            finally:
+                db_session.close()
+
+        try:
+            _event_log_executor.submit(worker)
+        except RuntimeError:
+            worker()
+
+    event_bus.subscribe_failures(log_event_handler_failure)
 
 def _get_entity_info(event: Event):
     """Extract entity type and ID from event name and data."""

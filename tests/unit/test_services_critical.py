@@ -13,6 +13,7 @@ from services.completion_handlers import (
     _evaluate_threshold_target,
     _evaluate_sum_target,
     _evaluate_frequency_target,
+    handle_activity_metrics_updated,
     handle_activity_instance_updated,
 )
 from services.events import Event, Events
@@ -371,12 +372,35 @@ class TestCompletionHandlerPublicFlow:
         handle_activity_instance_updated(
             Event(
                 Events.ACTIVITY_INSTANCE_UPDATED,
-                {"instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": []},
+                {"instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["completed"]},
             )
         )
 
         assert reverted == ["inst-1"]
         assert fake_db.committed is True
+        assert fake_db.closed is True
+
+    def test_handle_activity_instance_updated_ignores_non_lifecycle_fields(self, monkeypatch):
+        instance = SimpleNamespace(completed=False)
+        fake_db = _fake_db_session(instance)
+        reverted = []
+
+        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
+        monkeypatch.setattr(
+            completion_handlers,
+            "_revert_achievements_for_instance",
+            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
+        )
+
+        handle_activity_instance_updated(
+            Event(
+                Events.ACTIVITY_INSTANCE_UPDATED,
+                {"instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["notes"]},
+            )
+        )
+
+        assert reverted == []
+        assert fake_db.committed is False
         assert fake_db.closed is True
 
     def test_handle_activity_instance_updated_evaluates_when_completed_field_toggled(self, monkeypatch):
@@ -406,6 +430,38 @@ class TestCompletionHandlerPublicFlow:
         assert len(evaluated) == 1
         assert evaluated[0][1] == "session-2"
         assert evaluated[0][2] == "root-2"
+        assert fake_db.committed is True
+        assert fake_db.closed is True
+
+    def test_handle_activity_metrics_updated_recomputes_completed_instance(self, monkeypatch):
+        instance = SimpleNamespace(completed=True)
+        fake_db = _fake_db_session(instance)
+        reverted = []
+        evaluated = []
+
+        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
+        monkeypatch.setattr(
+            completion_handlers,
+            "_revert_achievements_for_instance",
+            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
+        )
+        monkeypatch.setattr(
+            completion_handlers,
+            "_run_evaluation_for_instance",
+            lambda _db, inst, session_id, root_id, pending_events=None: evaluated.append((inst, session_id, root_id)),
+        )
+
+        handle_activity_metrics_updated(
+            Event(
+                Events.ACTIVITY_METRICS_UPDATED,
+                {"instance_id": "inst-3", "session_id": "session-3", "root_id": "root-3", "updated_fields": ["sets"]},
+            )
+        )
+
+        assert reverted == ["inst-3"]
+        assert len(evaluated) == 1
+        assert evaluated[0][1] == "session-3"
+        assert evaluated[0][2] == "root-3"
         assert fake_db.committed is True
         assert fake_db.closed is True
 

@@ -271,6 +271,35 @@ class TestSessionActivityEndpoints:
         deleted_instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         assert deleted_instance is not None
         assert deleted_instance.deleted_at is not None
+
+    def test_removed_activity_is_excluded_from_session_reads(self, authed_client, db_session, sample_activity_instance):
+        """Soft-deleted activity instances should disappear from detail/list payloads."""
+        from models import PracticeSession
+
+        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        session_id = session.id
+        instance_id = sample_activity_instance.id
+
+        delete_response = authed_client.delete(
+            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}'
+        )
+        assert delete_response.status_code == 200
+
+        detail_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
+        assert detail_response.status_code == 200
+        detail_payload = json.loads(detail_response.data)
+        assert all(instance['id'] != instance_id for instance in detail_payload['activity_instances'])
+
+        sections = detail_payload['attributes']['session_data'].get('sections', [])
+        for section in sections:
+            assert instance_id not in section.get('activity_ids', [])
+
+        list_response = authed_client.get(f'/api/{root_id}/sessions')
+        assert list_response.status_code == 200
+        list_payload = json.loads(list_response.data)
+        matching_session = next(item for item in list_payload['sessions'] if item['id'] == session_id)
+        assert all(instance['id'] != instance_id for instance in matching_session['activity_instances'])
     
     def test_update_activity_instance(self, authed_client, db_session, sample_activity_instance):
         """Test updating an activity instance."""

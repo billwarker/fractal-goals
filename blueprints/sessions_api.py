@@ -294,7 +294,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
         instance = payload["instance"]
         activity_name = payload["activity_name"]
         
-        # Emit activity instance updated event
+        # Emit the generic lifecycle/update event for session-scoped instance edits.
         event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
@@ -374,8 +374,9 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
         instance = payload["instance"]
         activity_name = payload["activity_name"]
         
-        # Emit activity instance updated event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+        # Emit the metrics-specific event so downstream handlers can re-evaluate
+        # threshold-driven targets without treating this like a lifecycle edit.
+        event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
             'instance_id': instance.id,
             'activity_definition_id': instance.activity_definition_id,
             'activity_name': activity_name,

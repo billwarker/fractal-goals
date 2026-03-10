@@ -259,6 +259,7 @@ class GoalCreateSchema(BaseModel):
     allow_manual_completion: Optional[bool] = True
     track_activities: Optional[bool] = True
     session_id: Optional[str] = None  # If provided, link goal to session
+    activity_definition_id: Optional[str] = None
     
     @model_validator(mode='after')
     def validate_parent_type_constraints(self):

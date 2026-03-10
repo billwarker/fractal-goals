@@ -463,12 +463,16 @@ def handle_activity_instance_updated(event: Event):
         if not instance:
             return
             
-        # If instance is now incomplete, revert its achievements
+        # Only lifecycle transitions should drive persistence changes here.
+        if 'completed' not in updated_fields:
+            return
+
+        # If instance was explicitly marked incomplete, revert its achievements.
         if not instance.completed:
             _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
             db_session.commit()
         # If instance was JUST marked complete, evaluate targets
-        elif 'completed' in updated_fields and instance.completed:
+        elif instance.completed:
             logger.info(f"[ACTIVITY_UPDATED] Instance {instance_id} marked complete. Evaluating targets.")
             
             # Use same logic as handle_activity_instance_completed but wrapperized
@@ -485,6 +489,44 @@ def handle_activity_instance_updated(event: Event):
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance update: {e}")
+    finally:
+        db_session.close()
+
+
+@event_bus.on(Events.ACTIVITY_METRICS_UPDATED)
+def handle_activity_metrics_updated(event: Event):
+    """
+    When metrics/sets change on a completed instance, recompute threshold-driven
+    targets/goals. Incomplete instances should not persist target state from
+    metric edits alone.
+    """
+    instance_id = event.data.get('instance_id')
+    root_id = event.data.get('root_id')
+    session_id = event.data.get('session_id')
+
+    if not all([instance_id, root_id, session_id]):
+        return
+
+    db_session = _get_db_session()
+    pending_events = []
+    try:
+        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
+        if not instance or not instance.completed:
+            return
+
+        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
+        _run_evaluation_for_instance(
+            db_session,
+            instance,
+            session_id,
+            root_id,
+            pending_events=pending_events,
+        )
+        db_session.commit()
+        _emit_pending_events(pending_events)
+    except Exception as e:
+        db_session.rollback()
+        logger.exception(f"Error handling activity metrics update: {e}")
     finally:
         db_session.close()
 

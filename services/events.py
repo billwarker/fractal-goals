@@ -58,6 +58,17 @@ class Event:
         return f"Event({self.name}, data={self.data}, id={self.id[:8]})"
 
 
+@dataclass
+class EventHandlerFailure:
+    event: Event
+    handler_name: str
+    error: Exception
+
+    @property
+    def root_id(self) -> Optional[str]:
+        return self.event.data.get("root_id")
+
+
 class EventBus:
     """
     Central event dispatcher that manages event subscriptions and emissions.
@@ -70,6 +81,7 @@ class EventBus:
     
     def __init__(self):
         self._handlers: Dict[str, List[Callable[[Event], None]]] = {}
+        self._failure_handlers: List[Callable[[EventHandlerFailure], None]] = []
         self._enabled = True
         self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="event-bus")
     
@@ -98,6 +110,14 @@ class EventBus:
         """Remove a handler from an event type."""
         if event_name in self._handlers:
             self._handlers[event_name] = [h for h in self._handlers[event_name] if h != handler]
+
+    def subscribe_failures(self, handler: Callable[[EventHandlerFailure], None]):
+        """Register a callback that is invoked when an event handler fails."""
+        self._failure_handlers.append(handler)
+
+    def unsubscribe_failures(self, handler: Callable[[EventHandlerFailure], None]):
+        """Remove a failure callback."""
+        self._failure_handlers = [h for h in self._failure_handlers if h != handler]
     
     def emit(self, event: Event) -> List[Any]:
         """
@@ -120,8 +140,21 @@ class EventBus:
                 result = handler(event)
                 results.append(result)
             except Exception as e:
-                logger.exception(f"Error in handler {handler.__name__} for event {event.name}: {e}")
-        
+                failure = EventHandlerFailure(
+                    event=event,
+                    handler_name=handler.__name__,
+                    error=e,
+                )
+                logger.exception(
+                    "Error in handler %s for event %s (event_id=%s, source=%s): %s",
+                    handler.__name__,
+                    event.name,
+                    event.id,
+                    event.source,
+                    e,
+                )
+                self._notify_failure_handlers(failure)
+
         return results
 
     def emit_async(self, event: Event) -> None:
@@ -169,6 +202,20 @@ class EventBus:
     def clear(self):
         """Remove all handlers (useful for testing)."""
         self._handlers.clear()
+        self._failure_handlers.clear()
+
+    def _notify_failure_handlers(self, failure: EventHandlerFailure) -> None:
+        for handler in list(self._failure_handlers):
+            try:
+                handler(failure)
+            except Exception as error:
+                logger.exception(
+                    "Error in failure handler %s for event %s (event_id=%s): %s",
+                    getattr(handler, "__name__", repr(handler)),
+                    failure.event.name,
+                    failure.event.id,
+                    error,
+                )
 
 
 # Global event bus instance
@@ -207,6 +254,7 @@ class Events:
     ACTIVITY_INSTANCE_UPDATED = 'activity_instance.updated'
     ACTIVITY_INSTANCE_COMPLETED = 'activity_instance.completed'
     ACTIVITY_METRICS_UPDATED = 'activity_instance.metrics_updated'
+    EVENT_HANDLER_FAILED = 'event.handler_failed'
     
     # Program events
     PROGRAM_CREATED = 'program.created'

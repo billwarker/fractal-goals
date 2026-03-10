@@ -129,6 +129,14 @@ def serialize_activity_instance(instance):
         "metrics": metric_values_list  # Frontend alias
     }
 
+
+def _active_session_instances(session):
+    return [
+        instance
+        for instance in (getattr(session, "activity_instances", None) or [])
+        if getattr(instance, "deleted_at", None) is None
+    ]
+
 def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""
     smart_status = calculate_smart_status(goal)
@@ -201,6 +209,7 @@ def serialize_goal(goal, include_children=True):
 
 def serialize_session(session, include_image_data=False):
     """Serialize a Session object."""
+    active_instances = _active_session_instances(session)
     result = {
         "id": session.id,
         "name": session.name,
@@ -235,7 +244,7 @@ def serialize_session(session, include_image_data=False):
             "created_at": format_utc(session.created_at),
             "updated_at": format_utc(session.updated_at),
         },
-        "activity_instances": [serialize_activity_instance(inst) for inst in session.activity_instances],
+        "activity_instances": [serialize_activity_instance(inst) for inst in active_instances],
         "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
     }
     
@@ -274,8 +283,8 @@ def serialize_session(session, include_image_data=False):
     # SessionDetail renders from section.activity_ids, so normalize legacy shapes too.
     session_sections = result["attributes"]["session_data"].get("sections")
     if isinstance(session_sections, list):
-        instance_map = {inst.id: inst for inst in session.activity_instances}
-        remaining_ids = [inst.id for inst in session.activity_instances]
+        instance_map = {inst.id: inst for inst in active_instances}
+        remaining_ids = [inst.id for inst in active_instances]
         used_ids = set()
 
         def _extract_def_id(item):
@@ -297,7 +306,7 @@ def serialize_session(session, include_image_data=False):
 
         # Build definition -> instance ids map in creation order.
         ids_by_def = {}
-        for inst in session.activity_instances:
+        for inst in active_instances:
             ids_by_def.setdefault(inst.activity_definition_id, []).append(inst.id)
 
         for section in session_sections:
