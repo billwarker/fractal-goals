@@ -24,6 +24,15 @@ vi.mock('../../atoms/GoalIcon', () => ({
 }));
 
 describe('DayViewModal', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-03-08T12:00:00Z'));
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     const baseProps = {
         isOpen: true,
         onClose: vi.fn(),
