@@ -273,7 +273,7 @@ class TestSessionActivityEndpoints:
         assert deleted_instance.deleted_at is not None
 
     def test_removed_activity_is_excluded_from_session_reads(self, authed_client, db_session, sample_activity_instance):
-        """Soft-deleted activity instances should disappear from detail/list payloads."""
+        """Soft-deleted activity instances should disappear from all session read payloads."""
         from models import PracticeSession
 
         session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
@@ -291,6 +291,11 @@ class TestSessionActivityEndpoints:
         detail_payload = json.loads(detail_response.data)
         assert all(instance['id'] != instance_id for instance in detail_payload['activity_instances'])
 
+        activities_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}/activities')
+        assert activities_response.status_code == 200
+        activities_payload = json.loads(activities_response.data)
+        assert all(instance['id'] != instance_id for instance in activities_payload)
+
         sections = detail_payload['attributes']['session_data'].get('sections', [])
         for section in sections:
             assert instance_id not in section.get('activity_ids', [])
@@ -300,6 +305,12 @@ class TestSessionActivityEndpoints:
         list_payload = json.loads(list_response.data)
         matching_session = next(item for item in list_payload['sessions'] if item['id'] == session_id)
         assert all(instance['id'] != instance_id for instance in matching_session['activity_instances'])
+
+        global_list_response = authed_client.get('/api/practice-sessions')
+        assert global_list_response.status_code == 200
+        global_list_payload = json.loads(global_list_response.data)
+        matching_global_session = next(item for item in global_list_payload if item['id'] == session_id)
+        assert all(instance['id'] != instance_id for instance in matching_global_session['activity_instances'])
     
     def test_update_activity_instance(self, authed_client, db_session, sample_activity_instance):
         """Test updating an activity instance."""

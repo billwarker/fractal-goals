@@ -26,12 +26,12 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 | 1 | **Activities** | **A** | Clean end-to-end; blueprint is thin, service is comprehensive |
 | 2 | **Programs** | **A** | Dedicated service with validation errors, thorough test suite |
 | 3 | **Goals** | **A−** | Best service coverage; blueprint is slightly fat (764 lines) |
-| 4 | **Sessions** | **B+** | Mostly service-delegated; two inline query endpoints remain |
+| 4 | **Sessions** | **A−** | Backend and frontend are now largely aligned to the intended service/query architecture |
 | 5 | **Session Templates** | **B+** | Textbook thin blueprint; service is small but lean |
-| 6 | **Analytics & Annotations** | **B−** | Analytics uses service; annotations blueprint has all CRUD inline |
-| 7 | **Timers / Activity Time-Tracking** | **C+** | Heaviest blueprint (601 lines), substantial inline business logic |
+| 6 | **Analytics & Annotations** | **B+** | Analytics and annotations now both sit behind service boundaries, with testing still lighter than core domains |
+| 7 | **Timers / Activity Time-Tracking** | **B** | Timer lifecycle logic now lives in a service, though blueprint-owned orchestration remains |
 | 8 | **Auth & Settings** | **C** | No service layer at all; all logic inline in blueprint |
-| 9 | **Logging / Event Logs** | **C** | No service layer; uses `get_scoped_session()` differently from rest |
+| 9 | **Logging / Event Logs** | **B** | Log reads and retention are now service-backed and use the repo-standard DB session pattern |
 
 ---
 
@@ -101,11 +101,11 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 ---
 
-### 4. Sessions — Grade: B+
+### 4. Sessions — Grade: A−
 
 **Backend:**
-- [sessions_api.py](file:///Users/will/Projects/fractal-goals/blueprints/sessions_api.py) (397 lines) delegates most mutations to [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py) (36KB).
-- Create, update, delete, add/remove/reorder activities, update metrics — all service-delegated.
+- [sessions_api.py](file:///Users/will/Projects/fractal-goals/blueprints/sessions_api.py) is now transport-oriented across both mutations and reads, delegating to [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py).
+- Create, update, delete, add/remove/reorder activities, update metrics, global session list, and session activities reads are all service-delegated.
 - Events are emitted in the blueprint (same pattern as goals).
 
 **Frontend:**
@@ -116,8 +116,7 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_sessions_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_sessions_api.py) at 27KB.
 
 **Gaps:**
-- `get_all_sessions_endpoint` (global sessions GET) has a full inline ORM query with joins and eager loads — should be in `SessionService`.
-- `get_session_activities` also has inline ORM query instead of delegating to service.
+- Events are still emitted in the blueprint rather than being fully service-owned after commit.
 - `useSessionDetailMutations.js` at 23KB is very large — could benefit from further splitting.
 
 ---
@@ -140,7 +139,7 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 ---
 
-### 6. Analytics & Annotations — Grade: B−
+### 6. Analytics & Annotations — Grade: B+
 
 **Analytics Backend:**
 - [goal_analytics_service.py](file:///Users/will/Projects/fractal-goals/services/goal_analytics_service.py) properly encapsulates analytics queries.
@@ -148,37 +147,29 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 - Goal metrics endpoints also delegate to `GoalService` / `GoalMetricsService`.
 
 **Annotations Backend:**
-- [annotations_api.py](file:///Users/will/Projects/fractal-goals/blueprints/annotations_api.py) (237 lines) has **all CRUD logic inline** — no `AnnotationService` exists.
-- ORM queries, object creation, field updates, soft-delete — all in the blueprint.
-- In-Python JSON filtering for `visualization_context` matching is complex logic that belongs in a service.
+- [annotations_api.py](file:///Users/will/Projects/fractal-goals/blueprints/annotations_api.py) now delegates CRUD and read filtering to [annotation_service.py](file:///Users/will/Projects/fractal-goals/services/annotation_service.py).
+- Ownership checks, annotation CRUD, soft-delete behavior, and `visualization_context` containment matching now live in the service.
 
 **Frontend:**
 - `Analytics.jsx` (8.2KB) and `components/analytics/` subdirectory.
 - `useAnalyticsPageData.js` uses centralized query keys.
 
 **Tests:**
-- [test_annotations_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_annotations_api.py) is minimal at 3.4KB.
+- [test_annotations_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_annotations_api.py) now covers CRUD plus context-containment filtering.
 - [test_goal_analytics_service.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_goal_analytics_service.py) at 2.2KB.
 
 **Gaps:**
-- **No `AnnotationService`** — biggest gap in this section.
-- Annotations blueprint uses `get_engine()` / `get_session()` directly instead of `models.get_engine()` / `models.get_session()` like other blueprints (minor inconsistency).
 - No event emissions for annotation mutations.
 - Analytics test coverage is thin relative to the feature's complexity.
 
 ---
 
-### 7. Timers / Activity Time-Tracking — Grade: C+
+### 7. Timers / Activity Time-Tracking — Grade: B
 
 **Backend:**
-- [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) is **601 lines** — the second-largest blueprint and the most problematic from a standards perspective.
-- Contains substantial inline business logic:
-  - Timer start/stop/pause/resume logic with paused-time calculations.
-  - Activity instance creation with existence checks.
-  - Session pause/resume with cascading to activity instances.
-  - ISO datetime parsing utility function (`parse_iso_datetime`).
-  - Achievement retrieval from `completion_handlers`.
-- Uses `datetime.utcnow()` (deprecated) while other parts of the codebase use `datetime.now(timezone.utc)`.
+- [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) now delegates activity-instance lifecycle and session pause/resume logic to [timer_service.py](file:///Users/will/Projects/fractal-goals/services/timer_service.py).
+- `TimerService` owns create/list/start/complete/update/pause/resume behavior, including datetime parsing and pause-duration handling.
+- Deprecated timer-path `datetime.utcnow()` usage was replaced with centralized UTC normalization inside the service.
 - Dual GET/POST on single route (`/activity-instances`) is unconventional.
 
 **Frontend:**
@@ -187,9 +178,7 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_timers_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_timers_api.py) at 16.8KB — decent coverage.
 
 **Gaps:**
-- **No `TimerService`** — all pause/resume/complete logic should be extracted to a service.
-- Helper functions (`parse_iso_datetime`) live in the blueprint file.
-- `complete_activity_instance` has inline achievement retrieval — mixing concerns.
+- `complete_activity_instance` still has inline achievement retrieval/orchestration in the blueprint.
 - Inconsistent async/sync event emission (`emit_async` vs `emit`).
 
 ---
@@ -221,25 +210,22 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 ---
 
-### 9. Logging / Event Logs — Grade: C
+### 9. Logging / Event Logs — Grade: B
 
 **Backend:**
-- [logs_api.py](file:///Users/will/Projects/fractal-goals/blueprints/logs_api.py) (119 lines) has **all logic inline** — no `LogService`.
-- Uses `get_scoped_session()` instead of `models.get_engine()` / `get_session(engine)` — different pattern from every other blueprint.
-- Inline SQL query building with date parsing and filtering.
-- Hard-delete (`DELETE ... WHERE`) instead of soft-delete — inconsistent with the rest of the codebase.
+- [logs_api.py](file:///Users/will/Projects/fractal-goals/blueprints/logs_api.py) now delegates filtering, date parsing, pagination payload assembly, and clearing to [log_service.py](file:///Users/will/Projects/fractal-goals/services/log_service.py).
+- Logs now use the repo-standard `models.get_engine()` plus `get_session(engine)` DB session pattern.
+- Clear behavior is now explicitly documented as a hard-delete retention operation because `EventLog` has no `deleted_at` column.
 
 **Frontend:**
 - `useLogsData.js` (1.6KB) and `Logs.jsx` (7.2KB).
 - `LogsModal.jsx` in modals directory.
 
-**Tests:** [test_logs_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_logs_api.py) — minimal at 1.7KB.
+**Tests:** [test_logs_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_logs_api.py) now covers event-type filtering, date-range filtering, and clear behavior.
 
 **Gaps:**
-- **No `LogService`** — query building and date parsing belong in a service.
-- Session management pattern (`get_scoped_session()`) is inconsistent with the rest of the codebase.
-- `clear_logs` does a hard delete — all other surfaces use soft-delete.
-- Inline `from sqlalchemy import func, delete` and `from datetime import datetime` imports.
+- Logs still intentionally use hard-delete retention rather than the app-wide soft-delete model.
+- No event/retention audit surface exists yet beyond the API itself.
 
 ---
 
@@ -260,7 +246,7 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 | Pattern | Status |
 |---------|--------|
-| Service layer coverage | ⚠️ 5 of 9 areas fully service-backed |
+| Service layer coverage | ⚠️ 8 of 9 areas fully service-backed |
 | Pydantic validation decorator | ✅ Most endpoints, except timers POST and goal completion |
 | Serialization separation | ✅ `serializers.py` + `view_serializers.py` |
 | Event emissions after commits | ⚠️ Events emitted in blueprints, not always after service commits |
@@ -269,13 +255,90 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 ---
 
-## Priority Action Items
+## Prioritized Implementation Checklist
 
-1. **Extract `TimerService`** — Move ~400 lines of timer/pause/resume logic from `timers_api.py` into a new service.
-2. **Extract `AuthService`/`UserService`** — Move login, signup, lockout, PII anonymization, and preferences logic from `auth_api.py`.
-3. **Extract `AnnotationService`** — Move CRUD and context-matching logic from `annotations_api.py`.
-4. **Extract `LogService`** — Move query building and date parsing from `logs_api.py`; fix `get_scoped_session()` usage; switch from hard-delete to soft-delete.
-5. **Slim `goals_api.py`** — Move inline micro-goal queries and completion validation into services; standardize event emission.
-6. **Slim `sessions_api.py`** — Move the two remaining inline GET endpoints into `SessionService`.
-7. **Clean up stale `context/` directory** — Move or remove `client/src/context/HeaderContext.jsx`.
-8. **Standardize `datetime` usage** — Replace `datetime.utcnow()` calls in `timers_api.py` with `datetime.now(timezone.utc)`.
+This checklist supersedes the original action-item ordering above.
+It reflects the current architecture state as of March 10, 2026, including the session/session-detail frontend refactors that have already landed.
+
+### Wave 1 — Active Session Backend Cleanup
+
+- [x] Create `services/timer_service.py`.
+- [x] Move activity-instance create/list logic out of [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) into `TimerService`.
+- [x] Move timer start/complete/update logic out of [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) into `TimerService`.
+- [x] Move session pause/resume cascade logic out of [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) into `TimerService`.
+- [x] Move ISO datetime parsing helper out of the blueprint and into the service layer.
+- [x] Replace `datetime.utcnow()` usage in timer flows with `datetime.now(timezone.utc)` plus centralized normalization where needed.
+- [x] Standardize timer event emission boundaries so the blueprint only emits after successful service results.
+- [x] Keep current `async_completion` behavior intact while moving completion orchestration into the service.
+- [x] Move `get_all_sessions_endpoint` query from [sessions_api.py](file:///Users/will/Projects/fractal-goals/blueprints/sessions_api.py) into [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py).
+- [x] Move `get_session_activities` query from [sessions_api.py](file:///Users/will/Projects/fractal-goals/blueprints/sessions_api.py) into [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py).
+- [x] Leave session blueprint endpoints as transport/delegation only.
+- [x] Add or update focused backend tests for timer service-backed endpoints.
+- [x] Add or update focused backend tests for session list/session-activities service delegation.
+- [x] Re-run focused timer/session backend verification after extraction.
+
+Wave 1 verification completed:
+- `tests/integration/test_timers_api.py`
+- `tests/integration/test_phase1_confidence.py`
+- `tests/integration/test_sessions_api.py`
+
+### Wave 2 — Logging And Annotation Service Boundaries
+
+- [x] Create `services/log_service.py`.
+- [x] Move log filtering, query building, and date parsing out of [logs_api.py](file:///Users/will/Projects/fractal-goals/blueprints/logs_api.py).
+- [x] Replace `get_scoped_session()` usage in logs with the repo-standard DB session pattern.
+- [ ] Decide and implement explicit deletion policy for logs:
+  - [ ] soft-delete if logs should follow the rest of the app
+  - [x] documented hard-delete retention path if logs are intentionally different
+- [x] Create `services/annotation_service.py`.
+- [x] Move annotation CRUD and visualization-context matching out of [annotations_api.py](file:///Users/will/Projects/fractal-goals/blueprints/annotations_api.py).
+- [x] Remove inline ORM/business logic from both blueprints.
+- [x] Expand integration tests for logs and annotations beyond the current minimal coverage.
+
+Wave 2 verification completed:
+- `tests/integration/test_logs_api.py`
+- `tests/integration/test_annotations_api.py`
+
+### Wave 3 — Goals Blueprint Slimming
+
+- [ ] Move session micro-goal query logic out of [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) into goal services.
+- [ ] Replace inline goal-completion validation with the standard request validation pattern.
+- [ ] Reduce blueprint-owned event orchestration in [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py).
+- [ ] Push post-commit event ownership toward service boundaries where feasible.
+- [ ] Add regression tests for the moved goal query/completion paths.
+
+### Wave 4 — Auth And User Services
+
+- [ ] Create `services/auth_service.py`.
+- [ ] Create `services/user_service.py` or equivalent account/profile service boundary.
+- [ ] Move login/signup/refresh/lockout logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
+- [ ] Move password/email/username update logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
+- [ ] Move preferences JSON merge logic out of the blueprint.
+- [ ] Move account deletion / anonymization logic out of the blueprint.
+- [ ] Replace deprecated `query(...).get()` usage while touching these paths.
+- [ ] Preserve current auth integration coverage during the extraction.
+
+### Wave 5 — Cross-Cutting Consistency
+
+- [ ] Standardize “service commit first, event emit second” across timers, sessions, goals, logs, annotations, and auth.
+- [ ] Audit event emission ownership in blueprints after service extractions land.
+- [ ] Remove or migrate stale [HeaderContext.jsx](file:///Users/will/Projects/fractal-goals/client/src/context/HeaderContext.jsx) from `client/src/context/`.
+- [ ] Resolve leftover `client/src/context/` vs `client/src/contexts/` naming inconsistency.
+- [ ] Update [index.md](file:///Users/will/Projects/fractal-goals/index.md) once the service-boundary cleanup materially changes the architecture map.
+
+## Recommended Execution Order
+
+1. Wave 1 — highest impact on active production surfaces.
+2. Wave 2 — fast standards wins on self-contained backend areas.
+3. Wave 3 — broad but manageable after Wave 1/2 service patterns are established.
+4. Wave 4 — security-sensitive, highest migration risk, do after the service extraction pattern is stable.
+5. Wave 5 — cross-cutting cleanup after the service-boundary moves are complete.
+
+## Notes On Current State
+
+- The earlier sessions frontend concerns in this document are partly historical.
+- Session/session-detail frontend architecture has already been substantially decomposed into focused hooks, view models, and thin layout components.
+- Wave 1 backend cleanup is complete for the active session surface.
+- The largest remaining backend architecture gaps are now:
+  - [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py)
+  - [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py)

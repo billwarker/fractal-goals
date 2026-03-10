@@ -1,32 +1,22 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
 import models
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import select
 from models import (
     get_session,
-    Session, Goal, ActivityInstance, MetricValue,
-    ActivityDefinition,
-    validate_root_goal
 )
 from validators import (
     validate_request,
     SessionCreateSchema, SessionUpdateSchema,
-    SessionGoalAssociationSchema,
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, etag_json_response, internal_error
 from services import event_bus, Event, Events
-from services.owned_entity_queries import (
-    get_owned_session,
-)
-from services.serializers import serialize_session, serialize_activity_instance, serialize_goal
+from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
 
 # Create blueprint
@@ -43,24 +33,17 @@ def get_all_sessions_endpoint(current_user):
     """Get all sessions for grid view (Global), filtered by user."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        # Join with Goal to check ownership of the root_id
-        sessions_q = db_session.query(Session).join(Goal, Goal.id == Session.root_id).options(
-            selectinload(Session.goals),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances)
-        ).filter(
-            Session.deleted_at == None,
-            Goal.parent_id == None,
-            Goal.owner_id == current_user.id
-        ).order_by(Session.created_at.desc())
         limit, offset = parse_optional_pagination(request, max_limit=300)
-        if limit is not None:
-            sessions_q = sessions_q.offset(offset).limit(limit)
-        sessions = sessions_q.all()
-        # Don't include image data in list view
-        result = [serialize_session(s, include_image_data=False) for s in sessions]
+        result, error, status = service.get_all_sessions(current_user.id, limit, offset or 0)
+        if error:
+            return jsonify({"error": error}), status
         return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error getting all sessions")
+        return internal_error(logger, "Error getting all sessions")
     finally:
         db_session.close()
 
@@ -180,31 +163,12 @@ def get_session_activities(current_user, root_id, session_id):
     """Get all activity instances for a session in display order."""
     engine = models.get_engine()
     db_session = get_session(engine)
+    service = SessionService(db_session)
     try:
-        # Validate root goal exists and is owned by user
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        
-        # Validate session exists
-        session = get_owned_session(db_session, root_id, session_id)
-        
-        if not session:
-            return jsonify({"error": "Session not found"}), 404
-        
-        # Get all activity instances for this session, ordered by created_at
-        # Use eager loading to prevent N+1 queries
-        instances = db_session.query(ActivityInstance).options(
-            joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
-            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
-            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split)
-        ).filter(
-            ActivityInstance.session_id == session_id,
-            ActivityInstance.deleted_at == None
-        ).order_by(ActivityInstance.created_at).all()
-        
-        return jsonify([serialize_activity_instance(inst) for inst in instances])
-        
+        payload, error, status = service.get_session_activities(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error getting session activities")

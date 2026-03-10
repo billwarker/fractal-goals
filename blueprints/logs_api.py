@@ -1,10 +1,12 @@
 from flask import Blueprint, jsonify, request
-from models import EventLog, get_scoped_session, validate_root_goal
+import logging
+
+import models
 from blueprints.auth_api import token_required
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select, desc
-from services.serializers import serialize_event_log
-import logging
+from models import get_session
+from blueprints.api_utils import internal_error
+from services.log_service import LogService
 
 logger = logging.getLogger(__name__)
 
@@ -21,69 +23,27 @@ def get_logs(current_user, root_id):
     event_type = request.args.get('event_type')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    
-    db_session = get_scoped_session()
+
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    service = LogService(db_session)
     try:
-        # Verify ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        from sqlalchemy import func
-        from datetime import datetime
-        
-        # Create base query
-        stmt = select(EventLog).where(EventLog.root_id == root_id)
-        
-        # Apply filters
-        if event_type and event_type != 'all':
-            stmt = stmt.where(EventLog.event_type == event_type)
-        
-        if start_date:
-            try:
-                # Handle ISO date strings
-                s_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                stmt = stmt.where(EventLog.timestamp >= s_dt)
-            except ValueError:
-                pass
-                
-        if end_date:
-            try:
-                # Append end of day time for date-only filters
-                if len(end_date) <= 10: # YYYY-MM-DD
-                    end_date += "T23:59:59"
-                e_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                stmt = stmt.where(EventLog.timestamp <= e_dt)
-            except ValueError:
-                pass
-        
-        # Get total count for pagination WITH filters applied
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total_count = db_session.execute(count_stmt).scalar()
-        
-        # Final ordering, limit and offset
-        stmt = stmt.order_by(desc(EventLog.timestamp)).limit(limit).offset(offset)
-        
-        results = db_session.execute(stmt).scalars().all()
-        
-        # Also get all available event types for the filter dropdown
-        types_stmt = select(EventLog.event_type).where(EventLog.root_id == root_id).distinct()
-        event_types = [t for t in db_session.execute(types_stmt).scalars().all()]
-        
-        return jsonify({
-            "logs": [serialize_event_log(log) for log in results],
-            "event_types": sorted(event_types),
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "total": total_count,
-                "count": len(results),
-                "has_more": (offset + limit) < total_count
-            }
-        })
+        payload, error, status = service.get_logs(
+            root_id,
+            current_user.id,
+            limit=limit,
+            offset=offset,
+            event_type=event_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error fetching logs for root %s", root_id)
-        return jsonify({"error": "Internal server error"}), 500
+        return internal_error(logger, "Error fetching logs")
     finally:
         db_session.close()
 
@@ -93,26 +53,18 @@ def clear_logs(current_user, root_id):
     """
     Clear all logs for a specific fractal.
     """
-    db_session = get_scoped_session()
+    engine = models.get_engine()
+    db_session = get_session(engine)
+    service = LogService(db_session)
     try:
-        # Verify ownership
-        root = validate_root_goal(db_session, root_id, owner_id=current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-            
-        from sqlalchemy import delete
-        
-        # Delete logs
-        stmt = delete(EventLog).where(EventLog.root_id == root_id)
-        db_session.execute(stmt)
-        db_session.commit()
-        
-        logger.info(f"Cleared logs for root {root_id}")
-        return jsonify({"message": "Logs cleared successfully"})
-        
+        payload, error, status = service.clear_logs(root_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        logger.info("Cleared logs for root %s", root_id)
+        return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error clearing logs for root %s", root_id)
-        return jsonify({"error": "Internal server error"}), 500
+        return internal_error(logger, "Error clearing logs")
     finally:
         db_session.close()

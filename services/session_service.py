@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria
 from models import (
     Session, Goal, ActivityInstance, MetricDefinition, MetricValue, session_goals,
     ActivityDefinition, ProgramDay, ProgramBlock,
-    validate_root_goal, get_session_by_id
+    validate_root_goal
 )
 import models
 from services import event_bus, Event, Events
@@ -46,6 +46,26 @@ class SessionService:
     def __init__(self, db_session):
         self.db_session = db_session
         self._session_goals_has_source = None
+
+    @staticmethod
+    def _session_read_options():
+        return (
+            selectinload(Session.goals),
+            selectinload(Session.notes_list),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
+            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
+            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
+        )
+
+    @staticmethod
+    def _session_activity_read_options():
+        return (
+            joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
+            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
+            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
+        )
 
     @staticmethod
     def _extract_activity_definition_id(raw_item) -> str | None:
@@ -150,13 +170,7 @@ class SessionService:
         total_count = base_query.count()
         
         sessions = base_query.options(
-            selectinload(Session.goals),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
-            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
+            *self._session_read_options(),
         ).order_by(Session.created_at.desc()).offset(offset).limit(limit).all()
         
         result = [serialize_session(s, include_image_data=False) for s in sessions]
@@ -171,6 +185,26 @@ class SessionService:
             }
         }, None, 200
 
+    def get_all_sessions(self, current_user_id, limit=None, offset=0) -> ServiceResult[list[JsonDict]]:
+        """Get all sessions across fractals for the current user."""
+        sessions_q = self.db_session.query(Session).join(
+            Goal,
+            Goal.id == Session.root_id,
+        ).options(
+            *self._session_read_options(),
+        ).filter(
+            Session.deleted_at == None,
+            Goal.parent_id == None,
+            Goal.owner_id == current_user_id,
+            Goal.deleted_at == None,
+        ).order_by(Session.created_at.desc())
+
+        if limit is not None:
+            sessions_q = sessions_q.offset(offset).limit(limit)
+
+        sessions = sessions_q.all()
+        return [serialize_session(s, include_image_data=False) for s in sessions], None, 200
+
     def get_session_details(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
         """Get a single session with full details."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -178,13 +212,7 @@ class SessionService:
             return None, "Fractal not found or access denied", 404
 
         session = self.db_session.query(Session).options(
-            selectinload(Session.goals),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
-            with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
+            *self._session_read_options(),
         ).filter(Session.id == session_id, Session.root_id == root_id, Session.deleted_at == None).first()
         
         if not session:
@@ -197,6 +225,25 @@ class SessionService:
                 session._derived_goals = derived_goals
 
         return serialize_session(session, include_image_data=True), None, 200
+
+    def get_session_activities(self, root_id, session_id, current_user_id) -> ServiceResult[list[JsonDict]]:
+        """Get all non-deleted activity instances for a session in display order."""
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = get_owned_session(self.db_session, root_id, session_id)
+        if not session:
+            return None, "Session not found", 404
+
+        instances = self.db_session.query(ActivityInstance).options(
+            *self._session_activity_read_options(),
+        ).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.deleted_at == None,
+        ).order_by(ActivityInstance.created_at).all()
+
+        return [serialize_activity_instance(inst) for inst in instances], None, 200
 
     def add_activity_to_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)

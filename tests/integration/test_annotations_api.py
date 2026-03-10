@@ -72,6 +72,39 @@ class TestAnnotationsApi:
         db_session.refresh(annotation)
         assert annotation.deleted_at is not None
 
+    def test_get_annotations_filters_by_context_contains(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        db_session.add_all([
+            VisualizationAnnotation(
+                root_id=root_id,
+                visualization_type="goal-analytics",
+                visualization_context={"view": "weekly", "metric": "hours"},
+                selected_points=[{"x": 1, "y": 2}],
+                content="Weekly hours note",
+            ),
+            VisualizationAnnotation(
+                root_id=root_id,
+                visualization_type="goal-analytics",
+                visualization_context={"view": "monthly"},
+                selected_points=[{"x": 3, "y": 4}],
+                content="Monthly note",
+            ),
+        ])
+        db_session.commit()
+
+        response = authed_client.get(
+            f"/api/roots/{root_id}/annotations",
+            query_string={
+                "visualization_type": "goal-analytics",
+                "visualization_context": '{"view":"weekly"}',
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()["data"]
+        assert len(payload) == 1
+        assert payload[0]["content"] == "Weekly hours note"
+
     def test_update_annotation_rejects_non_array_selected_points(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         annotation = VisualizationAnnotation(
