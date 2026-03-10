@@ -31,7 +31,9 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
         getGoalColor: () => '#22d3ee',
+        getGoalSecondaryColor: () => '#0f172a',
         getGoalTextColor: () => '#0f172a',
+        getGoalIcon: () => 'circle',
         getLevelByName: () => ({ icon: 'circle' }),
     }),
 }));
