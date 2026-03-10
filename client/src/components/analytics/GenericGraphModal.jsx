@@ -2,10 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Line, Bar } from 'react-chartjs-2';
 import { useChartOptions } from './ChartJSWrapper'; // Import hook
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
-import styles from '../GoalDetailModal.module.css'; // Reusing modal styles for consistency
-import flowStyles from '../../FlowTree.module.css'; // Reusing node styles for goal icon
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import GoalIcon from '../atoms/GoalIcon';
 import '../../App.css'; // For global modal styles if needed
 
 /**
@@ -19,11 +17,14 @@ const GenericGraphModal = ({
     title,
     goalType,
     goalColor,
+    goalIcon,
+    goalSecondaryColor,
+    isSmart = false,
     graphData,
     options = {},
     type = 'line'
 }) => {
-    const { getGoalColor, getGoalSecondaryColor } = useGoalLevels();;
+    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
 
     // Theme-aware options
     const baseOptions = useChartOptions({
@@ -37,13 +38,8 @@ const GenericGraphModal = ({
 
     // Determine colors
     const effectiveGoalColor = goalColor || getGoalColor(goalType) || '#4caf50';
-    const smartRingFillColor = getGoalSecondaryColor(goalType) || 'rgba(76, 175, 80, 0.1)';
-
-    // Dataset color variables (readability first)
-    const sessionColor = '#4caf50';
-    const activityColor = '#2196f3';
-    const sessionBg = 'rgba(76, 175, 80, 0.1)';
-    const activityBg = 'rgba(33, 150, 243, 0.1)';
+    const effectiveGoalIcon = goalIcon || getGoalIcon(goalType) || 'circle';
+    const effectiveSecondaryColor = goalSecondaryColor || getGoalSecondaryColor(goalType) || effectiveGoalColor;
 
     // Helper to get computed CSS variable value
     const getCSSVar = (name) => {
@@ -52,6 +48,21 @@ const GenericGraphModal = ({
             return value || undefined;
         }
         return undefined;
+    };
+
+    const toRgba = (hexColor, alpha) => {
+        if (!hexColor || typeof hexColor !== 'string' || !hexColor.startsWith('#')) {
+            return hexColor;
+        }
+
+        const normalized = hexColor.length === 4
+            ? `#${hexColor[1]}${hexColor[1]}${hexColor[2]}${hexColor[2]}${hexColor[3]}${hexColor[3]}`
+            : hexColor;
+        const red = parseInt(normalized.slice(1, 3), 16);
+        const green = parseInt(normalized.slice(3, 5), 16);
+        const blue = parseInt(normalized.slice(5, 7), 16);
+
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
     };
 
     // Resolved colors for Chart.js (which doesn't support CSS variables)
@@ -145,18 +156,20 @@ const GenericGraphModal = ({
         ...graphData,
         datasets: graphData.datasets.map((ds, idx) => ({
             ...ds,
-            borderColor: idx === 0 ? sessionColor : activityColor,
-            backgroundColor: idx === 0 ? sessionBg : activityBg,
-            pointBackgroundColor: idx === 0 ? sessionColor : activityColor,
-            pointBorderColor: idx === 0 ? sessionColor : activityColor,
-            pointRadius: 4,
-            pointHoverRadius: 6,
+            borderColor: idx === 0 ? effectiveGoalColor : '#2196f3',
+            backgroundColor: idx === 0 ? toRgba(effectiveSecondaryColor, type === 'bar' ? 0.7 : 0.2) : 'rgba(33, 150, 243, 0.18)',
+            pointBackgroundColor: idx === 0 ? effectiveGoalColor : '#2196f3',
+            pointBorderColor: idx === 0 ? effectiveGoalColor : '#2196f3',
+            pointRadius: type === 'bar' ? 0 : 4,
+            pointHoverRadius: type === 'bar' ? 0 : 6,
             pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: idx === 0 ? sessionColor : activityColor,
-            pointHoverBorderWidth: 2,
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4
+            pointHoverBorderColor: idx === 0 ? effectiveGoalColor : '#2196f3',
+            pointHoverBorderWidth: type === 'bar' ? 0 : 2,
+            borderWidth: type === 'bar' ? 1 : 2,
+            fill: type !== 'bar',
+            tension: type === 'bar' ? 0 : 0.4,
+            borderRadius: type === 'bar' ? 6 : undefined,
+            maxBarThickness: type === 'bar' ? 28 : undefined
         }))
     } : null;
 
@@ -198,15 +211,13 @@ const GenericGraphModal = ({
                     marginBottom: '16px' // Significantly reduced margin
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        {/* Goal Icon - Favicon Bullseye Style */}
-                        <svg width="44" height="44" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                            {/* Outer Ring */}
-                            <circle cx="15" cy="15" r="13.75" fill={smartRingFillColor} stroke={effectiveGoalColor} strokeWidth="2.5" />
-                            {/* Middle Ring */}
-                            <circle cx="15" cy="15" r="8.75" fill={smartRingFillColor} stroke={effectiveGoalColor} strokeWidth="2.5" />
-                            {/* Inner Core */}
-                            <circle cx="15" cy="15" r="5" fill={effectiveGoalColor} />
-                        </svg>
+                        <GoalIcon
+                            shape={effectiveGoalIcon}
+                            color={effectiveGoalColor}
+                            secondaryColor={effectiveSecondaryColor}
+                            isSmart={isSmart}
+                            size={44}
+                        />
 
                         <h2 style={{
                             margin: 0,

@@ -2,7 +2,16 @@ import { useMemo, useState } from 'react';
 
 import { useGoalDailyDurations } from './useGoalQueries';
 
-export function useGoalDurationModal({ goalId, goalName, fallbackName, goalType, goalColor }) {
+export function useGoalDurationModal({
+    goalId,
+    goalName,
+    fallbackName,
+    goalType,
+    goalColor,
+    goalIcon,
+    goalSecondaryColor,
+    isSmart,
+}) {
     const [isDurationModalOpen, setIsDurationModalOpen] = useState(false);
     const { data: durationsData, isSuccess: isDurationsSuccess } = useGoalDailyDurations(goalId, isDurationModalOpen);
 
@@ -19,6 +28,10 @@ export function useGoalDurationModal({ goalId, goalName, fallbackName, goalType,
             title: goalName || fallbackName,
             goalType,
             goalColor,
+            goalIcon,
+            goalSecondaryColor,
+            isSmart,
+            type: 'bar',
             graphData: {
                 labels,
                 datasets: [
@@ -37,7 +50,18 @@ export function useGoalDurationModal({ goalId, goalName, fallbackName, goalType,
                 }
             }
         };
-    }, [durationsData, fallbackName, goalColor, goalName, goalType, isDurationModalOpen, isDurationsSuccess]);
+    }, [
+        durationsData,
+        fallbackName,
+        goalColor,
+        goalIcon,
+        goalName,
+        goalSecondaryColor,
+        goalType,
+        isDurationModalOpen,
+        isDurationsSuccess,
+        isSmart,
+    ]);
 
     return {
         graphModalConfig,

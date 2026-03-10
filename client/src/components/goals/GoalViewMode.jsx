@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
+import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import GoalSmartSection from './GoalSmartSection';
 import GoalChildrenList from './GoalChildrenList';
 import { formatDurationSeconds as formatDuration } from '../../utils/formatters';
@@ -161,8 +162,8 @@ function GoalViewMode({
                 const associatedPrograms = programs.filter(p => {
                     // Check directly on program
                     const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
-                    // Check on blocks
-                    const blockLevel = p.blocks && p.blocks.some(b => b.goal_ids && b.goal_ids.includes(goalId));
+                    // A goal belongs to a block whenever its deadline falls inside the block range.
+                    const blockLevel = p.blocks && p.blocks.some((block) => isGoalAssociatedWithBlock(goal, block));
                     return programLevel || blockLevel;
                 });
 

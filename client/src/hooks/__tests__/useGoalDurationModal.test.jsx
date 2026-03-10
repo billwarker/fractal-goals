@@ -28,6 +28,9 @@ describe('useGoalDurationModal', () => {
             fallbackName: 'Fallback',
             goalType: 'ShortTermGoal',
             goalColor: '#22d3ee',
+            goalIcon: 'diamond',
+            goalSecondaryColor: '#0f172a',
+            isSmart: true,
         }));
 
         act(() => {
@@ -40,5 +43,9 @@ describe('useGoalDurationModal', () => {
 
         expect(result.current.graphModalConfig?.graphData.datasets[0].data).toEqual([10, 20]);
         expect(result.current.graphModalConfig?.goalType).toBe('ShortTermGoal');
+        expect(result.current.graphModalConfig?.goalIcon).toBe('diamond');
+        expect(result.current.graphModalConfig?.goalSecondaryColor).toBe('#0f172a');
+        expect(result.current.graphModalConfig?.isSmart).toBe(true);
+        expect(result.current.graphModalConfig?.type).toBe('bar');
     });
 });

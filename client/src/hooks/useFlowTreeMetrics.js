@@ -310,6 +310,7 @@ export const deriveGraphMetrics = (
             totalGoals,
             completedGoals,
             pctCompleted,
+            smartGoals,
             pctSmart
         },
         row2: {

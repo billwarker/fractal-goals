@@ -7,6 +7,7 @@ import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getChildType } from '../utils/goalHelpers';
+import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalCompletionModal from './goals/GoalCompletionModal';
@@ -58,7 +59,7 @@ function GoalDetailModal({
     initialActivities = [], // Initial associated activities for create mode
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
-    const { getGoalColor, getGoalTextColor, getLevelByName } = useGoalLevels();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon, getLevelByName } = useGoalLevels();
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
     // Normalize programs to always be an array (handles null case)
@@ -83,6 +84,9 @@ function GoalDetailModal({
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
     const goalColor = getGoalColor(goalType);
+    const goalSecondaryColor = getGoalSecondaryColor(goalType);
+    const goalIcon = getGoalIcon(goalType);
+    const goalIsSmart = isSMART(goal);
 
     const depGoalId = goal?.attributes?.id || goal?.id;
     const {
@@ -95,6 +99,9 @@ function GoalDetailModal({
         fallbackName: name,
         goalType,
         goalColor,
+        goalIcon,
+        goalSecondaryColor,
+        isSmart: goalIsSmart,
     });
 
 
@@ -107,8 +114,6 @@ function GoalDetailModal({
         setTargetToEdit,
         viewState,
         setViewState,
-        isScrolled,
-        handleScroll,
         handleClose,
         handleCancel,
         handleCompletionConfirm,
@@ -266,8 +271,12 @@ function GoalDetailModal({
                         title={graphModalConfig?.title}
                         goalType={graphModalConfig?.goalType}
                         goalColor={graphModalConfig?.goalColor}
+                        goalIcon={graphModalConfig?.goalIcon}
+                        goalSecondaryColor={graphModalConfig?.goalSecondaryColor}
+                        isSmart={graphModalConfig?.isSmart}
                         graphData={graphModalConfig?.graphData}
                         options={graphModalConfig?.options}
+                        type={graphModalConfig?.type}
                     />
                 </Suspense>
 
@@ -283,7 +292,6 @@ function GoalDetailModal({
                     onClose={handleClose}
                     onCollapse={onMobileCollapse}
                     deadline={deadline}
-                    isCompact={isScrolled}
                 />
 
                 {isEditing ? (
@@ -495,10 +503,7 @@ function GoalDetailModal({
         return (
             <>
                 <div className={styles.panelContainer}>
-                    <div
-                        className={styles.panelContent}
-                        onScroll={handleScroll}
-                    >
+                    <div className={styles.panelContent}>
                         {content}
                     </div>
                 </div>
@@ -519,7 +524,6 @@ function GoalDetailModal({
                     style={{
                         borderTop: `4px solid ${goalColor}`,
                     }}
-                    onScroll={handleScroll}
                 >
                     {content}
                 </div>

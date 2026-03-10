@@ -299,7 +299,7 @@ const ProgramDetail = () => {
                             onSave={saveAttachedGoal}
                             goals={attachableBlockGoals}
                             block={attachBlock}
-                            associatedGoalIds={attachBlock?.goal_ids || []}
+                            associatedGoalIds={(blockGoalsByBlockId.get(attachBlock?.id) || []).map((goal) => goal.id)}
                         />
                         <DayViewModal
                             isOpen={showDayViewModal}

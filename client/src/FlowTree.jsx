@@ -328,7 +328,7 @@ const FlowTree = React.forwardRef(({
                         <div className={styles.metricsRowTitle}>Goals</div>
                         <div className={styles.metricItem} title="Total number of goals visible in this branch">Count: <span className={styles.metricValue}>{graphMetrics.row1.totalGoals}</span></div>
                         <div className={styles.metricItem} title="Number of goals marked as completed">Completed: <span className={styles.metricValue}>{graphMetrics.row1.completedGoals} ({graphMetrics.row1.pctCompleted}%)</span></div>
-                        <div className={styles.metricItem} title="Percentage of goals that meet SMART criteria">SMART: <span className={styles.metricValue}>{graphMetrics.row1.pctSmart}%</span></div>
+                        <div className={styles.metricItem} title="Number of goals that meet SMART criteria">SMART: <span className={styles.metricValue}>{graphMetrics.row1.smartGoals} ({graphMetrics.row1.pctSmart}%)</span></div>
                     </div>
 
                     <div className={styles.metricsRow}>

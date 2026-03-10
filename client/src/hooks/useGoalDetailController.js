@@ -23,8 +23,6 @@ export function useGoalDetailController({
     resetForm,
 }) {
     const [controllerStateByKey, setControllerStateByKey] = useState({});
-    const [isScrolled, setIsScrolled] = useState(false);
-
     const depGoalIdentity = goal?.attributes?.id || goal?.id;
     const depGoalCompleted = goal?.attributes?.completed;
     const depGoalCompletedAt = goal?.attributes?.completed_at;
@@ -80,10 +78,6 @@ export function useGoalDetailController({
         }));
     };
 
-    const handleScroll = (event) => {
-        setIsScrolled(event.target.scrollTop > 0);
-    };
-
     const handleClose = () => {
         clearControllerState();
         if (onClose) {
@@ -133,8 +127,6 @@ export function useGoalDetailController({
         setTargetToEdit,
         viewState: controllerState.viewState,
         setViewState,
-        isScrolled,
-        handleScroll,
         handleClose,
         handleCancel,
         handleCompletionConfirm,

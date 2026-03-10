@@ -23,6 +23,8 @@ const GoalCharacteristicsSettings = () => {
         return <div>Loading Goal Configuration...</div>;
     }
 
+    const editableGoalLevels = goalLevels.filter((level) => level?.name !== 'Completed');
+
     const handleChange = (levelId, field, value) => {
         setEdits(prev => ({
             ...prev,
@@ -78,7 +80,7 @@ const GoalCharacteristicsSettings = () => {
             {/* Completed Goal Global Settings */}
             <CompletedGoalSettingsCard user={user} setUser={setUser} animatedIcons={animatedIcons} isMobile={isMobile} />
 
-            {goalLevels.map((level) => {
+            {editableGoalLevels.map((level) => {
                 // Merge DB state with local unsaved edits
                 const current = { ...level, ...(edits[level.id] || {}) };
                 const hasUnsavedChanges = !!edits[level.id] && Object.keys(edits[level.id]).length > 0;

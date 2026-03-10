@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import moment from 'moment';
 
 import { getDatePart, getISOYMDInTimezone } from '../utils/dateUtils';
+import { getGoalDeadline, isGoalAssociatedWithBlock } from '../utils/programGoalAssociations';
 import { isBlockActive } from '../utils/programUtils.jsx';
 
 function getSessionProgramDayId(session) {
@@ -349,11 +350,17 @@ export function useProgramDetailViewModel({
         return program?.blocks?.find((block) => isBlockActive(block)) || null;
     }, [program?.blocks]);
 
+    const associatedGoals = useMemo(() => {
+        return Array.from(attachedGoalIds || [])
+            .map((goalId) => getGoalDetails(goalId))
+            .filter(Boolean);
+    }, [attachedGoalIds, getGoalDetails]);
+
     const blockGoalsByBlockId = useMemo(() => {
         const entries = sortedBlocks.map((block) => {
             const seenGoalIds = new Set();
-            const blockGoals = (block.goal_ids || [])
-                .map((goalId) => getGoalDetails(goalId))
+            const blockGoals = associatedGoals
+                .filter((goal) => isGoalAssociatedWithBlock(goal, block))
                 .filter((goal) => {
                     if (!goal || seenGoalIds.has(goal.id)) {
                         return false;
@@ -362,13 +369,16 @@ export function useProgramDetailViewModel({
                     return true;
                 })
                 .sort((left, right) => {
-                    if (left.deadline && right.deadline) {
-                        return new Date(left.deadline) - new Date(right.deadline);
+                    const leftDeadline = getGoalDeadline(left);
+                    const rightDeadline = getGoalDeadline(right);
+
+                    if (leftDeadline && rightDeadline) {
+                        return new Date(leftDeadline) - new Date(rightDeadline);
                     }
-                    if (left.deadline) {
+                    if (leftDeadline) {
                         return -1;
                     }
-                    if (right.deadline) {
+                    if (rightDeadline) {
                         return 1;
                     }
                     return left.name.localeCompare(right.name);
@@ -378,7 +388,7 @@ export function useProgramDetailViewModel({
         });
 
         return new Map(entries);
-    }, [getGoalDetails, sortedBlocks]);
+    }, [associatedGoals, sortedBlocks]);
 
     const blockMetrics = useMemo(() => {
         if (!activeBlock) {
@@ -394,22 +404,19 @@ export function useProgramDetailViewModel({
             return programDaysMap.get(programDayId)?.blockId === activeBlock.id;
         });
 
-        const blockGoalIds = Array.from(new Set(activeBlock.goal_ids || []));
+        const blockGoals = blockGoalsByBlockId.get(activeBlock.id) || [];
 
         return {
             name: activeBlock.name,
             color: activeBlock.color || '#3A86FF',
             completedSessions: blockSessions.filter((session) => session.completed).length,
             scheduledSessions: blockSessions.length,
-            goalsMet: blockGoalIds.filter((goalId) => {
-                const goal = getGoalDetails(goalId);
-                return goal && (goal.completed || goal.attributes?.completed);
-            }).length,
-            totalGoals: blockGoalIds.length,
+            goalsMet: blockGoals.filter((goal) => goal && (goal.completed || goal.attributes?.completed)).length,
+            totalGoals: blockGoals.length,
             totalDuration: blockSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
             daysRemaining: Math.max(0, moment(activeBlock.end_date).startOf('day').diff(moment().startOf('day'), 'days')),
         };
-    }, [activeBlock, getGoalDetails, programDaysMap, sessions]);
+    }, [activeBlock, blockGoalsByBlockId, programDaysMap, sessions]);
 
     const attachBlock = useMemo(() => {
         return sortedBlocks.find((block) => block.id === attachBlockId) || null;
