@@ -1,0 +1,12 @@
+{
+  "name": "fractal-goals-supabase-tools",
+  "private": true,
+  "scripts": {
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "status": "supabase status"
+  },
+  "devDependencies": {
+    "supabase": "^2.77.1"
+  }
+}

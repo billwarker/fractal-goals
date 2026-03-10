@@ -47,6 +47,7 @@ logs/
 *.old
 *.deprecated
 backups/
+Cloud_SQL_Export_*.sql
 
 # IDE & Editor
 .vscode/
