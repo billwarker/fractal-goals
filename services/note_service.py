@@ -11,6 +11,7 @@ from models import (
     session_goals,
     validate_root_goal,
 )
+from services.events import Event, Events, event_bus
 from services.goal_service import GoalService, sync_goal_targets
 from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
@@ -307,6 +308,17 @@ class NoteService:
         self.db_session.commit()
         self.db_session.refresh(new_goal)
         self.db_session.refresh(note)
+        event_bus.emit(Event(
+            Events.GOAL_CREATED,
+            {
+                'goal_id': new_goal.id,
+                'goal_name': new_goal.name,
+                'goal_type': get_canonical_goal_type(new_goal),
+                'parent_id': new_goal.parent_id,
+                'root_id': root_id,
+            },
+            source='note_service.create_nano_goal_note',
+        ))
 
         logger.info(
             "Created nano goal %s with note %s for activity instance %s",

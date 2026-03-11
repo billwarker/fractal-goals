@@ -19,6 +19,7 @@ from services.owned_entity_queries import (
     get_owned_activity_instance,
     get_owned_session,
 )
+from services.events import Event, Events, event_bus
 from services.serializers import serialize_activity_instance, serialize_session
 from services.service_types import JsonDict, ServiceResult
 
@@ -97,6 +98,19 @@ class TimerService:
         self.db_session.add(instance)
         return instance
 
+    @staticmethod
+    def _activity_event_payload(instance, root_id, activity_name, *, updated_fields=None) -> JsonDict:
+        payload = {
+            'instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'activity_name': activity_name,
+            'session_id': instance.session_id,
+            'root_id': root_id,
+        }
+        if updated_fields:
+            payload['updated_fields'] = updated_fields
+        return payload
+
     def create_activity_instance(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
         if not root:
@@ -138,6 +152,15 @@ class TimerService:
             activity_definition=activity_definition,
         )
         self.db_session.commit()
+        event_bus.emit_async(Event(
+            Events.ACTIVITY_INSTANCE_CREATED,
+            self._activity_event_payload(
+                instance,
+                root_id,
+                activity_definition.name if activity_definition else "Unknown",
+            ),
+            source='timer_service.create_activity_instance',
+        ))
         return {
             "instance": instance,
             "serialized": serialize_activity_instance(instance),
@@ -218,13 +241,31 @@ class TimerService:
             instance.last_paused_at = None
 
         self.db_session.commit()
+        activity_name = instance.definition.name if instance.definition else "Unknown"
+        event_bus.emit(Event(
+            Events.ACTIVITY_INSTANCE_UPDATED,
+            self._activity_event_payload(
+                instance,
+                root_id,
+                activity_name,
+                updated_fields=['time_start'],
+            ),
+            source='timer_service.start_activity_timer',
+        ))
         return {
             "instance": instance,
             "serialized": serialize_activity_instance(instance),
-            "activity_name": instance.definition.name if instance.definition else "Unknown",
+            "activity_name": activity_name,
         }, None, 200
 
-    def complete_activity_instance(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonDict]:
+    def complete_activity_instance(
+        self,
+        root_id,
+        instance_id,
+        current_user_id,
+        *,
+        async_completion=False,
+    ) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -258,10 +299,28 @@ class TimerService:
             instance.completed = True
 
         self.db_session.commit()
+        activity_name = instance.definition.name if instance.definition else "Unknown"
+        completion_event = Event(
+            Events.ACTIVITY_INSTANCE_COMPLETED,
+            {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': activity_name,
+                'session_id': instance.session_id,
+                'root_id': root_id,
+                'duration_seconds': instance.duration_seconds,
+                'completed_at': instance.time_stop.isoformat() if instance.time_stop else None,
+            },
+            source='timer_service.complete_activity_instance',
+        )
+        if async_completion:
+            event_bus.emit_async(completion_event)
+        else:
+            event_bus.emit(completion_event)
         return {
             "instance": instance,
             "serialized": serialize_activity_instance(instance),
-            "activity_name": instance.definition.name if instance.definition else "Unknown",
+            "activity_name": activity_name,
             "completed_at": instance.time_stop.isoformat() if instance.time_stop else None,
         }, None, 200
 
@@ -329,10 +388,35 @@ class TimerService:
             instance.duration_seconds = None
 
         self.db_session.commit()
+        activity_name = instance.definition.name if instance.definition else "Unknown"
+        updated_fields = list(data.keys())
+        non_metric_fields = [field for field in updated_fields if field != 'sets']
+        if 'sets' in data:
+            event_bus.emit(Event(
+                Events.ACTIVITY_METRICS_UPDATED,
+                self._activity_event_payload(
+                    instance,
+                    root_id,
+                    activity_name,
+                    updated_fields=['sets'],
+                ),
+                source='timer_service.update_activity_instance',
+            ))
+        if non_metric_fields:
+            event_bus.emit(Event(
+                Events.ACTIVITY_INSTANCE_UPDATED,
+                self._activity_event_payload(
+                    instance,
+                    root_id,
+                    activity_name,
+                    updated_fields=non_metric_fields,
+                ),
+                source='timer_service.update_activity_instance',
+            ))
         return {
             "instance": instance,
             "serialized": serialize_activity_instance(instance),
-            "activity_name": instance.definition.name if instance.definition else "Unknown",
+            "activity_name": activity_name,
         }, None, 200
 
     def pause_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -363,6 +447,14 @@ class TimerService:
 
         self.db_session.commit()
         refreshed = self._load_session_for_response(root_id, session_id) or session
+        event_bus.emit(Event(
+            Events.SESSION_UPDATED,
+            {
+                'session_id': refreshed.id,
+                'root_id': root_id,
+            },
+            source='timer_service.pause_session',
+        ))
         return {
             "session": refreshed,
             "serialized": serialize_session(refreshed),
@@ -402,6 +494,14 @@ class TimerService:
 
         self.db_session.commit()
         refreshed = self._load_session_for_response(root_id, session_id) or session
+        event_bus.emit(Event(
+            Events.SESSION_UPDATED,
+            {
+                'session_id': refreshed.id,
+                'root_id': root_id,
+            },
+            source='timer_service.resume_session',
+        ))
         return {
             "session": refreshed,
             "serialized": serialize_session(refreshed),

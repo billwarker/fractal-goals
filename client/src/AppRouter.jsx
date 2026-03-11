@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { fractalApi } from './utils/api';
-import { HeaderProvider, useHeader } from './context/HeaderContext';
+import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import useIsMobile from './hooks/useIsMobile';
 import styles from './AppRouter.module.css';
 import './App.css';

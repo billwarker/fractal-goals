@@ -1,14 +1,11 @@
+import React, { createContext, useContext, useState } from 'react';
 
-import React, { createContext, useState, useContext } from 'react';
-
-// Create the context
 const HeaderContext = createContext({
     headerActions: null,
-    setHeaderActions: () => { }
+    setHeaderActions: () => {},
 });
 
-// Provider component
-export const HeaderProvider = ({ children }) => {
+export function HeaderProvider({ children }) {
     const [headerActions, setHeaderActions] = useState(null);
 
     return (
@@ -16,7 +13,8 @@ export const HeaderProvider = ({ children }) => {
             {children}
         </HeaderContext.Provider>
     );
-};
+}
 
-// Hook to use the context
-export const useHeader = () => useContext(HeaderContext);
+export function useHeader() {
+    return useContext(HeaderContext);
+}

@@ -309,9 +309,21 @@ class SessionService:
 
         self.db_session.commit()
         self.db_session.refresh(instance)
+        activity_name = activity_def.name if activity_def else 'Unknown'
+        event_bus.emit(Event(
+            Events.ACTIVITY_INSTANCE_CREATED,
+            {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': activity_name,
+                'session_id': session_id,
+                'root_id': root_id,
+            },
+            source='session_service.add_activity_to_session',
+        ))
         return {
             "instance": instance,
-            "activity_name": activity_def.name if activity_def else 'Unknown',
+            "activity_name": activity_name,
         }, None, 201
 
     def reorder_activities(self, root_id, session_id, current_user_id, activity_ids) -> ServiceResult[JsonDict]:
@@ -361,6 +373,18 @@ class SessionService:
 
         self.db_session.commit()
         self.db_session.refresh(instance)
+        event_bus.emit(Event(
+            Events.ACTIVITY_INSTANCE_UPDATED,
+            {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': instance.definition.name if instance.definition else 'Unknown',
+                'session_id': session_id,
+                'root_id': root_id,
+                'updated_fields': list(data.keys()),
+            },
+            source='session_service.update_activity_instance',
+        ))
         return {
             "instance": instance,
             "activity_name": instance.definition.name if instance.definition else 'Unknown',
@@ -387,6 +411,17 @@ class SessionService:
 
         instance.deleted_at = models.utc_now()
         self.db_session.commit()
+        event_bus.emit(Event(
+            Events.ACTIVITY_INSTANCE_DELETED,
+            {
+                'instance_id': instance_id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': instance.definition.name if instance.definition else 'Unknown',
+                'session_id': session_id,
+                'root_id': root_id,
+            },
+            source='session_service.remove_activity_from_session',
+        ))
         return {
             "instance": instance,
             "activity_name": instance.definition.name if instance.definition else 'Unknown',
@@ -454,6 +489,18 @@ class SessionService:
 
         self.db_session.commit()
         self.db_session.refresh(instance)
+        event_bus.emit(Event(
+            Events.ACTIVITY_METRICS_UPDATED,
+            {
+                'instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'activity_name': instance.definition.name if instance.definition else 'Unknown',
+                'session_id': session_id,
+                'root_id': root_id,
+                'updated_fields': ['metrics'],
+            },
+            source='session_service.update_activity_metrics',
+        ))
         return {
             "instance": instance,
             "activity_name": instance.definition.name if instance.definition else 'Unknown',

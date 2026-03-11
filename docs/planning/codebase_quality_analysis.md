@@ -1,7 +1,7 @@
 # Codebase Quality Analysis — Engineering Standards Ranking
 
 > Evaluated against the architectural standards defined in [index.md](file:///Users/will/Projects/fractal-goals/index.md).
-> Reviewed: March 10, 2026
+> Reviewed: March 11, 2026
 
 ## Scoring Framework
 
@@ -19,18 +19,58 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 
 ---
 
+## Overall Grade
+
+**Overall codebase grade: A-**
+
+The codebase is now strongly aligned with the architecture described in [index.md](file:///Users/will/Projects/fractal-goals/index.md). The main backend surfaces are service-backed, the main frontend surfaces are query-first, post-commit event ownership is largely standardized, and the session/session-detail area has been substantially decomposed. The remaining distance from `S` is concentrated in a few older large blueprints, uneven analytics/annotation depth, and a handful of intentionally non-standard edges such as log retention and some timer-path transport quirks.
+
+## What Was Accomplished
+
+The following architecture work is now complete:
+
+- Session and session-detail frontend refactoring into focused hooks, contexts, controllers, and view models.
+- Timer lifecycle extraction into [timer_service.py](file:///Users/will/Projects/fractal-goals/services/timer_service.py).
+- Session read/write extraction into [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py), including global list and session-activities reads.
+- Logging extraction into [log_service.py](file:///Users/will/Projects/fractal-goals/services/log_service.py).
+- Annotation extraction into [annotation_service.py](file:///Users/will/Projects/fractal-goals/services/annotation_service.py).
+- Goal blueprint slimming, including service-owned goal and target event flow.
+- Auth/account extraction into [auth_service.py](file:///Users/will/Projects/fractal-goals/services/auth_service.py) and [user_service.py](file:///Users/will/Projects/fractal-goals/services/user_service.py).
+- Cross-cutting event-boundary cleanup so the main write surfaces emit from services after commit.
+- Frontend context cleanup, including migration of `HeaderContext` into [client/src/contexts/](file:///Users/will/Projects/fractal-goals/client/src/contexts/).
+- Documentation updates in [index.md](file:///Users/will/Projects/fractal-goals/index.md) and this analysis file to match the current architecture.
+
+## Overall Alignment To `index.md`
+
+Current alignment to the repo standards is strong:
+
+- **Backend flow:** The dominant pattern is now `request -> blueprint -> validation -> service -> serializer -> response`, especially across sessions, timers, goals, templates, logs, annotations, and auth.
+- **Frontend flow:** The dominant pattern is now `page/component -> query hook or mutation hook -> shared query key -> API module`, with the session detail area as the clearest example of the intended architecture.
+- **Separation of concerns:** Business rules and mutation orchestration are mostly out of route files and concentrated in services or focused frontend hooks.
+- **Consistency:** Soft-delete, ownership checks, query-key usage, and post-commit event behavior are much more standardized than before.
+- **Testing discipline:** Focused regression coverage was added around the refactored service boundaries and the session/session-detail flows that had shown production instability.
+
+The remaining misalignment is narrower:
+
+- A few older blueprints are still larger than the standard ideal.
+- Analytics and annotation surfaces still lag the core domains in depth of tests and observability.
+- Logs intentionally differ from the soft-delete model.
+- Some timer/session transport shapes are still less elegant than the newer service-backed surfaces.
+
+---
+
 ## Rankings Summary
 
 | # | Section | Grade | One-Line Verdict |
 |---|---------|-------|------------------|
 | 1 | **Activities** | **A** | Clean end-to-end; blueprint is thin, service is comprehensive |
 | 2 | **Programs** | **A** | Dedicated service with validation errors, thorough test suite |
-| 3 | **Goals** | **A−** | Best service coverage; blueprint is slightly fat (764 lines) |
-| 4 | **Sessions** | **A−** | Backend and frontend are now largely aligned to the intended service/query architecture |
-| 5 | **Session Templates** | **B+** | Textbook thin blueprint; service is small but lean |
+| 3 | **Goals** | **A−** | Strong service ownership with residual blueprint size, but the main write/event paths now sit behind services |
+| 4 | **Sessions** | **A** | Backend and frontend now align closely to the intended service/query architecture |
+| 5 | **Session Templates** | **A−** | Thin blueprint with service-owned post-commit event flow |
 | 6 | **Analytics & Annotations** | **B+** | Analytics and annotations now both sit behind service boundaries, with testing still lighter than core domains |
-| 7 | **Timers / Activity Time-Tracking** | **B** | Timer lifecycle logic now lives in a service, though blueprint-owned orchestration remains |
-| 8 | **Auth & Settings** | **C** | No service layer at all; all logic inline in blueprint |
+| 7 | **Timers / Activity Time-Tracking** | **B+** | Timer lifecycle logic and timer-driven events now live in the service layer |
+| 8 | **Auth & Settings** | **B+** | Auth and account flows are service-backed, with service-level observability improved |
 | 9 | **Logging / Event Logs** | **B** | Log reads and retention are now service-backed and use the repo-standard DB session pattern |
 
 ---
@@ -94,19 +134,17 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** Multiple test files: `test_goals_api.py` (25KB), `test_goal_service_routes.py`, `test_goal_updates.py`, `test_micro_goals.py`, `test_inherited_activities.py`, `test_goal_metrics.py`.
 
 **Gaps:**
-- [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) is **764 lines** — the blueprint is not as thin as Activities or Programs. Several endpoints still have inline serialization calls and event emissions rather than letting the service handle these.
-- `update_goal_completion_endpoint` does inline Pydantic validation instead of using `@validate_request`.
-- `get_session_micro_goals` has a complex inline SQLAlchemy query that should be in a service.
-- Events are emitted in the blueprint rather than after the service commit — violates the "events after successful commits" principle since the service already commits.
+- [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py) is still large enough to justify another slimming pass.
+- Some goal endpoints still do transport-level serialization and response shaping that could be pushed further toward dedicated service/view helpers.
 
 ---
 
-### 4. Sessions — Grade: A−
+### 4. Sessions — Grade: A
 
 **Backend:**
 - [sessions_api.py](file:///Users/will/Projects/fractal-goals/blueprints/sessions_api.py) is now transport-oriented across both mutations and reads, delegating to [session_service.py](file:///Users/will/Projects/fractal-goals/services/session_service.py).
 - Create, update, delete, add/remove/reorder activities, update metrics, global session list, and session activities reads are all service-delegated.
-- Events are emitted in the blueprint (same pattern as goals).
+- Main session and session-activity write events now emit from services after commit.
 
 **Frontend:**
 - Excellent decomposition: `ActiveSessionContext.jsx` splits into `SessionDataContext`, `SessionUiContext`, `SessionActionsContext`.
@@ -116,16 +154,16 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_sessions_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_sessions_api.py) at 27KB.
 
 **Gaps:**
-- Events are still emitted in the blueprint rather than being fully service-owned after commit.
-- `useSessionDetailMutations.js` at 23KB is very large — could benefit from further splitting.
+- `useSessionDetailMutations.js` at 23KB is still large and could benefit from one more split.
+- Session-side activity/timer behavior still spans two blueprints, even though the write logic now lands in services.
 
 ---
 
-### 5. Session Templates — Grade: B+
+### 5. Session Templates — Grade: A−
 
 **Backend:**
-- [templates_api.py](file:///Users/will/Projects/fractal-goals/blueprints/templates_api.py) (142 lines) is the **most textbook-thin blueprint** in the codebase. Every endpoint delegates to [template_service.py](file:///Users/will/Projects/fractal-goals/services/template_service.py) (3.3KB).
-- Events emitted after service calls. Consistent error handling.
+- [templates_api.py](file:///Users/will/Projects/fractal-goals/blueprints/templates_api.py) (142 lines) is the **most textbook-thin blueprint** in the codebase. Every endpoint delegates to [template_service.py](file:///Users/will/Projects/fractal-goals/services/template_service.py).
+- Template create/update events now emit from the service after commit. Error handling is consistent.
 
 **Frontend:**
 - `CreateSessionTemplate.jsx` (10.9KB) handles template management.
@@ -133,7 +171,7 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_templates_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_templates_api.py) at 6.2KB.
 
 **Gaps:**
-- Template service is very thin (3.3KB) — ownership checks and CRUD are simple, but there's limited domain logic.
+- Template service remains intentionally thin because the domain is still CRUD-heavy rather than rule-heavy.
 - No frontend hook tests specifically for template queries.
 - `TemplateCard.jsx` (7.7KB) is a standalone component without dedicated tests.
 
@@ -159,12 +197,12 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 - [test_goal_analytics_service.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_goal_analytics_service.py) at 2.2KB.
 
 **Gaps:**
-- No event emissions for annotation mutations.
+- Annotation writes still have lighter downstream observability than the core goal/session surfaces.
 - Analytics test coverage is thin relative to the feature's complexity.
 
 ---
 
-### 7. Timers / Activity Time-Tracking — Grade: B
+### 7. Timers / Activity Time-Tracking — Grade: B+
 
 **Backend:**
 - [timers_api.py](file:///Users/will/Projects/fractal-goals/blueprints/timers_api.py) now delegates activity-instance lifecycle and session pause/resume logic to [timer_service.py](file:///Users/will/Projects/fractal-goals/services/timer_service.py).
@@ -178,22 +216,18 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_timers_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_timers_api.py) at 16.8KB — decent coverage.
 
 **Gaps:**
-- `complete_activity_instance` still has inline achievement retrieval/orchestration in the blueprint.
-- Inconsistent async/sync event emission (`emit_async` vs `emit`).
+- `complete_activity_instance` still enriches the HTTP response with achievements in the blueprint after the service mutation returns.
+- The dual GET/POST `/activity-instances` route shape is still less explicit than the rest of the API.
 
 ---
 
-### 8. Auth & Settings — Grade: C
+### 8. Auth & Settings — Grade: B+
 
 **Backend:**
-- [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py) (379 lines) has **zero service layer** — all logic is inline:
-  - JWT token generation and refresh.
-  - Login with lockout tracking and failed-attempt counting.
-  - Signup with duplicate checking.
-  - Password/email/username updates with re-authentication.
-  - Account deletion with PII anonymization.
-  - Preferences update with JSON merge logic.
-- `token_required` decorator has its own DB session management.
+- [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py) now delegates signup/login/refresh/token resolution to [auth_service.py](file:///Users/will/Projects/fractal-goals/services/auth_service.py).
+- Account/profile mutations now delegate to [user_service.py](file:///Users/will/Projects/fractal-goals/services/user_service.py): preferences, password, email, username, and account deletion/anonymization.
+- Deprecated auth-path `query(...).get()` usage was replaced with `db_session.get(...)` inside the new user service.
+- `token_required` still lives in the blueprint layer, but it now resolves users through `AuthService` instead of holding the token lookup logic inline.
 
 **Frontend:**
 - `AuthContext.jsx` (3.6KB) manages auth state.
@@ -202,11 +236,8 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 **Tests:** [test_auth_api.py](file:///Users/will/Projects/fractal-goals/tests/integration/test_auth_api.py) at 18.7KB — good integration coverage.
 
 **Gaps:**
-- **No `AuthService` or `UserService`** — all business rules (lockout, PII anonymization, password hashing) are in the blueprint.
-- Inline imports (`from werkzeug.security import generate_password_hash`, `from sqlalchemy.orm.attributes import flag_modified`) are code smells.
-- `update_preferences` has inline JSON merge logic with `flag_modified` — should be in a service.
-- No event emissions for auth actions (login, signup, password change, account deletion).
-- `db_session.query(User).get()` is deprecated in SQLAlchemy 2.0+.
+- Auth actions still rely on service logging rather than first-class domain events.
+- The auth decorator remains blueprint-owned rather than part of a more centralized auth boundary.
 
 ---
 
@@ -240,18 +271,18 @@ Grades: **S** (exemplary) · **A** (strong) · **B** (good, minor gaps) · **C**
 | Context decomposition | ✅ Strong in Sessions (3-context split) |
 | Hook-based logic extraction | ✅ 41 hooks, 23 with tests |
 | CSS Modules adoption | ⚠️ Mixed — some files still use `.css`, others `.module.css` |
-| Stale `context/` directory | ⚠️ `client/src/context/HeaderContext.jsx` exists alongside `client/src/contexts/` |
+| Context directory consistency | ✅ `HeaderContext` now lives under `client/src/contexts/` with the rest of the app contexts |
 
 ### Backend Patterns
 
 | Pattern | Status |
 |---------|--------|
-| Service layer coverage | ⚠️ 8 of 9 areas fully service-backed |
-| Pydantic validation decorator | ✅ Most endpoints, except timers POST and goal completion |
+| Service layer coverage | ✅ All major areas are now service-backed |
+| Pydantic validation decorator | ✅ Used across nearly all write endpoints, with only a few custom timer-path validations left |
 | Serialization separation | ✅ `serializers.py` + `view_serializers.py` |
-| Event emissions after commits | ⚠️ Events emitted in blueprints, not always after service commits |
+| Event emissions after commits | ✅ Main write surfaces now emit from services after commit |
 | Soft-delete consistency | ⚠️ Logs uses hard delete; rest uses soft-delete |
-| DB session management | ⚠️ Logs uses `get_scoped_session()`; rest uses `get_session(engine)` |
+| DB session management | ✅ Main surfaces now use the repo-standard `get_session(engine)` pattern |
 
 ---
 
@@ -321,22 +352,32 @@ Wave 3 verification completed so far:
 
 ### Wave 4 — Auth And User Services
 
-- [ ] Create `services/auth_service.py`.
-- [ ] Create `services/user_service.py` or equivalent account/profile service boundary.
-- [ ] Move login/signup/refresh/lockout logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
-- [ ] Move password/email/username update logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
-- [ ] Move preferences JSON merge logic out of the blueprint.
-- [ ] Move account deletion / anonymization logic out of the blueprint.
-- [ ] Replace deprecated `query(...).get()` usage while touching these paths.
-- [ ] Preserve current auth integration coverage during the extraction.
+- [x] Create `services/auth_service.py`.
+- [x] Create `services/user_service.py` or equivalent account/profile service boundary.
+- [x] Move login/signup/refresh/lockout logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
+- [x] Move password/email/username update logic out of [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py).
+- [x] Move preferences JSON merge logic out of the blueprint.
+- [x] Move account deletion / anonymization logic out of the blueprint.
+- [x] Replace deprecated `query(...).get()` usage while touching these paths.
+- [x] Preserve current auth integration coverage during the extraction.
+
+Wave 4 verification completed:
+- `tests/integration/test_auth_api.py`
 
 ### Wave 5 — Cross-Cutting Consistency
 
-- [ ] Standardize “service commit first, event emit second” across timers, sessions, goals, logs, annotations, and auth.
-- [ ] Audit event emission ownership in blueprints after service extractions land.
-- [ ] Remove or migrate stale [HeaderContext.jsx](file:///Users/will/Projects/fractal-goals/client/src/context/HeaderContext.jsx) from `client/src/context/`.
-- [ ] Resolve leftover `client/src/context/` vs `client/src/contexts/` naming inconsistency.
-- [ ] Update [index.md](file:///Users/will/Projects/fractal-goals/index.md) once the service-boundary cleanup materially changes the architecture map.
+- [x] Standardize “service commit first, event emit second” across timers, sessions, goals, logs, annotations, and auth-adjacent account flows.
+- [x] Audit event emission ownership in blueprints after service extractions land.
+- [x] Remove or migrate stale [HeaderContext.jsx](file:///Users/will/Projects/fractal-goals/client/src/contexts/HeaderContext.jsx) from the old `client/src/context/` location.
+- [x] Resolve leftover `client/src/context/` vs `client/src/contexts/` naming inconsistency.
+- [x] Update [index.md](file:///Users/will/Projects/fractal-goals/index.md) once the service-boundary cleanup materially changes the architecture map.
+
+Wave 5 verification completed:
+- `tests/integration/test_timers_api.py`
+- `tests/integration/test_sessions_api.py`
+- `tests/integration/test_templates_api.py`
+- `tests/integration/test_notes_api.py`
+- `tests/integration/test_auth_api.py`
 
 ## Recommended Execution Order
 
@@ -351,6 +392,7 @@ Wave 3 verification completed so far:
 - The earlier sessions frontend concerns in this document are partly historical.
 - Session/session-detail frontend architecture has already been substantially decomposed into focused hooks, view models, and thin layout components.
 - Wave 1 backend cleanup is complete for the active session surface.
-- The largest remaining backend architecture gaps are now:
-  - [goals_api.py](file:///Users/will/Projects/fractal-goals/blueprints/goals_api.py)
-  - [auth_api.py](file:///Users/will/Projects/fractal-goals/blueprints/auth_api.py)
+- Wave 5 cross-cutting consistency cleanup is complete for the current architecture plan.
+- The largest remaining architecture gaps are now:
+  - blueprint size reduction in a few older large files (`goals_api.py`, some auth/session route shells)
+  - deeper analytics/annotation test and observability coverage

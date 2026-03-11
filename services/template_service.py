@@ -5,6 +5,7 @@ import models
 
 from blueprints.api_utils import require_owned_root
 from models import SessionTemplate
+from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
 from services.service_types import JsonList, ServiceResult
 
@@ -58,6 +59,15 @@ class TemplateService:
         self.db_session.add(new_template)
         self.db_session.commit()
         self.db_session.refresh(new_template)
+        event_bus.emit(Event(
+            Events.SESSION_TEMPLATE_CREATED,
+            {
+                'template_id': new_template.id,
+                'name': new_template.name,
+                'root_id': root_id,
+            },
+            source='template_service.create_template',
+        ))
         return new_template, None, 201
 
     def update_template(self, root_id, template_id, current_user_id, data) -> ServiceResult[SessionTemplate]:
@@ -74,6 +84,16 @@ class TemplateService:
 
         self.db_session.commit()
         self.db_session.refresh(template)
+        event_bus.emit(Event(
+            Events.SESSION_TEMPLATE_UPDATED,
+            {
+                'template_id': template.id,
+                'name': template.name,
+                'root_id': root_id,
+                'updated_fields': list(data.keys()),
+            },
+            source='template_service.update_template',
+        ))
         return template, None, 200
 
     def delete_template(self, root_id, template_id, current_user_id) -> ServiceResult[dict]:

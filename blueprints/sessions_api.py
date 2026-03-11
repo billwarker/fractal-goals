@@ -15,7 +15,6 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import parse_optional_pagination, etag_json_response, internal_error
-from services import event_bus, Event, Events
 from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
 
@@ -189,19 +188,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
         payload, error, status = service.add_activity_to_session(root_id, session_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
-        instance = payload["instance"]
-        activity_name = payload["activity_name"]
-        
-        # Emit activity instance created event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_CREATED, {
-            'instance_id': instance.id,
-            'activity_definition_id': instance.activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': session_id,
-            'root_id': root_id
-        }, source='sessions_api.add_activity_to_session'))
-        
-        return jsonify(serialize_activity_instance(instance)), 201
+        return jsonify(serialize_activity_instance(payload["instance"])), 201
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -255,20 +242,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
         )
         if error:
             return jsonify({"error": error}), status
-        instance = payload["instance"]
-        activity_name = payload["activity_name"]
-        
-        # Emit the generic lifecycle/update event for session-scoped instance edits.
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
-            'instance_id': instance.id,
-            'activity_definition_id': instance.activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': session_id,
-            'root_id': root_id,
-            'updated_fields': list(validated_data.keys())
-        }, source='sessions_api.update_activity_instance'))
-        
-        return jsonify(serialize_activity_instance(instance))
+        return jsonify(serialize_activity_instance(payload["instance"]))
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating activity instance")
@@ -293,19 +267,6 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
         )
         if error:
             return jsonify({"error": error}), status
-        instance = payload["instance"]
-        activity_definition_id = instance.activity_definition_id
-        activity_name = payload["activity_name"]
-        
-        # Emit activity instance deleted event
-        event_bus.emit(Event(Events.ACTIVITY_INSTANCE_DELETED, {
-            'instance_id': instance_id,
-            'activity_definition_id': activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': session_id,
-            'root_id': root_id
-        }, source='sessions_api.remove_activity_from_session'))
-        
         return jsonify({"message": "Activity instance removed"})
         
     except SQLAlchemyError:
@@ -335,21 +296,6 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
             if isinstance(error, dict):
                 return jsonify(error), status
             return jsonify({"error": error}), status
-        instance = payload["instance"]
-        activity_name = payload["activity_name"]
-        
-        # Emit the metrics-specific event so downstream handlers can re-evaluate
-        # threshold-driven targets without treating this like a lifecycle edit.
-        event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
-            'instance_id': instance.id,
-            'activity_definition_id': instance.activity_definition_id,
-            'activity_name': activity_name,
-            'session_id': session_id,
-            'root_id': root_id,
-            'updated_fields': ['metrics']
-        }, source='sessions_api.update_activity_metrics'))
-        
-        # Return updated serialized instance
         return jsonify(payload["serialized"])
         
     except SQLAlchemyError:

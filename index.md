@@ -50,7 +50,7 @@ Important backend design choices:
 - Services are the canonical boundary for validation, ownership checks, and transaction behavior.
 - Payload normalization is centralized.
 - Serialization is separated from business logic.
-- Events are emitted after successful commits.
+- Main domain events are emitted from services after successful commits.
 - Soft-delete behavior is standardized across the main app surfaces.
 
 ### Frontend shape
@@ -60,7 +60,7 @@ The frontend is split into:
 - `client/src/pages/`: route-level screens
 - `client/src/components/`: reusable UI and feature components
 - `client/src/hooks/`: query hooks, orchestration hooks, and feature helpers
-- `client/src/contexts/`: auth, selection, theme, and lightweight mutation/selection facades
+- `client/src/contexts/`: auth, header, selection, theme, and lightweight mutation/selection facades
 - `client/src/utils/`: API modules, goal-tree normalization, optimistic helpers, formatting, and low-level utilities
 
 The intended frontend flow is:
@@ -189,6 +189,21 @@ Key frontend pieces:
 - `client/src/components/modals/ProgramBuilder.jsx`
 - `client/src/components/modals/ProgramDayModal.jsx`
 
+### Auth and User Settings
+
+Authentication, token refresh, and account/profile mutations now sit behind dedicated services rather than living directly in the blueprint layer.
+
+Key backend pieces:
+
+- `services/auth_service.py`
+- `services/user_service.py`
+- `blueprints/auth_api.py`
+
+Key frontend pieces:
+
+- `client/src/contexts/AuthContext.jsx`
+- `client/src/components/modals/SettingsModal.jsx`
+
 ### Analytics, Annotations, and Logs
 
 The app includes historical and analytical tooling on top of the core execution data.
@@ -203,6 +218,8 @@ Key backend pieces:
 
 - `services/event_logger.py`
 - `services/events.py`
+- `services/annotation_service.py`
+- `services/log_service.py`
 - `blueprints/annotations_api.py`
 - `blueprints/logs_api.py`
 

@@ -12,7 +12,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from blueprints.api_utils import internal_error
 from blueprints.auth_api import token_required
 from models import get_engine, get_session
-from services import Event, Events, event_bus
 from services.note_service import NoteService
 from validators import NanoGoalNoteCreateSchema, NoteCreateSchema, NoteUpdateSchema, validate_request
 
@@ -154,16 +153,6 @@ def create_nano_goal_note(current_user, root_id, validated_data):
         payload, error, status = note_service.create_nano_goal_note(root_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
-
-        goal = payload["goal"]
-        event_bus.emit(Event(Events.GOAL_CREATED, {
-            'goal_id': goal['id'],
-            'goal_name': goal['name'],
-            'goal_type': goal['attributes'].get('type', 'NanoGoal'),
-            'parent_id': goal['attributes'].get('parent_id'),
-            'root_id': root_id,
-        }, source='notes_api.create_nano_goal_note'))
-
         return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
