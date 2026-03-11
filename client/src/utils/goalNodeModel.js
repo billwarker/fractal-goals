@@ -126,6 +126,44 @@ export const flattenGoalTree = (rootNode, options = {}) => {
     return flattened;
 };
 
+export const flattenSessionGoalsViewGoals = (sessionGoalsView) => {
+    if (!sessionGoalsView || typeof sessionGoalsView !== 'object') return [];
+
+    const flattened = [];
+    const seenIds = new Set();
+    const stack = [];
+
+    if (sessionGoalsView.goal_tree) {
+        stack.push(sessionGoalsView.goal_tree);
+    }
+
+    while (stack.length > 0) {
+        const currentNode = stack.pop();
+        if (!currentNode) continue;
+
+        const currentId = getGoalNodeId(currentNode);
+        if (!currentId || !seenIds.has(currentId)) {
+            flattened.push(currentNode);
+            if (currentId) seenIds.add(currentId);
+        }
+
+        const children = getGoalNodeChildren(currentNode);
+        for (let index = children.length - 1; index >= 0; index -= 1) {
+            stack.push(children[index]);
+        }
+    }
+
+    const microGoals = Array.isArray(sessionGoalsView.micro_goals) ? sessionGoalsView.micro_goals : [];
+    microGoals.forEach((goal) => {
+        const goalId = getGoalNodeId(goal);
+        if (goalId && seenIds.has(goalId)) return;
+        flattened.push(goal);
+        if (goalId) seenIds.add(goalId);
+    });
+
+    return flattened;
+};
+
 export const findGoalNodeById = (rootNode, targetId) => {
     if (!rootNode || targetId == null) return null;
 

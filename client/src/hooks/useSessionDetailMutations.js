@@ -348,6 +348,7 @@ export function useSessionDetailMutations({
                     previous.map((entry) => entry.id === instanceId ? response.data : entry)
                 );
                 queryClient.invalidateQueries({ queryKey: sessionKey });
+                queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             }
         } catch (error) {
             console.error('Timer action failed', error);

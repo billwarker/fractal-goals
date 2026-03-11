@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     findGoalNodeById,
     flattenGoalTree,
+    flattenSessionGoalsViewGoals,
     getGoalNodeCategory,
     isExecutionGoalNode,
     normalizeGoalNode,
@@ -101,5 +102,31 @@ describe('goalNodeModel', () => {
 
         expect(findGoalNodeById(tree, 'child')).toBe(tree.children[0]);
         expect(parseGoalTargets(tree.children[0])).toEqual([]);
+    });
+
+    it('flattens sessionGoalsView into a deduplicated canonical goal list', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                children: [
+                    {
+                        id: 'immediate',
+                        children: [],
+                    },
+                ],
+            },
+            micro_goals: [
+                { id: 'micro-1', parent_id: 'immediate' },
+                { id: 'immediate', parent_id: 'root' },
+                { id: 'micro-2', parent_id: 'immediate' },
+            ],
+        };
+
+        expect(flattenSessionGoalsViewGoals(sessionGoalsView).map((goal) => goal.id)).toEqual([
+            'root',
+            'immediate',
+            'micro-1',
+            'micro-2',
+        ]);
     });
 });

@@ -12,12 +12,18 @@ const {
     getActivities,
     getActivityGroups,
     getSessionGoalsView,
+    useTargetAchievementsMock,
 } = vi.hoisted(() => ({
     getSession: vi.fn(),
     getSessionActivities: vi.fn(),
     getActivities: vi.fn(),
     getActivityGroups: vi.fn(),
     getSessionGoalsView: vi.fn(),
+    useTargetAchievementsMock: vi.fn(() => ({
+        targetAchievements: new Map(),
+        achievedTargetIds: new Set(),
+        goalAchievements: new Map(),
+    })),
 }));
 
 vi.mock('../../utils/api', () => ({
@@ -31,11 +37,7 @@ vi.mock('../../utils/api', () => ({
 }));
 
 vi.mock('../useTargetAchievements', () => ({
-    useTargetAchievements: () => ({
-        targetAchievements: new Map(),
-        achievedTargetIds: new Set(),
-        goalAchievements: new Map(),
-    }),
+    useTargetAchievements: (...args) => useTargetAchievementsMock(...args),
 }));
 
 function createWrapper(queryClient) {
@@ -51,6 +53,11 @@ function createWrapper(queryClient) {
 describe('useSessionDetailData', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        useTargetAchievementsMock.mockImplementation(() => ({
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+            goalAchievements: new Map(),
+        }));
     });
 
     it('hydrates session detail data under canonical query keys and normalizes section activity ids', async () => {
@@ -73,8 +80,8 @@ describe('useSessionDetailData', () => {
                         ],
                     },
                 },
-                short_term_goals: [],
-                immediate_goals: [],
+                short_term_goals: [{ id: 'session-stale-goal' }],
+                immediate_goals: [{ id: 'session-stale-immediate-goal' }],
             },
         });
         getSessionActivities.mockResolvedValueOnce({
@@ -142,5 +149,68 @@ describe('useSessionDetailData', () => {
 
         expect(result.current.activityInstances).toEqual([]);
         expect(result.current.normalizedSessionData).toBeNull();
+    });
+
+    it('derives live target evaluation inputs from sessionGoalsView when available', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+            },
+        });
+
+        getSession.mockResolvedValueOnce({
+            data: {
+                id: 'session-1',
+                attributes: {
+                    session_data: {
+                        sections: [],
+                    },
+                },
+                short_term_goals: [],
+                immediate_goals: [],
+            },
+        });
+        getSessionActivities.mockResolvedValueOnce({ data: [] });
+        getActivities.mockResolvedValueOnce({ data: [] });
+        getActivityGroups.mockResolvedValueOnce({ data: [] });
+        getSessionGoalsView.mockResolvedValueOnce({
+            data: {
+                goal_tree: {
+                    id: 'root-goal',
+                    children: [
+                        {
+                            id: 'immediate-goal',
+                            attributes: {
+                                targets: [{ id: 'target-1', activity_id: 'activity-1' }],
+                            },
+                            children: [],
+                        },
+                    ],
+                },
+                micro_goals: [
+                    {
+                        id: 'micro-goal',
+                        attributes: {
+                            targets: [{ id: 'target-2', activity_id: 'activity-2' }],
+                        },
+                    },
+                ],
+            },
+        });
+
+        renderHook(
+            () => useSessionDetailData({ rootId: 'root-1', sessionId: 'session-1', isDeletingSession: false }),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await waitFor(() => {
+            const [, goalsArg] = useTargetAchievementsMock.mock.lastCall || [];
+            expect(goalsArg?.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal', 'micro-goal']);
+        });
+
+        const [, goalsArg] = useTargetAchievementsMock.mock.lastCall;
+        expect(goalsArg.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal', 'micro-goal']);
+        expect(goalsArg.map((goal) => goal.id)).not.toContain('session-stale-goal');
+        expect(goalsArg.map((goal) => goal.id)).not.toContain('session-stale-immediate-goal');
     });
 });

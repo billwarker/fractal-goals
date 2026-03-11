@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTargetAchievements } from './useTargetAchievements';
 import { queryKeys } from './queryKeys';
 import { fractalApi } from '../utils/api';
+import { flattenSessionGoalsViewGoals } from '../utils/goalNodeModel';
 
 function extractDefinitionId(item) {
     if (typeof item === 'string') return item;
@@ -189,9 +190,10 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
 
     const parentGoals = useMemo(() => session?.short_term_goals || [], [session]);
     const immediateGoals = useMemo(() => session?.immediate_goals || [], [session]);
-    const allGoalsForTargets = useMemo(() => {
-        return [...parentGoals, ...immediateGoals, ...microGoals];
-    }, [immediateGoals, microGoals, parentGoals]);
+    const allGoalsForTargets = useMemo(
+        () => flattenSessionGoalsViewGoals(sessionGoalsView),
+        [sessionGoalsView]
+    );
 
     const {
         targetAchievements,
