@@ -51,6 +51,7 @@ from services.view_serializers import (
 from validators import parse_date_string
 
 logger = logging.getLogger(__name__)
+_SESSION_GOALS_SUPPORTS_SOURCE = None
 
 _TYPE_TO_LEVEL_NAME = {
     'UltimateGoal': 'Ultimate Goal',
@@ -78,8 +79,13 @@ def resolve_level_id(db_session, type_value) -> str | None:
 
 
 def session_goals_supports_source(db_session) -> bool:
-    cols = inspect(db_session.bind).get_columns('session_goals')
-    return any(column.get('name') == 'association_source' for column in cols)
+    global _SESSION_GOALS_SUPPORTS_SOURCE
+    if _SESSION_GOALS_SUPPORTS_SOURCE is None:
+        cols = inspect(db_session.bind).get_columns('session_goals')
+        _SESSION_GOALS_SUPPORTS_SOURCE = any(
+            column.get('name') == 'association_source' for column in cols
+        )
+    return _SESSION_GOALS_SUPPORTS_SOURCE
 
 
 def session_goal_insert_values(db_session, session_id, goal_id, goal_type, association_source) -> JsonDict:
@@ -1103,7 +1109,12 @@ class GoalService:
         if goal.completed:
             event_payload['auto_completed'] = False
             event_payload['reason'] = 'manual'
-        event_bus.emit(Event(event_name, event_payload, source='goal_service.update_goal_completion'))
+        event_bus.emit(Event(
+            event_name,
+            event_payload,
+            source='goal_service.update_goal_completion',
+            context={'db_session': self.db_session},
+        ))
         return goal, None, 200
 
     def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:

@@ -14,7 +14,7 @@ from validators import (
     ActivityGoalsSetSchema, GoalAssociationBatchSchema, GroupReorderSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, require_owned_root, etag_json_response, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, etag_json_response, internal_error
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition
 )
@@ -94,8 +94,7 @@ def _parse_activity_payload(schema_class):
 @token_required
 def get_activity_groups(current_user, root_id):
     """Get all activity groups for a fractal."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         groups, error, status = service.list_activity_groups(root_id, current_user.id)
@@ -110,8 +109,7 @@ def get_activity_groups(current_user, root_id):
 @validate_request(ActivityGroupCreateSchema)
 def create_activity_group(current_user, root_id, validated_data):
     """Create a new activity group."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         new_group, error, status = service.create_activity_group(root_id, current_user.id, validated_data)
@@ -130,8 +128,7 @@ def create_activity_group(current_user, root_id, validated_data):
 @validate_request(ActivityGroupUpdateSchema)
 def update_activity_group(current_user, root_id, group_id, validated_data):
     """Update an activity group."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         group, error, status = service.update_activity_group(root_id, group_id, current_user.id, validated_data)
@@ -149,8 +146,7 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
 @token_required
 def delete_activity_group(current_user, root_id, group_id):
     """Delete an activity group."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.delete_activity_group(root_id, group_id, current_user.id)
@@ -169,8 +165,7 @@ def delete_activity_group(current_user, root_id, group_id):
 @validate_request(GroupReorderSchema)
 def reorder_activity_groups(current_user, root_id, validated_data):
     """Reorder activity groups."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.reorder_activity_groups(
@@ -193,8 +188,7 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 @validate_request(ActivityGoalsSetSchema)
 def set_activity_group_goals(current_user, root_id, group_id, validated_data):
     """Set goals associated with an activity group (replaces existing associations)."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         group, error, status = service.set_activity_group_goals(
@@ -221,8 +215,7 @@ def set_activity_group_goals(current_user, root_id, group_id, validated_data):
 @token_required
 def get_activities(current_user, root_id):
     """Get all activity definitions for a fractal."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         root = require_owned_root(session, root_id, current_user.id)
         if not root:
@@ -243,8 +236,7 @@ def get_activities(current_user, root_id):
 @token_required
 def create_activity(current_user, root_id):
     """Create a new activity definition with metrics."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         data, validation_error = _parse_activity_payload(ActivityDefinitionCreateSchema)
         if validation_error:
@@ -268,8 +260,7 @@ def create_activity(current_user, root_id):
 @token_required
 def update_activity(current_user, root_id, activity_id):
     """Update an activity definition and its metrics."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         data, validation_error = _parse_activity_payload(ActivityDefinitionUpdateSchema)
         if validation_error:
@@ -298,8 +289,7 @@ def update_activity(current_user, root_id, activity_id):
 @token_required
 def delete_activity(current_user, root_id, activity_id):
     """Delete an activity definition."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         root = require_owned_root(session, root_id, current_user.id)
         if not root:
@@ -330,8 +320,7 @@ def delete_activity(current_user, root_id, activity_id):
 @token_required
 def get_activity_goals(current_user, root_id, activity_id):
     """Get all goals associated with an activity."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         root = require_owned_root(session, root_id, current_user.id)
         if not root:
@@ -352,8 +341,7 @@ def get_activity_goals(current_user, root_id, activity_id):
 @validate_request(ActivityGoalsSetSchema)
 def set_activity_goals(current_user, root_id, activity_id, validated_data):
     """Set goals associated with an activity (replaces existing associations)."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         activity, error, status = service.set_activity_goals(
@@ -378,8 +366,7 @@ def set_activity_goals(current_user, root_id, activity_id, validated_data):
 @token_required
 def remove_activity_goal(current_user, root_id, activity_id, goal_id):
     """Remove a goal association from an activity."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.remove_activity_goal(
@@ -404,8 +391,7 @@ def remove_activity_goal(current_user, root_id, activity_id, goal_id):
 @token_required
 def get_goal_activities(current_user, root_id, goal_id):
     """Get all activities associated with a goal (including those from linked groups and INHERITED from children)."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.get_goal_activities(root_id, goal_id, current_user.id)
@@ -424,8 +410,7 @@ def get_goal_activities(current_user, root_id, goal_id):
 @token_required
 def get_goal_activity_groups(current_user, root_id, goal_id):
     """Get all activity groups linked to a goal."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.get_goal_activity_groups(root_id, goal_id, current_user.id)
@@ -441,8 +426,7 @@ def get_goal_activity_groups(current_user, root_id, goal_id):
 @validate_request(GoalAssociationBatchSchema)
 def set_goal_associations_batch(current_user, root_id, goal_id, validated_data):
     """Set both direct activity and activity-group associations for a goal in one request."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.set_goal_associations_batch(
@@ -467,8 +451,7 @@ def set_goal_associations_batch(current_user, root_id, goal_id, validated_data):
 @token_required
 def link_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Link an entire activity group to a goal (includes all current and future activities)."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.link_goal_activity_group(
@@ -493,8 +476,7 @@ def link_goal_activity_group(current_user, root_id, goal_id, group_id):
 @token_required
 def unlink_goal_activity_group(current_user, root_id, goal_id, group_id):
     """Unlink an activity group from a goal."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         service = ActivityService(session)
         payload, error, status = service.unlink_goal_activity_group(

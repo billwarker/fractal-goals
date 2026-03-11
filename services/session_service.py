@@ -384,6 +384,7 @@ class SessionService:
                 'updated_fields': list(data.keys()),
             },
             source='session_service.update_activity_instance',
+            context={'db_session': self.db_session},
         ))
         return {
             "instance": instance,
@@ -421,6 +422,7 @@ class SessionService:
                 'root_id': root_id,
             },
             source='session_service.remove_activity_from_session',
+            context={'db_session': self.db_session},
         ))
         return {
             "instance": instance,
@@ -500,6 +502,7 @@ class SessionService:
                 'updated_fields': ['metrics'],
             },
             source='session_service.update_activity_metrics',
+            context={'db_session': self.db_session},
         ))
         return {
             "instance": instance,
@@ -872,7 +875,8 @@ class SessionService:
                     'session_name': session.name,
                     'root_id': root_id
                 },
-                source='session_service.update_session'
+                source='session_service.update_session',
+                context={'db_session': self.db_session},
             ))
             
         return serialize_session(session), None, 200

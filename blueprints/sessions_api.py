@@ -14,7 +14,7 @@ from validators import (
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, etag_json_response, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error
 from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
 
@@ -30,8 +30,7 @@ sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
 @token_required
 def get_all_sessions_endpoint(current_user):
     """Get all sessions for grid view (Global), filtered by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         limit, offset = parse_optional_pagination(request, max_limit=300)
@@ -51,8 +50,7 @@ def get_all_sessions_endpoint(current_user):
 @token_required
 def get_fractal_sessions(current_user, root_id):
     """Get sessions for a specific fractal if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         limit = min(int(request.args.get('limit', 10)), 50)
@@ -75,8 +73,7 @@ def get_fractal_sessions(current_user, root_id):
 @validate_request(SessionCreateSchema)
 def create_fractal_session(current_user, root_id, validated_data):
     """Create a new session within a fractal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         result, error, status = service.create_session(root_id, current_user.id, validated_data)
@@ -96,8 +93,7 @@ def create_fractal_session(current_user, root_id, validated_data):
 @validate_request(SessionUpdateSchema)
 def update_session(current_user, root_id, session_id, validated_data):
     """Update a session's details."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         result, error, status = service.update_session(root_id, session_id, current_user.id, validated_data)
@@ -116,8 +112,7 @@ def update_session(current_user, root_id, session_id, validated_data):
 @token_required
 def get_session_endpoint(current_user, root_id, session_id):
     """Get a session by ID if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         result, error, status = service.get_session_details(root_id, session_id, current_user.id)
@@ -136,8 +131,7 @@ def get_session_endpoint(current_user, root_id, session_id):
 @token_required
 def delete_session_endpoint(current_user, root_id, session_id):
     """Delete a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         result, error, status = service.delete_session(root_id, session_id, current_user.id)
@@ -160,8 +154,7 @@ def delete_session_endpoint(current_user, root_id, session_id):
 @token_required
 def get_session_activities(current_user, root_id, session_id):
     """Get all activity instances for a session in display order."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = SessionService(db_session)
     try:
         payload, error, status = service.get_session_activities(root_id, session_id, current_user.id)
@@ -181,8 +174,7 @@ def get_session_activities(current_user, root_id, session_id):
 @validate_request(ActivityInstanceCreateSchema)
 def add_activity_to_session(current_user, root_id, session_id, validated_data):
     """Add a new activity instance to a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = SessionService(db_session)
         payload, error, status = service.add_activity_to_session(root_id, session_id, current_user.id, validated_data)
@@ -203,8 +195,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
 @validate_request(ActivityReorderSchema)
 def reorder_activities(current_user, root_id, session_id, validated_data):
     """Reorder activities in a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = SessionService(db_session)
         payload, error, status = service.reorder_activities(
@@ -229,8 +220,7 @@ def reorder_activities(current_user, root_id, session_id, validated_data):
 @validate_request(ActivityInstanceUpdateSchema)
 def update_activity_instance_in_session(current_user, root_id, session_id, instance_id, validated_data):
     """Update activity instance in session context."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = SessionService(db_session)
         payload, error, status = service.update_activity_instance(
@@ -255,8 +245,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
 @token_required
 def remove_activity_from_session(current_user, root_id, session_id, instance_id):
     """Remove an activity instance from a session."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = SessionService(db_session)
         payload, error, status = service.remove_activity_from_session(
@@ -281,8 +270,7 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
 @validate_request(ActivityMetricsUpdateSchema)
 def update_activity_metrics(current_user, root_id, session_id, instance_id, validated_data):
     """Replace the activity instance's metric set with the payload's metric rows."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = SessionService(db_session)
         payload, error, status = service.update_activity_metrics(

@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 from models import get_session
 from blueprints.auth_api import token_required
-from blueprints.api_utils import parse_optional_pagination, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
 from services.completion_handlers import get_recent_achievements
 from services.timer_service import TimerService
 from validators import (
@@ -42,8 +42,7 @@ def _validation_error_response(error: ValidationError):
 @token_required
 def activity_instances(current_user, root_id):
     """Get all activity instances (GET) or create a new one (POST) if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         if request.method == 'POST':
@@ -85,8 +84,7 @@ def activity_instances(current_user, root_id):
 @token_required
 def start_activity_timer(current_user, root_id, instance_id):
     """Start the timer for an activity instance if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         try:
@@ -117,8 +115,7 @@ def start_activity_timer(current_user, root_id, instance_id):
 @token_required
 def complete_activity_instance(current_user, root_id, instance_id):
     """Complete an activity instance (sets stop time and marks as completed)."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         async_completion = (
@@ -160,8 +157,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
 @validate_request(TimerActivityInstanceManualUpdateSchema)
 def update_activity_instance(current_user, root_id, instance_id, validated_data):
     """Update an activity instance manually if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         payload, error, status = service.update_activity_instance(
@@ -186,8 +182,7 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
 @token_required
 def pause_session(current_user, root_id, session_id):
     """Pause the session and all currently active activity instances."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         payload, error, status = service.pause_session(root_id, session_id, current_user.id)
@@ -206,8 +201,7 @@ def pause_session(current_user, root_id, session_id):
 @token_required
 def resume_session(current_user, root_id, session_id):
     """Resume the session and all currently paused activity instances."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = TimerService(db_session)
     try:
         payload, error, status = service.resume_session(root_id, session_id, current_user.id)

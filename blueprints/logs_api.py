@@ -5,7 +5,7 @@ import models
 from blueprints.auth_api import token_required
 from sqlalchemy.exc import SQLAlchemyError
 from models import get_session
-from blueprints.api_utils import internal_error
+from blueprints.api_utils import get_db_session, internal_error
 from services.log_service import LogService
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,7 @@ def get_logs(current_user, root_id):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = LogService(db_session)
     try:
         payload, error, status = service.get_logs(
@@ -53,8 +52,7 @@ def clear_logs(current_user, root_id):
     """
     Clear all logs for a specific fractal.
     """
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = LogService(db_session)
     try:
         payload, error, status = service.clear_logs(root_id, current_user.id)

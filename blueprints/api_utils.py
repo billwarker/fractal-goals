@@ -1,9 +1,9 @@
 import hashlib
 import json
 
-from flask import jsonify, request, make_response
+from flask import g, jsonify, request, make_response
 
-from models import Goal, validate_root_goal
+from models import Goal, get_scoped_session, validate_root_goal
 
 
 def require_owned_root(db_session, root_id: str, user_id: str):
@@ -23,6 +23,15 @@ def get_goal_in_root(db_session, root_id: str, goal_id: str):
 def internal_error(logger, message: str = "Internal server error"):
     logger.exception(message)
     return jsonify({"error": "Internal server error"}), 500
+
+
+def get_db_session():
+    """Return the request-scoped DB session, creating it if needed."""
+    db_session = getattr(g, "db_session", None)
+    if db_session is None:
+        db_session = get_scoped_session()
+        g.db_session = db_session
+    return db_session
 
 
 def parse_optional_pagination(req, *, max_limit: int = 200):

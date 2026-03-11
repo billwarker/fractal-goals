@@ -36,8 +36,30 @@ def invalidate_root(root_id: str) -> None:
 
 
 def setup_analytics_cache_invalidation() -> None:
-    @event_bus.on("*")
     def _invalidate_on_event(event: Event):
         root_id = event.data.get("root_id")
         if root_id:
             invalidate_root(root_id)
+
+    invalidating_events = (
+        "session.created",
+        "session.updated",
+        "session.completed",
+        "session.deleted",
+        "goal.created",
+        "goal.updated",
+        "goal.completed",
+        "goal.uncompleted",
+        "goal.deleted",
+        "target.achieved",
+        "target.reverted",
+        "target.created",
+        "target.deleted",
+        "activity_instance.created",
+        "activity_instance.updated",
+        "activity_instance.completed",
+        "activity_instance.deleted",
+        "activity_instance.metrics_updated",
+    )
+    for event_name in invalidating_events:
+        event_bus.subscribe(event_name, _invalidate_on_event)

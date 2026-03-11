@@ -20,7 +20,7 @@ from validators import (
 )
 from services.programs import ProgramService, ProgramServiceValidationError
 from blueprints.auth_api import token_required
-from blueprints.api_utils import internal_error, parse_optional_pagination, etag_json_response
+from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination, etag_json_response
 from services import event_bus, Event, Events
 
 logger = logging.getLogger(__name__)
@@ -40,8 +40,7 @@ def _program_service_error_response(error: ProgramServiceValidationError):
 @token_required
 def get_programs(current_user, root_id):
     """Get all training programs for a fractal if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         programs = ProgramService.get_programs(session, root_id, current_user.id)
         limit, offset = parse_optional_pagination(request, max_limit=200)
@@ -62,8 +61,7 @@ def get_programs(current_user, root_id):
 @token_required
 def get_program(current_user, root_id, program_id):
     """Get a specific training program if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         program = ProgramService.get_program(session, root_id, program_id, current_user.id)
         if program is None:
@@ -84,8 +82,7 @@ def get_program(current_user, root_id, program_id):
 @validate_request(ProgramCreateSchema)
 def create_program(current_user, root_id, validated_data):
     """Create a new training program if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.create_program(session, root_id, validated_data, current_user.id)
         return jsonify(result), 201
@@ -104,8 +101,7 @@ def create_program(current_user, root_id, validated_data):
 @validate_request(ProgramUpdateSchema)
 def update_program(current_user, root_id, program_id, validated_data):
     """Update a training program if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.update_program(session, root_id, program_id, validated_data, current_user.id)
         if not result:
@@ -125,8 +121,7 @@ def update_program(current_user, root_id, program_id, validated_data):
 @token_required
 def delete_program(current_user, root_id, program_id):
     """Delete a training program if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.delete_program(session, root_id, program_id, current_user.id)
         return jsonify({
@@ -146,8 +141,7 @@ def delete_program(current_user, root_id, program_id):
 @token_required
 def get_program_session_count(current_user, root_id, program_id):
     """Get the count of sessions associated with a program if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         count = ProgramService.get_program_session_count(session, root_id, program_id, current_user.id)
         return jsonify({"session_count": count})
@@ -169,8 +163,7 @@ def get_program_session_count(current_user, root_id, program_id):
 @validate_request(ProgramBlockSchema)
 def create_block(current_user, root_id, program_id, validated_data):
     """Create a new program block."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         block_dict = ProgramService.create_block(session, root_id, program_id, validated_data, current_user.id)
         return jsonify(block_dict), 201
@@ -188,8 +181,7 @@ def create_block(current_user, root_id, program_id, validated_data):
 @validate_request(ProgramBlockUpdateSchema)
 def update_block(current_user, root_id, program_id, block_id, validated_data):
     """Update a specific program block."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify(block_dict)
@@ -206,8 +198,7 @@ def update_block(current_user, root_id, program_id, block_id, validated_data):
 @token_required
 def delete_block(current_user, root_id, program_id, block_id):
     """Delete a program block."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         ProgramService.delete_block(session, root_id, program_id, block_id, current_user.id)
         return jsonify({"message": "Block deleted"})
@@ -225,8 +216,7 @@ def delete_block(current_user, root_id, program_id, block_id):
 @validate_request(ProgramDayCreateSchema)
 def add_block_day(current_user, root_id, program_id, block_id, validated_data):
     """Add a configured day to a program block if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify(result), 201
@@ -244,8 +234,7 @@ def add_block_day(current_user, root_id, program_id, block_id, validated_data):
 @validate_request(ProgramDayUpdateSchema)
 def update_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Update a specific program day."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify(result)
@@ -262,8 +251,7 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id, valida
 @token_required
 def delete_block_day(current_user, root_id, program_id, block_id, day_id):
     """Delete a program day."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id, current_user.id)
         return jsonify({"message": "Day deleted"})
@@ -281,8 +269,7 @@ def delete_block_day(current_user, root_id, program_id, block_id, day_id):
 @validate_request(ProgramDayCopySchema)
 def copy_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Copy a day to other blocks."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify(result)
@@ -300,8 +287,7 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id, validate
 @validate_request(ProgramDayScheduleSchema)
 def schedule_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Schedule an existing program day by creating a session in program context."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         scheduled_session = ProgramService.schedule_block_day(
             session,
@@ -327,8 +313,7 @@ def schedule_block_day(current_user, root_id, program_id, block_id, day_id, vali
 @validate_request(ProgramDayOccurrenceUnscheduleSchema)
 def unschedule_block_day_occurrence(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Unschedule sessions for a specific program-day occurrence on a calendar date."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         result = ProgramService.unschedule_block_day_occurrence(
             session,
@@ -353,8 +338,7 @@ def unschedule_block_day_occurrence(current_user, root_id, program_id, block_id,
 @token_required
 def get_active_program_days(current_user, root_id):
     """Get active program days if owned by user."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         days = ProgramService.get_active_program_days(session, root_id, current_user.id)
         return jsonify(days or [])
@@ -372,8 +356,7 @@ def get_active_program_days(current_user, root_id):
 @validate_request(ProgramBlockGoalAttachSchema)
 def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_data):
     """Attach a goal to a block and update its deadline."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify({"message": "Goal attached and updated", "block": block_dict})
@@ -393,8 +376,7 @@ def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_
 @validate_request(ProgramDayGoalAttachSchema)
 def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, validated_data):
     """Attach a goal directly to a program day."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
@@ -412,8 +394,7 @@ def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, vali
 @validate_request(ProgramGoalDeadlineSchema)
 def set_goal_deadline_for_program_date(current_user, root_id, program_id, validated_data):
     """Set a goal deadline through program-calendar semantics."""
-    engine = models.get_engine()
-    session = get_session(engine)
+    session = get_db_session()
     try:
         goal_dict = ProgramService.set_goal_deadline_for_program_date(
             session,

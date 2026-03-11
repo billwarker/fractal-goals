@@ -9,7 +9,7 @@ import logging
 from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
-from blueprints.api_utils import internal_error
+from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
 from models import get_engine, get_session
 from services.note_service import NoteService
@@ -21,7 +21,7 @@ notes_bp = Blueprint('notes', __name__, url_prefix='/api')
 
 
 def _with_note_service():
-    db_session = get_session(get_engine())
+    db_session = get_db_session()
     return db_session, NoteService(db_session)
 
 

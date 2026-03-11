@@ -16,6 +16,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import (
+    get_db_session,
     internal_error,
     parse_optional_pagination,
     etag_json_response,
@@ -44,8 +45,7 @@ goals_bp = Blueprint('goals', __name__, url_prefix='/api')
 @token_required
 def get_goals(current_user):
     """Get all root goals with their complete trees."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         limit, offset = parse_optional_pagination(request, max_limit=200)
         service = GoalService(db_session, sync_targets=_sync_targets)
@@ -65,8 +65,7 @@ def get_goals(current_user):
 @token_required
 def create_goal(current_user, validated_data):
     """Create a new goal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         new_goal, error, status = service.create_global_goal(current_user.id, validated_data)
@@ -93,8 +92,7 @@ def create_goal(current_user, validated_data):
 @token_required
 def get_session_micro_goals(current_user, root_id, session_id):
     """Get all micro goals linked to a session, including their nano children."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         micro_goals, error, status = service.get_session_micro_goals(root_id, session_id, current_user.id)
@@ -115,8 +113,7 @@ def get_session_goals_view(current_user, root_id, session_id):
     """Return the canonical goals payload used by the session detail sidepane."""
     from services.goal_tree_service import GoalTreeService
 
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalTreeService(db_session)
         payload, error_dict, status_code = service.get_session_goals_view_payload(current_user, root_id, session_id)
@@ -137,8 +134,7 @@ def delete_goal_endpoint(current_user, goal_id: str):
     """Soft-delete a goal and all its children."""
     logger.debug(f"Attempting to delete goal with ID: {goal_id}")
     
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.delete_global_goal(goal_id, current_user.id)
@@ -162,8 +158,7 @@ def delete_goal_endpoint(current_user, goal_id: str):
 @token_required
 def get_goal_endpoint(current_user, goal_id: str):
     """Get a goal by ID."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.get_global_goal(goal_id, current_user.id)
@@ -181,8 +176,7 @@ def update_goal_endpoint(current_user, goal_id: str, validated_data):
     """Update goal details."""
     data = validated_data
     
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.update_global_goal(goal_id, current_user.id, data)
@@ -212,8 +206,7 @@ def update_goal_endpoint(current_user, goal_id: str, validated_data):
 def add_goal_target(current_user, goal_id, validated_data):
     """Add a target to a goal using relational Target model."""
     data = validated_data
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.add_goal_target(goal_id, current_user.id, data)
@@ -237,8 +230,7 @@ def add_goal_target(current_user, goal_id, validated_data):
 @token_required
 def remove_goal_target(current_user, goal_id, target_id):
     """Remove a target from a goal (soft delete)."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.remove_goal_target(goal_id, target_id, current_user.id)
@@ -261,8 +253,7 @@ def remove_goal_target(current_user, goal_id, target_id):
 @token_required
 def get_goal_metrics(current_user, goal_id: str):
     """Get calculated metrics for a goal (direct and recursive)."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.get_goal_metrics(goal_id, current_user.id)
@@ -281,8 +272,7 @@ def get_goal_metrics(current_user, goal_id: str):
 @token_required
 def get_goal_daily_durations(current_user, goal_id: str):
     """Get daily duration metrics for a goal (recursive)."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.get_goal_daily_durations(goal_id, current_user.id)
@@ -303,8 +293,7 @@ def get_goal_daily_durations(current_user, goal_id: str):
 @validate_request(GoalCompletionUpdateSchema, allow_empty_json=True)
 def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None, validated_data=None):
     """Update goal completion status."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.update_goal_completion(
@@ -335,8 +324,7 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None, va
 @token_required
 def get_all_fractals(current_user):
     """Get all fractals (root goals) for the selection page, filtered by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         fractals, _, _ = service.list_fractals(current_user.id)
@@ -351,8 +339,7 @@ def get_all_fractals(current_user):
 @limiter.limit("5 per minute")
 def create_fractal(current_user, validated_data):
     """Create a new fractal (root goal) owned by current user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         new_fractal, error, status = service.create_fractal(current_user.id, validated_data)
@@ -372,8 +359,7 @@ def create_fractal(current_user, validated_data):
 @token_required
 def delete_fractal(current_user, root_id):
     """Delete an entire fractal if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         result, error, status = service.delete_fractal(root_id, current_user.id)
@@ -393,8 +379,7 @@ def delete_fractal(current_user, root_id):
 @token_required
 def get_fractal_goals(current_user, root_id):
     """Get the complete goal tree for a specific fractal if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         root, error, status = service.get_fractal_tree(root_id, current_user.id)
@@ -417,8 +402,7 @@ def get_active_goals_for_selection(current_user, root_id):
     Get active ShortTermGoals and their active ImmediateGoals for session creation.
     Excludes completed goals.
     """
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         result, error, status = service.get_active_goals_for_selection(root_id, current_user.id)
@@ -439,8 +423,7 @@ def get_active_goals_for_selection(current_user, root_id):
 @validate_request(GoalCreateSchema)
 def create_fractal_goal(current_user, root_id, validated_data):
     """Create a new goal within a fractal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         new_goal, error, status = service.create_fractal_goal(root_id, current_user.id, validated_data)
@@ -462,8 +445,7 @@ def create_fractal_goal(current_user, root_id, validated_data):
 @token_required
 def get_fractal_goal(current_user, root_id, goal_id):
     """Get a specific goal by ID within a fractal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.get_fractal_goal(root_id, goal_id, current_user.id)
@@ -479,8 +461,7 @@ def get_fractal_goal(current_user, root_id, goal_id):
 @token_required
 def delete_fractal_goal(current_user, root_id, goal_id):
     """Delete a goal within a fractal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         goal, error, status = service.delete_fractal_goal(root_id, goal_id, current_user.id)
@@ -502,8 +483,7 @@ def delete_fractal_goal(current_user, root_id, goal_id):
 @validate_request(GoalUpdateSchema)
 def update_fractal_goal(current_user, root_id, goal_id, validated_data):
     """Update a goal within a fractal."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         data = validated_data
         service = GoalService(db_session, sync_targets=_sync_targets)
@@ -533,8 +513,7 @@ def get_goal_analytics(current_user, root_id):
     
     Optimized to use batched queries and avoid N+1 query patterns.
     """
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         cached = get_analytics(root_id)
         if cached is not None:
@@ -585,8 +564,7 @@ def evaluate_goal_targets(current_user, root_id, goal_id, validated_data):
         "goal_completed": bool  // Whether the goal was auto-completed
     }
     """
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
         payload, error, status = service.evaluate_goal_targets(

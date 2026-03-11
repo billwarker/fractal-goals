@@ -251,6 +251,7 @@ class TimerService:
                 updated_fields=['time_start'],
             ),
             source='timer_service.start_activity_timer',
+            context={'db_session': self.db_session},
         ))
         return {
             "instance": instance,
@@ -312,6 +313,7 @@ class TimerService:
                 'completed_at': instance.time_stop.isoformat() if instance.time_stop else None,
             },
             source='timer_service.complete_activity_instance',
+            context={} if async_completion else {'db_session': self.db_session},
         )
         if async_completion:
             event_bus.emit_async(completion_event)
@@ -401,6 +403,7 @@ class TimerService:
                     updated_fields=['sets'],
                 ),
                 source='timer_service.update_activity_instance',
+                context={'db_session': self.db_session},
             ))
         if non_metric_fields:
             event_bus.emit(Event(
@@ -412,6 +415,7 @@ class TimerService:
                     updated_fields=non_metric_fields,
                 ),
                 source='timer_service.update_activity_instance',
+                context={'db_session': self.db_session},
             ))
         return {
             "instance": instance,

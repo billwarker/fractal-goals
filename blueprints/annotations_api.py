@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import models
 from models import get_session
 from blueprints.auth_api import token_required
-from blueprints.api_utils import internal_error
+from blueprints.api_utils import get_db_session, internal_error
 from services.annotation_service import AnnotationService
 from validators import validate_request, AnnotationCreateSchema, AnnotationUpdateSchema
 
@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 @token_required
 def get_annotations(current_user, root_id):
     """Get all annotations for a fractal root if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = AnnotationService(db_session)
     try:
         payload, error, status = service.get_annotations(
@@ -47,8 +46,7 @@ def get_annotations(current_user, root_id):
 @validate_request(AnnotationCreateSchema)
 def create_annotation(current_user, root_id, validated_data):
     """Create a new visualization annotation if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = AnnotationService(db_session)
     try:
         payload, error, status = service.create_annotation(root_id, current_user.id, validated_data)
@@ -67,8 +65,7 @@ def create_annotation(current_user, root_id, validated_data):
 @token_required
 def get_annotation(current_user, root_id, annotation_id):
     """Get a single annotation by ID if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = AnnotationService(db_session)
     try:
         payload, error, status = service.get_annotation(root_id, annotation_id, current_user.id)
@@ -88,8 +85,7 @@ def get_annotation(current_user, root_id, annotation_id):
 @validate_request(AnnotationUpdateSchema)
 def update_annotation(current_user, root_id, annotation_id, validated_data):
     """Update an existing annotation if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = AnnotationService(db_session)
     try:
         payload, error, status = service.update_annotation(root_id, annotation_id, current_user.id, validated_data)
@@ -108,8 +104,7 @@ def update_annotation(current_user, root_id, annotation_id, validated_data):
 @token_required
 def delete_annotation(current_user, root_id, annotation_id):
     """Soft delete an annotation if owned by user."""
-    engine = models.get_engine()
-    db_session = get_session(engine)
+    db_session = get_db_session()
     service = AnnotationService(db_session)
     try:
         payload, error, status = service.delete_annotation(root_id, annotation_id, current_user.id)
