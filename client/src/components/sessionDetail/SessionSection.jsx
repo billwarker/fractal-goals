@@ -4,8 +4,14 @@ import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
+import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
+
+const SELECTOR_MODES = {
+    ADD: 'add',
+    COPY: 'copy',
+};
 
 const SessionSection = ({
     section,
@@ -51,6 +57,7 @@ const SessionSection = ({
     const [browseParentGroupId, setBrowseParentGroupId] = useState(null);
     const [activeLeafGroupId, setActiveLeafGroupId] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
+    const [selectorMode, setSelectorMode] = useState(SELECTOR_MODES.ADD);
 
     // Filter ungrouped activities
     const ungroupedActivities = Array.isArray(activities) ? activities.filter(a => !a.group_id) : [];
@@ -160,6 +167,27 @@ const SessionSection = ({
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
         setBrowseParentGroupId(null);
         setActiveLeafGroupId(null);
+        setSelectorMode(SELECTOR_MODES.ADD);
+    };
+
+    const openActivityBuilder = (activityDefinition = null) => {
+        closeSelector();
+        onOpenActivityBuilder(sectionIndex, activityDefinition);
+    };
+
+    const isCopyMode = selectorMode === SELECTOR_MODES.COPY;
+
+    const handleSelectActivity = (activity) => {
+        if (isCopyMode) {
+            openActivityBuilder(prepareActivityDefinitionCopy(activity));
+            return;
+        }
+
+        addActivity(sectionIndex, activity.id);
+    };
+
+    const handleCreateActivityDefinition = () => {
+        openActivityBuilder();
     };
 
     const handleBack = () => {
@@ -177,16 +205,23 @@ const SessionSection = ({
     const selectorContent = (
         <div className={styles.activitySelector}>
             <div className={styles.selectorHeader}>
-                <span className={styles.selectorTitle}>
-                    {activeLeafGroupId === null
-                        ? (browseParentGroupId
-                            ? `Step 1: Select Sub-Group in ${currentParentGroup?.name || 'Group'}`
-                            : 'Step 1: Select Activity Group')
-                        : (activeLeafGroupId === 'ungrouped'
-                            ? 'Step 2: Pick an Ungrouped Activity'
-                            : `Step 2: Pick a ${groupMap[activeLeafGroupId]?.name || 'Group'} Activity`)
-                    }
-                </span>
+                <div className={styles.selectorHeaderContent}>
+                    <span className={styles.selectorTitle}>
+                        {activeLeafGroupId === null
+                            ? (browseParentGroupId
+                                ? `Step 1: Select Sub-Group in ${currentParentGroup?.name || 'Group'}`
+                                : 'Step 1: Select Activity Group')
+                            : (activeLeafGroupId === 'ungrouped'
+                                ? 'Step 2: Pick an Ungrouped Activity'
+                                : `Step 2: Pick a ${groupMap[activeLeafGroupId]?.name || 'Group'} Activity`)
+                        }
+                    </span>
+                    {isCopyMode && (
+                        <div className={styles.copyModeHint}>
+                            Copy mode: select an existing activity definition to duplicate into a new one.
+                        </div>
+                    )}
+                </div>
                 <div className={styles.selectorActions}>
                     <button
                         type="button"
@@ -256,10 +291,10 @@ const SessionSection = ({
                                     <button
                                         type="button"
                                         key={act.id}
-                                        onClick={() => addActivity(sectionIndex, act.id)}
+                                        onClick={() => handleSelectActivity(act)}
                                         className={styles.activityButton}
                                     >
-                                        <span>+</span> {act.name}
+                                        <span>{isCopyMode ? 'Copy' : '+'}</span> {act.name}
                                     </button>
                                 ))}
                             </div>
@@ -272,10 +307,10 @@ const SessionSection = ({
                         <button
                             type="button"
                             key={act.id}
-                            onClick={() => addActivity(sectionIndex, act.id)}
+                            onClick={() => handleSelectActivity(act)}
                             className={styles.activityButton}
                         >
-                            <span>+</span> {act.name}
+                            <span>{isCopyMode ? 'Copy' : '+'}</span> {act.name}
                         </button>
                     ))}
                     {(leafActivities.length === 0 && (
@@ -287,13 +322,26 @@ const SessionSection = ({
             {activeLeafGroupId === null && (
                 <>
                     <div className={styles.selectorDivider}></div>
-                    <button
-                        type="button"
-                        onClick={() => onOpenActivityBuilder(sectionIndex)}
-                        className={styles.createActivityButton}
-                    >
-                        + Create New Activity Definition
-                    </button>
+                    <div className={styles.selectorPrimaryActions}>
+                        <button
+                            type="button"
+                            onClick={handleCreateActivityDefinition}
+                            className={styles.createActivityButton}
+                        >
+                            + Create New Activity Definition
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelectorMode((currentMode) => (
+                                currentMode === SELECTOR_MODES.COPY ? SELECTOR_MODES.ADD : SELECTOR_MODES.COPY
+                            ))}
+                            className={`${styles.createActivityButton} ${isCopyMode ? styles.createActivityButtonActive : ''}`}
+                        >
+                            {isCopyMode
+                                ? 'Cancel Copy Mode'
+                                : '+ Copy Existing Activity Definition'}
+                        </button>
+                    </div>
                 </>
             )}
         </div>

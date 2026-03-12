@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode }) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
+    const [builderActivity, setBuilderActivity] = useState(null);
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -29,15 +30,23 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         if (isMobile) setIsMobilePaneOpen(true);
     };
 
-    const handleOpenActivityBuilder = (sectionIndex) => {
+    const handleOpenActivityBuilder = (sectionIndex, activityDefinition = null) => {
         setSectionForNewActivity(sectionIndex);
+        setBuilderActivity(activityDefinition);
         setShowBuilder(true);
+    };
+
+    const handleCloseActivityBuilder = () => {
+        setShowBuilder(false);
+        setBuilderActivity(null);
+        setSectionForNewActivity(null);
     };
 
     const handleActivityCreated = async (newActivity) => {
         if (!newActivity || sectionForNewActivity == null) return;
         await addActivity(sectionForNewActivity, newActivity.id, newActivity);
         setSectionForNewActivity(null);
+        setBuilderActivity(null);
     };
 
     useEffect(() => {
@@ -54,7 +63,7 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         showDeleteConfirm,
         setShowDeleteConfirm,
         showBuilder,
-        setShowBuilder,
+        builderActivity,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -68,6 +77,7 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         handleActivityFocus,
         handleOpenGoals,
         handleOpenActivityBuilder,
+        handleCloseActivityBuilder,
         handleActivityCreated,
     };
 }

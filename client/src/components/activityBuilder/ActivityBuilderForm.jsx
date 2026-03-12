@@ -184,8 +184,12 @@ function ActivityBuilderForm({
             selectedGoalIds,
         });
 
-        if (editingActivity?.metric_definitions) {
-            const removedMetrics = editingActivity.metric_definitions.filter(
+        const persistedMetrics = editingActivity?.id
+            ? (editingActivity.metric_definitions || []).filter((metric) => Boolean(metric?.id))
+            : [];
+
+        if (persistedMetrics.length > 0) {
+            const removedMetrics = persistedMetrics.filter(
                 (oldMetric) => !validMetrics.find((newMetric) => newMetric.id && newMetric.id === oldMetric.id)
             );
 

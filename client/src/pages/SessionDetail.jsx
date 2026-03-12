@@ -49,7 +49,7 @@ function SessionDetailContent() {
         showDeleteConfirm,
         setShowDeleteConfirm,
         showBuilder,
-        setShowBuilder,
+        builderActivity,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -70,9 +70,9 @@ function SessionDetailContent() {
         handleAssociateActivity,
         handleGoalAssociationsChanged,
         handleOpenActivityBuilder,
+        handleCloseActivityBuilder,
         handleActivityCreated,
-        handleConfirmDelete,
-        handleSaveSession
+        handleConfirmDelete
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
 
     if (loading) {
@@ -153,7 +153,8 @@ function SessionDetailContent() {
                 onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
                 onConfirmDelete={handleConfirmDelete}
                 showBuilder={showBuilder}
-                onCloseBuilder={() => setShowBuilder(false)}
+                builderActivity={builderActivity}
+                onCloseBuilder={handleCloseActivityBuilder}
                 onActivityCreated={handleActivityCreated}
                 selectedGoal={selectedGoal}
                 onCloseGoal={() => setSelectedGoal(null)}

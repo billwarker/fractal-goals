@@ -148,4 +148,46 @@ describe('ActivityBuilder', () => {
             }));
         });
     });
+
+    it('does not warn when removing metrics from a copied activity definition', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={{
+                    name: 'Scale Practice (Copy)',
+                    description: '',
+                    has_sets: false,
+                    has_metrics: true,
+                    metrics_multiplicative: false,
+                    has_splits: false,
+                    group_id: null,
+                    associated_goal_ids: [],
+                    metric_definitions: [
+                        { id: undefined, name: 'Speed', unit: 'bpm' },
+                    ],
+                    split_definitions: [],
+                }}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByDisplayValue('Speed'), {
+            target: { value: '' },
+        });
+        fireEvent.change(screen.getByDisplayValue('bpm'), {
+            target: { value: '' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                metrics: [],
+            }));
+        });
+
+        expect(screen.queryByText('Removing Metrics')).not.toBeInTheDocument();
+    });
 });

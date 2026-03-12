@@ -26,7 +26,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         showDeleteConfirm,
         setShowDeleteConfirm,
         showBuilder,
-        setShowBuilder,
+        builderActivity,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -40,6 +40,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleActivityFocus,
         handleOpenGoals,
         handleOpenActivityBuilder,
+        handleCloseActivityBuilder,
         handleActivityCreated,
     } = useSessionDetailUiState({
         isMobile,
@@ -120,7 +121,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         showDeleteConfirm,
         setShowDeleteConfirm,
         showBuilder,
-        setShowBuilder,
+        builderActivity,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -145,6 +146,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleGoalHierarchyChanged,
         handleGoalAssociationsChanged,
         handleOpenActivityBuilder,
+        handleCloseActivityBuilder,
         handleActivityCreated,
         handleConfirmDelete,
         handleSaveSession

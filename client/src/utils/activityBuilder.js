@@ -23,3 +23,24 @@ export function buildActivityPayload({
         goal_ids: selectedGoalIds || []
     };
 }
+
+export function prepareActivityDefinitionCopy(activity) {
+    if (!activity) {
+        return null;
+    }
+
+    return {
+        ...activity,
+        id: undefined,
+        name: `${activity.name} (Copy)`,
+        metric_definitions: (activity.metric_definitions || []).map((metric) => ({
+            ...metric,
+            id: undefined,
+        })),
+        split_definitions: (activity.split_definitions || []).map((split) => ({
+            ...split,
+            id: undefined,
+        })),
+        associated_goal_ids: activity.associated_goal_ids ? [...activity.associated_goal_ids] : [],
+    };
+}

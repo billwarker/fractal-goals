@@ -9,6 +9,7 @@ import ActivityCard from '../components/ActivityCard';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import Linkify from '../components/atoms/Linkify';
+import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { buildGroupReorderPayload, buildLastInstantiatedMap } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 
@@ -167,18 +168,7 @@ function ManageActivities() {
     };
 
     const handleDuplicate = async (activity) => {
-        // Create a copy of the activity data WITHOUT the ID to trigger "Create Mode" in Builder
-        const copyData = {
-            ...activity,
-            id: undefined, // IMPORTANT: Undefined ID signals "Create New"
-            name: `${activity.name} (Copy)`,
-            // Ensure we deep copy arrays if needed to avoid reference bugs
-            metric_definitions: activity.metric_definitions?.map(m => ({ ...m, id: undefined })),
-            split_definitions: activity.split_definitions?.map(s => ({ ...s, id: undefined })),
-            associated_goal_ids: activity.associated_goal_ids ? [...activity.associated_goal_ids] : []
-        };
-
-        setEditingActivity(copyData);
+        setEditingActivity(prepareActivityDefinitionCopy(activity));
         setShowBuilder(true);
     };
 
