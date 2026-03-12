@@ -19,11 +19,15 @@ describe('goalDetailQueryUtils', () => {
 
         await invalidateGoalAssociationQueries(queryClient, 'root-1', 'goal-1');
 
-        expect(invalidateSpy).toHaveBeenCalledTimes(4);
+        expect(invalidateSpy).toHaveBeenCalledTimes(8);
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalActivities('root-1', 'goal-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['goalActivities', 'root-1'] });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalActivityGroups('root-1', 'goal-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['goalActivityGroups', 'root-1'] });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalMetrics('goal-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['goalMetrics'] });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.activities('root-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.fractalTree('root-1') });
     });
 
     it('invalidates session-derived goal caches together', async () => {

@@ -187,7 +187,6 @@ const ActivityAssociationModal = ({
                 <div
                     className={styles.groupTitleRow}
                     onClick={() => toggleSection(type)}
-                    style={{ cursor: 'pointer' }}
                 >
                     <div className={`${styles.chevron} ${isCollapsed ? styles.collapsed : ''}`}>▼</div>
                     <GoalIcon

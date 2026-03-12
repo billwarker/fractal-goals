@@ -3,6 +3,7 @@
 
 /* ============ LAYOUT ============ */
 .container {
+    --activity-associator-accent: var(--color-text-primary);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -25,6 +26,7 @@
 .inlineSectionLabel {
     font-size: var(--font-size-xs);
     font-weight: bold;
+    color: var(--activity-associator-accent);
 }
 
 .inlineSectionCount {
@@ -72,6 +74,7 @@
     margin-top: -24px;
     padding-top: 24px;
     isolation: isolate;
+    border-bottom: 2px solid var(--activity-associator-accent);
 }
 
 .headerTopLine {
@@ -104,6 +107,7 @@
 .backBtn {
     background: transparent;
     border: none;
+    color: var(--activity-associator-accent);
     cursor: pointer;
     padding: 0;
     display: flex;
@@ -126,6 +130,7 @@
     margin: 0;
     font-size: 24px;
     font-weight: bold;
+    color: var(--activity-associator-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -165,10 +170,12 @@
 
 /* ============ METRICS BREAKDOWN ============ */
 .metricsBreakdown {
+    color: var(--activity-associator-accent);
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     opacity: 0.9;
+    gap: 14px 20px;
 }
 
 .metricItem {
@@ -176,6 +183,7 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
+    min-width: 0;
 }
 
 .metricNumber {
@@ -188,6 +196,16 @@
     font-size: 12px;
     font-weight: bold;
     color: inherit;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.metricLabelRow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
 }
 
 /* ============ GROUP CONTAINERS ============ */
@@ -220,6 +238,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.groupHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .collapseBtn {
@@ -278,6 +302,13 @@
 .groupCount {
     font-size: 11px;
     color: var(--color-text-muted);
+}
+
+.nestedGroupChildren {
+    padding-left: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* ============ ACTIVITY MINI-CARD GRID ============ */
@@ -374,14 +405,9 @@
     color: var(--color-text-secondary);
     opacity: 0.7;
     flex-shrink: 0;
-    /* Create a small subtle background if needed, or just keep it simple */
-    /* Rotate 180deg to make it look like "coming from above" arrow? Or use the "subdirectory_arrow_right" style */
-    transform: rotate(180deg) scaleX(-1);
-    /* Flips the standard "corner-down-right" icon to be "corner-up-left" ish? No, let's keep it simple. */
-    /* Actually the SVG path I used: move(9,10) -> (4,15) -> (9,20) is an arrow pointing LEFT-DOWN. */
-    /* path d="M20 4v7a4 4 0 0 1-4 4H4" is corner-right-down into arrow. */
-    /* This looks like "coming from parent". */
-    transform: none;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
 }
 
 .miniCard:hover .removeBtn {
@@ -427,6 +453,15 @@
     font-size: 9px;
     color: var(--color-text-muted);
     background: var(--color-bg-input);
+    padding: 1px 5px;
+    border-radius: 3px;
+    align-self: flex-start;
+}
+
+.childInheritedNote {
+    font-size: 9px;
+    color: var(--color-text-muted);
+    background: rgba(0, 0, 0, 0.04);
     padding: 1px 5px;
     border-radius: 3px;
     align-self: flex-start;
@@ -537,6 +572,13 @@
 }
 
 /* ============ ASSOCIATE BUTTON ============ */
+.associateActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .associateBtn {
     background: transparent;
     border: 1.5px solid #4caf50;
@@ -552,6 +594,35 @@
 
 .associateBtn:hover {
     background: rgba(76, 175, 80, 0.1);
+}
+
+.inlineAssociateBtn {
+    background: transparent;
+    border: 1.5px solid #4caf50;
+    border-radius: 4px;
+    color: #4caf50;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 8px;
+    transition: all 0.2s;
+}
+
+.inlineAssociateBtn:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.inheritCheckbox {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    user-select: none;
+}
+
+.inheritCheckboxInput {
+    margin: 0;
+    accent-color: var(--color-brand-primary);
 }
 
 /* ============ CREATE LINK ============ */
@@ -592,6 +663,32 @@
     color: var(--color-text-muted);
     font-style: italic;
     margin-top: -8px;
+}
+
+.removeModalText {
+    margin: 0 0 16px 0;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.removeModalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.associatedActivitiesList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.discoveryWrapper {
+    margin-top: 16px;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ============ UNGROUPED SECTION ============ */
@@ -655,6 +752,13 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.groupCreatorOverlay {
+    position: relative;
+    margin-top: -12px;
+    background: var(--color-bg-primary);
+    z-index: 10;
 }
 
 .groupCreatorTitle {

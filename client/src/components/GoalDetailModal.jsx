@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import useGoalAssociationMutations from '../hooks/useGoalAssociationMutations';
+import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
 import useGoalDetailController from '../hooks/useGoalDetailController';
 import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';

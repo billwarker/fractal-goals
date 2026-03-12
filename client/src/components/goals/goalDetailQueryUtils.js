@@ -7,9 +7,13 @@ export function invalidateGoalAssociationQueries(queryClient, rootId, goalId) {
 
     return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.goalActivities(rootId, goalId) }),
+        queryClient.invalidateQueries({ queryKey: ['goalActivities', rootId] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalActivityGroups(rootId, goalId) }),
+        queryClient.invalidateQueries({ queryKey: ['goalActivityGroups', rootId] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalMetrics(goalId) }),
+        queryClient.invalidateQueries({ queryKey: ['goalMetrics'] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) }),
     ]);
 }
 

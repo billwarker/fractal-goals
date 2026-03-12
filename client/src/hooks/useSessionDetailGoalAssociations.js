@@ -104,7 +104,8 @@ export function useSessionDetailGoalAssociations({
             queryClient.invalidateQueries({ queryKey: fractalTreeKey });
             notify.success('Activity associated successfully');
             return true;
-        } catch {
+        } catch (error) {
+            console.error('Failed to associate activity with goals', error);
             notify.error('Failed to associate activity');
             return false;
         }
@@ -117,5 +118,3 @@ export function useSessionDetailGoalAssociations({
         handleGoalAssociationsChanged,
     };
 }
-
-export default useSessionDetailGoalAssociations;

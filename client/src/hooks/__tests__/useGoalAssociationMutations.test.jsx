@@ -2,7 +2,7 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import useGoalAssociationMutations from '../useGoalAssociationMutations';
+import { useGoalAssociationMutations } from '../useGoalAssociationMutations';
 
 const setGoalAssociationsBatch = vi.fn();
 const setActivityGoals = vi.fn();
@@ -87,5 +87,42 @@ describe('useGoalAssociationMutations', () => {
 
         expect(result.current.associatedActivities.map((activity) => activity.id)).toEqual(['activity-2']);
         expect(setActivityGoals).not.toHaveBeenCalled();
+    });
+
+    it('persists only direct activity associations when inherited activities are present', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-1',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [
+                { id: 'activity-direct', name: 'Direct Activity', has_direct_association: true },
+                { id: 'activity-hybrid', name: 'Hybrid Activity', has_direct_association: true, inherited_from_children: true },
+                { id: 'activity-inherited', name: 'Inherited Only', has_direct_association: false, inherited_from_children: true },
+                { id: 'activity-parent', name: 'Parent Only', has_direct_association: false, inherited_from_parent: true },
+            ],
+            fetchedGroups: [],
+        }), { wrapper: createWrapper(queryClient) });
+
+        await waitFor(() => {
+            expect(result.current.associatedActivities).toHaveLength(4);
+        });
+
+        await act(async () => {
+            await result.current.persistAssociations();
+        });
+
+        expect(setGoalAssociationsBatch).toHaveBeenCalledWith('root-1', 'goal-1', {
+            activity_ids: ['activity-direct', 'activity-hybrid'],
+            group_ids: [],
+        });
     });
 });

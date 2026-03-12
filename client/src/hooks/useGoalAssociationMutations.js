@@ -8,12 +8,53 @@ function dedupeById(items) {
     return Array.from(new Map((items || []).map((item) => [item.id, item])).values());
 }
 
-function parseSerializedItems(serialized) {
-    try {
-        return JSON.parse(serialized);
-    } catch {
-        return [];
+function isDirectActivityAssociation(activity) {
+    return activity?.has_direct_association !== false;
+}
+
+function arePrimitiveArraysEqual(left = [], right = []) {
+    if (left.length !== right.length) return false;
+    return left.every((value, index) => value === right[index]);
+}
+
+function areShallowObjectsEqual(left, right) {
+    if (left === right) return true;
+    if (!left || !right) return false;
+
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) return false;
+
+    return leftKeys.every((key) => {
+        const leftValue = left[key];
+        const rightValue = right[key];
+
+        if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+            return Array.isArray(leftValue)
+                && Array.isArray(rightValue)
+                && arePrimitiveArraysEqual(leftValue, rightValue);
+        }
+
+        return leftValue === rightValue;
+    });
+}
+
+function areItemListsEquivalent(left = [], right = []) {
+    if (left === right) return true;
+    if (left.length !== right.length) return false;
+
+    return left.every((item, index) => areShallowObjectsEqual(item, right[index]));
+}
+
+function useStableNormalizedList(items, normalize = (value) => value) {
+    const stableRef = useRef([]);
+    const normalized = useMemo(() => normalize(items || []), [items, normalize]);
+
+    if (!areItemListsEquivalent(stableRef.current, normalized)) {
+        stableRef.current = normalized;
     }
+
+    return stableRef.current;
 }
 
 export function useGoalAssociationMutations({
@@ -29,31 +70,11 @@ export function useGoalAssociationMutations({
     onAssociationsChanged,
 }) {
     const queryClient = useQueryClient();
-    const activityGroupsRawKey = JSON.stringify(activityGroupsRaw || []);
-    const initialActivitiesKey = JSON.stringify(initialActivities || []);
-    const initialActivityGroupsKey = JSON.stringify(initialActivityGroups || []);
-    const fetchedActivitiesKey = JSON.stringify(fetchedActivities || []);
-    const fetchedGroupsKey = JSON.stringify(fetchedGroups || []);
-    const normalizedActivityGroupsRaw = useMemo(
-        () => parseSerializedItems(activityGroupsRawKey),
-        [activityGroupsRawKey]
-    );
-    const normalizedInitialActivities = useMemo(
-        () => dedupeById(parseSerializedItems(initialActivitiesKey)),
-        [initialActivitiesKey]
-    );
-    const normalizedInitialActivityGroups = useMemo(
-        () => dedupeById(parseSerializedItems(initialActivityGroupsKey)),
-        [initialActivityGroupsKey]
-    );
-    const normalizedFetchedActivities = useMemo(
-        () => dedupeById(parseSerializedItems(fetchedActivitiesKey)),
-        [fetchedActivitiesKey]
-    );
-    const normalizedFetchedGroups = useMemo(
-        () => dedupeById(parseSerializedItems(fetchedGroupsKey)),
-        [fetchedGroupsKey]
-    );
+    const normalizedActivityGroupsRaw = useStableNormalizedList(activityGroupsRaw);
+    const normalizedInitialActivities = useStableNormalizedList(initialActivities, dedupeById);
+    const normalizedInitialActivityGroups = useStableNormalizedList(initialActivityGroups, dedupeById);
+    const normalizedFetchedActivities = useStableNormalizedList(fetchedActivities, dedupeById);
+    const normalizedFetchedGroups = useStableNormalizedList(fetchedGroups, dedupeById);
     const [activityGroups, setActivityGroups] = useState(normalizedActivityGroupsRaw);
     const [associatedActivities, setAssociatedActivities] = useState([]);
     const [associatedActivityGroups, setAssociatedActivityGroups] = useState([]);
@@ -119,7 +140,9 @@ export function useGoalAssociationMutations({
         }
 
         try {
-            const activityIds = nextActivities.map((activity) => activity.id);
+            const activityIds = nextActivities
+                .filter(isDirectActivityAssociation)
+                .map((activity) => activity.id);
             const groupIds = nextGroups.map((group) => group.id);
 
             await fractalApi.setGoalAssociationsBatch(rootId, targetGoalId, {
@@ -134,12 +157,6 @@ export function useGoalAssociationMutations({
 
             if (onAssociationsChanged) {
                 onAssociationsChanged();
-            }
-
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('goalAssociationsChanged', {
-                    detail: { goalId: targetGoalId, rootId }
-                }));
             }
 
             return true;
@@ -176,5 +193,3 @@ export function useGoalAssociationMutations({
         attachInlineCreatedActivity,
     };
 }
-
-export default useGoalAssociationMutations;

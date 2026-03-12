@@ -1,6 +1,6 @@
 import notify from '../utils/notify';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
-import useSessionDetailGoalAssociations from './useSessionDetailGoalAssociations';
+import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
 import useSessionDetailUiState from './useSessionDetailUiState';
 import useSessionSidePaneViewModel from './useSessionSidePaneViewModel';

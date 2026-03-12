@@ -89,7 +89,7 @@ class TestInheritedActivities:
         assert not child_act_self.get('is_inherited', False)
 
     def test_duplicate_handling(self, authed_client, sample_ultimate_goal):
-        """Test that if an activity is both DIRECT and INHERITED, it shows as DIRECT."""
+        """Test that direct associations retain inherited-child provenance when duplicated."""
         root_id = sample_ultimate_goal.id
         
         # Create Child
@@ -107,5 +107,11 @@ class TestInheritedActivities:
         data = res.get_json()
         
         activity = next(a for a in data if a['id'] == act_id)
-        # Should be Direct (is_inherited=False) because Direct takes precedence
+        # Direct takes precedence for the primary state, but child provenance is retained.
         assert not activity.get('is_inherited', False)
+        assert activity['has_direct_association'] is True
+        assert activity['inherited_from_children'] is True
+        assert activity['inherited_source_goal_names'] == ['Child Goal']
+        assert activity['inherited_source_goal_ids'] == [child_id]
+        assert activity['source_goal_name'] == 'Child Goal'
+        assert activity['source_goal_id'] == child_id

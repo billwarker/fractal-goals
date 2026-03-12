@@ -528,46 +528,74 @@ class ActivityService:
         if not goal:
             return None, "Goal not found", 404
 
+        def upsert_activity(activity, activities_map, *, is_inherited, source_name=None, source_goal_id=None, from_linked_group=False):
+            entry = activities_map.get(activity.id)
+            if entry is None:
+                entry = {
+                    "id": activity.id,
+                    "name": activity.name,
+                    "description": activity.description,
+                    "group_id": activity.group_id,
+                    "from_linked_group": from_linked_group,
+                    "has_direct_association": not is_inherited,
+                    "inherited_from_children": is_inherited,
+                    "inherited_source_goal_names": [source_name] if is_inherited and source_name else [],
+                    "inherited_source_goal_ids": [source_goal_id] if is_inherited and source_goal_id else [],
+                    "is_inherited": is_inherited,
+                    "source_goal_name": source_name if is_inherited else None,
+                    "source_goal_id": source_goal_id if is_inherited else None,
+                }
+                activities_map[activity.id] = entry
+                return
+
+            if is_inherited:
+                entry["inherited_from_children"] = True
+                if source_name and source_name not in entry["inherited_source_goal_names"]:
+                    entry["inherited_source_goal_names"].append(source_name)
+                if source_goal_id and source_goal_id not in entry["inherited_source_goal_ids"]:
+                    entry["inherited_source_goal_ids"].append(source_goal_id)
+                if entry["source_goal_name"] is None and source_name:
+                    entry["source_goal_name"] = source_name
+                if entry["source_goal_id"] is None and source_goal_id:
+                    entry["source_goal_id"] = source_goal_id
+                return
+
+            entry["has_direct_association"] = True
+            entry["is_inherited"] = False
+            entry["from_linked_group"] = from_linked_group
+            if not entry["inherited_from_children"]:
+                entry["source_goal_name"] = None
+                entry["source_goal_id"] = None
+
         def process_goal(goal_node, activities_map, *, is_inherited=False, source_name=None):
+            source_goal_id = goal_node.id if is_inherited else None
+
             for activity in goal_node.associated_activities:
                 if activity.deleted_at:
                     continue
 
-                if activity.id not in activities_map:
-                    activities_map[activity.id] = {
-                        "id": activity.id,
-                        "name": activity.name,
-                        "description": activity.description,
-                        "group_id": activity.group_id,
-                        "is_inherited": is_inherited,
-                        "source_goal_name": source_name if is_inherited else None,
-                        "source_goal_id": goal_node.id if is_inherited else None,
-                    }
-                elif not is_inherited and activities_map[activity.id]['is_inherited']:
-                    activities_map[activity.id]['is_inherited'] = False
-                    activities_map[activity.id]['source_goal_name'] = None
-                    activities_map[activity.id]['source_goal_id'] = None
+                upsert_activity(
+                    activity,
+                    activities_map,
+                    is_inherited=is_inherited,
+                    source_name=source_name,
+                    source_goal_id=source_goal_id,
+                    from_linked_group=False,
+                )
 
             for group in goal_node.associated_activity_groups:
                 for activity in group.activities:
                     if activity.deleted_at:
                         continue
 
-                    if activity.id not in activities_map:
-                        activities_map[activity.id] = {
-                            "id": activity.id,
-                            "name": activity.name,
-                            "description": activity.description,
-                            "group_id": activity.group_id,
-                            "from_linked_group": True,
-                            "is_inherited": is_inherited,
-                            "source_goal_name": source_name if is_inherited else None,
-                            "source_goal_id": goal_node.id if is_inherited else None,
-                        }
-                    elif not is_inherited and activities_map[activity.id]['is_inherited']:
-                        activities_map[activity.id]['is_inherited'] = False
-                        activities_map[activity.id]['source_goal_name'] = None
-                        activities_map[activity.id]['source_goal_id'] = None
+                    upsert_activity(
+                        activity,
+                        activities_map,
+                        is_inherited=is_inherited,
+                        source_name=source_name,
+                        source_goal_id=source_goal_id,
+                        from_linked_group=True,
+                    )
 
         activities = {}
         process_goal(goal, activities, is_inherited=False)
