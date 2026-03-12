@@ -26,6 +26,9 @@ function buildInitialGoalFormState(goal, mode) {
         deadline: mode === 'create' ? '' : deadline,
         relevanceStatement: mode === 'create' ? '' : (goal?.attributes?.relevance_statement || ''),
         completedViaChildren: mode === 'create' ? false : (goal?.attributes?.completed_via_children || false),
+        inheritParentActivities: mode === 'create'
+            ? false
+            : (goal?.attributes?.inherit_parent_activities || false),
         trackActivities: mode === 'create' ? true : (goal?.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true),
         allowManualCompletion: mode === 'create' ? true : (goal?.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true),
         targets: mode === 'create' ? [] : parsedTargets,
@@ -158,6 +161,8 @@ export function useGoalForm(goal, mode) {
         },
         completedViaChildren: currentFormState.values.completedViaChildren,
         setCompletedViaChildren: (value) => setFieldValue('completedViaChildren', value),
+        inheritParentActivities: currentFormState.values.inheritParentActivities,
+        setInheritParentActivities: (value) => setFieldValue('inheritParentActivities', value),
         trackActivities: currentFormState.values.trackActivities,
         setTrackActivities: (value) => setFieldValue('trackActivities', value),
         allowManualCompletion: currentFormState.values.allowManualCompletion,

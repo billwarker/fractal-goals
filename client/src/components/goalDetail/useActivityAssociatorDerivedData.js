@@ -6,9 +6,7 @@ export function useActivityAssociatorDerivedData({
     activityGroups,
     associatedActivities,
     associatedActivityGroups,
-    fetchedParentActivities,
-    inheritFromParent,
-    inheritedActivityIds,
+    previewParentActivities,
     parentGoalId,
 }) {
     const getGroupDepth = useCallback((groupId) => {
@@ -43,14 +41,12 @@ export function useActivityAssociatorDerivedData({
     }, [activityGroups]);
 
     const displayActivities = useMemo(() => {
-        const inheritedIdsSet = new Set(inheritedActivityIds);
-        const parentInheritedIdsSet = new Set((fetchedParentActivities || []).map((activity) => activity.id));
+        const previewParentIdsSet = new Set((previewParentActivities || []).map((activity) => activity.id));
         const materializedActivities = (associatedActivities || []).map((activity) => {
             const hasDirectAssociation = activity.has_direct_association !== false;
             const inheritedFromChildren = Boolean(activity.inherited_from_children);
             const inheritedFromParent = Boolean(activity.inherited_from_parent)
-                || inheritedIdsSet.has(activity.id)
-                || (inheritFromParent && parentInheritedIdsSet.has(activity.id));
+                || previewParentIdsSet.has(activity.id);
             const isInheritedOnly = !hasDirectAssociation && (inheritedFromChildren || inheritedFromParent);
 
             return {
@@ -61,25 +57,26 @@ export function useActivityAssociatorDerivedData({
                 inherited_source_goal_names: activity.inherited_source_goal_names || [],
                 inherited_source_goal_ids: activity.inherited_source_goal_ids || [],
                 is_inherited: isInheritedOnly,
-                source_goal_name: inheritedIdsSet.has(activity.id)
+                source_goal_name: previewParentIdsSet.has(activity.id)
                     ? 'Parent Goal'
                     : activity.source_goal_name,
-                source_goal_id: inheritedIdsSet.has(activity.id)
+                source_goal_id: previewParentIdsSet.has(activity.id)
                     ? (parentGoalId || activity.source_goal_id || null)
                     : activity.source_goal_id,
             };
         });
 
-        if (!inheritFromParent || (fetchedParentActivities || []).length === 0) {
+        if ((previewParentActivities || []).length === 0) {
             return materializedActivities;
         }
 
         const existing = new Set((associatedActivities || []).map((activity) => activity.id));
-        const inherited = (fetchedParentActivities || [])
+        const inherited = (previewParentActivities || [])
             .filter((activity) => !existing.has(activity.id))
             .map((activity) => ({
                 ...activity,
                 is_inherited: true,
+                has_direct_association: false,
                 inherited_from_parent: true,
                 inherited_from_children: Boolean(activity.inherited_from_children),
                 inherited_source_goal_names: activity.inherited_source_goal_names || [],
@@ -91,10 +88,8 @@ export function useActivityAssociatorDerivedData({
         return [...materializedActivities, ...inherited];
     }, [
         associatedActivities,
-        fetchedParentActivities,
-        inheritFromParent,
-        inheritedActivityIds,
         parentGoalId,
+        previewParentActivities,
     ]);
 
     const { roots, ungrouped } = useMemo(() => {

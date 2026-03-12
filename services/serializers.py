@@ -172,6 +172,7 @@ def serialize_goal(goal, include_children=True):
             "targets": [serialize_target(t) for t in (goal.targets_rel or []) if t.deleted_at is None],
             "relevance_statement": goal.relevance_statement,
             "completed_via_children": goal.completed_via_children,
+            "inherit_parent_activities": goal.inherit_parent_activities,
             "allow_manual_completion": goal.allow_manual_completion,
             "track_activities": goal.track_activities,
             "is_smart": all(smart_status.values()),

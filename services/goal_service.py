@@ -508,6 +508,8 @@ class GoalService:
         if allow_extended_fields:
             if 'relevance_statement' in data:
                 goal.relevance_statement = data['relevance_statement']
+            if 'inherit_parent_activities' in data:
+                goal.inherit_parent_activities = data['inherit_parent_activities']
             if 'allow_manual_completion' in data:
                 goal.allow_manual_completion = data['allow_manual_completion']
             if 'track_activities' in data:
@@ -664,6 +666,14 @@ class GoalService:
                 }, 400
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
+        level_obj = self.db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
+        goal_defaults = Goal(parent_id=parent_id)
+        goal_defaults.level = level_obj
+        inherit_parent_activities = should_inherit_parent_activities(
+            goal_defaults,
+            parent,
+            explicit_value=data.get('inherit_parent_activities'),
+        )
 
         with self.db_session.begin_nested():
             new_goal = Goal(
@@ -673,6 +683,7 @@ class GoalService:
                 deadline=deadline,
                 completed=False,
                 completed_via_children=data.get('completed_via_children', False),
+                inherit_parent_activities=inherit_parent_activities,
                 relevance_statement=data.get('relevance_statement'),
                 parent_id=parent_id,
                 owner_id=parent.owner_id if parent else current_user_id,
@@ -689,10 +700,6 @@ class GoalService:
 
             if not parent:
                 new_goal.root_id = new_goal.id
-
-            if should_inherit_parent_activities(new_goal, parent):
-                for activity in parent.associated_activities:
-                    new_goal.associated_activities.append(activity)
 
             if data.get('targets'):
                 self.sync_targets(self.db_session, new_goal, data['targets'])
@@ -776,6 +783,13 @@ class GoalService:
                 return None, parent_capacity_error, 400
 
         completed_via_children = resolve_completed_via_children(data, level_obj)
+        goal_defaults = Goal(parent_id=parent_id)
+        goal_defaults.level = level_obj
+        inherit_parent_activities = should_inherit_parent_activities(
+            goal_defaults,
+            parent_goal if parent_id else None,
+            explicit_value=data.get('inherit_parent_activities'),
+        )
 
         with self.db_session.begin_nested():
             new_goal = Goal(
@@ -787,6 +801,7 @@ class GoalService:
                 deadline=deadline,
                 completed=False,
                 completed_via_children=completed_via_children,
+                inherit_parent_activities=inherit_parent_activities,
                 allow_manual_completion=data.get('allow_manual_completion', True),
                 track_activities=data.get('track_activities', True),
                 relevance_statement=data.get('relevance_statement'),

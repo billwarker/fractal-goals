@@ -44,7 +44,8 @@ const ActivityAssociator = ({
     completedViaChildren = false,
     isAboveShortTermGoal = false,
     headerColor,
-    goalType,
+    inheritParentActivities = false,
+    setInheritParentActivities,
     onClose,
     onSave,
     onRefreshAssociations
@@ -63,17 +64,29 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
-    const [inheritFromParent, setInheritFromParent] = useState(goalType === 'NanoGoal');
-    const [parentActivities, setParentActivities] = useState([]);
-    const [inheritedActivityIds, setInheritedActivityIds] = useState([]);
     const linkedGroupIds = useMemo(
         () => new Set((associatedActivityGroups || []).map(g => g.id)),
         [associatedActivityGroups]
     );
     const associatedActivitiesRef = useRef(associatedActivities);
     const associatedGroupsRef = useRef(associatedActivityGroups);
-    const directActivityIdsBeforeInheritanceRef = useRef(
-        new Set(goalType === 'NanoGoal' ? [] : (associatedActivities || []).map((activity) => activity.id))
+    const shouldPreviewParentActivities = Boolean(!goalId && inheritParentActivities && rootId && parentGoalId);
+    const { activities: fetchedParentActivities = [] } = useGoalAssociations(
+        shouldPreviewParentActivities ? rootId : null,
+        shouldPreviewParentActivities ? parentGoalId : null
+    );
+    const previewParentActivities = useMemo(
+        () => (fetchedParentActivities || [])
+            .filter((activity) => activity.has_direct_association !== false)
+            .map((activity) => ({
+                ...activity,
+                has_direct_association: false,
+                inherited_from_parent: true,
+                is_inherited: true,
+                source_goal_name: 'Parent Goal',
+                source_goal_id: parentGoalId || null,
+            })),
+        [fetchedParentActivities, parentGoalId]
     );
 
     useEffect(() => {
@@ -83,31 +96,6 @@ const ActivityAssociator = ({
     useEffect(() => {
         associatedGroupsRef.current = associatedActivityGroups;
     }, [associatedActivityGroups]);
-
-    useEffect(() => {
-        if (!inheritFromParent || parentActivities.length === 0) {
-            if (inheritedActivityIds.length > 0) {
-                setInheritedActivityIds([]);
-            }
-            return;
-        }
-
-        const parentIds = new Set(parentActivities.map((activity) => activity.id));
-        const baselineDirectIds = directActivityIdsBeforeInheritanceRef.current;
-        const nextInheritedIds = associatedActivities
-            .filter((activity) => parentIds.has(activity.id) && !baselineDirectIds.has(activity.id))
-            .map((activity) => activity.id);
-
-        setInheritedActivityIds((prev) => {
-            if (
-                prev.length === nextInheritedIds.length &&
-                prev.every((id, index) => id === nextInheritedIds[index])
-            ) {
-                return prev;
-            }
-            return nextInheritedIds;
-        });
-    }, [associatedActivities, inheritFromParent, inheritedActivityIds.length, parentActivities]);
 
     useEffect(() => {
         if (!isDiscoveryActive) {
@@ -178,8 +166,8 @@ const ActivityAssociator = ({
             ? targets.filter(t => t.activity_id === activityId)
             : [];
 
-        const remainsInheritedFromChild = Boolean(activity.inherited_from_children);
-        const next = remainsInheritedFromChild
+        const remainsInherited = Boolean(activity.inherited_from_children || activity.inherited_from_parent);
+        const next = remainsInherited
             ? associatedActivities.map((item) => {
                 if (item.id !== activityId) return item;
 
@@ -187,9 +175,14 @@ const ActivityAssociator = ({
                     ...item,
                     has_direct_association: false,
                     is_inherited: true,
-                    inherited_from_children: true,
-                    source_goal_name: item.inherited_source_goal_names?.[0] || item.source_goal_name || 'Child Goal',
-                    source_goal_id: item.inherited_source_goal_ids?.[0] || item.source_goal_id || null,
+                    inherited_from_children: Boolean(item.inherited_from_children),
+                    inherited_from_parent: Boolean(item.inherited_from_parent),
+                    source_goal_name: item.inherited_from_children
+                        ? (item.inherited_source_goal_names?.[0] || item.source_goal_name || 'Child Goal')
+                        : (item.inherited_from_parent ? 'Parent Goal' : item.source_goal_name),
+                    source_goal_id: item.inherited_from_children
+                        ? (item.inherited_source_goal_ids?.[0] || item.source_goal_id || null)
+                        : (item.inherited_from_parent ? (parentGoalId || item.source_goal_id || null) : item.source_goal_id),
                 };
             })
             : associatedActivities.filter((item) => item.id !== activityId);
@@ -197,14 +190,19 @@ const ActivityAssociator = ({
 
         if (onSave) {
             await onSave(next, associatedActivityGroups);
-            if (remainsInheritedFromChild && onRefreshAssociations) {
+            if (remainsInherited && onRefreshAssociations) {
                 await onRefreshAssociations();
             }
         }
 
         const countForToast = removedTargetsCount || dependentTargets.length;
-        if (remainsInheritedFromChild) {
-            notify.success(`Direct association removed. "${activity.name}" remains inherited from a child goal.`);
+        if (remainsInherited) {
+            const sourceLabel = activity.inherited_from_children && activity.inherited_from_parent
+                ? 'other goals'
+                : activity.inherited_from_children
+                    ? 'a child goal'
+                    : 'the parent goal';
+            notify.success(`Direct association removed. "${activity.name}" remains inherited from ${sourceLabel}.`);
         } else if (countForToast > 0) {
             notify.success(`Activity association removed and ${countForToast} target${countForToast === 1 ? '' : 's'} deleted`);
         } else {
@@ -313,93 +311,41 @@ const ActivityAssociator = ({
     };
 
     const handleInheritFromParentChange = async (checked) => {
-        const latestActivities = Array.isArray(associatedActivitiesRef.current) ? associatedActivitiesRef.current : [];
-        const latestGroups = Array.isArray(associatedGroupsRef.current) ? associatedGroupsRef.current : [];
-
-        if (!checked) {
-            const inheritedIdsSet = new Set(inheritedActivityIds);
-            const nextActivities = latestActivities.filter((activity) => !inheritedIdsSet.has(activity.id));
-            const removedCount = latestActivities.length - nextActivities.length;
-
-            directActivityIdsBeforeInheritanceRef.current = new Set(nextActivities.map((activity) => activity.id));
-            setInheritFromParent(false);
-            setParentActivities([]);
-            setInheritedActivityIds([]);
-            setAssociatedActivities(nextActivities);
-
-            if (onSave) {
-                await onSave(nextActivities, latestGroups);
-            }
-
-            if (removedCount > 0) {
-                notify.success(`Removed ${removedCount} inherited parent activit${removedCount === 1 ? 'y' : 'ies'}`);
-            }
+        if (!setInheritParentActivities) {
             return;
         }
 
-        directActivityIdsBeforeInheritanceRef.current = new Set(latestActivities.map((activity) => activity.id));
-        setInheritFromParent(checked);
+        const latestActivities = Array.isArray(associatedActivitiesRef.current) ? associatedActivitiesRef.current : [];
+        setInheritParentActivities(checked);
 
-        if (!parentGoalId || !rootId) {
+        if (!goalId || !rootId) {
+            if (!checked) {
+                const nextActivities = latestActivities
+                    .filter((activity) => activity.has_direct_association !== false || !activity.inherited_from_parent)
+                    .map((activity) => (
+                        activity.has_direct_association !== false
+                            ? { ...activity, inherited_from_parent: false }
+                            : activity
+                    ));
+                setAssociatedActivities(nextActivities);
+            }
             return;
         }
 
         try {
-            const res = await fractalApi.getGoalActivities(rootId, parentGoalId);
-            const parentActs = res.data || [];
-
-            if (parentActs.length === 0) {
-                notify.info("Parent goal has no activities to inherit");
-                return;
+            await fractalApi.updateGoal(rootId, goalId, {
+                inherit_parent_activities: checked,
+            });
+            if (onRefreshAssociations) {
+                await onRefreshAssociations();
             }
-
-            const existingIds = new Set(latestActivities.map(a => a.id));
-            const newActs = parentActs.filter(a => !existingIds.has(a.id));
-
-            if (newActs.length === 0) {
-                notify.info("All parent activities are already associated");
-                return;
-            }
-
-            const nextActivities = [
-                ...latestActivities,
-                ...newActs.map((activity) => ({
-                    ...activity,
-                    has_direct_association: true,
-                    inherited_from_parent: true,
-                    is_inherited: true,
-                    source_goal_name: 'Parent Goal',
-                    source_goal_id: parentGoalId || null,
-                }))
-            ];
-            setAssociatedActivities(nextActivities);
-
-            if (onSave) {
-                await onSave(nextActivities, latestGroups);
-                notify.success(`Inherited and associated ${newActs.length} activities from parent`);
-            } else {
-                notify.success(`Queued ${newActs.length} inherited activities for association`);
-            }
+            notify.success(checked ? 'Enabled parent activity inheritance' : 'Disabled parent activity inheritance');
         } catch (err) {
-            console.error("Failed to inherit parent activities", err);
-            notify.error("Failed to inherit parent activities");
+            setInheritParentActivities(!checked);
+            console.error('Failed to update parent activity inheritance', err);
+            notify.error('Failed to update parent activity inheritance');
         }
     };
-
-    // Fetch parent activities via React Query hook when inherit checkbox is checked
-    const { activities: fetchedParentActivities } = useGoalAssociations(
-        inheritFromParent ? rootId : null,
-        inheritFromParent ? parentGoalId : null
-    );
-
-    // Sync fetched activities to the local state
-    useEffect(() => {
-        if (inheritFromParent) {
-            setParentActivities(fetchedParentActivities);
-        } else {
-            setParentActivities([]);
-        }
-    }, [inheritFromParent, fetchedParentActivities]);
 
     const {
         counts,
@@ -412,9 +358,7 @@ const ActivityAssociator = ({
         activityGroups,
         associatedActivities,
         associatedActivityGroups,
-        fetchedParentActivities: parentActivities,
-        inheritFromParent,
-        inheritedActivityIds,
+        previewParentActivities,
         parentGoalId,
     });
 
@@ -544,9 +488,9 @@ const ActivityAssociator = ({
                         <span className={styles.inlineSectionLabel}>
                             Associated Activities
                         </span>
-                        {associatedActivities.length > 0 && (
+                        {counts.total > 0 && (
                             <span className={styles.inlineSectionCount}>
-                                {associatedActivities.length}
+                                {counts.total}
                             </span>
                         )}
                     </div>
@@ -605,7 +549,7 @@ const ActivityAssociator = ({
                                     <label className={styles.inheritCheckbox}>
                                         <input
                                             type="checkbox"
-                                            checked={inheritFromParent}
+                                            checked={inheritParentActivities}
                                             onChange={(e) => handleInheritFromParentChange(e.target.checked)}
                                             className={styles.inheritCheckboxInput}
                                         />
@@ -664,7 +608,7 @@ const ActivityAssociator = ({
             )}
 
             {/* ============ COMPLETION VIA CHILDREN NOTE (selector mode only) ============ */}
-            {isSelectorMode && associatedActivities.length === 0 && isAboveShortTermGoal && !completedViaChildren && (
+            {isSelectorMode && counts.total === 0 && isAboveShortTermGoal && !completedViaChildren && (
                 <div className={styles.helperNote}>
                     (Goal implies completion via children unless activities are added)
                 </div>

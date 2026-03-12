@@ -115,3 +115,116 @@ class TestInheritedActivities:
         assert activity['inherited_source_goal_ids'] == [child_id]
         assert activity['source_goal_name'] == 'Child Goal'
         assert activity['source_goal_id'] == child_id
+
+    def test_parent_inheritance_when_flag_enabled(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        child_payload = {
+            'name': 'Child Goal',
+            'type': 'LongTermGoal',
+            'parent_id': root_id,
+            'inherit_parent_activities': True,
+        }
+        child_id = authed_client.post(f'/api/{root_id}/goals', json=child_payload).get_json()['id']
+
+        act_root_id = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Root Activity'},
+        ).get_json()['id']
+        authed_client.post(f'/api/{root_id}/activities/{act_root_id}/goals', json={'goal_ids': [root_id]})
+
+        res = authed_client.get(f'/api/{root_id}/goals/{child_id}/activities')
+        assert res.status_code == 200
+
+        activity = next(a for a in res.get_json() if a['id'] == act_root_id)
+        assert activity['has_direct_association'] is False
+        assert activity['is_inherited'] is True
+        assert activity['inherited_from_parent'] is True
+        assert activity['source_goal_name'] == sample_ultimate_goal.name
+        assert activity['source_goal_id'] == root_id
+
+    def test_parent_inheritance_flag_disabled_by_default(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        child_payload = {
+            'name': 'Child Goal',
+            'type': 'LongTermGoal',
+            'parent_id': root_id,
+        }
+        child_id = authed_client.post(f'/api/{root_id}/goals', json=child_payload).get_json()['id']
+
+        act_root_id = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Root Activity'},
+        ).get_json()['id']
+        authed_client.post(f'/api/{root_id}/activities/{act_root_id}/goals', json={'goal_ids': [root_id]})
+
+        res = authed_client.get(f'/api/{root_id}/goals/{child_id}/activities')
+        assert res.status_code == 200
+        ids = [activity['id'] for activity in res.get_json()]
+        assert act_root_id not in ids
+
+    def test_parent_inheritance_does_not_walk_grandparents(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        child_id = authed_client.post(
+            f'/api/{root_id}/goals',
+            json={'name': 'Child Goal', 'type': 'LongTermGoal', 'parent_id': root_id},
+        ).get_json()['id']
+        grandchild_id = authed_client.post(
+            f'/api/{root_id}/goals',
+            json={
+                'name': 'Grandchild Goal',
+                'type': 'MidTermGoal',
+                'parent_id': child_id,
+                'inherit_parent_activities': True,
+            },
+        ).get_json()['id']
+
+        act_root_id = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Root Activity'},
+        ).get_json()['id']
+        act_child_id = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Child Activity'},
+        ).get_json()['id']
+
+        authed_client.post(f'/api/{root_id}/activities/{act_root_id}/goals', json={'goal_ids': [root_id]})
+        authed_client.post(f'/api/{root_id}/activities/{act_child_id}/goals', json={'goal_ids': [child_id]})
+
+        res = authed_client.get(f'/api/{root_id}/goals/{grandchild_id}/activities')
+        assert res.status_code == 200
+
+        ids = [activity['id'] for activity in res.get_json()]
+        assert act_child_id in ids
+        assert act_root_id not in ids
+
+    def test_parent_inheritance_duplicate_handling(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        child_id = authed_client.post(
+            f'/api/{root_id}/goals',
+            json={
+                'name': 'Child Goal',
+                'type': 'LongTermGoal',
+                'parent_id': root_id,
+                'inherit_parent_activities': True,
+            },
+        ).get_json()['id']
+
+        act_id = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={'name': 'Shared Activity'},
+        ).get_json()['id']
+        authed_client.post(f'/api/{root_id}/activities/{act_id}/goals', json={'goal_ids': [root_id, child_id]})
+
+        res = authed_client.get(f'/api/{root_id}/goals/{child_id}/activities')
+        assert res.status_code == 200
+
+        activity = next(a for a in res.get_json() if a['id'] == act_id)
+        assert activity['has_direct_association'] is True
+        assert activity['is_inherited'] is False
+        assert activity['inherited_from_parent'] is True
+        assert activity['source_goal_name'] == sample_ultimate_goal.name
+        assert activity['source_goal_id'] == root_id

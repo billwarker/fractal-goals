@@ -49,12 +49,12 @@ def test_nano_and_micro_goal_detection():
 
 def test_should_inherit_parent_activities_only_for_nano_children():
     parent = _goal(level_name="Immediate Goal")
-    parent.associated_activities = [SimpleNamespace(id="activity-1")]
     nano = _goal(level_name="Nano Goal", parent_id="parent-1")
     micro = _goal(level_name="Micro Goal", parent_id="parent-1")
 
     assert should_inherit_parent_activities(nano, parent) is True
     assert should_inherit_parent_activities(micro, parent) is False
+    assert should_inherit_parent_activities(micro, parent, explicit_value=True) is True
 
 
 def test_all_active_targets_completed_ignores_deleted_targets():

@@ -528,7 +528,16 @@ class ActivityService:
         if not goal:
             return None, "Goal not found", 404
 
-        def upsert_activity(activity, activities_map, *, is_inherited, source_name=None, source_goal_id=None, from_linked_group=False):
+        def upsert_activity(
+            activity,
+            activities_map,
+            *,
+            is_inherited,
+            source_name=None,
+            source_goal_id=None,
+            from_linked_group=False,
+            direction=None,
+        ):
             entry = activities_map.get(activity.id)
             if entry is None:
                 entry = {
@@ -538,9 +547,10 @@ class ActivityService:
                     "group_id": activity.group_id,
                     "from_linked_group": from_linked_group,
                     "has_direct_association": not is_inherited,
-                    "inherited_from_children": is_inherited,
-                    "inherited_source_goal_names": [source_name] if is_inherited and source_name else [],
-                    "inherited_source_goal_ids": [source_goal_id] if is_inherited and source_goal_id else [],
+                    "inherited_from_children": direction == "child",
+                    "inherited_from_parent": direction == "parent",
+                    "inherited_source_goal_names": [source_name] if direction == "child" and source_name else [],
+                    "inherited_source_goal_ids": [source_goal_id] if direction == "child" and source_goal_id else [],
                     "is_inherited": is_inherited,
                     "source_goal_name": source_name if is_inherited else None,
                     "source_goal_id": source_goal_id if is_inherited else None,
@@ -549,11 +559,14 @@ class ActivityService:
                 return
 
             if is_inherited:
-                entry["inherited_from_children"] = True
-                if source_name and source_name not in entry["inherited_source_goal_names"]:
-                    entry["inherited_source_goal_names"].append(source_name)
-                if source_goal_id and source_goal_id not in entry["inherited_source_goal_ids"]:
-                    entry["inherited_source_goal_ids"].append(source_goal_id)
+                if direction == "parent":
+                    entry["inherited_from_parent"] = True
+                else:
+                    entry["inherited_from_children"] = True
+                    if source_name and source_name not in entry["inherited_source_goal_names"]:
+                        entry["inherited_source_goal_names"].append(source_name)
+                    if source_goal_id and source_goal_id not in entry["inherited_source_goal_ids"]:
+                        entry["inherited_source_goal_ids"].append(source_goal_id)
                 if entry["source_goal_name"] is None and source_name:
                     entry["source_goal_name"] = source_name
                 if entry["source_goal_id"] is None and source_goal_id:
@@ -567,7 +580,7 @@ class ActivityService:
                 entry["source_goal_name"] = None
                 entry["source_goal_id"] = None
 
-        def process_goal(goal_node, activities_map, *, is_inherited=False, source_name=None):
+        def process_goal(goal_node, activities_map, *, is_inherited=False, source_name=None, direction=None):
             source_goal_id = goal_node.id if is_inherited else None
 
             for activity in goal_node.associated_activities:
@@ -581,6 +594,7 @@ class ActivityService:
                     source_name=source_name,
                     source_goal_id=source_goal_id,
                     from_linked_group=False,
+                    direction=direction,
                 )
 
             for group in goal_node.associated_activity_groups:
@@ -595,6 +609,7 @@ class ActivityService:
                         source_name=source_name,
                         source_goal_id=source_goal_id,
                         from_linked_group=True,
+                        direction=direction,
                     )
 
         activities = {}
@@ -606,8 +621,13 @@ class ActivityService:
             for child in current.children:
                 if child.deleted_at:
                     continue
-                process_goal(child, activities, is_inherited=True, source_name=child.name)
+                process_goal(child, activities, is_inherited=True, source_name=child.name, direction="child")
                 stack.append(child)
+
+        if goal.inherit_parent_activities and goal.parent_id:
+            parent = self.db_session.query(Goal).filter_by(id=goal.parent_id, root_id=root_id).first()
+            if parent and not parent.deleted_at:
+                process_goal(parent, activities, is_inherited=True, source_name=parent.name, direction="parent")
 
         return list(activities.values()), None, 200
 

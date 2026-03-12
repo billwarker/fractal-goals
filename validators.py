@@ -269,6 +269,7 @@ class GoalCreateSchema(BaseModel):
     targets: Optional[List[Dict[str, Any]]] = None
     relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     completed_via_children: Optional[bool] = False
+    inherit_parent_activities: Optional[bool] = False
     allow_manual_completion: Optional[bool] = True
     track_activities: Optional[bool] = True
     session_id: Optional[str] = None  # If provided, link goal to session
@@ -346,6 +347,7 @@ class GoalUpdateSchema(BaseModel):
     relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     completed: Optional[bool] = None
     completed_via_children: Optional[bool] = None
+    inherit_parent_activities: Optional[bool] = None
     allow_manual_completion: Optional[bool] = None
     track_activities: Optional[bool] = None
     

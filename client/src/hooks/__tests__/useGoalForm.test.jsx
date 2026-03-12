@@ -18,6 +18,7 @@ describe('useGoalForm', () => {
                             deadline: '2026-04-01T00:00:00.000Z',
                             relevance_statement: 'Initial why',
                             completed_via_children: false,
+                            inherit_parent_activities: true,
                             track_activities: true,
                             allow_manual_completion: true,
                             targets: [],
@@ -29,6 +30,7 @@ describe('useGoalForm', () => {
 
         expect(result.current.name).toBe('Deep Work');
         expect(result.current.description).toBe('Initial description');
+        expect(result.current.inheritParentActivities).toBe(true);
 
         act(() => {
             result.current.setName('Edited Name');
@@ -49,6 +51,7 @@ describe('useGoalForm', () => {
                     deadline: '2026-05-01T00:00:00.000Z',
                     relevance_statement: 'Fresh why',
                     completed_via_children: true,
+                    inherit_parent_activities: false,
                     track_activities: false,
                     allow_manual_completion: false,
                     targets: [],
@@ -58,6 +61,7 @@ describe('useGoalForm', () => {
 
         expect(result.current.name).toBe('Practice Scales');
         expect(result.current.description).toBe('Fresh description');
+        expect(result.current.inheritParentActivities).toBe(false);
 
         act(() => {
             result.current.setName('Changed again');

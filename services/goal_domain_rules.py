@@ -39,12 +39,13 @@ def resolve_completed_via_children(data, level_obj) -> bool:
     return bool(level_obj and getattr(level_obj, "auto_complete_when_children_done", False))
 
 
-def should_inherit_parent_activities(goal, parent_goal) -> bool:
+def should_inherit_parent_activities(goal, parent_goal, explicit_value=None) -> bool:
+    if explicit_value is not None:
+        return bool(explicit_value)
     return bool(
         parent_goal
         and getattr(goal, "parent_id", None)
         and is_nano_goal(goal)
-        and getattr(parent_goal, "associated_activities", None)
     )
 
 

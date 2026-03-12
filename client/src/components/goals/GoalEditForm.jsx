@@ -27,6 +27,7 @@ function GoalEditForm({
     relevanceStatement, setRelevanceStatement,
     trackActivities, setTrackActivities,
     completedViaChildren, setCompletedViaChildren,
+    inheritParentActivities, setInheritParentActivities,
     allowManualCompletion, setAllowManualCompletion,
     targets, setTargets,
     // Association state
@@ -187,6 +188,8 @@ function GoalEditForm({
                         headerColor={goalColor}
                         goalType={goalType}
                         onRefreshAssociations={refreshAssociations}
+                        inheritParentActivities={inheritParentActivities}
+                        setInheritParentActivities={setInheritParentActivities}
                     />
                 </Suspense>
             )}

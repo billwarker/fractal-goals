@@ -78,6 +78,7 @@ function GoalDetailModal({
         deadline, setDeadline,
         relevanceStatement, setRelevanceStatement,
         completedViaChildren, setCompletedViaChildren,
+        inheritParentActivities, setInheritParentActivities,
         trackActivities, setTrackActivities,
         allowManualCompletion, setAllowManualCompletion,
         targets, setTargets,
@@ -185,6 +186,7 @@ function GoalDetailModal({
             parent_id: parentGoal?.attributes?.id || parentGoal?.id,
             targets: targets,
             completed_via_children: completedViaChildren,
+            inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
             allow_manual_completion: allowManualCompletion
         } : {
@@ -194,6 +196,7 @@ function GoalDetailModal({
             targets: targets,
             relevance_statement: relevanceStatement,
             completed_via_children: completedViaChildren,
+            inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
             allow_manual_completion: allowManualCompletion
         };
@@ -256,6 +259,7 @@ function GoalDetailModal({
                 deadline: deadline,
                 relevance_statement: relevanceStatement,
                 completed_via_children: completedViaChildren,
+                inherit_parent_activities: inheritParentActivities,
                 // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
                 smart_status: undefined,
                 is_smart: undefined
@@ -265,7 +269,8 @@ function GoalDetailModal({
             targets: Array.isArray(targets) ? targets : [],
             deadline: deadline,
             relevance_statement: relevanceStatement,
-            completed_via_children: completedViaChildren
+            completed_via_children: completedViaChildren,
+            inherit_parent_activities: inheritParentActivities
         };
 
         return (
@@ -320,6 +325,7 @@ function GoalDetailModal({
                         relevanceStatement={relevanceStatement} setRelevanceStatement={setRelevanceStatement}
                         trackActivities={trackActivities} setTrackActivities={setTrackActivities}
                         completedViaChildren={completedViaChildren} setCompletedViaChildren={setCompletedViaChildren}
+                        inheritParentActivities={inheritParentActivities} setInheritParentActivities={setInheritParentActivities}
                         allowManualCompletion={allowManualCompletion} setAllowManualCompletion={setAllowManualCompletion}
                         targets={targets} setTargets={setTargets}
                         associatedActivities={associatedActivities} setAssociatedActivities={setAssociatedActivities}
@@ -437,7 +443,8 @@ function GoalDetailModal({
                                 description,
                                 deadline,
                                 relevance_statement: relevanceStatement,
-                                targets: newTargets
+                                targets: newTargets,
+                                inherit_parent_activities: inheritParentActivities,
                             });
                         }
                         setViewState('goal');
@@ -470,6 +477,8 @@ function GoalDetailModal({
                     onClose={handleClose}
                     onSave={!isEditing ? persistAssociations : undefined}
                     onRefreshAssociations={refreshAssociations}
+                    inheritParentActivities={inheritParentActivities}
+                    setInheritParentActivities={setInheritParentActivities}
                     onCreateActivity={() => {
                         // Switch to activity builder view
                         setViewState('activity-builder');

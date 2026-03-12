@@ -6,6 +6,7 @@ import ActivityAssociator from '../ActivityAssociator';
 const createActivityGroup = vi.fn();
 const setActivityGroupGoals = vi.fn();
 const useGoalAssociations = vi.fn(() => ({ activities: [] }));
+const updateGoal = vi.fn(() => Promise.resolve());
 
 vi.mock('../../../contexts/ActivitiesContext', () => ({
     useActivities: () => ({
@@ -18,6 +19,12 @@ vi.mock('../../../hooks/useGoalQueries', () => ({
     useGoalAssociations: (...args) => useGoalAssociations(...args),
 }));
 
+vi.mock('../../../utils/api', () => ({
+    fractalApi: {
+        updateGoal: (...args) => updateGoal(...args),
+    },
+}));
+
 vi.mock('../../common/ActivitySearchWidget', () => ({
     default: () => <div data-testid="activity-search-widget" />,
 }));
@@ -26,10 +33,12 @@ function ActivityAssociatorHarness({
     initialActivities,
     onSave = vi.fn(() => Promise.resolve()),
     parentGoalId = null,
-    goalType = 'ShortTermGoal',
+    goalId = 'goal-1',
+    inheritParentActivities = false,
 }) {
     const [activities, setActivities] = useState(initialActivities);
     const [groups, setGroups] = useState([]);
+    const [inheritParent, setInheritParent] = useState(inheritParentActivities);
 
     return (
         <ActivityAssociator
@@ -43,12 +52,13 @@ function ActivityAssociatorHarness({
             targets={[]}
             setTargets={() => {}}
             rootId="root-1"
-            goalId="goal-1"
+            goalId={goalId}
             parentGoalId={parentGoalId}
             onCloseSelector={() => {}}
             onCreateActivity={() => {}}
-            goalType={goalType}
             onSave={onSave}
+            inheritParentActivities={inheritParent}
+            setInheritParentActivities={setInheritParent}
         />
     );
 }
@@ -128,5 +138,49 @@ describe('ActivityAssociator', () => {
 
         expect(screen.getByText('↑ inherited from child')).toBeInTheDocument();
         expect(screen.getByText('↓ inherited from parent')).toBeInTheDocument();
+    });
+
+    it('persists the inherit-from-parent flag for an existing goal', async () => {
+        render(
+            <ActivityAssociatorHarness
+                initialActivities={[]}
+                parentGoalId="parent-goal-1"
+                inheritParentActivities={false}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('checkbox'));
+
+        await waitFor(() => {
+            expect(updateGoal).toHaveBeenCalledWith('root-1', 'goal-1', {
+                inherit_parent_activities: true,
+            });
+        });
+    });
+
+    it('shows a parent-inheritance preview for create mode without persisting direct associations', () => {
+        useGoalAssociations.mockReturnValue({
+            activities: [
+                {
+                    id: 'parent-activity-1',
+                    name: 'Parent Activity',
+                    has_direct_association: true,
+                },
+            ],
+        });
+
+        render(
+            <ActivityAssociatorHarness
+                initialActivities={[]}
+                goalId={null}
+                parentGoalId="parent-goal-1"
+                inheritParentActivities={true}
+            />
+        );
+
+        expect(screen.getByText('Parent Activity')).toBeInTheDocument();
+        expect(screen.getByText('↓ inherited from parent')).toBeInTheDocument();
+        expect(screen.queryByTitle('Remove association')).not.toBeInTheDocument();
+        expect(updateGoal).not.toHaveBeenCalled();
     });
 });
