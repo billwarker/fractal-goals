@@ -1,8 +1,9 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import useIsMobile from './hooks/useIsMobile';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import styles from './AppRouter.module.css';
 import './App.css';
 
@@ -10,17 +11,17 @@ import './App.css';
 import Selection from './pages/Selection';
 
 // Lazy load non-critical pages
-const FractalGoals = lazy(() => import('./pages/FractalGoals'));
-const Programs = lazy(() => import('./pages/Programs'));
-const ProgramDetail = lazy(() => import('./pages/ProgramDetail'));
-const Sessions = lazy(() => import('./pages/Sessions'));
-const SessionDetail = lazy(() => import('./pages/SessionDetail'));
-const CreateSession = lazy(() => import('./pages/CreateSession'));
-const CreateSessionTemplate = lazy(() => import('./pages/CreateSessionTemplate'));
-const ManageActivities = lazy(() => import('./pages/ManageActivities'));
-const Analytics = lazy(() => import('./pages/Analytics'));
-const Logs = lazy(() => import('./pages/Logs'));
-const SettingsModal = lazy(() => import('./components/modals/SettingsModal'));
+const FractalGoals = lazyWithRetry(() => import('./pages/FractalGoals'), 'pages/FractalGoals');
+const Programs = lazyWithRetry(() => import('./pages/Programs'), 'pages/Programs');
+const ProgramDetail = lazyWithRetry(() => import('./pages/ProgramDetail'), 'pages/ProgramDetail');
+const Sessions = lazyWithRetry(() => import('./pages/Sessions'), 'pages/Sessions');
+const SessionDetail = lazyWithRetry(() => import('./pages/SessionDetail'), 'pages/SessionDetail');
+const CreateSession = lazyWithRetry(() => import('./pages/CreateSession'), 'pages/CreateSession');
+const CreateSessionTemplate = lazyWithRetry(() => import('./pages/CreateSessionTemplate'), 'pages/CreateSessionTemplate');
+const ManageActivities = lazyWithRetry(() => import('./pages/ManageActivities'), 'pages/ManageActivities');
+const Analytics = lazyWithRetry(() => import('./pages/Analytics'), 'pages/Analytics');
+const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
+const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';

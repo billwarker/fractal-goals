@@ -1,10 +1,11 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 
 import ConfirmationModal from '../ConfirmationModal';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
-const ActivityBuilder = lazy(() => import('../ActivityBuilder'));
-const GoalDetailModal = lazy(() => import('../GoalDetailModal'));
-const ActivityAssociationModal = lazy(() => import('./ActivityAssociationModal'));
+const ActivityBuilder = lazyWithRetry(() => import('../ActivityBuilder'), 'components/ActivityBuilder');
+const GoalDetailModal = lazyWithRetry(() => import('../GoalDetailModal'), 'components/GoalDetailModal');
+const ActivityAssociationModal = lazyWithRetry(() => import('./ActivityAssociationModal'), 'components/sessionDetail/ActivityAssociationModal');
 
 function SessionDetailModals({
     rootId,
@@ -37,41 +38,45 @@ function SessionDetailModals({
                 confirmText="Delete"
             />
 
-            <Suspense fallback={null}>
-                {(showBuilder || !!selectedGoal || showAssociationModal) && (
-                    <>
-                        <ActivityBuilder
-                            isOpen={showBuilder}
-                            onClose={onCloseBuilder}
-                            editingActivity={builderActivity}
-                            rootId={rootId}
-                            onSave={onActivityCreated}
-                        />
+            {showBuilder && (
+                <Suspense fallback={null}>
+                    <ActivityBuilder
+                        isOpen={showBuilder}
+                        onClose={onCloseBuilder}
+                        editingActivity={builderActivity}
+                        rootId={rootId}
+                        onSave={onActivityCreated}
+                    />
+                </Suspense>
+            )}
 
-                        {!!selectedGoal && (
-                            <GoalDetailModal
-                                isOpen={Boolean(selectedGoal)}
-                                onClose={onCloseGoal}
-                                goal={selectedGoal}
-                                onUpdate={onUpdateGoal}
-                                activityDefinitions={activities}
-                                rootId={rootId}
-                                onAssociationsChanged={onGoalAssociationsChanged}
-                            />
-                        )}
+            {!!selectedGoal && (
+                <Suspense fallback={null}>
+                    <GoalDetailModal
+                        isOpen={Boolean(selectedGoal)}
+                        onClose={onCloseGoal}
+                        goal={selectedGoal}
+                        onUpdate={onUpdateGoal}
+                        activityDefinitions={activities}
+                        rootId={rootId}
+                        onAssociationsChanged={onGoalAssociationsChanged}
+                    />
+                </Suspense>
+            )}
 
-                        <ActivityAssociationModal
-                            key={`${associationContext?.activityDefinition?.id || 'none'}:${(associationContext?.initialSelectedGoalIds || []).join(',')}`}
-                            isOpen={showAssociationModal}
-                            onClose={onCloseAssociationModal}
-                            onAssociate={onAssociateActivity}
-                            initialActivityName={associationContext?.activityDefinition?.name}
-                            initialSelectedGoalIds={associationContext?.initialSelectedGoalIds || []}
-                            goals={allAvailableGoals}
-                        />
-                    </>
-                )}
-            </Suspense>
+            {showAssociationModal && (
+                <Suspense fallback={null}>
+                    <ActivityAssociationModal
+                        key={`${associationContext?.activityDefinition?.id || 'none'}:${(associationContext?.initialSelectedGoalIds || []).join(',')}`}
+                        isOpen={showAssociationModal}
+                        onClose={onCloseAssociationModal}
+                        onAssociate={onAssociateActivity}
+                        initialActivityName={associationContext?.activityDefinition?.name}
+                        initialSelectedGoalIds={associationContext?.initialSelectedGoalIds || []}
+                        goals={allAvailableGoals}
+                    />
+                </Suspense>
+            )}
         </>
     );
 }

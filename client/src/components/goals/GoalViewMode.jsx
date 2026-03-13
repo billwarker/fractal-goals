@@ -1,13 +1,14 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import GoalSmartSection from './GoalSmartSection';
 import GoalChildrenList from './GoalChildrenList';
 import { formatDurationSeconds as formatDuration } from '../../utils/formatters';
 import styles from '../GoalDetailModal.module.css';
 
-const TargetManager = lazy(() => import('../goalDetail/TargetManager'));
+const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 
 function GoalViewMode({
     mode,

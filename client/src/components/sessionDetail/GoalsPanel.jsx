@@ -5,12 +5,13 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import notify from '../../utils/notify';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import MicroGoalModal from '../MicroGoalModal';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './GoalsPanel.module.css';
 
-const GoalDetailModal = React.lazy(() => import('../GoalDetailModal'));
+const GoalDetailModal = lazyWithRetry(() => import('../GoalDetailModal'), 'components/GoalDetailModal');
 
 /**
  * GoalsPanel - Displays goals relevant to the current session or focused activity.

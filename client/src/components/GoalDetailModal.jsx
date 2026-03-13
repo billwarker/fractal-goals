@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
@@ -9,6 +9,7 @@ import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
@@ -18,10 +19,10 @@ import GoalEditForm from './goals/GoalEditForm';
 
 import styles from './GoalDetailModal.module.css';
 
-const TargetManager = lazy(() => import('./goalDetail/TargetManager'));
-const ActivityAssociator = lazy(() => import('./goalDetail/ActivityAssociator'));
-const InlineActivityBuilder = lazy(() => import('./goalDetail/InlineActivityBuilder'));
-const GenericGraphModal = lazy(() => import('./analytics/GenericGraphModal'));
+const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
+const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
+const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilder'), 'components/goalDetail/InlineActivityBuilder');
+const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
 
 /**
  * GoalDetailModal Component

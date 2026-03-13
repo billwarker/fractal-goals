@@ -1,12 +1,13 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import Input from '../atoms/Input';
 import Checkbox from '../atoms/Checkbox';
 import { isAboveShortTermGoal } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
 
-const TargetManager = lazy(() => import('../goalDetail/TargetManager'));
-const ActivityAssociator = lazy(() => import('../goalDetail/ActivityAssociator'));
+const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
+const ActivityAssociator = lazyWithRetry(() => import('../goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 
 function GoalEditForm({
     mode,

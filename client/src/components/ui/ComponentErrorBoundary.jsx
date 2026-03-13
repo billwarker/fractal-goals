@@ -1,4 +1,5 @@
 import React from 'react';
+import { isDynamicImportError, pageReloader } from '../../utils/lazyWithRetry';
 
 class ComponentErrorBoundary extends React.Component {
     constructor(props) {
@@ -16,6 +17,7 @@ class ComponentErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
+            const isChunkLoadError = isDynamicImportError(this.state.error);
             // Default generic fallback if none provided
             const Fallback = this.props.fallback;
             if (Fallback) {
@@ -41,7 +43,13 @@ class ComponentErrorBoundary extends React.Component {
                         {this.state.error?.toString()}
                     </pre>
                     <button
-                        onClick={() => this.setState({ hasError: false })}
+                        onClick={() => {
+                            if (isChunkLoadError) {
+                                pageReloader.reload();
+                                return;
+                            }
+                            this.setState({ hasError: false });
+                        }}
                         style={{
                             marginTop: '12px',
                             background: 'transparent',
@@ -53,7 +61,7 @@ class ComponentErrorBoundary extends React.Component {
                             fontSize: '12px'
                         }}
                     >
-                        Try Again
+                        {isChunkLoadError ? 'Reload Page' : 'Try Again'}
                     </button>
                 </div>
             );

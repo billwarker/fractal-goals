@@ -1,8 +1,9 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { formatLiteralDate } from '../utils/dateUtils';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
@@ -16,12 +17,12 @@ import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
 
-const ProgramBuilder = lazy(() => import('../components/modals/ProgramBuilder'));
-const ProgramBlockModal = lazy(() => import('../components/modals/ProgramBlockModal'));
-const ProgramDayModal = lazy(() => import('../components/modals/ProgramDayModal'));
-const AttachGoalModal = lazy(() => import('../components/modals/AttachGoalModal'));
-const DayViewModal = lazy(() => import('../components/modals/DayViewModal'));
-const GoalDetailModal = lazy(() => import('../components/GoalDetailModal'));
+const ProgramBuilder = lazyWithRetry(() => import('../components/modals/ProgramBuilder'), 'components/modals/ProgramBuilder');
+const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
+const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
+const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
+const DayViewModal = lazyWithRetry(() => import('../components/modals/DayViewModal'), 'components/modals/DayViewModal');
+const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModal'), 'components/GoalDetailModal');
 
 const ProgramDetail = () => {
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
