@@ -102,4 +102,45 @@ describe('ActivityAssociationModal', () => {
             expect(onClose).toHaveBeenCalledTimes(1);
         });
     });
+
+    it('shows parent and child inheritance copy only for inherited rows', () => {
+        render(
+            <ActivityAssociationModal
+                isOpen={true}
+                onClose={vi.fn()}
+                onAssociate={vi.fn(() => Promise.resolve(true))}
+                goals={[
+                    {
+                        id: 'goal-root',
+                        name: 'Ultimate Goal',
+                        type: 'UltimateGoal',
+                        childrenIds: ['goal-parent'],
+                    },
+                    {
+                        id: 'goal-parent',
+                        name: 'Long Goal',
+                        type: 'LongTermGoal',
+                        parent_id: 'goal-root',
+                        parentName: 'Ultimate Goal',
+                        childrenIds: ['goal-child'],
+                    },
+                    {
+                        id: 'goal-child',
+                        name: 'Immediate Goal',
+                        type: 'ImmediateGoal',
+                        parent_id: 'goal-parent',
+                        parentName: 'Long Goal',
+                        childrenIds: [],
+                    },
+                ]}
+                initialActivityName="Metronome"
+                initialSelectedGoalIds={['goal-parent']}
+            />
+        );
+
+        expect(screen.getByText('Inherited via child goal Long Goal')).toBeInTheDocument();
+        expect(screen.getByText('Inherited via parent goal Long Goal')).toBeInTheDocument();
+        expect(screen.queryByText('via Ultimate Goal')).not.toBeInTheDocument();
+        expect(screen.queryByText('via Long Goal')).not.toBeInTheDocument();
+    });
 });

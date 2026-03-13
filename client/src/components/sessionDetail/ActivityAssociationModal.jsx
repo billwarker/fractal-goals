@@ -143,36 +143,84 @@ const ActivityAssociationModal = ({
         }
     };
 
-    const selectedDescendantCache = useMemo(() => {
-        const cache = new Map();
+    const inheritanceByGoalId = useMemo(() => {
+        const selectedDescendantCache = new Map();
         const visiting = new Set();
 
-        const hasSelectedDescendant = (goalId) => {
-            if (!goalId) return false;
-            if (cache.has(goalId)) return cache.get(goalId);
-            if (visiting.has(goalId)) return false;
+        const findSelectedDescendant = (goalId) => {
+            if (!goalId) return null;
+            if (selectedDescendantCache.has(goalId)) return selectedDescendantCache.get(goalId);
+            if (visiting.has(goalId)) return null;
             visiting.add(goalId);
 
             const goal = goalById.get(goalId);
             if (!goal || !Array.isArray(goal.childrenIds) || goal.childrenIds.length === 0) {
-                cache.set(goalId, false);
+                selectedDescendantCache.set(goalId, null);
                 visiting.delete(goalId);
-                return false;
+                return null;
             }
 
-            const result = goal.childrenIds.some((childId) => (
-                selectedGoalIds.has(childId) || hasSelectedDescendant(childId)
-            ));
+            let result = null;
+            for (const childId of goal.childrenIds) {
+                const childGoal = goalById.get(childId);
+                if (selectedGoalIds.has(childId)) {
+                    result = {
+                        direction: 'child',
+                        sourceGoalId: childId,
+                        sourceGoalName: childGoal?.name || null,
+                    };
+                    break;
+                }
 
-            cache.set(goalId, result);
+                const descendantResult = findSelectedDescendant(childId);
+                if (descendantResult) {
+                    result = descendantResult;
+                    break;
+                }
+            }
+
+            selectedDescendantCache.set(goalId, result);
             visiting.delete(goalId);
             return result;
         };
 
+        const findSelectedAncestor = (goalId) => {
+            const seen = new Set([goalId]);
+            let currentGoal = goalById.get(goalId);
+
+            while (currentGoal?.parent_id && !seen.has(currentGoal.parent_id)) {
+                const parentId = currentGoal.parent_id;
+                seen.add(parentId);
+                const parentGoal = goalById.get(parentId);
+                if (selectedGoalIds.has(parentId)) {
+                    return {
+                        direction: 'parent',
+                        sourceGoalId: parentId,
+                        sourceGoalName: parentGoal?.name || null,
+                    };
+                }
+                currentGoal = parentGoal;
+            }
+
+            return null;
+        };
+
+        const map = new Map();
         goals.forEach((goal) => {
-            hasSelectedDescendant(goal.id);
+            if (selectedGoalIds.has(goal.id)) {
+                map.set(goal.id, null);
+                return;
+            }
+
+            const inheritedFromChild = findSelectedDescendant(goal.id);
+            if (inheritedFromChild) {
+                map.set(goal.id, inheritedFromChild);
+                return;
+            }
+
+            map.set(goal.id, findSelectedAncestor(goal.id));
         });
-        return cache;
+        return map;
     }, [goals, goalById, selectedGoalIds]);
 
     // Helper to render section with icon
@@ -203,7 +251,11 @@ const ActivityAssociationModal = ({
                     <div className={styles.groupContent}>
                         {typeGoals.map(goal => {
                             const isSelected = selectedGoalIds.has(goal.id);
-                            const isInherited = selectedDescendantCache.get(goal.id) || false;
+                            const inheritance = inheritanceByGoalId.get(goal.id) || null;
+                            const isInherited = Boolean(inheritance);
+                            const inheritanceLabel = inheritance
+                                ? `Inherited via ${inheritance.direction} goal:${inheritance.sourceGoalName ? ` ${inheritance.sourceGoalName}` : ''}`
+                                : null;
 
                             // Determine styles based on state
                             // Direct selection takes precedence over inheritance visually
@@ -222,23 +274,30 @@ const ActivityAssociationModal = ({
                                     className={rowClass}
                                     onClick={() => toggleGoalSelection(goal.id)}
                                 >
-                                    <div className={checkboxClass}>
+                                    <div className={checkboxClass} title={inheritanceLabel || undefined}>
                                         {isSelected && (
                                             <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                                                 <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         )}
                                         {!isSelected && isInherited && (
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleX(-1)', opacity: 0.7 }}>
-                                                <polyline points="15 10 20 15 15 20"></polyline>
-                                                <path d="M4 4v7a4 4 0 0 0 4 4h12"></path>
-                                            </svg>
+                                            inheritance.direction === 'child' ? (
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label={inheritanceLabel}>
+                                                    <path d="M12 19V6" />
+                                                    <polyline points="7 11 12 6 17 11" />
+                                                </svg>
+                                            ) : (
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label={inheritanceLabel}>
+                                                    <path d="M12 5v13" />
+                                                    <polyline points="7 14 12 19 17 14" />
+                                                </svg>
+                                            )
                                         )}
                                     </div>
 
                                     <div className={styles.goalInfo}>
                                         <div className={styles.goalName}>{goal.name}</div>
-                                        {goal.parentName && <div className={styles.goalParent}>via {goal.parentName}</div>}
+                                        {inheritanceLabel && <div className={styles.goalInheritance}>{inheritanceLabel}</div>}
                                     </div>
                                 </div>
                             );

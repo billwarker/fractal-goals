@@ -5,7 +5,7 @@ from sqlalchemy import text, inspect
 from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria
 from models import (
     Session, Goal, ActivityInstance, MetricDefinition, MetricValue, session_goals,
-    ActivityDefinition, ProgramDay, ProgramBlock,
+    ActivityDefinition, ActivityGroup, ProgramDay, ProgramBlock,
     validate_root_goal
 )
 import models
@@ -112,6 +112,62 @@ class SessionService:
             values['association_source'] = association_source
         return values
 
+    def _get_effective_activity_goals(self, root_id, activity_def_ids) -> dict[str, list[Goal]]:
+        """Resolve direct and group-inherited goals for each activity definition."""
+        if not activity_def_ids:
+            return {}
+
+        activities = self.db_session.query(ActivityDefinition).options(
+            selectinload(ActivityDefinition.associated_goals)
+        ).filter(
+            ActivityDefinition.id.in_(activity_def_ids),
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at == None
+        ).all()
+
+        groups_by_id = {
+            group.id: group
+            for group in self.db_session.query(ActivityGroup).options(
+                selectinload(ActivityGroup.associated_goals)
+            ).filter(
+                ActivityGroup.root_id == root_id,
+                ActivityGroup.deleted_at == None
+            ).all()
+        }
+
+        effective_goals_by_activity = {}
+        for activity in activities:
+            seen_goal_ids = set()
+            effective_goals = []
+
+            def append_goal(goal):
+                if not goal or goal.deleted_at or goal.root_id != root_id:
+                    return
+                if goal.id in seen_goal_ids:
+                    return
+                seen_goal_ids.add(goal.id)
+                effective_goals.append(goal)
+
+            for goal in activity.associated_goals or []:
+                append_goal(goal)
+
+            seen_group_ids = set()
+            current_group_id = activity.group_id
+            while current_group_id and current_group_id not in seen_group_ids:
+                seen_group_ids.add(current_group_id)
+                group = groups_by_id.get(current_group_id)
+                if not group:
+                    break
+
+                for goal in group.associated_goals or []:
+                    append_goal(goal)
+
+                current_group_id = group.parent_id
+
+            effective_goals_by_activity[activity.id] = effective_goals
+
+        return effective_goals_by_activity
+
     def _derive_session_goals_from_activities(self, session_obj) -> list[Goal]:
         """Derive display goals from session activities when persisted links are missing."""
         activity_def_ids = set()
@@ -130,14 +186,7 @@ class SessionService:
 
         if not activity_def_ids:
             return []
-
-        activities = self.db_session.query(ActivityDefinition).options(
-            joinedload(ActivityDefinition.associated_goals)
-        ).filter(
-            ActivityDefinition.id.in_(activity_def_ids),
-            ActivityDefinition.root_id == session_obj.root_id,
-            ActivityDefinition.deleted_at == None
-        ).all()
+        activity_goals = self._get_effective_activity_goals(session_obj.root_id, activity_def_ids)
 
         # Program scoping applies only when program has selected goals.
         program_goal_ids = set()
@@ -145,8 +194,8 @@ class SessionService:
             program_goal_ids = _program_goal_ids(self.db_session, session_obj.program_day.block.program.id)
 
         derived = {}
-        for act in activities:
-            for goal in act.associated_goals:
+        for goals in activity_goals.values():
+            for goal in goals:
                 if goal.deleted_at or goal.completed:
                     continue
                 if goal.root_id != session_obj.root_id:

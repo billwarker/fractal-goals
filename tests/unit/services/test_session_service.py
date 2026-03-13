@@ -3,7 +3,7 @@ import json
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from models import Goal, ActivityDefinition, ActivityInstance, Session, get_session_by_id
+from models import Goal, ActivityDefinition, ActivityGroup, ActivityInstance, Session, get_session_by_id
 from services.session_service import SessionService
 
 @pytest.fixture
@@ -66,6 +66,52 @@ def test_derive_session_goals_from_activities(
     assert len(derived_goals) == 1
     assert derived_goals[0].id == sample_goal_hierarchy['short_term'].id
     assert derived_goals[0].name == sample_goal_hierarchy['short_term'].name
+
+
+def test_derive_session_goals_from_activities_includes_ancestor_group_associations(
+    db_session, session_service, sample_practice_session, sample_goal_hierarchy, sample_activity_definition
+):
+    from models.goal import goal_activity_group_associations
+
+    parent_group = ActivityGroup(
+        id=str(uuid4()),
+        root_id=sample_practice_session.root_id,
+        name='Parent Group',
+        parent_id=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    child_group = ActivityGroup(
+        id=str(uuid4()),
+        root_id=sample_practice_session.root_id,
+        name='Child Group',
+        parent_id=parent_group.id,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([parent_group, child_group])
+    db_session.flush()
+
+    sample_activity_definition.group_id = child_group.id
+    db_session.execute(
+        goal_activity_group_associations.insert().values(
+            goal_id=sample_goal_hierarchy['long_term'].id,
+            activity_group_id=parent_group.id,
+        )
+    )
+    db_session.add(
+        ActivityInstance(
+            id=str(uuid4()),
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=sample_practice_session.root_id,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    session_obj = get_session_by_id(db_session, sample_practice_session.id)
+    derived_goals = session_service._derive_session_goals_from_activities(session_obj)
+
+    assert [goal.id for goal in derived_goals] == [sample_goal_hierarchy['long_term'].id]
 
 # ==============================================================================
 # Create Session
@@ -155,4 +201,3 @@ def test_delete_session(db_session, session_service, sample_practice_session, te
     # Session should no longer exist
     session_obj = get_session_by_id(db_session, session_id)
     assert session_obj is None
-

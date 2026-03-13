@@ -3,7 +3,7 @@ from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlalchemy import select, or_
 
 import models
-from models import Goal, Session, ActivityInstance, session_goals, ActivityDefinition, get_session
+from models import Goal, Session, ActivityInstance, session_goals
 from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
@@ -119,16 +119,10 @@ class GoalTreeService:
 
         activity_goal_ids_by_activity = {}
         if session_activity_ids:
-            activity_defs = self.db_session.query(ActivityDefinition).options(
-                selectinload(ActivityDefinition.associated_goals)
-            ).filter(
-                ActivityDefinition.id.in_(session_activity_ids),
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.deleted_at == None
-            ).all()
-            for activity_def in activity_defs:
-                activity_goal_ids_by_activity[activity_def.id] = [
-                    goal.id for goal in (activity_def.associated_goals or [])
+            effective_goals_by_activity = session_service._get_effective_activity_goals(root_id, session_activity_ids)
+            for activity_id, goals in effective_goals_by_activity.items():
+                activity_goal_ids_by_activity[activity_id] = [
+                    goal.id for goal in goals
                     if not goal.deleted_at and goal.root_id == root_id
                 ]
 
