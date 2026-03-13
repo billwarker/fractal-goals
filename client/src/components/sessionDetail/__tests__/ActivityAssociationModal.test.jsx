@@ -138,8 +138,8 @@ describe('ActivityAssociationModal', () => {
             />
         );
 
-        expect(screen.getByText('Inherited via child goal Long Goal')).toBeInTheDocument();
-        expect(screen.getByText('Inherited via parent goal Long Goal')).toBeInTheDocument();
+        expect(screen.getByText('Inherited via child goal: Long Goal')).toBeInTheDocument();
+        expect(screen.getByText('Inherited via parent goal: Long Goal')).toBeInTheDocument();
         expect(screen.queryByText('via Ultimate Goal')).not.toBeInTheDocument();
         expect(screen.queryByText('via Long Goal')).not.toBeInTheDocument();
     });
