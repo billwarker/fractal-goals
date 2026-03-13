@@ -278,45 +278,70 @@ const ProgramDetail = () => {
                 )}
             </div>
 
-            <Suspense fallback={null}>
-                {(showEditBuilder || showBlockModal || showDayModal || showAttachModal || showDayViewModal || showGoalModal) && (
-                    <>
-                        <ProgramBuilder isOpen={showEditBuilder} onClose={() => setShowEditBuilder(false)} onSave={saveProgram} initialData={program} />
-                        <ProgramBlockModal isOpen={showBlockModal} onClose={closeBlockModal} onSave={saveBlock} initialData={blockModalData} programDates={{ start: program.start_date, end: program.end_date }} />
-                        <ProgramDayModal
-                            isOpen={showDayModal}
-                            onClose={closeDayModal}
-                            onSave={saveDay}
-                            onCopy={copyDay}
-                            onDelete={deleteDay}
-                            rootId={rootId}
-                            blockId={selectedBlockId}
-                            initialData={dayModalInitialData}
-                        />
-                        <AttachGoalModal
-                            isOpen={showAttachModal}
-                            onClose={closeAttachModal}
-                            onSave={saveAttachedGoal}
-                            goals={attachableBlockGoals}
-                            block={attachBlock}
-                            associatedGoalIds={(blockGoalsByBlockId.get(attachBlock?.id) || []).map((goal) => goal.id)}
-                        />
-                        <DayViewModal
-                            isOpen={showDayViewModal}
-                            onClose={closeDayViewModal}
-                            date={selectedDate}
-                            program={program}
-                            goals={attachedGoals}
-                            onSetGoalDeadline={setGoalDeadline}
-                            blocks={sortedBlocks}
-                            onScheduleDay={scheduleDay}
-                            onCreateDayForDate={handleCreateDayForDate}
-                            onUnscheduleDay={handleUnscheduleDay}
-                            sessions={sessions}
-                        />
-                    </>
-                )}
-            </Suspense>
+            {showEditBuilder && (
+                <Suspense fallback={null}>
+                    <ProgramBuilder
+                        isOpen={showEditBuilder}
+                        onClose={() => setShowEditBuilder(false)}
+                        onSave={saveProgram}
+                        initialData={program}
+                    />
+                </Suspense>
+            )}
+            {showBlockModal && (
+                <Suspense fallback={null}>
+                    <ProgramBlockModal
+                        isOpen={showBlockModal}
+                        onClose={closeBlockModal}
+                        onSave={saveBlock}
+                        initialData={blockModalData}
+                        programDates={{ start: program.start_date, end: program.end_date }}
+                    />
+                </Suspense>
+            )}
+            {showDayModal && (
+                <Suspense fallback={null}>
+                    <ProgramDayModal
+                        isOpen={showDayModal}
+                        onClose={closeDayModal}
+                        onSave={saveDay}
+                        onCopy={copyDay}
+                        onDelete={deleteDay}
+                        rootId={rootId}
+                        blockId={selectedBlockId}
+                        initialData={dayModalInitialData}
+                    />
+                </Suspense>
+            )}
+            {showAttachModal && (
+                <Suspense fallback={null}>
+                    <AttachGoalModal
+                        isOpen={showAttachModal}
+                        onClose={closeAttachModal}
+                        onSave={saveAttachedGoal}
+                        goals={attachableBlockGoals}
+                        block={attachBlock}
+                        associatedGoalIds={(blockGoalsByBlockId.get(attachBlock?.id) || []).map((goal) => goal.id)}
+                    />
+                </Suspense>
+            )}
+            {showDayViewModal && (
+                <Suspense fallback={null}>
+                    <DayViewModal
+                        isOpen={showDayViewModal}
+                        onClose={closeDayViewModal}
+                        date={selectedDate}
+                        program={program}
+                        goals={attachedGoals}
+                        onSetGoalDeadline={setGoalDeadline}
+                        blocks={sortedBlocks}
+                        onScheduleDay={scheduleDay}
+                        onCreateDayForDate={handleCreateDayForDate}
+                        onUnscheduleDay={handleUnscheduleDay}
+                        sessions={sessions}
+                    />
+                </Suspense>
+            )}
 
             <ConfirmationModal
                 isOpen={unscheduleConfirmOpen}
