@@ -1,0 +1,152 @@
+.pageShell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--color-bg-app);
+}
+
+.pageHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    flex-shrink: 0;
+    padding: 80px 40px 20px 40px;
+    background: var(--color-bg-app);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.headerCopy {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pageTitle {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--color-text-primary);
+}
+
+.pageSubtitle {
+    margin: 0;
+    max-width: 640px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+}
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.actionButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 16px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.primaryActionButton {
+    background: var(--color-brand-primary);
+    border: 1px solid var(--color-brand-primary);
+    color: white;
+    font-weight: 600;
+}
+
+.primaryActionButton:hover {
+    background: var(--color-brand-primary-hover);
+    border-color: var(--color-brand-primary-hover);
+}
+
+.secondaryActionButton {
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+.secondaryActionButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+}
+
+.tertiaryActionButton {
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.tertiaryActionButton:hover {
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+}
+
+.scrollContent {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.gridContent {
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+@media (max-width: 1024px) {
+    .pageHeader {
+        gap: 12px;
+        padding: 80px 20px 16px 20px;
+    }
+
+    .scrollContent {
+        background-size: 20px 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .pageHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 92px 12px 12px 12px;
+    }
+
+    .pageTitle {
+        font-size: 24px;
+        line-height: 1.1;
+    }
+
+    .headerActions {
+        width: 100%;
+    }
+
+    .actionButton {
+        min-height: 40px;
+        font-size: 12px;
+    }
+
+    .scrollContent {
+        background-size: 16px 16px;
+    }
+}

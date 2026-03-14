@@ -9,6 +9,8 @@ import ActivityCard from '../components/ActivityCard';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import Linkify from '../components/atoms/Linkify';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { buildGroupReorderPayload, buildLastInstantiatedMap } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
@@ -376,36 +378,34 @@ function ManageActivities() {
     const rootGroups = groupChildrenMap.get('__root__') || [];
 
     return (
-        <div className={`page-container ${styles.container}`}>
-            {/* Header with Create Button */}
-            <div className={styles.header}>
-                <h1 className={styles.title}>
-                    Manage Activities
-                </h1>
-                <div className={styles.headerActions}>
-                    <button
-                        onClick={handleCreateGroup}
-                        className={styles.createGroupBtn}
-                    >
-                        + Create Group
-                    </button>
-                    <button
-                        onClick={handleCreateClick}
-                        className={styles.createActivityBtn}
-                    >
-                        + Create Activity
-                    </button>
-                </div>
-            </div>
+        <div className={`${headerStyles.pageShell} ${styles.container}`}>
+            <PageHeader
+                title="Manage Activities"
+                subtitle="Create, group, and reuse activity definitions across sessions and templates."
+                actions={(
+                    <>
+                        <button
+                            onClick={handleCreateGroup}
+                            className={`${headerStyles.actionButton} ${headerStyles.tertiaryActionButton}`}
+                        >
+                            + Create Group
+                        </button>
+                        <button
+                            onClick={handleCreateClick}
+                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
+                        >
+                            + Create Activity
+                        </button>
+                    </>
+                )}
+            />
 
-            {error && (
-                <div className={styles.errorMessage}>
-                    {error}
-                </div>
-            )}
-
-            {/* Groups and Activities Render */}
-            <div className={styles.content}>
+            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
+                {error && (
+                    <div className={styles.errorMessage}>
+                        {error}
+                    </div>
+                )}
 
                 {/* 1. Render Root Activity Groups (recursively renders children) */}
                 {rootGroups.map(group => renderGroup(group))}

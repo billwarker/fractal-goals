@@ -11,6 +11,8 @@ import { Heading, Text } from '../components/atoms/Typography';
 import { useGoals } from '../contexts/GoalsContext';
 import { useProgramsPageData } from '../hooks/useProgramsPageData';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
 
 /**
  * Programs Page - Create and manage training programs
@@ -132,20 +134,19 @@ function Programs() {
 
     return (
         <div className={styles.container}>
-            {/* Page Header */}
-            <div className={styles.header}>
-                <Heading level={1} className={styles.title}>
-                    Programs
-                </Heading>
-
-                <button
-                    onClick={() => setIsCreatingProgram(true)}
-                    className={styles.newProgramBtn}
-                >
-                    <span className={styles.plusIcon}>+</span>
-                    New Program
-                </button>
-            </div>
+            <PageHeader
+                title="Programs"
+                subtitle="Create and manage structured training programs, blocks, and linked goals."
+                className={styles.header}
+                actions={(
+                    <button
+                        onClick={() => setIsCreatingProgram(true)}
+                        className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
+                    >
+                        + New Program
+                    </button>
+                )}
+            />
 
             {/* Programs List */}
             <div className={styles.content}>

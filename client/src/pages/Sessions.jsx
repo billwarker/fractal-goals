@@ -9,6 +9,8 @@ import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQuerie
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
 import { flattenGoals } from '../utils/goalHelpers';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import '../App.css';
@@ -166,35 +168,32 @@ function Sessions() {
     return (
         <div className={styles.pageContainer}>
             <div className={styles.leftPanel}>
-                <div className={styles.pageHeader}>
-                    <div className={styles.headerCopy}>
-                        <h1 className={styles.pageTitle}>Sessions</h1>
-                        <div className={styles.pageSubtitle}>
-                            Query sessions by date range, completion, activity, and activity-linked goals.
-                        </div>
-                    </div>
-
-                    <div className={styles.actionButtons}>
-                        <button
-                            onClick={() => navigate(`/${rootId}/manage-session-templates`)}
-                            className={styles.primaryButton}
-                        >
-                            Manage Session Templates
-                        </button>
-                        <button
-                            onClick={() => navigate(`/${rootId}/manage-activities`)}
-                            className={styles.secondaryButton}
-                        >
-                            Manage Activities
-                        </button>
-                        <button
-                            onClick={() => setIsFiltersPaneOpen((prev) => !prev)}
-                            className={`${styles.secondaryButton} ${styles.notesToggleButton}`}
-                        >
-                            {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
-                        </button>
-                    </div>
-                </div>
+                <PageHeader
+                    title="Sessions"
+                    subtitle="Query sessions by date range, completion, activity, and activity-linked goals."
+                    actions={(
+                        <>
+                            <button
+                                onClick={() => navigate(`/${rootId}/manage-session-templates`)}
+                                className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
+                            >
+                                Manage Session Templates
+                            </button>
+                            <button
+                                onClick={() => navigate(`/${rootId}/manage-activities`)}
+                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
+                            >
+                                Manage Activities
+                            </button>
+                            <button
+                                onClick={() => setIsFiltersPaneOpen((prev) => !prev)}
+                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton} ${styles.notesToggleButton}`}
+                            >
+                                {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
+                            </button>
+                        </>
+                    )}
+                />
 
                 <div className={styles.sessionsList}>
                     {sessionsLoading || (sessionsFetching && !isFetchingNextPage) ? (

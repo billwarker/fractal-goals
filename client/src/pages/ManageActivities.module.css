@@ -2,64 +2,6 @@
 
 .container {
     color: var(--color-text-primary);
-    /* page-container is global, but we can extend or replace if needed. 
-       For now we kept className="page-container" in other files, 
-       but we can apply local styles too. */
-}
-
-/* Header */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 80px 40px 20px 40px;
-    border-bottom: 1px solid var(--color-border);
-    margin-bottom: 30px;
-}
-
-.title {
-    font-weight: 300;
-    margin: 0;
-    font-size: 28px;
-}
-
-.headerActions {
-    display: flex;
-    gap: 10px;
-}
-
-.createGroupBtn {
-    padding: 6px 16px;
-    background: transparent;
-    border: 1px dashed var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.createGroupBtn:hover {
-    border-color: var(--color-text-secondary);
-    color: var(--color-text-primary);
-}
-
-.createActivityBtn {
-    padding: 6px 16px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.createActivityBtn:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
 }
 
 /* Error Message */
@@ -67,13 +9,13 @@
     padding: 10px;
     background: rgba(255, 0, 0, 0.1);
     color: #f44336;
-    margin: 0 40px 20px 40px;
+    margin-bottom: 20px;
     border-radius: var(--radius-sm);
 }
 
 /* Content Area */
 .content {
-    padding: 0 40px 40px 40px;
+    padding: 20px 40px 40px 40px;
 }
 
 /* Activity Group */
@@ -283,41 +225,13 @@
 }
 
 @media (max-width: 768px) {
-    .header {
-        padding: 102px 12px 12px 12px;
-        margin-bottom: 12px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-
-    .title {
-        font-size: 20px;
-        line-height: 1.2;
-    }
-
-    .headerActions {
-        width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-    }
-
-    .createGroupBtn,
-    .createActivityBtn {
-        min-height: 40px;
-        font-size: 12px;
-        width: 100%;
-        padding: 8px 10px;
-        min-width: 0;
-    }
-
     .errorMessage {
-        margin: 0 12px 12px 12px;
+        margin-bottom: 12px;
     }
 
     .content {
-        padding: 0 12px 20px 12px;
+        padding: 12px;
+        padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     }
 
     .groupContainer {

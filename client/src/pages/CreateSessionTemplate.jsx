@@ -7,7 +7,9 @@ import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
-import '../App.css';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
+import styles from './CreateSessionTemplate.module.css';
 
 /**
  * Manage Session Templates Page - Grid view of template cards with modal builder
@@ -177,86 +179,41 @@ function CreateSessionTemplate() {
     }
 
     return (
-        <div className="page-container">
-            {/* Header with Create Button */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0 0 20px 0',
-                borderBottom: '1px solid var(--color-border)',
-                marginBottom: '30px'
-            }}>
-                <h1 style={{ fontWeight: 300, margin: 0, fontSize: '28px', color: 'var(--color-text-primary)' }}>
-                    Manage Session Templates
-                </h1>
-                <button
-                    onClick={handleCreateClick}
-                    style={{
-                        padding: '10px 20px',
-                        background: 'var(--color-brand-primary)',
-                        border: '1px solid var(--color-border-btn)',
-                        borderRadius: '6px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        transition: 'background 0.2s'
-                    }}
-                    className="hover-brighten"
-                >
-                    + Create Template
-                </button>
-            </div>
+        <div className={headerStyles.pageShell}>
+            <PageHeader
+                title="Manage Session Templates"
+                subtitle="Build reusable session structures from your activity library."
+                actions={(
+                    <button
+                        onClick={handleCreateClick}
+                        className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
+                    >
+                        + Create Template
+                    </button>
+                )}
+            />
 
-            {error && (
-                <div style={{
-                    padding: '12px 16px',
-                    background: 'rgba(244, 67, 54, 0.1)',
-                    color: '#f44336',
-                    marginBottom: '20px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(244, 67, 54, 0.2)'
-                }}>
-                    {error}
-                </div>
-            )}
+            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
+                {error && (
+                    <div className={styles.errorMessage}>
+                        {error}
+                    </div>
+                )}
 
-            {/* Templates Grid */}
-            <div style={{ paddingBottom: '40px' }}>
                 {templates.length === 0 ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '60px 20px',
-                        background: 'var(--color-bg-card)',
-                        border: '1px dashed var(--color-border)',
-                        borderRadius: '8px'
-                    }}>
-                        <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', marginBottom: '20px' }}>
+                    <div className={styles.emptyState}>
+                        <p className={styles.emptyText}>
                             No session templates created yet
                         </p>
                         <button
                             onClick={handleCreateClick}
-                            style={{
-                                padding: '12px 24px',
-                                background: '#4caf50',
-                                border: '1px solid var(--color-border-btn)',
-                                borderRadius: '6px',
-                                color: 'white',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
-                            }}
+                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton} ${styles.createFirstButton}`}
                         >
                             + Create Your First Template
                         </button>
                     </div>
                 ) : (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                        gap: '20px'
-                    }}>
+                    <div className={styles.templatesGrid}>
                         {templates.map(template => (
                             <TemplateCard
                                 key={template.id}
