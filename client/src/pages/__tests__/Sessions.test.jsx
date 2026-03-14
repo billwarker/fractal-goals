@@ -31,8 +31,24 @@ vi.mock('../../hooks/useIsMobile', () => ({
     default: () => false
 }));
 
+vi.mock('../../hooks/useActivityQueries', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useActivityGroups: () => ({ activityGroups: [], isLoading: false, error: null })
+    };
+});
+
+vi.mock('../../hooks/useGoalQueries', () => ({
+    useFractalTree: () => ({
+        data: { id: 'root-1', name: 'Root', children: [] },
+        isLoading: false,
+        error: null
+    })
+}));
+
 vi.mock('../../components/sessions', () => ({
-    SessionNotesSidebar: () => <div data-testid="notes-sidebar" />,
+    SessionsQuerySidebar: () => <div data-testid="sessions-query-sidebar" />,
     SessionCardExpanded: ({ sessionActivityInstances = [] }) => (
         <div>instances:{sessionActivityInstances.length}</div>
     )

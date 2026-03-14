@@ -26,6 +26,36 @@ sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
 # ENDPOINTS
 # ============================================================================
 
+def _parse_multi_value_arg(name):
+    values = request.args.getlist(name)
+    if not values:
+        raw_value = request.args.get(name)
+        values = [raw_value] if raw_value else []
+
+    parsed = []
+    for value in values:
+        for part in str(value).split(','):
+            normalized = part.strip()
+            if normalized:
+                parsed.append(normalized)
+    return parsed
+
+
+def _get_session_query_filters():
+    return {
+        'completed': request.args.get('completed'),
+        'sort_by': request.args.get('sort_by'),
+        'sort_order': request.args.get('sort_order'),
+        'range_start': request.args.get('range_start'),
+        'range_end': request.args.get('range_end'),
+        'duration_operator': request.args.get('duration_operator'),
+        'duration_minutes': request.args.get('duration_minutes'),
+        'heatmap_metric': request.args.get('heatmap_metric'),
+        'timezone': request.args.get('timezone'),
+        'activity_ids': _parse_multi_value_arg('activity_ids'),
+        'goal_ids': _parse_multi_value_arg('goal_ids'),
+    }
+
 @sessions_bp.route('/practice-sessions', methods=['GET'])
 @token_required
 def get_all_sessions_endpoint(current_user):
@@ -53,17 +83,49 @@ def get_fractal_sessions(current_user, root_id):
     db_session = get_db_session()
     service = SessionService(db_session)
     try:
-        limit = min(int(request.args.get('limit', 10)), 50)
-        offset = int(request.args.get('offset', 0))
-        
-        result, error, status = service.get_fractal_sessions(root_id, current_user.id, limit, offset)
+        try:
+            limit = min(int(request.args.get('limit', 10)), 50)
+            offset = int(request.args.get('offset', 0))
+        except ValueError:
+            return jsonify({"error": "Invalid pagination parameters"}), 400
+
+        result, error, status = service.get_fractal_sessions(
+            root_id,
+            current_user.id,
+            limit,
+            offset,
+            filters=_get_session_query_filters(),
+        )
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return etag_json_response(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_fractal_sessions")
         return internal_error(logger, "Error in get_fractal_sessions")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/heatmap', methods=['GET'])
+@token_required
+def get_session_heatmap(current_user, root_id):
+    """Get daily session counts for the active sessions query scope."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.get_session_heatmap(
+            root_id,
+            current_user.id,
+            filters=_get_session_query_filters(),
+        )
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error in get_session_heatmap")
+        return internal_error(logger, "Error in get_session_heatmap")
     finally:
         db_session.close()
 

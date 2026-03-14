@@ -19,11 +19,31 @@
 .pageHeader {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 20px;
     padding: 80px 40px 20px 40px;
     background: var(--color-bg-app);
     border-bottom: 1px solid var(--color-border);
     z-index: 10;
+}
+
+.headerCopy {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pageTitle {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--color-text-primary);
+}
+
+.pageSubtitle {
+    max-width: 640px;
+    font-size: 13px;
+    color: var(--color-text-muted);
 }
 
 .headerControls {
@@ -85,6 +105,8 @@
 .actionButtons {
     display: flex;
     gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .primaryButton {
@@ -140,6 +162,17 @@
     text-align: center;
     padding: 40px;
     color: var(--color-text-muted);
+}
+
+.loadingContainer {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+}
+
+.loadingText {
+    font-size: 1.2rem;
+    color: #888;
 }
 
 /* Session Card */
@@ -603,10 +636,10 @@
 
 /* Right Panel */
 .rightPanel {
-    width: 350px;
+    width: 390px;
     flex-shrink: 0;
-    border-left: 1px solid #333;
-    background: #1a1a1a;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-sidebar);
     overflow: hidden;
 }
 

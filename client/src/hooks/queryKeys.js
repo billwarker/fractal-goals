@@ -48,5 +48,7 @@ export const queryKeys = {
     activityDefinitionNotes: (rootId, activityDefinitionId) => ['activity-definition-notes', rootId, activityDefinitionId],
     sessions: (rootId) => ['sessions', rootId],
     sessionsAll: (rootId) => ['sessions', rootId, 'all'],
+    sessionsSearch: (rootId, filters = {}) => ['sessions', rootId, 'search', filters],
+    sessionsHeatmap: (rootId, filters = {}) => ['sessions', rootId, 'heatmap', filters],
     sessionsPaginated: (rootId) => ['sessions', rootId, 'paginated'],
 };

@@ -15,8 +15,10 @@ Tests cover:
 
 import pytest
 import json
-from datetime import datetime, timedelta
-from models import ActivityInstance
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
+from models import ActivityDefinition, ActivityInstance, Session, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -55,6 +57,260 @@ class TestSessionListEndpoints:
         """Test retrieving a session that doesn't exist."""
         response = authed_client.get(f'/api/{sample_ultimate_goal.id}/sessions/nonexistent-id')
         assert response.status_code == 404
+
+    def test_list_sessions_filters_by_completion_and_sort(
+        self, authed_client, db_session, sample_practice_session
+    ):
+        """Session list should honor completion filters and explicit sort fields."""
+        root_id = sample_practice_session.root_id
+        sample_practice_session.session_start = datetime(2026, 1, 10, 9, 0, tzinfo=timezone.utc)
+        sample_practice_session.updated_at = datetime(2026, 1, 11, 9, 0, tzinfo=timezone.utc)
+
+        completed_session = Session(
+            id=str(uuid4()),
+            name='Completed Session',
+            description='Completed',
+            root_id=root_id,
+            session_start=datetime(2026, 1, 8, 9, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 8, 9, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 1, 9, 9, 0, tzinfo=timezone.utc),
+            completed=True,
+            completed_at=datetime(2026, 1, 8, 10, 0, tzinfo=timezone.utc),
+            attributes=json.dumps({}),
+        )
+        db_session.add(completed_session)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?completed=completed&sort_by=updated_at&sort_order=asc'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert [session['id'] for session in data['sessions']] == [completed_session.id]
+
+    def test_list_sessions_filters_by_activity(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition
+    ):
+        """Activity filters should match sessions containing the selected activity definition."""
+        root_id = sample_practice_session.root_id
+        other_activity = ActivityDefinition(
+            id=str(uuid4()),
+            root_id=root_id,
+            name='Pull Up',
+            description='Bodyweight pull up',
+            created_at=datetime.now(timezone.utc),
+        )
+        other_session = Session(
+            id=str(uuid4()),
+            name='Other Session',
+            description='Different activity',
+            root_id=root_id,
+            session_start=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            attributes=json.dumps({}),
+        )
+        db_session.add_all([other_activity, other_session])
+        db_session.flush()
+
+        db_session.add_all([
+            ActivityInstance(
+                id=str(uuid4()),
+                session_id=sample_practice_session.id,
+                activity_definition_id=sample_activity_definition.id,
+                root_id=root_id,
+                created_at=datetime.now(timezone.utc),
+            ),
+            ActivityInstance(
+                id=str(uuid4()),
+                session_id=other_session.id,
+                activity_definition_id=other_activity.id,
+                root_id=root_id,
+                created_at=datetime.now(timezone.utc),
+            ),
+        ])
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?activity_ids={sample_activity_definition.id}'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert [session['id'] for session in data['sessions']] == [sample_practice_session.id]
+
+    def test_list_sessions_filters_by_goal_via_activity_association(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition, sample_goal_hierarchy
+    ):
+        """Goal filters should match sessions through activity-goal associations, not direct session-goal links."""
+        root_id = sample_practice_session.root_id
+        other_activity = ActivityDefinition(
+            id=str(uuid4()),
+            root_id=root_id,
+            name='Row',
+            description='Barbell row',
+            created_at=datetime.now(timezone.utc),
+        )
+        other_session = Session(
+            id=str(uuid4()),
+            name='Unrelated Session',
+            description='No matching goal',
+            root_id=root_id,
+            session_start=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            attributes=json.dumps({}),
+        )
+        db_session.add_all([other_activity, other_session])
+        db_session.flush()
+
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=sample_goal_hierarchy['short_term'].id,
+            )
+        )
+        db_session.add_all([
+            ActivityInstance(
+                id=str(uuid4()),
+                session_id=sample_practice_session.id,
+                activity_definition_id=sample_activity_definition.id,
+                root_id=root_id,
+                created_at=datetime.now(timezone.utc),
+            ),
+            ActivityInstance(
+                id=str(uuid4()),
+                session_id=other_session.id,
+                activity_definition_id=other_activity.id,
+                root_id=root_id,
+                created_at=datetime.now(timezone.utc),
+            ),
+        ])
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?goal_ids={sample_goal_hierarchy["short_term"].id}'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert [session['id'] for session in data['sessions']] == [sample_practice_session.id]
+
+    def test_list_sessions_filters_by_duration_operator(
+        self, authed_client, db_session, sample_practice_session
+    ):
+        """Duration filter should support greater-than and less-than minute comparisons."""
+        root_id = sample_practice_session.root_id
+        sample_practice_session.total_duration_seconds = 45 * 60
+
+        short_session = Session(
+            id=str(uuid4()),
+            name='Short Session',
+            description='Short',
+            root_id=root_id,
+            session_start=datetime(2026, 1, 9, 9, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 9, 9, 0, tzinfo=timezone.utc),
+            total_duration_seconds=15 * 60,
+            attributes=json.dumps({}),
+        )
+        db_session.add(short_session)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?duration_operator=gt&duration_minutes=30'
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert [session['id'] for session in data['sessions']] == [sample_practice_session.id]
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?duration_operator=lt&duration_minutes=30'
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert [session['id'] for session in data['sessions']] == [short_session.id]
+
+    def test_session_heatmap_returns_reverse_chronological_daily_counts(
+        self, authed_client, db_session, sample_practice_session
+    ):
+        """The heatmap endpoint should aggregate matching sessions by local day."""
+        root_id = sample_practice_session.root_id
+        sample_practice_session.session_start = datetime(2026, 1, 10, 15, 0, tzinfo=timezone.utc)
+        sample_practice_session.created_at = datetime(2026, 1, 10, 15, 0, tzinfo=timezone.utc)
+
+        same_day_session = Session(
+            id=str(uuid4()),
+            name='Same Day Session',
+            description='Same day',
+            root_id=root_id,
+            session_start=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            attributes=json.dumps({}),
+        )
+        previous_day_session = Session(
+            id=str(uuid4()),
+            name='Previous Day Session',
+            description='Previous day',
+            root_id=root_id,
+            session_start=datetime(2026, 1, 9, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 9, 12, 0, tzinfo=timezone.utc),
+            attributes=json.dumps({}),
+        )
+        db_session.add_all([same_day_session, previous_day_session])
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/heatmap?range_start=2026-01-09&range_end=2026-01-10&timezone=UTC'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert data['range_start'] == '2026-01-09'
+        assert data['range_end'] == '2026-01-10'
+        assert data['metric'] == 'count'
+        assert data['total_sessions'] == 3
+        assert data['total_value'] == 3
+        assert data['max_count'] == 2
+        assert data['max_value'] == 2
+        assert data['days'] == [
+            {'date': '2026-01-10', 'count': 2, 'value': 2},
+            {'date': '2026-01-09', 'count': 1, 'value': 1},
+        ]
+
+    def test_session_heatmap_can_use_duration_metric(
+        self, authed_client, db_session, sample_practice_session
+    ):
+        """Heatmap duration mode should aggregate session duration in minutes per day."""
+        root_id = sample_practice_session.root_id
+        sample_practice_session.session_start = datetime(2026, 1, 10, 15, 0, tzinfo=timezone.utc)
+        sample_practice_session.created_at = datetime(2026, 1, 10, 15, 0, tzinfo=timezone.utc)
+        sample_practice_session.total_duration_seconds = 30 * 60
+
+        same_day_session = Session(
+            id=str(uuid4()),
+            name='Same Day Session',
+            description='Same day',
+            root_id=root_id,
+            session_start=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            total_duration_seconds=45 * 60,
+            attributes=json.dumps({}),
+        )
+        db_session.add(same_day_session)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/heatmap?range_start=2026-01-10&range_end=2026-01-10&timezone=UTC&heatmap_metric=duration'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert data['metric'] == 'duration'
+        assert data['total_sessions'] == 2
+        assert data['total_value'] == 75.0
+        assert data['max_value'] == 75.0
+        assert data['days'] == [
+            {'date': '2026-01-10', 'count': 2, 'value': 75.0},
+        ]
 
 
 @pytest.mark.integration

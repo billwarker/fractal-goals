@@ -1,0 +1,207 @@
+.session-filter-modal-search {
+    margin-bottom: 16px;
+}
+
+.session-filter-modal-search input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.session-filter-modal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.session-filter-modal-scroll-region {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.session-filter-modal-browser {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.session-filter-modal-browser-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.session-filter-modal-back-button {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.session-filter-modal-browser-step {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.session-filter-modal-groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 10px;
+}
+
+.session-filter-modal-group-card {
+    padding: 14px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.session-filter-modal-group-card:hover {
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-card-hover);
+    transform: translateY(-1px);
+}
+
+.session-filter-modal-group-card-ungrouped {
+    border-style: dashed;
+    color: var(--color-text-secondary);
+}
+
+.session-filter-modal-group-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.session-filter-modal-group-count {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.session-filter-modal-group-selected {
+    font-size: 11px;
+    color: var(--color-brand-primary);
+}
+
+.session-filter-modal-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--color-border);
+}
+
+.session-filter-modal-group-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.session-filter-modal-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.session-filter-modal-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.session-filter-modal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-card);
+    cursor: pointer;
+}
+
+.session-filter-modal-item.selected {
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-card-hover);
+}
+
+.session-filter-modal-item input {
+    margin-top: 2px;
+}
+
+.session-filter-modal-item-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+}
+
+.session-filter-modal-goal-icon {
+    margin-top: 1px;
+}
+
+.session-filter-modal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.session-filter-modal-name {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.session-filter-modal-meta {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.session-filter-modal-empty {
+    padding: 32px 0;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.session-filter-modal-secondary,
+.session-filter-modal-primary {
+    padding: 10px 14px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+}
+
+.session-filter-modal-secondary {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.session-filter-modal-primary {
+    border: none;
+    background: var(--color-brand-primary);
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .session-filter-modal-browser-header {
+        flex-wrap: wrap;
+    }
+
+    .session-filter-modal-groups-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { fractalApi } from '../utils/api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { queryKeys } from '../hooks/queryKeys';
-import { formatDateInTimezone } from '../utils/dateUtils';
-import { SessionNotesSidebar, SessionCardExpanded } from '../components/sessions';
+import { useGoals } from '../contexts/GoalsContext';
+import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
+import { useFractalTree } from '../hooks/useGoalQueries';
+import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQueries';
+import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
+import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
+import { flattenGoals } from '../utils/goalHelpers';
+import { formatDateInTimezone } from '../utils/dateUtils';
 import '../App.css';
 import styles from './Sessions.module.css';
-import { useGoals } from '../contexts/GoalsContext';
 
 /**
- * Sessions Page - View and manage practice sessions
- * Displays all practice sessions for the current fractal in card format with horizontal sections
+ * Sessions Page - View and query practice sessions
  */
 function Sessions() {
     const { getGoalColor } = useGoalLevels();
@@ -25,22 +26,19 @@ function Sessions() {
     const { setActiveRootId } = useGoals();
     const isMobile = useIsMobile();
 
-    const [filterCompleted, setFilterCompleted] = useState('all');
     const [selectedSessionId, setSelectedSessionId] = useState(null);
-    const [selectedNoteId, setSelectedNoteId] = useState(null);
-    const notesPaneStorageKey = `sessions-notes-pane-open:${rootId || 'default'}`;
-    const [isNotesPaneOpen, setIsNotesPaneOpen] = useState(() => {
+    const filtersPaneStorageKey = `sessions-query-pane-open:${rootId || 'default'}`;
+    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
         if (typeof window === 'undefined') return true;
-        const stored = window.localStorage.getItem(`sessions-notes-pane-open:${rootId || 'default'}`);
+        const stored = window.localStorage.getItem(`sessions-query-pane-open:${rootId || 'default'}`);
         return stored == null ? true : stored === 'true';
     });
-    const [sortBy, setSortBy] = useState('start_date');
-    const [sortOrder, setSortOrder] = useState('desc');
     const [hiddenSessionIds, setHiddenSessionIds] = useState(() => {
         const deletedId = location.state?.deletedSessionId;
         return deletedId ? new Set([deletedId]) : new Set();
     });
 
+    const { filters, apiFilters, heatmapApiFilters, hasActiveFilters, updateFilters, resetFilters } = useSessionsPageFilters(timezone);
     const SESSIONS_PER_PAGE = 10;
 
     useEffect(() => {
@@ -55,115 +53,85 @@ function Sessions() {
     const {
         data: sessionsPages,
         isLoading: sessionsLoading,
+        isFetching: sessionsFetching,
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
-    } = useInfiniteQuery({
-        queryKey: queryKeys.sessionsPaginated(rootId),
-        queryFn: async ({ pageParam = 0 }) => {
-            const res = await fractalApi.getSessions(rootId, {
-                limit: SESSIONS_PER_PAGE,
-                offset: pageParam
-            });
-            return res.data;
-        },
-        initialPageParam: 0,
-        getNextPageParam: (lastPage) => {
-            if (!lastPage?.pagination?.has_more) return undefined;
-            return (lastPage.pagination.offset || 0) + (lastPage.pagination.limit || SESSIONS_PER_PAGE);
-        },
-        enabled: !!rootId
-    });
+    } = useSessionsSearch(rootId, apiFilters, SESSIONS_PER_PAGE);
 
-    const { data: activities = [], isLoading: activitiesLoading } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getActivities(rootId);
-            return res.data || [];
-        },
-        enabled: !!rootId,
-        staleTime: 60 * 1000,
-    });
+    const { activities = [], isLoading: activitiesLoading } = useActivities(rootId);
+    const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
+    const {
+        data: goalTree,
+        isLoading: goalsLoading,
+    } = useFractalTree(rootId);
+    const {
+        data: heatmap,
+        isLoading: heatmapLoading,
+    } = useSessionsHeatmap(rootId, heatmapApiFilters);
 
     const sessions = useMemo(() => {
         const pages = sessionsPages?.pages || [];
         return pages.flatMap((page) => page?.sessions || []);
     }, [sessionsPages]);
 
-    const totalSessions = sessionsPages?.pages?.[0]?.pagination?.total || sessions.length;
+    const totalSessions = sessionsPages?.pages?.[0]?.pagination?.total || 0;
 
     useEffect(() => {
         const deletedId = location.state?.deletedSessionId;
         if (!deletedId) return;
-        setHiddenSessionIds(prev => {
+        setHiddenSessionIds((prev) => {
             const next = new Set(prev);
             next.add(deletedId);
             return next;
         });
-        setSelectedSessionId(prev => (prev === deletedId ? null : prev));
+        setSelectedSessionId((prev) => (prev === deletedId ? null : prev));
     }, [location.state]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const stored = window.localStorage.getItem(notesPaneStorageKey);
-        setIsNotesPaneOpen(stored == null ? true : stored === 'true');
-    }, [notesPaneStorageKey]);
+        const stored = window.localStorage.getItem(filtersPaneStorageKey);
+        setIsFiltersPaneOpen(stored == null ? true : stored === 'true');
+    }, [filtersPaneStorageKey]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        window.localStorage.setItem(notesPaneStorageKey, String(isNotesPaneOpen));
-    }, [notesPaneStorageKey, isNotesPaneOpen]);
+        window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
+    }, [filtersPaneStorageKey, isFiltersPaneOpen]);
 
-    // Scroll to selected session
+    const visibleSessions = useMemo(
+        () => sessions.filter((session) => !hiddenSessionIds.has(session.id)),
+        [sessions, hiddenSessionIds]
+    );
+
+    useEffect(() => {
+        if (!selectedSessionId) return;
+        const sessionStillVisible = visibleSessions.some((session) => session.id === selectedSessionId);
+        if (!sessionStillVisible) {
+            setSelectedSessionId(null);
+        }
+    }, [selectedSessionId, visibleSessions]);
+
     useEffect(() => {
         if (selectedSessionId) {
-            const el = document.getElementById(`session-card-${selectedSessionId}`);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const element = document.getElementById(`session-card-${selectedSessionId}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
     }, [selectedSessionId]);
 
-    const handleSortChange = useCallback((criteria) => {
-        if (sortBy === criteria) {
-            setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
-        } else {
-            setSortBy(criteria);
-            setSortOrder('desc');
-        }
-    }, [sortBy]);
+    const goalOptions = useMemo(() => {
+        const allGoals = flattenGoals(goalTree ? [goalTree] : []);
+        const goalIdsInActivities = new Set(
+            activities.flatMap((activity) => activity.associated_goal_ids || [])
+        );
 
-    // Memoize filtered and sorted sessions
-    const filteredSessions = useMemo(() => {
-        return sessions.filter(session => {
-            if (hiddenSessionIds.has(session.id)) return false;
-            if (filterCompleted === 'completed') return session.attributes?.completed;
-            if (filterCompleted === 'incomplete') return !session.attributes?.completed;
-            return true;
-        }).sort((a, b) => {
-            let timeA = 0;
-            let timeB = 0;
+        return allGoals
+            .filter((goal) => goalIdsInActivities.has(goal.id))
+            .sort((goalA, goalB) => goalA.name.localeCompare(goalB.name));
+    }, [activities, goalTree]);
 
-            if (sortBy === 'start_date') {
-                const startA = a.session_start || a.attributes?.session_data?.session_start || a.attributes?.created_at;
-                const startB = b.session_start || b.attributes?.session_data?.session_start || b.attributes?.created_at;
-                timeA = new Date(startA).getTime();
-                timeB = new Date(startB).getTime();
-            } else {
-                const modA = a.attributes?.updated_at || a.attributes?.created_at;
-                const modB = b.attributes?.updated_at || b.attributes?.created_at;
-                timeA = new Date(modA).getTime();
-                timeB = new Date(modB).getTime();
-            }
-
-            if (isNaN(timeA)) timeA = 0;
-            if (isNaN(timeB)) timeB = 0;
-
-            return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-        });
-    }, [sessions, hiddenSessionIds, filterCompleted, sortBy, sortOrder]);
-
-    // Memoize date formatter
     const formatDate = useCallback((dateString, options = {}) => {
         if (!dateString) return '';
         if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-') && !dateString.includes('T')) {
@@ -172,79 +140,37 @@ function Sessions() {
             return date.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
-                year: 'numeric'
+                year: 'numeric',
             });
         }
         return formatDateInTimezone(dateString, timezone, {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
-            ...options
+            ...options,
         });
     }, [timezone]);
 
-    // Memoize session selection handler
     const handleSessionSelect = useCallback((sessionId) => {
         setSelectedSessionId(sessionId);
-        setSelectedNoteId(null);
     }, []);
 
-    const totalNotesCount = useMemo(() => {
-        return sessions.reduce((count, session) => count + (session.notes?.length || 0), 0);
-    }, [sessions]);
-
-    if (sessionsLoading || activitiesLoading) {
-        return <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>Loading sessions...</div>;
+    if (activitiesLoading || activityGroupsLoading || goalsLoading || !goalTree) {
+        return (
+            <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+                Loading sessions...
+            </div>
+        );
     }
 
     return (
         <div className={styles.pageContainer}>
-            {/* Left Panel: Sessions List */}
             <div className={styles.leftPanel}>
-                {/* Page Header (Fixed) */}
                 <div className={styles.pageHeader}>
-                    <div className={styles.headerControls}>
-                        <button
-                            onClick={() => setFilterCompleted('all')}
-                            className={`${styles.filterButton} ${filterCompleted === 'all' ? styles.filterButtonActive : ''}`}
-                        >
-                            All
-                        </button>
-                        <button
-                            onClick={() => setFilterCompleted('incomplete')}
-                            className={`${styles.filterButton} ${filterCompleted === 'incomplete' ? styles.filterButtonActive : ''}`}
-                        >
-                            Incomplete
-                        </button>
-                        <button
-                            onClick={() => setFilterCompleted('completed')}
-                            className={`${styles.filterButton} ${filterCompleted === 'completed' ? styles.filterButtonActive : ''}`}
-                        >
-                            Completed
-                        </button>
-
-                        <div className={styles.divider}></div>
-
-                        <div className={styles.sortGroup}>
-                            <span className={styles.sortLabel}>Sort:</span>
-                            <button
-                                onClick={() => handleSortChange('start_date')}
-                                className={`${styles.sortButton} ${sortBy === 'start_date' ? styles.sortButtonActive : ''}`}
-                            >
-                                Date
-                                {sortBy === 'start_date' && (
-                                    <span>{sortOrder === 'desc' ? '↓' : '↑'}</span>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => handleSortChange('last_modified')}
-                                className={`${styles.sortButton} ${sortBy === 'last_modified' ? styles.sortButtonActive : ''}`}
-                            >
-                                Modified
-                                {sortBy === 'last_modified' && (
-                                    <span>{sortOrder === 'desc' ? '↓' : '↑'}</span>
-                                )}
-                            </button>
+                    <div className={styles.headerCopy}>
+                        <h1 className={styles.pageTitle}>Sessions</h1>
+                        <div className={styles.pageSubtitle}>
+                            Query sessions by date range, completion, activity, and activity-linked goals.
                         </div>
                     </div>
 
@@ -262,23 +188,28 @@ function Sessions() {
                             Manage Activities
                         </button>
                         <button
-                            onClick={() => setIsNotesPaneOpen((prev) => !prev)}
+                            onClick={() => setIsFiltersPaneOpen((prev) => !prev)}
                             className={`${styles.secondaryButton} ${styles.notesToggleButton}`}
                         >
-                            {isNotesPaneOpen ? 'Hide Notes' : `Show Notes${totalNotesCount ? ` (${totalNotesCount})` : ''}`}
+                            {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
                         </button>
                     </div>
                 </div>
 
-                {/* Scrollable Sessions List */}
                 <div className={styles.sessionsList}>
-                    {filteredSessions.length === 0 ? (
+                    {sessionsLoading || (sessionsFetching && !isFetchingNextPage) ? (
+                        <div className={styles.loadingContainer}>
+                            <p className={styles.loadingText}>Loading session data...</p>
+                        </div>
+                    ) : visibleSessions.length === 0 ? (
                         <div className={styles.emptyState}>
-                            No sessions found. Start by clicking "+ ADD SESSION" in the navigation.
+                            {hasActiveFilters
+                                ? 'No sessions match the current filters.'
+                                : 'No sessions found. Start by clicking "+ ADD SESSION" in the navigation.'}
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {filteredSessions.map(session => (
+                            {visibleSessions.map((session) => (
                                 <SessionCardExpanded
                                     key={session.id}
                                     session={session}
@@ -293,15 +224,14 @@ function Sessions() {
                                 />
                             ))}
 
-                            {/* Load More Button */}
                             {hasNextPage && (
                                 <div className={styles.loadMoreContainer}>
                                     <span className={styles.loadMoreText}>
-                                        Showing {sessions.length} of {totalSessions} sessions
+                                        Showing {visibleSessions.length} of {totalSessions} sessions
                                     </span>
                                     <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
+                                        onClick={(event) => {
+                                            event.stopPropagation();
                                             fetchNextPage();
                                         }}
                                         disabled={isFetchingNextPage}
@@ -323,16 +253,21 @@ function Sessions() {
                 </div>
             </div>
 
-            {/* Right Panel: Notes Sidebar */}
-            {isNotesPaneOpen && (
+            {isFiltersPaneOpen && (
                 <div className={styles.rightPanel}>
-                    <SessionNotesSidebar
-                        selectedNoteId={selectedNoteId}
-                        sessions={sessions}
+                    <SessionsQuerySidebar
+                        filters={filters}
+                        visibleSessionsCount={visibleSessions.length}
+                        totalSessionsCount={totalSessions}
                         activities={activities}
-                        onSelectSession={setSelectedSessionId}
-                        onSelectNote={setSelectedNoteId}
-                        onToggleCollapse={() => setIsNotesPaneOpen(false)}
+                        activityGroups={activityGroups}
+                        goalOptions={goalOptions}
+                        heatmap={heatmap}
+                        isHeatmapLoading={heatmapLoading && !heatmap}
+                        hasActiveFilters={hasActiveFilters}
+                        onUpdateFilters={updateFilters}
+                        onResetFilters={resetFilters}
+                        onToggleCollapse={() => setIsFiltersPaneOpen(false)}
                         isMobile={isMobile}
                     />
                 </div>

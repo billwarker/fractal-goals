@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
@@ -41,6 +41,82 @@ export function useAllSessions(rootId) {
     return useQuery({
         queryKey: queryKeys.sessionsAll(rootId),
         queryFn: () => fetchAllSessions(rootId),
+        enabled: isReady,
+        staleTime: 60 * 1000,
+    });
+}
+
+function normalizeSessionSearchFilters(filters = {}) {
+    const normalized = {
+        completed: filters.completed || 'all',
+        sort_by: filters.sort_by || 'session_start',
+        sort_order: filters.sort_order || 'desc',
+        timezone: filters.timezone || 'UTC',
+    };
+
+    if (filters.range_start) {
+        normalized.range_start = filters.range_start;
+    }
+    if (filters.range_end) {
+        normalized.range_end = filters.range_end;
+    }
+
+    if (filters.duration_operator && filters.duration_minutes !== undefined) {
+        normalized.duration_operator = filters.duration_operator;
+        normalized.duration_minutes = filters.duration_minutes;
+    }
+
+    if (filters.heatmap_metric) {
+        normalized.heatmap_metric = filters.heatmap_metric;
+    }
+
+    if (Array.isArray(filters.activity_ids) && filters.activity_ids.length > 0) {
+        normalized.activity_ids = [...filters.activity_ids].filter(Boolean).sort();
+    }
+
+    if (Array.isArray(filters.goal_ids) && filters.goal_ids.length > 0) {
+        normalized.goal_ids = [...filters.goal_ids].filter(Boolean).sort();
+    }
+
+    return normalized;
+}
+
+export function useSessionsSearch(rootId, filters = {}, pageSize = 10) {
+    const isReady = Boolean(rootId);
+    const normalizedFilters = normalizeSessionSearchFilters(filters);
+
+    return useInfiniteQuery({
+        queryKey: queryKeys.sessionsSearch(rootId, normalizedFilters),
+        queryFn: async ({ pageParam = 0 }) => {
+            const res = await fractalApi.getSessions(rootId, {
+                ...normalizedFilters,
+                limit: pageSize,
+                offset: pageParam,
+            });
+            return res.data;
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => {
+            if (!lastPage?.pagination?.has_more) return undefined;
+            return (lastPage.pagination.offset || 0) + (lastPage.pagination.limit || pageSize);
+        },
+        placeholderData: (previousData) => previousData,
+        enabled: isReady,
+        staleTime: 60 * 1000,
+    });
+}
+
+export function useSessionsHeatmap(rootId, filters = {}) {
+    const isReady = Boolean(rootId);
+    const normalizedFilters = normalizeSessionSearchFilters(filters);
+
+    return useQuery({
+        queryKey: queryKeys.sessionsHeatmap(rootId, normalizedFilters),
+        queryFn: async () => {
+            const res = await fractalApi.getSessionsHeatmap(rootId, normalizedFilters);
+            return res.data;
+        },
+        placeholderData: (previousData) => previousData,
         enabled: isReady,
         staleTime: 60 * 1000,
     });

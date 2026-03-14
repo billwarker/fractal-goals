@@ -87,7 +87,15 @@ export function buildQueryString(options = {}, mappings = {}) {
         if (value === undefined || value === null || value === '') {
             return;
         }
-        params.append(mappings[key] || key, value);
+        const paramKey = mappings[key] || key;
+        if (Array.isArray(value)) {
+            value.forEach((item) => {
+                if (item === undefined || item === null || item === '') return;
+                params.append(paramKey, item);
+            });
+            return;
+        }
+        params.append(paramKey, value);
     });
 
     const queryString = params.toString();
