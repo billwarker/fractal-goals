@@ -202,36 +202,29 @@ function SessionsQuerySidebar({
                     <div className="sessions-query-sidebar-section-header">
                         <h4>Sort</h4>
                     </div>
-                    <div className="sessions-query-inline-actions">
+                    <div className="sessions-query-sort-row">
                         <button
                             type="button"
-                            className={`sessions-query-chip ${filters.sortBy === 'session_start' ? 'active' : ''}`}
-                            onClick={() => onUpdateFilters?.({ sortBy: 'session_start' })}
+                            className="sessions-query-sort-toggle"
+                            onClick={() => onUpdateFilters?.({
+                                sortBy: filters.sortBy === 'session_start' ? 'updated_at' : 'session_start',
+                            })}
+                            aria-label={`Sort field: ${filters.sortBy === 'session_start' ? 'session date' : 'last modified'}. Click to toggle.`}
+                            title="Toggle sort field"
                         >
-                            Session Date
+                            {filters.sortBy === 'session_start' ? 'Session Date' : 'Last Modified'}
                         </button>
+                        <span className="sessions-query-sort-text">by</span>
                         <button
                             type="button"
-                            className={`sessions-query-chip ${filters.sortBy === 'updated_at' ? 'active' : ''}`}
-                            onClick={() => onUpdateFilters?.({ sortBy: 'updated_at' })}
+                            className="sessions-query-sort-toggle"
+                            onClick={() => onUpdateFilters?.({
+                                sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
+                            })}
+                            aria-label={`Sort order: ${filters.sortOrder === 'desc' ? 'newest first' : 'oldest first'}. Click to toggle.`}
+                            title="Toggle sort order"
                         >
-                            Last Modified
-                        </button>
-                    </div>
-                    <div className="sessions-query-inline-actions">
-                        <button
-                            type="button"
-                            className={`sessions-query-chip ${filters.sortOrder === 'desc' ? 'active' : ''}`}
-                            onClick={() => onUpdateFilters?.({ sortOrder: 'desc' })}
-                        >
-                            Newest First
-                        </button>
-                        <button
-                            type="button"
-                            className={`sessions-query-chip ${filters.sortOrder === 'asc' ? 'active' : ''}`}
-                            onClick={() => onUpdateFilters?.({ sortOrder: 'asc' })}
-                        >
-                            Oldest First
+                            {filters.sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
                         </button>
                     </div>
                 </section>

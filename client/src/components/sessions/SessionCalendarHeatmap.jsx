@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './SessionCalendarHeatmap.css';
 
+const CELL_SIZE = 16;
+const CELL_GAP = 6;
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const VISIBLE_DAY_INDEXES = [1, 3, 5];
 
 function toUtcDate(dateString) {
     return new Date(`${dateString}T00:00:00Z`);
@@ -112,6 +113,10 @@ function SessionCalendarHeatmap({
         () => buildHeatmapColumns(heatmap?.days || []),
         [heatmap]
     );
+    const gridWidth = useMemo(() => {
+        if (!columns.length) return 0;
+        return (columns.length * CELL_SIZE) + ((columns.length - 1) * CELL_GAP);
+    }, [columns.length]);
 
     useEffect(() => {
         if (!scrollRef.current) return;
@@ -157,9 +162,9 @@ function SessionCalendarHeatmap({
 
             <div className="session-heatmap-shell">
                 <div className="session-heatmap-day-axis">
-                    {DAY_LABELS.map((label, index) => (
+                    {DAY_LABELS.map((label) => (
                         <div key={label} className="session-heatmap-day-label">
-                            {VISIBLE_DAY_INDEXES.includes(index) ? label : ''}
+                            {label}
                         </div>
                     ))}
                 </div>
@@ -169,12 +174,17 @@ function SessionCalendarHeatmap({
                     ref={scrollRef}
                     onScroll={hideTooltip}
                 >
-                    <div className="session-heatmap-month-row">
+                    <div
+                        className="session-heatmap-month-row"
+                        style={{ width: `${gridWidth}px` }}
+                    >
                         {monthLabels.map((month) => (
                             <div
                                 key={`${month.label}-${month.columnIndex}`}
                                 className="session-heatmap-month-label"
-                                style={{ gridColumn: `${month.columnIndex + 1} / span 4` }}
+                                style={{
+                                    left: `${month.columnIndex * (CELL_SIZE + CELL_GAP)}px`,
+                                }}
                             >
                                 {month.label}
                             </div>
@@ -183,7 +193,7 @@ function SessionCalendarHeatmap({
 
                     <div
                         className="session-heatmap-grid"
-                        style={{ gridTemplateColumns: `repeat(${columns.length}, 16px)` }}
+                        style={{ gridTemplateColumns: `repeat(${columns.length}, ${CELL_SIZE}px)` }}
                     >
                         {columns.map((column, columnIndex) => (
                             <div className="session-heatmap-column" key={`column-${columnIndex}`}>
