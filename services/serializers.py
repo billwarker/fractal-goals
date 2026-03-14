@@ -152,6 +152,7 @@ def serialize_goal(goal, include_children=True):
         "level_name": goal_level_name,
         "completed": goal.completed,
         "completed_at": format_utc(goal.completed_at),
+        "completed_session_id": getattr(goal, 'completed_session_id', None),
         "is_smart": all(smart_status.values()),
         "smart_status": smart_status,
         "description": goal.description,
@@ -167,6 +168,7 @@ def serialize_goal(goal, include_children=True):
             "deadline": format_utc(goal.deadline),
             "completed": goal.completed,
             "completed_at": format_utc(goal.completed_at),
+            "completed_session_id": getattr(goal, 'completed_session_id', None),
             "created_at": format_utc(goal.created_at),
             "updated_at": format_utc(goal.updated_at),
             "targets": [serialize_target(t) for t in (goal.targets_rel or []) if t.deleted_at is None],
@@ -371,9 +373,11 @@ def serialize_session(session, include_image_data=False):
             
         result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ShortTermGoal']
         result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ImmediateGoal']
+        result["micro_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'MicroGoal']
     else:
         result["short_term_goals"] = []
         result["immediate_goals"] = []
+        result["micro_goals"] = []
 
     # Add Program Info if associated
     if hasattr(session, 'program_day') and session.program_day:

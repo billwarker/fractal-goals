@@ -154,7 +154,12 @@ export function useSessionDetailMutations({
     });
 
     const toggleGoalCompletionMutation = useMutation({
-        mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(rootId, goalId, completed),
+        mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(
+            rootId,
+            goalId,
+            completed,
+            completed ? sessionId : null
+        ),
         onSuccess: (response, variables) => {
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });

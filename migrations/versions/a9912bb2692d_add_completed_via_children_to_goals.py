@@ -92,8 +92,8 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                server_default=None,
                existing_nullable=True)
-    op.drop_index(op.f('idx_goal_activity_group_goal'), table_name='goal_activity_group_associations')
-    op.drop_index(op.f('idx_goal_activity_group_group'), table_name='goal_activity_group_associations')
+    op.execute('DROP INDEX IF EXISTS idx_goal_activity_group_goal')
+    op.execute('DROP INDEX IF EXISTS idx_goal_activity_group_group')
     op.add_column('goals', sa.Column('completed_via_children', sa.Boolean(), nullable=True))
     op.alter_column('goals', 'description',
                existing_type=sa.VARCHAR(),

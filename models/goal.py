@@ -108,6 +108,16 @@ class Goal(Base):
     deadline = Column(DateTime, nullable=True)
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)
+    completed_session_id = Column(
+        String,
+        ForeignKey(
+            'sessions.id',
+            ondelete='SET NULL',
+            name='fk_goals_completed_session_id_sessions',
+            use_alter=True,
+        ),
+        nullable=True,
+    )
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
@@ -142,6 +152,7 @@ class Goal(Base):
         back_populates="goals",
         viewonly=True
     )
+    completed_session = relationship("Session", foreign_keys=[completed_session_id])
     associated_activities = relationship(
         "ActivityDefinition",
         secondary=activity_goal_associations,

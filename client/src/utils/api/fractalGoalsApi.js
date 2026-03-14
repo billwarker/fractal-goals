@@ -7,8 +7,11 @@ export const fractalGoalsApi = {
     createGoal: (rootId, data) => axios.post(`${API_BASE}/${rootId}/goals`, data),
     updateGoal: (rootId, goalId, data) => axios.put(`${API_BASE}/${rootId}/goals/${goalId}`, data),
     deleteGoal: (rootId, goalId) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}`),
-    toggleGoalCompletion: (rootId, goalId, completed) =>
-        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/complete`, { completed }),
+    toggleGoalCompletion: (rootId, goalId, completed, sessionId = null) =>
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/complete`, {
+            completed,
+            ...(sessionId ? { session_id: sessionId } : {}),
+        }),
     evaluateGoalTargets: (rootId, goalId, sessionId) =>
         axios.post(`${API_BASE}/${rootId}/goals/${goalId}/evaluate-targets`, { session_id: sessionId }),
     getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),

@@ -10,52 +10,128 @@ import React, { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
+import { isSMART } from '../../utils/smartHelpers';
 import GoalIcon from '../atoms/GoalIcon';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import SessionSectionGrid from './SessionSectionGrid';
 import styles from './SessionCardExpanded.module.css';
 
+const GOAL_LEVEL_ORDER = {
+    UltimateGoal: 0,
+    LongTermGoal: 1,
+    MidTermGoal: 2,
+    ShortTermGoal: 3,
+    ImmediateGoal: 4,
+    MicroGoal: 5,
+    NanoGoal: 6,
+};
+
+function getGoalId(goal) {
+    return goal?.id ?? goal?.attributes?.id ?? null;
+}
+
+function getGoalType(goal) {
+    return goal?.type ?? goal?.attributes?.type ?? null;
+}
+
+function getGoalName(goal) {
+    return goal?.name ?? goal?.attributes?.name ?? '';
+}
+
+function getGoalCompletedAt(goal) {
+    return goal?.completed_at ?? goal?.attributes?.completed_at ?? null;
+}
+
+function getGoalChildren(goal) {
+    return Array.isArray(goal?.children) ? goal.children : [];
+}
+
+function collectUniqueGoals(goals) {
+    const seenIds = new Set();
+    const collected = [];
+
+    const visit = (goal) => {
+        if (!goal) return;
+
+        const goalId = getGoalId(goal);
+        if (goalId && seenIds.has(goalId)) return;
+        if (goalId) seenIds.add(goalId);
+        collected.push(goal);
+
+        getGoalChildren(goal).forEach(visit);
+    };
+
+    goals.forEach(visit);
+    return collected;
+}
+
+function isTimestampWithinSession(timestamp, sessionStart, sessionEnd) {
+    if (!timestamp || !sessionStart || !sessionEnd) return false;
+
+    const targetTime = new Date(timestamp).getTime();
+    const startTime = new Date(sessionStart).getTime();
+    const endTime = new Date(sessionEnd).getTime();
+
+    if ([targetTime, startTime, endTime].some(Number.isNaN)) return false;
+    return targetTime >= startTime && targetTime <= endTime;
+}
+
 const AccomplishmentsSection = memo(function AccomplishmentsSection({
     completedGoals,
+    nanoGoalsCompleted,
     getGoalColor,
+    getGoalSecondaryColor,
     getGoalIcon
 }) {
-    if (completedGoals.length === 0) {
+    const hasCompletedGoals = completedGoals.length > 0;
+    const hasNanoGoals = nanoGoalsCompleted > 0;
+
+    if (!hasCompletedGoals && !hasNanoGoals) {
         return null;
     }
 
-    const completionColor = getGoalColor('Completed');
-
     return (
-        <div className={styles.goalsSection}>
-            <div className={styles.goalsColumn}>
-                <div className={styles.fieldLabel} style={{ fontSize: '10px', letterSpacing: '0.03em', marginBottom: '8px' }}>
-                    Completed Goals
-                </div>
-                <div className={styles.goalsList} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {/* Completed Goals */}
-                    {completedGoals.map(goal => {
-                        const originalShape = getGoalIcon(goal.type || goal.attributes?.type);
-                        return (
-                            <div
-                                key={goal.id}
-                                className={`${styles.goalTag} ${styles.goalTagCompleted}`}
-                                style={{
-                                    border: `1px solid ${completionColor}`,
-                                    color: completionColor,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    paddingLeft: '6px'
-                                }}
-                            >
-                                <GoalIcon shape={originalShape} color={completionColor} size={14} />
-                                <span style={{ fontWeight: 500 }}>{goal.name}</span>
-                            </div>
-                        );
-                    })}
-                </div>
+        <div className={styles.accomplishmentsSection}>
+            <div className={styles.accomplishmentsLabel}>Completed in Session</div>
+            <div className={styles.accomplishmentsList}>
+                {completedGoals.map((goal) => {
+                    const goalType = getGoalType(goal);
+                    const goalColor = getGoalColor(goal);
+                    const goalSecondaryColor = getGoalSecondaryColor(goal);
+
+                    return (
+                        <div
+                            key={getGoalId(goal) || `${goalType}-${getGoalName(goal)}`}
+                            className={styles.accomplishmentChip}
+                            style={{ '--accomplishment-color': goalColor }}
+                        >
+                            <GoalIcon
+                                shape={getGoalIcon(goal)}
+                                color={goalColor}
+                                secondaryColor={goalSecondaryColor}
+                                isSmart={isSMART(goal)}
+                                size={16}
+                            />
+                            <span className={styles.accomplishmentText}>{getGoalName(goal)}</span>
+                        </div>
+                    );
+                })}
+                {hasNanoGoals && (
+                    <div
+                        className={styles.accomplishmentChip}
+                        style={{ '--accomplishment-color': getGoalColor('NanoGoal') }}
+                    >
+                        <GoalIcon
+                            shape={getGoalIcon('NanoGoal')}
+                            color={getGoalColor('NanoGoal')}
+                            secondaryColor={getGoalSecondaryColor('NanoGoal')}
+                            size={16}
+                        />
+                        <span className={styles.accomplishmentText}>
+                            {nanoGoalsCompleted} Nano Goal{nanoGoalsCompleted === 1 ? '' : 's'} Completed
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -74,12 +150,13 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     getGoalColor,
     formatDate
 }) {
-    const { getLevelByName, getGoalIcon } = useGoalLevels();;
+    const { getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
     const sessionData = session.attributes?.session_data;
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
-    const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
+    const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end || session?.attributes?.updated_at || session?.updated_at;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
+    const microGoals = session.micro_goals || [];
 
     // Calculate all associated goals (including from activities)
     const allGoals = useMemo(() => {
@@ -97,6 +174,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
         // 1. Direct session goals (short-term and immediate)
         shortTermGoals.forEach(addGoal);
         immediateGoals.forEach(addGoal);
+        microGoals.forEach(addGoal);
 
         // 2. Goals from activity definitions currently used in this session
         const activityDefIds = new Set(
@@ -121,11 +199,11 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             }
         });
 
-        return goals;
-    }, [shortTermGoals, immediateGoals, sessionActivityInstances, activities]);
+        return collectUniqueGoals(goals);
+    }, [shortTermGoals, immediateGoals, microGoals, sessionActivityInstances, activities]);
 
     const achievedTargets = useMemo(() => {
-        const allAchievables = [...shortTermGoals, ...immediateGoals];
+        const allAchievables = [...shortTermGoals, ...immediateGoals, ...microGoals];
         const allAchieved = getAchievedTargetsForSession(session, allAchievables);
         // Filter specifically for targets achieved in THIS session (relational check)
         return allAchieved.filter(achieved => {
@@ -136,27 +214,74 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             // and is currently marked as completed.
             return achieved.target.completed;
         });
-    }, [session, shortTermGoals, immediateGoals]);
+    }, [session, shortTermGoals, immediateGoals, microGoals]);
 
-    const completedGoals = useMemo(() => {
-        // Goals are accomplishments if they are completed AND 
-        // they triggered because of a target or activity in this session
-        const sessionTargetGoalIds = new Set(achievedTargets.map(t => t.goalId));
+    const { completedGoals, nanoGoalsCompleted } = useMemo(() => {
+        const sessionTargetGoalIds = new Set(achievedTargets.map((target) => String(target.goalId)));
 
-        return allGoals.filter(goal => {
-            const isCompleted = goal.completed || goal.attributes?.completed;
-            if (!isCompleted) return false;
+        const directlyCompletedGoalIds = new Set(
+            allGoals
+                .filter((goal) => {
+                    const goalId = getGoalId(goal);
+                    const isCompleted = goal.completed || goal.attributes?.completed;
+                    if (!goalId || !isCompleted) return false;
 
-            // Relational check: Was this goal's target achieved in this session?
-            if (sessionTargetGoalIds.has(goal.id)) return true;
+                    const completedSessionId = goal.completed_session_id || goal.attributes?.completed_session_id;
+                    const isExplicitlyLinked = completedSessionId != null && String(completedSessionId) === String(session.id);
 
-            // Check children
-            const childAchieved = goal.children?.some(child => sessionTargetGoalIds.has(child.id));
-            if (childAchieved) return true;
+                    return isExplicitlyLinked
+                        || sessionTargetGoalIds.has(String(goalId))
+                        || isTimestampWithinSession(getGoalCompletedAt(goal), sessionStart, sessionEnd);
+                })
+                .map((goal) => String(getGoalId(goal)))
+        );
 
-            return false;
+        const hasCompletedDescendant = (goal) => (
+            getGoalChildren(goal).some((child) => {
+                const childId = getGoalId(child);
+                return (childId && directlyCompletedGoalIds.has(String(childId))) || hasCompletedDescendant(child);
+            })
+        );
+
+        const completed = allGoals
+            .filter((goal) => {
+                const goalId = getGoalId(goal);
+                const isCompleted = goal.completed || goal.attributes?.completed;
+                if (!goalId || !isCompleted) return false;
+
+                return directlyCompletedGoalIds.has(String(goalId)) || hasCompletedDescendant(goal);
+            })
+            .sort((goalA, goalB) => {
+                const levelA = GOAL_LEVEL_ORDER[getGoalType(goalA)] ?? Number.MAX_SAFE_INTEGER;
+                const levelB = GOAL_LEVEL_ORDER[getGoalType(goalB)] ?? Number.MAX_SAFE_INTEGER;
+                if (levelA !== levelB) return levelA - levelB;
+                return getGoalName(goalA).localeCompare(getGoalName(goalB));
+            });
+
+        const completedNanoGoalIds = new Set(
+            completed
+                .filter((goal) => getGoalType(goal) === 'NanoGoal')
+                .map((goal) => getGoalId(goal))
+                .filter(Boolean)
+                .map(String)
+        );
+
+        const completedNanoNotes = Array.isArray(session.notes)
+            ? session.notes.filter((note) => note?.is_nano_goal && note?.nano_goal_completed)
+            : [];
+
+        let nanoCount = completedNanoGoalIds.size;
+        completedNanoNotes.forEach((note) => {
+            const noteGoalId = note.nano_goal_id ? String(note.nano_goal_id) : null;
+            if (noteGoalId && completedNanoGoalIds.has(noteGoalId)) return;
+            nanoCount += 1;
         });
-    }, [allGoals, achievedTargets]);
+
+        return {
+            completedGoals: completed.filter((goal) => getGoalType(goal) !== 'NanoGoal'),
+            nanoGoalsCompleted: nanoCount,
+        };
+    }, [achievedTargets, allGoals, session.notes, sessionEnd, sessionStart]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -264,7 +389,9 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             {/* Session Accomplishments Section */}
             <AccomplishmentsSection
                 completedGoals={completedGoals}
+                nanoGoalsCompleted={nanoGoalsCompleted}
                 getGoalColor={getGoalColor}
+                getGoalSecondaryColor={getGoalSecondaryColor}
                 getGoalIcon={getGoalIcon}
             />
 

@@ -1101,7 +1101,6 @@ class GoalService:
         goal.completed = data['completed'] if 'completed' in data else not goal.completed
 
         if goal.completed:
-            level = getattr(goal, 'level', None)
             if not goal_allows_manual_completion(goal):
                 return None, "Manual completion is not allowed for this goal level", 403
             if goal_requires_smart_validation(goal):
@@ -1113,6 +1112,7 @@ class GoalService:
                     }, 400
 
         goal.completed_at = datetime.now(timezone.utc) if goal.completed else None
+        goal.completed_session_id = data.get('session_id') if goal.completed else None
         self.db_session.commit()
         self.db_session.refresh(goal)
         event_name = Events.GOAL_COMPLETED if goal.completed else Events.GOAL_UNCOMPLETED
@@ -1121,6 +1121,8 @@ class GoalService:
             'goal_name': goal.name,
             'root_id': goal.root_id or goal.id,
         }
+        if goal.completed_session_id:
+            event_payload['session_id'] = goal.completed_session_id
         if goal.completed:
             event_payload['auto_completed'] = False
             event_payload['reason'] = 'manual'

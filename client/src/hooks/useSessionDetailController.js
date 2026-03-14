@@ -17,6 +17,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     } = useActiveSessionData();
     const {
         updateGoal,
+        toggleGoalCompletion,
         addActivity,
         deleteSession,
     } = useActiveSessionActions();
@@ -117,6 +118,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setSidePaneMode: setSidePaneModeUi,
         localSessionData,
         updateGoal,
+        toggleGoalCompletion,
         calculateTotalDuration,
         showDeleteConfirm,
         setShowDeleteConfirm,

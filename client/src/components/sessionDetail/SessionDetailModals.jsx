@@ -20,6 +20,7 @@ function SessionDetailModals({
     selectedGoal,
     onCloseGoal,
     onUpdateGoal,
+    onToggleGoalCompletion,
     onGoalAssociationsChanged,
     showAssociationModal,
     onCloseAssociationModal,
@@ -57,6 +58,7 @@ function SessionDetailModals({
                         onClose={onCloseGoal}
                         goal={selectedGoal}
                         onUpdate={onUpdateGoal}
+                        onToggleCompletion={onToggleGoalCompletion}
                         activityDefinitions={activities}
                         rootId={rootId}
                         onAssociationsChanged={onGoalAssociationsChanged}

@@ -388,6 +388,7 @@ class GoalUpdateSchema(BaseModel):
 class GoalCompletionUpdateSchema(BaseModel):
     """Schema for toggling or explicitly setting goal completion."""
     completed: Optional[bool] = None
+    session_id: Optional[str] = None
 
 
 class GoalTargetCreateSchema(BaseModel):

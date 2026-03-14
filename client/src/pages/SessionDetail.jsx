@@ -45,6 +45,7 @@ function SessionDetailContent() {
         setSidePaneMode,
         localSessionData,
         updateGoal,
+        toggleGoalCompletion,
         calculateTotalDuration,
         showDeleteConfirm,
         setShowDeleteConfirm,
@@ -159,6 +160,9 @@ function SessionDetailContent() {
                 selectedGoal={selectedGoal}
                 onCloseGoal={() => setSelectedGoal(null)}
                 onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
+                onToggleGoalCompletion={(goalId, currentStatus) =>
+                    toggleGoalCompletion({ goalId, completed: !currentStatus })
+                }
                 onGoalAssociationsChanged={handleGoalAssociationsChanged}
                 showAssociationModal={showAssociationModal}
                 onCloseAssociationModal={() => setShowAssociationModal(false)}
