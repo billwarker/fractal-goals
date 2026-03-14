@@ -51,10 +51,18 @@
     width: 100%;
 }
 
+.titleMain {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
 .title {
     font-weight: 600;
     font-size: 14px;
     color: var(--target-card-accent, var(--color-text-primary));
+    min-width: 0;
 }
 
 .headerControls {
@@ -69,6 +77,7 @@
     color: var(--target-card-accent, var(--color-text-primary));
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .description {

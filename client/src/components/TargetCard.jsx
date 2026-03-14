@@ -67,13 +67,15 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
         >
             <div className={styles.header}>
                 <div className={styles.titleRow}>
-                    <div className={styles.title}>
-                        {activityDef.name}
-                    </div>
-                    <div className={styles.headerControls}>
+                    <div className={styles.titleMain}>
                         <span className={styles.iconWrap}>
                             {statusObj.icon}
                         </span>
+                        <div className={styles.title}>
+                            {activityDef.name}
+                        </div>
+                    </div>
+                    <div className={styles.headerControls}>
                         {isEditMode && onEdit && (
                             <button
                                 onClick={(e) => {
