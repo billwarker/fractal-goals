@@ -347,12 +347,12 @@ class SessionService:
 
     @staticmethod
     def _session_duration_seconds_from_row(total_duration_seconds, duration_minutes, session_start, session_end) -> int:
+        if session_start is not None and session_end is not None:
+            return max(0, int((session_end - session_start).total_seconds()))
         if total_duration_seconds is not None:
             return max(0, int(total_duration_seconds))
         if duration_minutes is not None:
             return max(0, int(duration_minutes * 60))
-        if session_start is not None and session_end is not None:
-            return max(0, int((session_end - session_start).total_seconds()))
         return 0
 
     def _apply_duration_filter(self, query, filters: JsonDict):

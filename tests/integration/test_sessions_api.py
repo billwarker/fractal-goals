@@ -229,6 +229,24 @@ class TestSessionListEndpoints:
         data = json.loads(response.data)
         assert [session['id'] for session in data['sessions']] == [short_session.id]
 
+    def test_list_sessions_duration_filter_prefers_wall_clock_when_stored_duration_is_stale(
+        self, authed_client, db_session, sample_practice_session
+    ):
+        """Duration filtering should match the UI's displayed wall-clock duration when available."""
+        root_id = sample_practice_session.root_id
+        sample_practice_session.session_start = datetime(2026, 2, 21, 18, 33, tzinfo=timezone.utc)
+        sample_practice_session.session_end = datetime(2026, 2, 21, 19, 35, tzinfo=timezone.utc)
+        sample_practice_session.total_duration_seconds = 45 * 60
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions?duration_operator=lt&duration_minutes=60'
+        )
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        assert sample_practice_session.id not in [session['id'] for session in data['sessions']]
+
     def test_session_heatmap_returns_reverse_chronological_daily_counts(
         self, authed_client, db_session, sample_practice_session
     ):
