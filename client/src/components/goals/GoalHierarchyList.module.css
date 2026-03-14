@@ -4,6 +4,11 @@
 }
 
 .sessionList {
+    --tree-indent: 28px;
+    --icon-size: 16px;
+    --icon-center: calc(var(--icon-size) / 2);
+    --tree-row-height: 28px;
+    --tree-item-pad-y: 6px;
     gap: 0;
 }
 
@@ -17,14 +22,67 @@
     font-size: 13px;
 }
 
-.sessionNode {
+.sessionTreeRoot,
+.sessionTreeChildren {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.sessionTreeChildren {
+    margin: 0;
+    padding-left: var(--tree-indent);
+}
+
+.sessionTreeItem {
+    position: relative;
+    margin: 0;
+    padding: var(--tree-item-pad-y) 0;
+}
+
+.sessionTreeItemNested::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * (var(--tree-row-height) + var(--tree-item-pad-y) - var(--icon-center)));
+    bottom: calc(-1 * var(--tree-item-pad-y));
+    left: calc(-1 * (var(--tree-indent) - var(--icon-center)));
+    width: 1px;
+    background: var(--color-border);
+}
+
+.sessionTreeItemNested:last-child::before {
+    bottom: auto;
+    height: calc(var(--tree-row-height) + (var(--tree-item-pad-y) * 2));
+}
+
+.sessionTreeNode {
+    position: relative;
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 6px 0;
-    position: relative;
-    min-height: 28px;
+    min-height: var(--tree-row-height);
     width: 100%;
+}
+
+.sessionTreeNodeNested::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: calc(-1 * (var(--tree-indent) - var(--icon-center)));
+    width: var(--tree-indent);
+    height: 1px;
+    background: var(--color-border);
+    z-index: 0;
+}
+
+.sessionIconSlot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--icon-size);
+    min-width: var(--icon-size);
+    z-index: 1;
 }
 
 .sessionNodeActive {
@@ -36,8 +94,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 16px;
-    margin-top: 1px;
+    min-height: var(--icon-size);
 }
 
 .sessionNodeName {
@@ -161,4 +218,20 @@
     justify-content: center;
     font-size: 10px;
     color: white;
+}
+
+@media (max-width: 768px) {
+    .sessionTreeChildren {
+        --tree-indent: 24px;
+        padding-left: var(--tree-indent);
+    }
+
+    .sessionTreeItemNested::before {
+        left: calc(-1 * (var(--tree-indent) - var(--icon-center)));
+    }
+
+    .sessionTreeNodeNested::before {
+        left: calc(-1 * (var(--tree-indent) - var(--icon-center)));
+        width: var(--tree-indent);
+    }
 }

@@ -5,6 +5,48 @@ import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import styles from './GoalHierarchyList.module.css';
 
+function buildSessionHierarchyTree(nodes) {
+    const nodeMap = new Map();
+    const roots = [];
+
+    nodes.forEach((node, index) => {
+        if (!node?.id) {
+            return;
+        }
+
+        nodeMap.set(node.id, {
+            ...node,
+            originalIndex: index,
+            children: [],
+        });
+    });
+
+    nodes.forEach((node) => {
+        if (!node?.id) {
+            return;
+        }
+
+        const current = nodeMap.get(node.id);
+        const parent = node.parent_id ? nodeMap.get(node.parent_id) : null;
+
+        if (parent) {
+            parent.children.push(current);
+        } else {
+            roots.push(current);
+        }
+    });
+
+    const sortChildren = (treeNode) => {
+        treeNode.children.sort((a, b) => a.originalIndex - b.originalIndex);
+        treeNode.children.forEach(sortChildren);
+    };
+
+    roots.sort((a, b) => a.originalIndex - b.originalIndex);
+    roots.forEach(sortChildren);
+
+    return roots;
+}
+
 function GoalHierarchyList({
     nodes = [],
     variant = 'session',
@@ -95,57 +137,67 @@ function GoalHierarchyList({
         );
     }
 
-    return (
-        <div className={`${styles.list} ${styles.sessionList}`}>
-            {nodes.map((node, index) => {
+    const treeRoots = buildSessionHierarchyTree(nodes);
+
+    const renderSessionTreeNodes = (treeNodes, isNestedLevel = false) => (
+        <ul className={isNestedLevel ? styles.sessionTreeChildren : styles.sessionTreeRoot}>
+            {treeNodes.map((node) => {
                 const isCompleted = node.status
                     ? Boolean(node.status.completed)
                     : Boolean(node.completed);
+                const isNestedNode = isNestedLevel;
 
                 return (
-                    <div
-                        key={node.id || `session-node-${index}`}
-                        className={`${styles.sessionNode} ${node.isLinked ? styles.sessionNodeActive : ''}`}
-                        style={{ paddingLeft: `${node.depth * 28}px` }}
+                    <li
+                        key={node.id}
+                        className={`${styles.sessionTreeItem} ${isNestedNode ? styles.sessionTreeItemNested : ''} ${node.children.length > 0 ? styles.sessionTreeItemHasChildren : ''}`}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', height: '16px', minWidth: '16px' }}>
-                            <GoalIcon
-                                shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
-                                color={isCompleted ? completedColor : getGoalColor(node.type)}
-                                secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
-                                isSmart={node.is_smart}
-                                size={16}
-                            />
-                        </div>
-                        <div className={styles.sessionNodeContent}>
-                            <span
-                                className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''}`}
-                                onClick={() => handleGoalClick(node)}
-                            >
-                                {node.name}
-                            </span>
-                            {onStartSubGoalCreation && canAddChild(node.type) && (
-                                <button
-                                    className={styles.addSubGoalBtn}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
-                                            onAddTargetForGoal(node);
-                                            return;
-                                        }
-                                        onStartSubGoalCreation(node);
-                                    }}
-                                    title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
+                        <div
+                            className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''} ${isNestedNode ? styles.sessionTreeNodeNested : ''}`}
+                        >
+                            <div className={styles.sessionIconSlot}>
+                                <GoalIcon
+                                    shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
+                                    color={isCompleted ? completedColor : getGoalColor(node.type)}
+                                    secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
+                                    isSmart={node.is_smart}
+                                    size={16}
+                                />
+                            </div>
+                            <div className={styles.sessionNodeContent}>
+                                <span
+                                    className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''}`}
+                                    onClick={() => handleGoalClick(node)}
                                 >
-                                    +
-                                </button>
-                            )}
+                                    {node.name}
+                                </span>
+                                {onStartSubGoalCreation && canAddChild(node.type) && (
+                                    <button
+                                        className={styles.addSubGoalBtn}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
+                                                onAddTargetForGoal(node);
+                                                return;
+                                            }
+                                            onStartSubGoalCreation(node);
+                                        }}
+                                        title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
+                                    >
+                                        +
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+
+                        {node.children.length > 0 ? renderSessionTreeNodes(node.children, true) : null}
+                    </li>
                 );
             })}
-        </div>
+        </ul>
     );
+
+    return <div className={`${styles.list} ${styles.sessionList}`}>{renderSessionTreeNodes(treeRoots)}</div>;
 }
 
 export default GoalHierarchyList;
