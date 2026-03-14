@@ -68,13 +68,13 @@ const NavigationHeader = ({ onOpenSettings }) => {
     // Only show nav if we're on a fractal page
     if (!rootId || rootId === '') return null;
 
-    const navItems = [
+    const primaryNavItems = [
         { path: `/${rootId}/goals`, label: 'GOALS' },
         { path: `/${rootId}/programs`, label: 'PROGRAMS' },
         { path: `/${rootId}/sessions`, label: 'SESSIONS' },
-        { path: `/${rootId}/analytics`, label: 'ANALYTICS' },
-        { path: `/${rootId}/logs`, label: 'LOGS' }
+        { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
     ];
+    const logsNavItem = { path: `/${rootId}/logs`, label: 'LOGS' };
 
     const isActive = (path) => location.pathname.startsWith(path);
 
@@ -94,7 +94,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
 
                     <div className={styles.mobileControlsRow}>
 
-                        {navItems.map(item => (
+                        {primaryNavItems.map(item => (
                             <button
                                 key={item.path}
                                 className={`nav-text-link ${styles.mobileBtn} ${isActive(item.path) ? 'active' : ''}`}
@@ -103,6 +103,13 @@ const NavigationHeader = ({ onOpenSettings }) => {
                                 {item.label}
                             </button>
                         ))}
+
+                        <button
+                            className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
+                            onClick={() => navigate(logsNavItem.path)}
+                        >
+                            {logsNavItem.label}
+                        </button>
 
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={onOpenSettings}>
                             SETTINGS
@@ -131,7 +138,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
                         + ADD SESSION
                     </button>
 
-                    {navItems.map(item => (
+                    {primaryNavItems.map(item => (
                         <button
                             key={item.path}
                             className={`nav-text-link ${isActive(item.path) ? 'active' : ''}`}
@@ -151,6 +158,14 @@ const NavigationHeader = ({ onOpenSettings }) => {
                             {headerActions}
                         </>
                     )}
+
+                    <div className={`nav-separator ${styles.navSeparator}`}></div>
+                    <button
+                        className={`nav-text-link ${isActive(logsNavItem.path) ? 'active' : ''}`}
+                        onClick={() => navigate(logsNavItem.path)}
+                    >
+                        {logsNavItem.label}
+                    </button>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button className="nav-text-link" onClick={onOpenSettings}>
