@@ -12,6 +12,8 @@ import useIsMobile from '../hooks/useIsMobile';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
+import EmptyState from '../components/common/EmptyState';
+import LoadingState from '../components/common/LoadingState';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
@@ -269,8 +271,8 @@ function Sessions() {
 
     if (activitiesLoading || activityGroupsLoading || goalsLoading || !goalTree) {
         return (
-            <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                Loading sessions...
+            <div className="page-container">
+                <LoadingState label="Loading sessions..." />
             </div>
         );
     }
@@ -307,15 +309,14 @@ function Sessions() {
 
                 <div className={styles.sessionsList}>
                     {sessionsLoading || (sessionsFetching && !isFetchingNextPage) ? (
-                        <div className={styles.loadingContainer}>
-                            <p className={styles.loadingText}>Loading session data...</p>
-                        </div>
+                        <LoadingState label="Loading session data..." className={styles.loadingContainer} />
                     ) : visibleSessions.length === 0 ? (
-                        <div className={styles.emptyState}>
-                            {hasActiveFilters
+                        <EmptyState
+                            className={styles.emptyState}
+                            description={hasActiveFilters
                                 ? 'No sessions match the current filters.'
                                 : 'No sessions found. Start by clicking "+ ADD SESSION" in the navigation.'}
-                        </div>
+                        />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {visibleSessions.map((session) => (

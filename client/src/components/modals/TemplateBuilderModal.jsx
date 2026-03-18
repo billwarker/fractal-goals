@@ -6,7 +6,11 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import Select from '../atoms/Select';
+import TextArea from '../atoms/TextArea';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
+import EmptyState from '../common/EmptyState';
+import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import {
@@ -367,31 +371,29 @@ function TemplateBuilderModal({
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label className={styles.label}>
-                                Description
-                            </label>
-                            <textarea
+                            <TextArea
+                                label="Description"
                                 value={currentTemplate.description}
                                 onChange={(event) => setCurrentTemplate((previous) => ({ ...previous, description: event.target.value }))}
                                 placeholder="Describe this practice template..."
-                                className={styles.textarea}
+                                fullWidth
                             />
                         </div>
 
                         <div className={styles.sessionMetaGrid}>
                             <div className={styles.formGroup}>
-                                <label className={styles.label}>Session Type</label>
-                                <select
+                                <Select
+                                    label="Session Type"
                                     value={currentTemplate.sessionType}
                                     onChange={(event) => setCurrentTemplate((previous) => ({
                                         ...previous,
                                         sessionType: event.target.value,
                                     }))}
-                                    className={styles.select}
+                                    fullWidth
                                 >
                                     <option value={SESSION_TYPE_NORMAL}>Normal Session</option>
                                     <option value={SESSION_TYPE_QUICK}>Quick Session</option>
-                                </select>
+                                </Select>
                             </div>
 
                             <div className={styles.formGroup}>
@@ -443,48 +445,55 @@ function TemplateBuilderModal({
                                 <div>
                                     <h3 className={styles.sectionListTitle}>Activities</h3>
                                     {currentTemplate.quickActivities.length === 0 ? (
-                                        <div className={styles.emptyState}>
-                                            Add between 1 and 5 activities for this quick session template.
-                                        </div>
+                                        <EmptyState
+                                            className={styles.emptyState}
+                                            description="Add between 1 and 5 activities for this quick session template."
+                                        />
                                     ) : (
                                         <div className={styles.sectionsContainer}>
                                             {currentTemplate.quickActivities.map((activity, activityIndex) => (
                                                 <div key={`${activity.activity_id}-${activityIndex}`} className={styles.sectionCard}>
-                                                    <div className={styles.sectionHeader}>
-                                                        <div className={styles.sectionInfo}>
+                                                    <SectionHeader
+                                                        className={styles.sectionHeader}
+                                                        contentClassName={styles.sectionInfo}
+                                                        title={(
                                                             <div className={styles.sectionTitleRow}>
                                                                 <strong className={styles.sectionName}>{activity.name}</strong>
                                                             </div>
+                                                        )}
+                                                        meta={(
                                                             <p className={styles.sectionMeta}>
                                                                 {activity.type || 'Activity'}
                                                             </p>
-                                                        </div>
-                                                        <div className={styles.sectionControls}>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                onClick={() => handleMoveQuickActivity(activityIndex, 'up')}
-                                                                disabled={activityIndex === 0}
-                                                            >
-                                                                ↑
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                onClick={() => handleMoveQuickActivity(activityIndex, 'down')}
-                                                                disabled={activityIndex === currentTemplate.quickActivities.length - 1}
-                                                            >
-                                                                ↓
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="danger"
-                                                                onClick={() => handleRemoveQuickActivity(activityIndex)}
-                                                            >
-                                                                ×
-                                                            </Button>
-                                                        </div>
-                                                    </div>
+                                                        )}
+                                                        actions={(
+                                                            <div className={styles.sectionControls}>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => handleMoveQuickActivity(activityIndex, 'up')}
+                                                                    disabled={activityIndex === 0}
+                                                                >
+                                                                    ↑
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => handleMoveQuickActivity(activityIndex, 'down')}
+                                                                    disabled={activityIndex === currentTemplate.quickActivities.length - 1}
+                                                                >
+                                                                    ↓
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="danger"
+                                                                    onClick={() => handleRemoveQuickActivity(activityIndex)}
+                                                                >
+                                                                    ×
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    />
                                                 </div>
                                             ))}
                                         </div>
@@ -521,59 +530,66 @@ function TemplateBuilderModal({
                                 <div>
                                     <h3 className={styles.sectionListTitle}>Sections</h3>
                                     {currentTemplate.sections.length === 0 ? (
-                                        <div className={styles.emptyState}>
-                                            No sections yet. Click "Add Section" to start building your template.
-                                        </div>
+                                        <EmptyState
+                                            className={styles.emptyState}
+                                            description='No sections yet. Click "Add Section" to start building your template.'
+                                        />
                                     ) : (
                                         <div className={styles.sectionsContainer}>
                                             {currentTemplate.sections.map((section, sectionIndex) => (
                                                 <div key={sectionIndex} className={styles.sectionCard}>
-                                                    <div className={styles.sectionHeader}>
-                                                        <div className={styles.sectionInfo}>
+                                                    <SectionHeader
+                                                        className={styles.sectionHeader}
+                                                        contentClassName={styles.sectionInfo}
+                                                        title={(
                                                             <div className={styles.sectionTitleRow}>
                                                                 <strong className={styles.sectionName}>{section.name}</strong>
                                                                 <span className={styles.sectionDurationBadge}>
                                                                     {section.duration_minutes} min
                                                                 </span>
                                                             </div>
+                                                        )}
+                                                        meta={(
                                                             <p className={styles.sectionMeta}>
                                                                 {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
                                                             </p>
-                                                        </div>
-                                                        <div className={styles.sectionControls}>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                onClick={() => handleEditSection(sectionIndex)}
-                                                                title="Edit section"
-                                                            >
-                                                                ✎
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                onClick={() => handleMoveSection(sectionIndex, 'up')}
-                                                                disabled={sectionIndex === 0}
-                                                            >
-                                                                ↑
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                onClick={() => handleMoveSection(sectionIndex, 'down')}
-                                                                disabled={sectionIndex === currentTemplate.sections.length - 1}
-                                                            >
-                                                                ↓
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="danger"
-                                                                onClick={() => handleRemoveSection(sectionIndex)}
-                                                            >
-                                                                ×
-                                                            </Button>
-                                                        </div>
-                                                    </div>
+                                                        )}
+                                                        actions={(
+                                                            <div className={styles.sectionControls}>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => handleEditSection(sectionIndex)}
+                                                                    title="Edit section"
+                                                                >
+                                                                    ✎
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => handleMoveSection(sectionIndex, 'up')}
+                                                                    disabled={sectionIndex === 0}
+                                                                >
+                                                                    ↑
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => handleMoveSection(sectionIndex, 'down')}
+                                                                    disabled={sectionIndex === currentTemplate.sections.length - 1}
+                                                                >
+                                                                    ↓
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="danger"
+                                                                    onClick={() => handleRemoveSection(sectionIndex)}
+                                                                >
+                                                                    ×
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    />
 
                                                     <div className={styles.activitiesList}>
                                                         {(section.activities || []).map((activity, activityIndex) => (

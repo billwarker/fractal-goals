@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
+
+import Button from '../atoms/Button';
+import EmptyState from '../common/EmptyState';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import styles from './SelectExistingGoalModal.module.css';
 
-/**
- * Modal for selecting existing immediate goals to attach to session
- */
 function SelectExistingGoalModal({
     isOpen,
     existingImmediateGoals,
     alreadyAddedGoalIds,
     onClose,
-    onConfirm
+    onConfirm,
 }) {
-    const { getGoalColor } = useGoalLevels();;
     const [tempSelectedGoals, setTempSelectedGoals] = useState([]);
 
     const handleConfirm = () => {
@@ -35,17 +35,13 @@ function SelectExistingGoalModal({
             size="md"
         >
             <ModalBody>
-                <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '16px', marginBottom: '16px' }}>
-                    Existing Immediate Goals
-                </h2>
+                <h2 className={styles.heading}>Existing Immediate Goals</h2>
 
                 {existingImmediateGoals.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        <p>No existing immediate goals found.</p>
-                    </div>
+                    <EmptyState description="No existing immediate goals found." />
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
-                        {existingImmediateGoals.map(goal => {
+                    <div className={styles.goalList}>
+                        {existingImmediateGoals.map((goal) => {
                             const isAlreadyAdded = alreadyAddedGoalIds.includes(goal.id);
                             const isSelected = tempSelectedGoals.includes(goal.id);
 
@@ -57,11 +53,11 @@ function SelectExistingGoalModal({
                                     isAlreadyAdded={isAlreadyAdded}
                                     onToggle={() => {
                                         if (!isAlreadyAdded) {
-                                            setTempSelectedGoals(prev =>
+                                            setTempSelectedGoals((prev) => (
                                                 prev.includes(goal.id)
-                                                    ? prev.filter(id => id !== goal.id)
+                                                    ? prev.filter((id) => id !== goal.id)
                                                     : [...prev, goal.id]
-                                            );
+                                            ));
                                         }
                                     }}
                                 />
@@ -69,40 +65,20 @@ function SelectExistingGoalModal({
                         })}
                     </div>
                 )}
-
             </ModalBody>
 
             <ModalFooter>
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: '1px solid #666',
-                            color: '#ccc',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleConfirm}
-                        disabled={tempSelectedGoals.length === 0}
-                        style={{
-                            padding: '10px 20px',
-                            background: tempSelectedGoals.length === 0 ? '#444' : getGoalColor('ImmediateGoal'),
-                            border: 'none',
-                            borderRadius: '6px',
-                            color: tempSelectedGoals.length === 0 ? '#888' : '#1a1a1a',
-                            fontWeight: 'bold',
-                            cursor: tempSelectedGoals.length === 0 ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        Add Selected ({tempSelectedGoals.length})
-                    </button>
+                <Button type="button" onClick={handleClose} variant="secondary">
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={tempSelectedGoals.length === 0}
+                    variant="primary"
+                >
+                    Add Selected ({tempSelectedGoals.length})
+                </Button>
             </ModalFooter>
         </Modal>
     );
@@ -110,66 +86,42 @@ function SelectExistingGoalModal({
 
 function GoalSelectionCard({ goal, isSelected, isAlreadyAdded, onToggle }) {
     const { getGoalColor } = useGoalLevels();
+    const goalColor = getGoalColor('ImmediateGoal');
+
     return (
-        <div
+        <button
+            type="button"
             onClick={onToggle}
+            className={`${styles.goalCard} ${isAlreadyAdded ? styles.goalCardDisabled : ''}`}
             style={{
-                background: isSelected ? '#2a4a2a' : '#1e1e1e',
-                border: `2px solid ${isSelected ? getGoalColor('ImmediateGoal') : (isAlreadyAdded ? '#333' : '#444')}`,
-                borderRadius: '6px',
-                padding: '12px 16px',
-                cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
-                opacity: isAlreadyAdded ? 0.5 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-                if (!isAlreadyAdded && !isSelected) {
-                    e.currentTarget.style.borderColor = getGoalColor('ImmediateGoal');
-                }
-            }}
-            onMouseLeave={(e) => {
-                if (!isAlreadyAdded && !isSelected) {
-                    e.currentTarget.style.borderColor = '#444';
-                }
+                '--goal-color': goalColor,
+                background: isSelected ? `${goalColor}1A` : undefined,
+                borderColor: isSelected ? goalColor : undefined,
             }}
         >
-            <div style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '4px',
-                border: `2px solid ${isSelected ? getGoalColor('ImmediateGoal') : '#666'}`,
-                background: isSelected ? getGoalColor('ImmediateGoal') : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1a1a1a',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                flexShrink: 0
-            }}>
-                {(isSelected || isAlreadyAdded) && '✓'}
+            <div
+                className={`${styles.checkbox} ${(isSelected || isAlreadyAdded) ? styles.checkboxSelected : ''}`}
+                style={{
+                    borderColor: isSelected ? goalColor : undefined,
+                    background: isSelected ? goalColor : undefined,
+                }}
+            >
+                {(isSelected || isAlreadyAdded) ? '✓' : null}
             </div>
 
-            <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected || isAlreadyAdded ? getGoalColor('ImmediateGoal') : '#ccc' }}>
+            <div className={styles.goalContent}>
+                <div className={styles.goalName} style={{ color: (isSelected || isAlreadyAdded) ? goalColor : undefined }}>
                     {goal.name}
-                    {isAlreadyAdded && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>(Already added)</span>}
+                    {isAlreadyAdded ? <span className={styles.alreadyAdded}>(Already added)</span> : null}
                 </div>
-                {goal.description && (
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        {goal.description}
+                {goal.description ? <div className={styles.goalDescription}>{goal.description}</div> : null}
+                {goal.deadline ? (
+                    <div className={styles.goalDeadline}>
+                        {new Date(goal.deadline).toLocaleDateString()}
                     </div>
-                )}
-                {goal.deadline && (
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                        📅 {new Date(goal.deadline).toLocaleDateString()}
-                    </div>
-                )}
+                ) : null}
             </div>
-        </div>
+        </button>
     );
 }
 

@@ -1,0 +1,26 @@
+.container {
+    text-align: center;
+}
+
+.button {
+    min-width: 260px;
+    margin-bottom: 24px;
+}
+
+.summary {
+    margin-top: 24px;
+    color: var(--color-text-muted);
+    font-size: 15px;
+}
+
+.summaryLine {
+    font-size: 16px;
+}
+
+.primaryText {
+    color: var(--color-text-primary);
+}
+
+.accentText {
+    color: var(--color-brand-primary);
+}

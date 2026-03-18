@@ -1,4 +1,7 @@
 import React, { useMemo } from 'react';
+import EmptyState from '../common/EmptyState';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
+import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
 import styles from './ProgramDayPicker.module.css';
 
@@ -39,25 +42,19 @@ function ProgramDayPicker({
 
     if (programDays.length === 0) {
         return (
-            <div className={styles.container}>
+            <StepContainer>
                 <StepHeader stepNumber={1} title="Select a Day from Your Program" />
-                <div className={styles.emptyStateContent}>
-                    <p className={styles.emptyStateText}>No active program days available for today</p>
-                    {hasTemplates && (
-                        <button
-                            onClick={onSwitchToTemplate}
-                            className={styles.activeButton}
-                        >
-                            Select Template Instead
-                        </button>
-                    )}
-                </div>
-            </div>
+                <EmptyState
+                    description="No active program days available for today."
+                    actionLabel={hasTemplates ? 'Select Template Instead' : undefined}
+                    onAction={hasTemplates ? onSwitchToTemplate : undefined}
+                />
+            </StepContainer>
         );
     }
 
     return (
-        <div className={styles.container}>
+        <StepContainer>
             <StepHeader
                 stepNumber={1}
                 title={groupedDays.length === 1
@@ -78,7 +75,7 @@ function ProgramDayPicker({
                     />
                 ))}
             </div>
-        </div>
+        </StepContainer>
     );
 }
 
@@ -124,7 +121,6 @@ function BlockGroup({
                                 <SessionList
                                     sessions={programDay.sessions}
                                     selectedSession={selectedProgramSession}
-                                    blockColor={programDay.block_color}
                                     onSelectSession={onSelectProgramSession}
                                 />
                             )}
@@ -159,7 +155,11 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
 
                 {!hasMultipleSessions && (
                     <div className={styles.templateNameBadge}>
-                        {programDay.sessions[0].template_name}
+                        <SessionTemplateNameBadge
+                            name={programDay.sessions[0].template_name}
+                            color={programDay.sessions[0].template_color}
+                            size="sm"
+                        />
                     </div>
                 )}
 
@@ -173,7 +173,7 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
     );
 }
 
-function SessionList({ sessions, selectedSession, blockColor, onSelectSession }) {
+function SessionList({ sessions, selectedSession, onSelectSession }) {
     return (
         <div className={styles.sessionListContainer}>
             <div className={styles.sessionListTitle}>

@@ -8,6 +8,8 @@ import Button from '../atoms/Button';
 import styles from './ProgramBlockView.module.css';
 import { useState } from 'react';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
+import EmptyState from '../common/EmptyState';
+import MetaField from '../common/MetaField';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
@@ -55,7 +57,12 @@ function ProgramBlockView({
     };
 
     if (!blocks || blocks.length === 0) {
-        return <div className={styles.emptyState}>No blocks defined. Switch to Calendar to add blocks.</div>;
+        return (
+            <EmptyState
+                className={styles.emptyState}
+                description="No blocks defined. Switch to Calendar to add blocks."
+            />
+        );
     }
 
     return (
@@ -68,6 +75,8 @@ function ProgramBlockView({
                 const start = moment(block.start_date);
                 const end = moment(block.end_date);
                 const durationDays = end.diff(start, 'days') + 1;
+                const blockIsActive = isBlockActive(block);
+                const daysRemaining = Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'));
 
                 return (
                     <Card
@@ -80,18 +89,28 @@ function ProgramBlockView({
                         <div className={styles.mainContent}>
                             {/* Block Info Section */}
                             <div className={styles.blockInfo}>
-                                {/* Row 1: Name, Badge, Dates, Days Remaining */}
                                 <div className={styles.blockHeaderRow}>
-                                    <h3 className={styles.blockName}>{block.name}</h3>
-                                    {isBlockActive(block) && <ActiveBlockBadge />}
-
-                                    <div className={styles.metaRow}>
-                                        <span>{formatDate(block.start_date)} - {formatDate(block.end_date)} • {durationDays} Days</span>
-                                        {isBlockActive(block) && (
-                                            <span style={{ color: block.color || '#3A86FF', fontWeight: 600 }}>
-                                                • {Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'))} Days Remaining
-                                            </span>
-                                        )}
+                                    <div className={styles.blockTitleGroup}>
+                                        <h3 className={styles.blockName}>{block.name}</h3>
+                                        {blockIsActive && <ActiveBlockBadge />}
+                                    </div>
+                                    <div className={styles.blockMetaGrid}>
+                                        <MetaField
+                                            label="Dates"
+                                            value={`${formatDate(block.start_date)} - ${formatDate(block.end_date)}`}
+                                        />
+                                        <MetaField
+                                            label="Duration"
+                                            value={`${durationDays} Days`}
+                                        />
+                                        {blockIsActive ? (
+                                            <MetaField
+                                                label="Remaining"
+                                                value={`${daysRemaining} Days`}
+                                                emphasize
+                                                valueClassName={styles.blockRemainingValue}
+                                            />
+                                        ) : null}
                                     </div>
                                 </div>
 

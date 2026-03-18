@@ -1,0 +1,22 @@
+.emptyState {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.description {
+    margin: 0;
+    max-width: 42ch;
+    font-size: 14px;
+    line-height: 1.5;
+}

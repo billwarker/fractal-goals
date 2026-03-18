@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
+import MetaField from '../common/MetaField';
+import SectionHeader from '../common/SectionHeader';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
@@ -135,19 +137,30 @@ const SessionSection = ({
             onDrop={handleDrop}
             className={`${styles.sectionContainer} ${isDragOver ? styles.sectionContainerDragOver : ''}`}
         >
-            <div className={styles.sectionHeader}>
-                <Heading level={3} className={styles.sectionTitle}>
-                    {section.name || `Section ${sectionIndex + 1}`}
-                </Heading>
-                <div className={styles.sectionDuration}>
-                    Duration: <span className={styles.durationValue}>
-                        {formatClockDuration(calculateSectionDurationFromInstanceIds(section, activityInstances))}
-                    </span>
-                    <span className={styles.durationPlanned}>
-                        (planned: {section.estimated_duration_minutes || '—'} min)
-                    </span>
-                </div>
-            </div>
+            <SectionHeader
+                className={styles.sectionHeader}
+                title={(
+                    <Heading level={3} className={styles.sectionTitle}>
+                        {section.name || `Section ${sectionIndex + 1}`}
+                    </Heading>
+                )}
+                meta={(
+                    <MetaField
+                        className={styles.sectionDurationField}
+                        label="Duration"
+                        value={(
+                            <span className={styles.sectionDuration}>
+                                <span className={styles.durationValue}>
+                                    {formatClockDuration(calculateSectionDurationFromInstanceIds(section, activityInstances))}
+                                </span>
+                                <span className={styles.durationPlanned}>
+                                    (planned: {section.estimated_duration_minutes || '—'} min)
+                                </span>
+                            </span>
+                        )}
+                    />
+                )}
+            />
 
             <div className={styles.activitiesContainer}>
                 {section.activity_ids?.map((instanceId) => {

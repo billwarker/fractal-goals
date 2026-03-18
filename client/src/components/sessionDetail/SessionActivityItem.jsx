@@ -10,6 +10,7 @@ import { fractalApi } from '../../utils/api';
 import { getGroupBreadcrumb } from '../../utils/manageActivities';
 import notify from '../../utils/notify';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
+import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
 import GoalIcon from '../atoms/GoalIcon';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
@@ -568,10 +569,15 @@ function SessionActivityItem({
 
                                 {/* Duration Display */}
                                 <div className={styles.timerFieldContainer}>
-                                    <label className={styles.timerLabel}>Duration</label>
-                                    <div className={`${styles.durationDisplay} ${(exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive}`}>
-                                        {formatDuration(realtimeDuration)}
-                                    </div>
+                                    <MetaField
+                                        className={styles.durationMetaField}
+                                        label="Duration"
+                                        value={formatDuration(realtimeDuration)}
+                                        valueClassName={[
+                                            styles.durationDisplay,
+                                            (exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive,
+                                        ].join(' ')}
+                                    />
                                 </div>
                             </div>
 

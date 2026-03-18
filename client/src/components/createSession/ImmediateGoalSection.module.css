@@ -1,0 +1,118 @@
+.container {
+    background: var(--color-bg-card-alt);
+    padding: 12px 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.sectionLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.sectionLabelIcon {
+    color: var(--goal-color);
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.listWithGap {
+    margin-bottom: 12px;
+}
+
+.goalRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    color: inherit;
+    text-align: left;
+}
+
+.goalRow:hover {
+    border-color: var(--goal-color-soft-border);
+    background: var(--color-bg-card-hover);
+}
+
+.checkbox {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    border: 2px solid var(--color-border-hover);
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.checkboxSelected {
+    color: #1a1a1a;
+}
+
+.goalContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.goalName {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.goalMeta {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.doneText {
+    font-size: 11px;
+    color: var(--color-brand-success);
+}
+
+.addButton {
+    margin-top: 12px;
+    border-style: dashed;
+    border-color: var(--goal-color-soft-border);
+    color: var(--goal-color);
+}
+
+.newGoalCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--goal-color-soft);
+    border: 1px solid var(--goal-color);
+    border-radius: 4px;
+}
+
+.newGoalBadge {
+    font-size: 12px;
+    color: var(--color-brand-success);
+}
+
+.newGoalName {
+    font-size: 13px;
+    color: var(--goal-color);
+}
+
+.removeButton {
+    min-width: 32px;
+}

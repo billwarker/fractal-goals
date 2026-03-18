@@ -5,6 +5,7 @@ import { useActiveSessionActions, useActiveSessionData } from '../../contexts/Ac
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
+import EmptyState from '../common/EmptyState';
 import MetaField from '../common/MetaField';
 import SessionCompletionButton from '../common/SessionCompletionButton';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
@@ -159,9 +160,10 @@ function QuickSessionWorkspace({
 
                 <div className={styles.bodySection}>
                     {orderedInstances.length === 0 ? (
-                        <div className={styles.emptyState}>
-                            No activities available for this quick session.
-                        </div>
+                        <EmptyState
+                            className={styles.emptyState}
+                            description="No activities available for this quick session."
+                        />
                     ) : (
                         <div className={styles.activityList}>
                             {orderedInstances.map((instance) => (

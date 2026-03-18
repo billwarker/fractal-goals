@@ -9,6 +9,7 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import Select from '../atoms/Select';
 import styles from './ProgramDayModal.module.css';
 import { isQuickSession } from '../../utils/sessionRuntime';
 
@@ -205,42 +206,37 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                                     return (
                                         <div key={idx} className={styles.sessionItem}>
                                             <span className={styles.sessionName}>{t ? t.name : 'Unknown Template'}</span>
-                                            <button
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
                                                 onClick={() => {
                                                     const newTids = [...selectedTemplates];
                                                     newTids.splice(idx, 1);
                                                     setSelectedTemplates(newTids);
                                                 }}
                                                 className={styles.removeSessionBtn}
-                                                title="Remove Template"
+                                                aria-label="Remove Template"
                                             >
                                                 &times;
-                                            </button>
+                                            </Button>
                                         </div>
                                     );
                                 })}
                             </div>
 
                             <div className={styles.sessionActions}>
-                                <select
+                                <Select
                                     value=""
                                     onChange={handleAddTemplate}
                                     className={styles.templateSelect}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        background: 'var(--color-bg-input)',
-                                        border: '1px solid var(--color-border)',
-                                        color: 'var(--color-text-primary)',
-                                        borderRadius: 'var(--border-radius-sm)',
-                                        fontSize: '14px'
-                                    }}
+                                    fullWidth
                                 >
                                     <option value="">+ Add Session Template</option>
                                     {availableProgramTemplates.map(t => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
-                                </select>
+                                </Select>
                                 <Button
                                     onClick={() => setShowTemplateBuilder(true)}
                                     size="sm"

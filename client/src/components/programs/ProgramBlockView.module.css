@@ -40,10 +40,19 @@
 
 .blockHeaderRow {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.blockTitleGroup {
+    display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 8px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .blockName {
@@ -53,12 +62,14 @@
     font-weight: 600;
 }
 
-.metaRow {
-    color: var(--color-text-muted);
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.blockMetaGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+    gap: 16px;
+}
+
+.blockRemainingValue {
+    color: var(--color-brand-primary);
 }
 
 .goalList {
@@ -108,10 +119,7 @@
 }
 
 .emptyState {
-    color: var(--color-text-muted);
-    font-style: italic;
     grid-column: 1 / -1;
-    font-size: 13px;
 }
 
 .dayCard {

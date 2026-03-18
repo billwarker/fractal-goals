@@ -1,0 +1,25 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.content {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.title {
+    min-width: 0;
+}
+
+.meta {
+    min-width: 0;
+}
+
+.actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+}

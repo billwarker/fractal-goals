@@ -1,0 +1,49 @@
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+}
+
+.icon {
+    font-size: 32px;
+    margin-bottom: 6px;
+}
+
+.name {
+    color: var(--color-text-primary);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.meta {
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.selectedState {
+    color: var(--color-brand-success);
+    font-size: 14px;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+
+.footer {
+    margin-top: 16px;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+}
+
+.orText {
+    color: var(--color-text-muted);
+    font-size: 13px;
+}

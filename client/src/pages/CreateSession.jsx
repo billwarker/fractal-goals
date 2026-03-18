@@ -14,6 +14,8 @@ import {
     CreateSessionActions,
     QuickSessionCompleteStep,
 } from '../components/createSession';
+import LoadingState from '../components/common/LoadingState';
+import StepContainer from '../components/common/StepContainer';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { isQuickSession } from '../utils/sessionRuntime';
@@ -300,9 +302,7 @@ function CreateSession() {
     if (loading) {
         return (
             <div className="page-container">
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                    <p>Loading...</p>
-                </div>
+                <LoadingState />
             </div>
         );
     }
@@ -369,17 +369,9 @@ function CreateSession() {
                 )}
 
                 {quickTemplateSelected && creating && !activeQuickSessionId && (
-                    <div style={{
-                        background: 'var(--color-bg-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        marginBottom: '24px',
-                        color: 'var(--color-text-muted)',
-                        textAlign: 'center'
-                    }}>
-                        Loading quick session...
-                    </div>
+                    <StepContainer>
+                        <LoadingState label="Loading quick session..." />
+                    </StepContainer>
                 )}
 
                 {quickTemplateSelected && activeQuickSessionId && (

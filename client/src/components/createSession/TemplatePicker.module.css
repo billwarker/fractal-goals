@@ -1,0 +1,40 @@
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+}
+
+.card {
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.identity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.meta {
+    margin-bottom: 8px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.description {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.selectedState {
+    margin-top: auto;
+    padding-top: 8px;
+    color: var(--color-brand-success);
+    font-size: 12px;
+    font-weight: 700;
+}

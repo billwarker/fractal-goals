@@ -32,9 +32,16 @@
 }
 
 .sectionDuration {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
     font-family: var(--font-family-mono);
+}
+
+.sectionDurationField {
+    min-width: 0;
 }
 
 .durationValue {

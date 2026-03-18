@@ -151,6 +151,10 @@
     min-width: 0;
 }
 
+.durationMetaField {
+    min-width: 0;
+}
+
 .timerLabel {
     font-size: 9px;
     color: var(--color-text-muted);

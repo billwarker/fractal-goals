@@ -1,13 +1,12 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+
+import EmptyState from '../common/EmptyState';
+import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
 import ImmediateGoalSection from './ImmediateGoalSection';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import styles from './GoalAssociation.module.css';
 
-/**
- * Step 2: Associate with Goals
- * Displays STGs with selectable checkboxes and nested IGs
- */
 function GoalAssociation({
     goals,
     selectedGoalIds,
@@ -16,17 +15,10 @@ function GoalAssociation({
     onToggleGoal,
     onToggleImmediateGoal,
     onRemoveImmediateGoal,
-    onCreateImmediateGoal
+    onCreateImmediateGoal,
 }) {
-    const { getGoalColor } = useGoalLevels();;
     return (
-        <div style={{
-            background: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '24px'
-        }}>
+        <StepContainer>
             <StepHeader
                 stepNumber={2}
                 title="Associate with Goals"
@@ -34,38 +26,26 @@ function GoalAssociation({
             />
 
             {goals.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                    <p>No short-term goals found. Create goals in the Goals page first.</p>
-                </div>
+                <EmptyState description="No short-term goals found. Create goals in the Goals page first." />
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {goals.map(stg => {
+                <div className={styles.list}>
+                    {goals.map((stg) => {
                         const isSelected = selectedGoalIds.includes(stg.id);
                         const stgImmediateGoals = stg.immediateGoals || [];
-                        const newGoalsForSTG = immediateGoals.filter(g => g.parent_id === stg.id);
-                        const hasImmediateGoals = stgImmediateGoals.length > 0;
-                        const hasNewGoals = newGoalsForSTG.length > 0;
+                        const newGoalsForSTG = immediateGoals.filter((goal) => goal.parent_id === stg.id);
+                        const hasImmediateGoals = stgImmediateGoals.length > 0 || newGoalsForSTG.length > 0;
 
                         return (
-                            <div key={stg.id} style={{
-                                border: `2px solid ${isSelected ? getGoalColor('ShortTermGoal') : 'var(--color-border)'}`,
-                                borderRadius: '8px',
-                                overflow: 'hidden',
-                                transition: 'all 0.2s'
-                            }}>
-                                {/* Short-Term Goal Header */}
-                                <ShortTermGoalHeader
-                                    stg={stg}
-                                    isSelected={isSelected}
-                                    totalImmediateCount={stgImmediateGoals.length + newGoalsForSTG.length}
-                                    hasImmediateGoals={hasImmediateGoals || hasNewGoals}
-                                    onClick={() => onToggleGoal(stg.id)}
-                                />
-
-                                {/* Immediate Goals Section - Show when STG is selected */}
-                                {isSelected && (
+                            <GoalCard
+                                key={stg.id}
+                                stg={stg}
+                                isSelected={isSelected}
+                                totalImmediateCount={stgImmediateGoals.length + newGoalsForSTG.length}
+                                hasImmediateGoals={hasImmediateGoals}
+                                onToggle={() => onToggleGoal(stg.id)}
+                            >
+                                {isSelected ? (
                                     <ImmediateGoalSection
-                                        stgId={stg.id}
                                         existingImmediateGoals={stgImmediateGoals}
                                         newImmediateGoals={newGoalsForSTG}
                                         selectedImmediateGoalIds={selectedImmediateGoalIds}
@@ -73,68 +53,56 @@ function GoalAssociation({
                                         onRemoveNewGoal={onRemoveImmediateGoal}
                                         onCreateNewGoal={() => onCreateImmediateGoal(stg)}
                                     />
-                                )}
-                            </div>
+                                ) : null}
+                            </GoalCard>
                         );
                     })}
                 </div>
             )}
-        </div>
+        </StepContainer>
     );
 }
 
-function ShortTermGoalHeader({ stg, isSelected, totalImmediateCount, hasImmediateGoals, onClick }) {
-    const { getGoalColor } = useGoalLevels();;
+function GoalCard({ stg, isSelected, totalImmediateCount, hasImmediateGoals, onToggle, children }) {
+    const { getGoalColor } = useGoalLevels();
+    const goalColor = getGoalColor('ShortTermGoal');
+
     return (
         <div
-            onClick={onClick}
-            style={{
-                background: isSelected ? `${getGoalColor('ShortTermGoal')}1A` : 'var(--color-bg-input)', // or card-alt
-                padding: '14px 16px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-            }}
+            className={styles.goalCard}
+            style={{ borderColor: isSelected ? goalColor : undefined }}
         >
-            <div style={{
-                width: '22px',
-                height: '22px',
-                borderRadius: '4px',
-                border: `2px solid ${isSelected ? getGoalColor('ShortTermGoal') : '#666'}`,
-                background: isSelected ? getGoalColor('ShortTermGoal') : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#1a1a1a',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                flexShrink: 0
-            }}>
-                {isSelected && '✓'}
-            </div>
-            <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? getGoalColor('ShortTermGoal') : 'var(--color-text-primary)' }}>
-                    {stg.name}
+            <button
+                type="button"
+                onClick={onToggle}
+                className={`${styles.goalHeader} ${isSelected ? styles.goalHeaderSelected : ''}`}
+                style={{
+                    '--goal-color': goalColor,
+                    background: isSelected ? `${goalColor}1A` : undefined,
+                }}
+            >
+                <div
+                    className={`${styles.checkbox} ${isSelected ? styles.checkboxSelected : ''}`}
+                    style={{
+                        borderColor: isSelected ? goalColor : undefined,
+                        background: isSelected ? goalColor : undefined,
+                    }}
+                >
+                    {isSelected ? '✓' : null}
                 </div>
-                {stg.description && (
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        {stg.description}
+                <div className={styles.goalText}>
+                    <div className={styles.goalName} style={{ color: isSelected ? goalColor : undefined }}>
+                        {stg.name}
                     </div>
-                )}
-            </div>
-            {hasImmediateGoals && (
-                <div style={{
-                    fontSize: '11px',
-                    color: 'var(--color-text-muted)',
-                    padding: '2px 8px',
-                    background: 'var(--color-bg-card)',
-                    borderRadius: '10px',
-                    border: '1px solid var(--color-border)'
-                }}>
-                    {totalImmediateCount} immediate goal{totalImmediateCount !== 1 ? 's' : ''}
+                    {stg.description ? <div className={styles.goalDescription}>{stg.description}</div> : null}
                 </div>
-            )}
+                {hasImmediateGoals ? (
+                    <div className={styles.immediateCount}>
+                        {totalImmediateCount} immediate goal{totalImmediateCount !== 1 ? 's' : ''}
+                    </div>
+                ) : null}
+            </button>
+            {children}
         </div>
     );
 }

@@ -6,6 +6,7 @@
  */
 
 import React, { memo, useMemo } from 'react';
+import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import styles from './ExerciseCard.module.css';
 
@@ -52,7 +53,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
         });
 
         return (
-            <div className={styles.setRow} style={{ alignItems: 'start' }}>
+            <div className={`${styles.setRow} ${styles.setRowStart}`}>
                 <span className={`${styles.setLabel} ${styles.setLabelWithTopPadding}`}>
                     SET {setIdx + 1}
                 </span>
@@ -148,10 +149,12 @@ const ExerciseCard = memo(function ExerciseCard({
         <div className={`${styles.exerciseCard} ${isActivity ? styles.exerciseCardActivity : ''}`}>
             {/* Header */}
             <div className={styles.exerciseHeader}>
-                <span className={`${styles.completionIcon} ${exercise.completed ? styles.completionIconCompleted : ''}`}>
-                    {exercise.completed ? '✓' : '○'}
-                </span>
-                <div style={{ flex: 1 }}>
+                {exercise.completed ? (
+                    <CompletionCheckBadge className={styles.completionBadge} label="Completed activity" />
+                ) : (
+                    <span className={styles.completionIcon} aria-hidden="true">○</span>
+                )}
+                <div className={styles.content}>
                     <div className={styles.exerciseTitleRow}>
                         <div className={styles.exerciseName}>
                             {exercise.name}

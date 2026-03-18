@@ -1,0 +1,15 @@
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accomplishment-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accomplishment-color) 45%, transparent);
+}
+
+.text {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.3;
+}

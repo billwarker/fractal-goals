@@ -11,9 +11,9 @@ import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import { isSMART } from '../../utils/smartHelpers';
-import GoalIcon from '../atoms/GoalIcon';
 import CardCornerActionButton from '../common/CardCornerActionButton';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
+import GoalAccomplishmentChip from '../common/GoalAccomplishmentChip';
 import MetaField from '../common/MetaField';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import SessionSectionGrid from './SessionSectionGrid';
@@ -109,37 +109,25 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                     const goalSecondaryColor = getGoalSecondaryColor(goal);
 
                     return (
-                        <div
+                        <GoalAccomplishmentChip
                             key={getGoalId(goal) || `${goalType}-${getGoalName(goal)}`}
                             className={styles.accomplishmentChip}
-                            style={{ '--accomplishment-color': goalColor }}
-                        >
-                            <GoalIcon
-                                shape={getGoalIcon(goal)}
-                                color={goalColor}
-                                secondaryColor={goalSecondaryColor}
-                                isSmart={isSMART(goal)}
-                                size={16}
-                            />
-                            <span className={styles.accomplishmentText}>{getGoalName(goal)}</span>
-                        </div>
+                            label={getGoalName(goal)}
+                            color={goalColor}
+                            secondaryColor={goalSecondaryColor}
+                            shape={getGoalIcon(goal)}
+                            isSmart={isSMART(goal)}
+                        />
                     );
                 })}
                 {hasNanoGoals && (
-                    <div
+                    <GoalAccomplishmentChip
                         className={styles.accomplishmentChip}
-                        style={{ '--accomplishment-color': getGoalColor('NanoGoal') }}
-                    >
-                        <GoalIcon
-                            shape={getGoalIcon('NanoGoal')}
-                            color={getGoalColor('NanoGoal')}
-                            secondaryColor={getGoalSecondaryColor('NanoGoal')}
-                            size={16}
-                        />
-                        <span className={styles.accomplishmentText}>
-                            {nanoGoalsCompleted} Nano Goal{nanoGoalsCompleted === 1 ? '' : 's'} Completed
-                        </span>
-                    </div>
+                        label={`${nanoGoalsCompleted} Nano Goal${nanoGoalsCompleted === 1 ? '' : 's'} Completed`}
+                        color={getGoalColor('NanoGoal')}
+                        secondaryColor={getGoalSecondaryColor('NanoGoal')}
+                        shape={getGoalIcon('NanoGoal')}
+                    />
                 )}
             </div>
         </div>

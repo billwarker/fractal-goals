@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
+import EmptyState from './EmptyState';
 import styles from './ActivitySelectorPanel.module.css';
 
 const SELECTOR_MODES = {
@@ -237,7 +238,10 @@ export default function ActivitySelectorPanel({
                         </button>
                     ))}
                     {leafActivities.length === 0 && (
-                        <div className={styles.noActivitiesMessage}>No activities found in this group.</div>
+                        <EmptyState
+                            className={styles.noActivitiesMessage}
+                            description="No activities found in this group."
+                        />
                     )}
                 </div>
             )}

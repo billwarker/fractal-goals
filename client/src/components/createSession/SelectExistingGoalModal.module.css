@@ -1,0 +1,87 @@
+.heading {
+    margin: 0 0 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    font-size: 20px;
+}
+
+.goalList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    margin-bottom: 20px;
+    overflow-y: auto;
+}
+
+.goalCard {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 2px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+    color: inherit;
+}
+
+.goalCard:hover:not(.goalCardDisabled) {
+    border-color: var(--goal-color);
+}
+
+.goalCardDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.checkbox {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 2px solid var(--color-text-muted);
+    color: #1a1a1a;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.checkboxSelected {
+    color: #1a1a1a;
+}
+
+.goalContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.goalName {
+    color: var(--color-text-primary);
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.alreadyAdded {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.goalDescription {
+    margin-top: 4px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.goalDeadline {
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
