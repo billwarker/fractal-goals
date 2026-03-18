@@ -10,6 +10,7 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import styles from './ProgramDayModal.module.css';
+import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 
@@ -79,6 +80,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
         },
         enabled: Boolean(rootId),
     });
+    const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
 
     const { data: activities = [] } = useQuery({
         queryKey: queryKeys.activities(rootId),
@@ -235,7 +237,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                                     }}
                                 >
                                     <option value="">+ Add Session Template</option>
-                                    {sessionTemplates.map(t => (
+                                    {availableProgramTemplates.map(t => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
                                 </select>

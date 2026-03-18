@@ -1,64 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import styles from './TemplateBuilderModal.module.css';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
-import ActivitySearchWidget from '../common/ActivitySearchWidget';
+import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
+import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
+import {
+    DEFAULT_TEMPLATE_COLOR,
+    SESSION_TYPE_NORMAL,
+    SESSION_TYPE_QUICK,
+    getSessionRuntimeType,
+    getTemplateColor,
+} from '../../utils/sessionRuntime';
 
-/**
- * Template Builder Modal - Full-screen modal for creating/editing session templates
- */
+const EMPTY_TEMPLATE = {
+    name: '',
+    description: '',
+    sessionType: SESSION_TYPE_NORMAL,
+    templateColor: DEFAULT_TEMPLATE_COLOR,
+    sections: [],
+    quickActivities: [],
+};
+
+function buildActivityPreview(activity) {
+    return {
+        activity_id: activity.id,
+        name: activity.name,
+        type: activity.type,
+    };
+}
+
 function TemplateBuilderModal({
     isOpen,
     onClose,
     onSave,
     editingTemplate,
     activities,
-    activityGroups = [] // New prop for grouping
+    activityGroups = [],
 }) {
-    const [currentTemplate, setCurrentTemplate] = useState({
-        name: '',
-        description: '',
-        sections: []
-    });
+    const [currentTemplate, setCurrentTemplate] = useState(EMPTY_TEMPLATE);
     const [showSectionModal, setShowSectionModal] = useState(false);
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [selectedSectionIndex, setSelectedSectionIndex] = useState(null);
-    const [editingSectionIndex, setEditingSectionIndex] = useState(null); // For editing existing sections
+    const [editingSectionIndex, setEditingSectionIndex] = useState(null);
     const [newSection, setNewSection] = useState({
         name: '',
         duration_minutes: '10',
-        activities: []
+        activities: [],
     });
-    const [selectedActivities, setSelectedActivities] = useState([]);
-    const [selectedGroupId, setSelectedGroupId] = useState(null); // For group selection flow
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
 
-    // Load editing template when modal opens
+    const isExistingTemplate = Boolean(editingTemplate?.id);
+    const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
+    const totalDuration = currentTemplate.sections.reduce((sum, section) => sum + section.duration_minutes, 0);
+
     useEffect(() => {
-        if (isOpen && editingTemplate) {
-            // Migrate old 'exercises' to 'activities' for backward compatibility
-            const sections = (editingTemplate.template_data?.sections || []).map(section => ({
+        if (!isOpen) return;
+
+        if (editingTemplate) {
+            const sections = (editingTemplate.template_data?.sections || []).map((section) => ({
                 ...section,
-                activities: section.activities || section.exercises || []
+                activities: section.activities || section.exercises || [],
             }));
 
             setCurrentTemplate({
-                name: editingTemplate.name,
+                name: editingTemplate.name || '',
                 description: editingTemplate.description || '',
-                sections
+                sessionType: getSessionRuntimeType(editingTemplate),
+                templateColor: getTemplateColor(editingTemplate),
+                sections,
+                quickActivities: editingTemplate.template_data?.activities || [],
             });
-        } else if (isOpen && !editingTemplate) {
-            // Reset for new template
-            setCurrentTemplate({
-                name: '',
-                description: '',
-                sections: []
-            });
+            return;
         }
-    }, [isOpen, editingTemplate]);
+
+        setCurrentTemplate(EMPTY_TEMPLATE);
+    }, [editingTemplate, isOpen]);
+
+    const resetSectionEditor = () => {
+        setEditingSectionIndex(null);
+        setNewSection({ name: '', duration_minutes: '10', activities: [] });
+        setShowSectionModal(false);
+    };
+
+    const resetActivityPicker = () => {
+        setShowActivityModal(false);
+        setSelectedSectionIndex(null);
+    };
 
     const handleAddSection = () => {
         if (!newSection.name.trim()) {
@@ -66,32 +98,30 @@ function TemplateBuilderModal({
             return;
         }
 
-        const duration = parseInt(newSection.duration_minutes) || 10;
+        const duration = parseInt(newSection.duration_minutes, 10) || 10;
         if (duration < 1) {
             setAlertModal({ show: true, title: 'Validation Error', message: 'Duration must be at least 1 minute' });
             return;
         }
 
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: [...currentTemplate.sections, { ...newSection, duration_minutes: duration }]
-        });
-
-        setNewSection({
-            name: '',
-            duration_minutes: '10',
-            activities: []
-        });
-
-        setShowSectionModal(false);
+        setCurrentTemplate((previous) => ({
+            ...previous,
+            sections: [...previous.sections, { ...newSection, duration_minutes: duration }],
+        }));
+        resetSectionEditor();
     };
 
     const handleEditSection = (index) => {
         const section = currentTemplate.sections[index];
+        if (!section) {
+            setAlertModal({ show: true, title: 'Validation Error', message: 'Unable to edit this section.' });
+            return;
+        }
+
         setNewSection({
-            name: section.name,
-            duration_minutes: String(section.duration_minutes),
-            activities: section.activities || []
+            name: section.name || '',
+            duration_minutes: String(section.duration_minutes || 10),
+            activities: section.activities || [],
         });
         setEditingSectionIndex(index);
         setShowSectionModal(true);
@@ -103,31 +133,25 @@ function TemplateBuilderModal({
             return;
         }
 
-        const duration = parseInt(newSection.duration_minutes) || 10;
-        if (duration < 1) {
+        const duration = parseInt(newSection.duration_minutes, 10) || 10;
+        if (duration < 1 || editingSectionIndex === null) {
             setAlertModal({ show: true, title: 'Validation Error', message: 'Duration must be at least 1 minute' });
             return;
         }
 
-        const updatedSections = [...currentTemplate.sections];
-        updatedSections[editingSectionIndex] = {
-            ...updatedSections[editingSectionIndex],
-            name: newSection.name,
-            duration_minutes: duration
-        };
-
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: updatedSections
+        setCurrentTemplate((previous) => {
+            const updatedSections = [...previous.sections];
+            updatedSections[editingSectionIndex] = {
+                ...updatedSections[editingSectionIndex],
+                name: newSection.name,
+                duration_minutes: duration,
+            };
+            return {
+                ...previous,
+                sections: updatedSections,
+            };
         });
-
-        setNewSection({
-            name: '',
-            duration_minutes: '10',
-            activities: []
-        });
-        setEditingSectionIndex(null);
-        setShowSectionModal(false);
+        resetSectionEditor();
     };
 
     const handleOpenAddSection = () => {
@@ -136,88 +160,140 @@ function TemplateBuilderModal({
         setShowSectionModal(true);
     };
 
-    const handleAddActivities = (newSelectedIds) => {
-        const idsToUse = newSelectedIds || selectedActivities;
-        if (idsToUse.length === 0) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Please select at least one activity' });
+    const handleAddActivity = (activity) => {
+        const activityToAdd = buildActivityPreview(activity);
+        if (isQuickTemplate) {
+            setCurrentTemplate((previous) => {
+                const existingIds = new Set(previous.quickActivities.map((activity) => activity.activity_id));
+                const nextActivities = [...previous.quickActivities];
+
+                if (!existingIds.has(activityToAdd.activity_id)) {
+                    nextActivities.push(activityToAdd);
+                    existingIds.add(activityToAdd.activity_id);
+                }
+
+                if (nextActivities.length > 5) {
+                    setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions are limited to 5 activities.' });
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    quickActivities: nextActivities,
+                };
+            });
+            resetActivityPicker();
             return;
         }
 
-        const updatedSections = [...currentTemplate.sections];
-        const activitiesToAdd = idsToUse.map(actId => {
-            const activity = Array.isArray(activities) ? activities.find(a => a.id === actId) : null;
-            if (!activity) return null;
+        setCurrentTemplate((previous) => {
+            const updatedSections = [...previous.sections];
+            const targetSection = updatedSections[selectedSectionIndex];
+            if (!targetSection) {
+                return previous;
+            }
+
+            updatedSections[selectedSectionIndex] = {
+                ...targetSection,
+                activities: [
+                    ...(targetSection.activities || []),
+                    activityToAdd,
+                ],
+            };
+
             return {
-                activity_id: activity.id,
-                name: activity.name,
-                type: activity.type
+                ...previous,
+                sections: updatedSections,
             };
         });
-
-        updatedSections[selectedSectionIndex].activities = [
-            ...updatedSections[selectedSectionIndex].activities,
-            ...activitiesToAdd
-        ];
-
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: updatedSections
-        });
-
-        setSelectedActivities([]);
-        setShowActivityModal(false);
-        setSelectedSectionIndex(null);
+        resetActivityPicker();
     };
 
     const handleRemoveSection = (index) => {
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: currentTemplate.sections.filter((_, i) => i !== index)
-        });
+        setCurrentTemplate((previous) => ({
+            ...previous,
+            sections: previous.sections.filter((_, currentIndex) => currentIndex !== index),
+        }));
     };
 
     const handleRemoveActivity = (sectionIndex, activityIndex) => {
-        const updatedSections = [...currentTemplate.sections];
-        updatedSections[sectionIndex].activities = updatedSections[sectionIndex].activities.filter((_, i) => i !== activityIndex);
+        setCurrentTemplate((previous) => {
+            const updatedSections = [...previous.sections];
+            const targetSection = updatedSections[sectionIndex];
+            if (!targetSection) {
+                return previous;
+            }
 
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: updatedSections
+            updatedSections[sectionIndex] = {
+                ...targetSection,
+                activities: (targetSection.activities || []).filter(
+                (_, currentIndex) => currentIndex !== activityIndex
+                ),
+            };
+            return {
+                ...previous,
+                sections: updatedSections,
+            };
         });
     };
 
+    const handleRemoveQuickActivity = (activityIndex) => {
+        setCurrentTemplate((previous) => ({
+            ...previous,
+            quickActivities: previous.quickActivities.filter((_, currentIndex) => currentIndex !== activityIndex),
+        }));
+    };
+
     const handleMoveSection = (index, direction) => {
-        const newSections = [...currentTemplate.sections];
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        setCurrentTemplate((previous) => {
+            const newSections = [...previous.sections];
+            const newIndex = direction === 'up' ? index - 1 : index + 1;
 
-        if (newIndex < 0 || newIndex >= newSections.length) return;
+            if (newIndex < 0 || newIndex >= newSections.length) {
+                return previous;
+            }
 
-        [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: newSections
+            [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+            return {
+                ...previous,
+                sections: newSections,
+            };
         });
     };
 
     const handleMoveActivity = (sectionIndex, activityIndex, direction) => {
-        const updatedSections = [...currentTemplate.sections];
-        const section = updatedSections[sectionIndex];
-        const newActivities = [...section.activities];
-        const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
+        setCurrentTemplate((previous) => {
+            const updatedSections = [...previous.sections];
+            const section = updatedSections[sectionIndex];
+            const newActivities = [...section.activities];
+            const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
 
-        if (newIndex < 0 || newIndex >= newActivities.length) return;
+            if (newIndex < 0 || newIndex >= newActivities.length) {
+                return previous;
+            }
 
-        [newActivities[activityIndex], newActivities[newIndex]] = [newActivities[newIndex], newActivities[activityIndex]];
+            [newActivities[activityIndex], newActivities[newIndex]] = [newActivities[newIndex], newActivities[activityIndex]];
+            updatedSections[sectionIndex] = { ...section, activities: newActivities };
+            return {
+                ...previous,
+                sections: updatedSections,
+            };
+        });
+    };
 
-        updatedSections[sectionIndex] = {
-            ...section,
-            activities: newActivities
-        };
+    const handleMoveQuickActivity = (activityIndex, direction) => {
+        setCurrentTemplate((previous) => {
+            const nextActivities = [...previous.quickActivities];
+            const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
+            if (newIndex < 0 || newIndex >= nextActivities.length) {
+                return previous;
+            }
 
-        setCurrentTemplate({
-            ...currentTemplate,
-            sections: updatedSections
+            [nextActivities[activityIndex], nextActivities[newIndex]] = [nextActivities[newIndex], nextActivities[activityIndex]];
+            return {
+                ...previous,
+                quickActivities: nextActivities,
+            };
         });
     };
 
@@ -227,33 +303,46 @@ function TemplateBuilderModal({
             return;
         }
 
-        if (currentTemplate.sections.length === 0) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Add at least one section to the template' });
+        if (isQuickTemplate) {
+            if (currentTemplate.quickActivities.length === 0) {
+                setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions must include at least one activity.' });
+                return;
+            }
+            if (currentTemplate.quickActivities.length > 5) {
+                setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions are limited to 5 activities.' });
+                return;
+            }
+        } else if (currentTemplate.sections.length === 0) {
+            setAlertModal({ show: true, title: 'Validation Error', message: 'Add at least one section to the template.' });
             return;
         }
 
-        const totalDuration = currentTemplate.sections.reduce((sum, s) => sum + s.duration_minutes, 0);
+        const templateData = isQuickTemplate
+            ? {
+                session_type: SESSION_TYPE_QUICK,
+                template_color: currentTemplate.templateColor,
+                activities: currentTemplate.quickActivities,
+            }
+            : {
+                session_type: SESSION_TYPE_NORMAL,
+                template_color: currentTemplate.templateColor,
+                sections: currentTemplate.sections,
+                total_duration_minutes: totalDuration,
+            };
 
-        const templateData = {
-            sections: currentTemplate.sections,
-            total_duration_minutes: totalDuration
-        };
-
-        const payload = {
+        onSave({
             name: currentTemplate.name,
             description: currentTemplate.description,
-            template_data: templateData
-        };
-
-        onSave(payload, editingTemplate?.id);
+            template_data: templateData,
+        }, editingTemplate?.id);
     };
 
     const handleClose = () => {
-        setCurrentTemplate({ name: '', description: '', sections: [] });
+        setCurrentTemplate(EMPTY_TEMPLATE);
+        resetSectionEditor();
+        resetActivityPicker();
         onClose();
     };
-
-    const totalDuration = currentTemplate.sections.reduce((sum, s) => sum + s.duration_minutes, 0);
 
     if (!isOpen) return null;
 
@@ -262,18 +351,16 @@ function TemplateBuilderModal({
             <Modal
                 isOpen={isOpen}
                 onClose={handleClose}
-                title={editingTemplate ? 'Edit Template' : 'Create Template'}
+                title={isExistingTemplate ? 'Edit Template' : 'Create Template'}
                 size="xl"
             >
                 <ModalBody>
-                    {/* Content - Scrollable */}
                     <div className={styles.contentArea}>
-                        {/* Template Name & Description */}
                         <div className={styles.formGroup}>
                             <Input
                                 label="Template Name"
                                 value={currentTemplate.name}
-                                onChange={(e) => setCurrentTemplate({ ...currentTemplate, name: e.target.value })}
+                                onChange={(event) => setCurrentTemplate((previous) => ({ ...previous, name: event.target.value }))}
                                 placeholder="e.g., Morning Guitar Practice"
                                 fullWidth
                             />
@@ -285,176 +372,311 @@ function TemplateBuilderModal({
                             </label>
                             <textarea
                                 value={currentTemplate.description}
-                                onChange={(e) => setCurrentTemplate({ ...currentTemplate, description: e.target.value })}
+                                onChange={(event) => setCurrentTemplate((previous) => ({ ...previous, description: event.target.value }))}
                                 placeholder="Describe this practice template..."
                                 className={styles.textarea}
                             />
                         </div>
 
-                        {/* Duration & Add Section */}
-                        <div className={styles.actionBar}>
-                            <span className={styles.durationText}>
-                                Total Duration: <strong className={styles.durationValue}>{totalDuration} minutes</strong>
-                            </span>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={handleOpenAddSection}
-                            >
-                                + Add Section
-                            </Button>
+                        <div className={styles.sessionMetaGrid}>
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>Session Type</label>
+                                <select
+                                    value={currentTemplate.sessionType}
+                                    onChange={(event) => setCurrentTemplate((previous) => ({
+                                        ...previous,
+                                        sessionType: event.target.value,
+                                    }))}
+                                    className={styles.select}
+                                >
+                                    <option value={SESSION_TYPE_NORMAL}>Normal Session</option>
+                                    <option value={SESSION_TYPE_QUICK}>Quick Session</option>
+                                </select>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label className={styles.label}>Template Color</label>
+                                <div className={styles.colorRow}>
+                                    <input
+                                        type="color"
+                                        value={currentTemplate.templateColor}
+                                        onChange={(event) => setCurrentTemplate((previous) => ({
+                                            ...previous,
+                                            templateColor: event.target.value,
+                                        }))}
+                                        className={styles.colorInput}
+                                    />
+                                    <span className={styles.colorValue}>{currentTemplate.templateColor}</span>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Sections List */}
-                        <div>
-                            <h3 className={styles.sectionListTitle}>
-                                Sections
-                            </h3>
-                            {currentTemplate.sections.length === 0 ? (
-                                <div className={styles.emptyState}>
-                                    No sections yet. Click "Add Section" to start building your template.
-                                </div>
-                            ) : (
-                                <div className={styles.sectionsContainer}>
-                                    {currentTemplate.sections.map((section, sectionIndex) => (
-                                        <div
-                                            key={sectionIndex}
-                                            className={styles.sectionCard}
-                                        >
-                                            <div className={styles.sectionHeader}>
-                                                <div className={styles.sectionInfo}>
-                                                    <div className={styles.sectionTitleRow}>
-                                                        <strong className={styles.sectionName}>{section.name}</strong>
-                                                        <span className={styles.sectionDurationBadge}>
-                                                            {section.duration_minutes} min
-                                                        </span>
-                                                    </div>
-                                                    <p className={styles.sectionMeta}>
-                                                        {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
-                                                    </p>
-                                                </div>
-                                                <div className={styles.sectionControls}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        onClick={() => handleEditSection(sectionIndex)}
-                                                        title="Edit section"
-                                                    >
-                                                        ✎
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        onClick={() => handleMoveSection(sectionIndex, 'up')}
-                                                        disabled={sectionIndex === 0}
-                                                    >
-                                                        ↑
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        onClick={() => handleMoveSection(sectionIndex, 'down')}
-                                                        disabled={sectionIndex === currentTemplate.sections.length - 1}
-                                                    >
-                                                        ↓
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="danger"
-                                                        onClick={() => handleRemoveSection(sectionIndex)}
-                                                    >
-                                                        ×
-                                                    </Button>
-                                                </div>
-                                            </div>
+                        <div className={styles.previewRow}>
+                            <span className={styles.label}>Preview</span>
+                            <div className={styles.previewStack}>
+                                <SessionTemplateNameBadge
+                                    name={currentTemplate.name || 'Template Name'}
+                                    color={currentTemplate.templateColor}
+                                    size="md"
+                                />
+                                <SessionTemplateTypePill sessionType={currentTemplate.sessionType} size="sm" />
+                            </div>
+                        </div>
 
-                                            {/* Activities in this section */}
-                                            <div className={styles.activitiesList}>
-                                                {(section.activities || []).map((activity, activityIndex) => (
-                                                    <div
-                                                        key={activityIndex}
-                                                        className={styles.activityItem}
-                                                    >
-                                                        <div style={{ flex: 1 }}>
-                                                            <div className={styles.activityName}>{activity.name}</div>
-                                                            {activity.type && (
-                                                                <div className={styles.activityType}>
-                                                                    {activity.type}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                                            <div style={{ display: 'flex', gap: '4px' }}>
-                                                                <button
-                                                                    className={styles.miniMoveBtn}
-                                                                    onClick={(e) => { e.stopPropagation(); handleMoveActivity(sectionIndex, activityIndex, 'up'); }}
-                                                                    disabled={activityIndex === 0}
-                                                                    title="Move Up"
-                                                                >↑</button>
-                                                                <button
-                                                                    className={styles.miniMoveBtn}
-                                                                    onClick={(e) => { e.stopPropagation(); handleMoveActivity(sectionIndex, activityIndex, 'down'); }}
-                                                                    disabled={activityIndex === (section.activities || []).length - 1}
-                                                                    title="Move Down"
-                                                                >↓</button>
+                        {isQuickTemplate ? (
+                            <div>
+                                <div className={styles.actionBar}>
+                                    <span className={styles.durationText}>
+                                        Quick Session: <strong className={styles.durationValue}>{currentTemplate.quickActivities.length}</strong> activit{currentTemplate.quickActivities.length === 1 ? 'y' : 'ies'}
+                                    </span>
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => {
+                                            setShowActivityModal(true);
+                                        }}
+                                    >
+                                        + Add Activity
+                                    </Button>
+                                </div>
+
+                                <div>
+                                    <h3 className={styles.sectionListTitle}>Activities</h3>
+                                    {currentTemplate.quickActivities.length === 0 ? (
+                                        <div className={styles.emptyState}>
+                                            Add between 1 and 5 activities for this quick session template.
+                                        </div>
+                                    ) : (
+                                        <div className={styles.sectionsContainer}>
+                                            {currentTemplate.quickActivities.map((activity, activityIndex) => (
+                                                <div key={`${activity.activity_id}-${activityIndex}`} className={styles.sectionCard}>
+                                                    <div className={styles.sectionHeader}>
+                                                        <div className={styles.sectionInfo}>
+                                                            <div className={styles.sectionTitleRow}>
+                                                                <strong className={styles.sectionName}>{activity.name}</strong>
                                                             </div>
-                                                            <button
-                                                                onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
-                                                                className={styles.removeActivityButton}
+                                                            <p className={styles.sectionMeta}>
+                                                                {activity.type || 'Activity'}
+                                                            </p>
+                                                        </div>
+                                                        <div className={styles.sectionControls}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() => handleMoveQuickActivity(activityIndex, 'up')}
+                                                                disabled={activityIndex === 0}
+                                                            >
+                                                                ↑
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() => handleMoveQuickActivity(activityIndex, 'down')}
+                                                                disabled={activityIndex === currentTemplate.quickActivities.length - 1}
+                                                            >
+                                                                ↓
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="danger"
+                                                                onClick={() => handleRemoveQuickActivity(activityIndex)}
                                                             >
                                                                 ×
-                                                            </button>
+                                                            </Button>
                                                         </div>
                                                     </div>
-                                                ))}
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedSectionIndex(sectionIndex);
-                                                        setSelectedActivities([]);
-                                                        setShowActivityModal(true);
-                                                    }}
-                                                    className={styles.addActivityPrompt}
-                                                >
-                                                    + Add Activity
-                                                </button>
-                                            </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {showActivityModal && (
+                                        <div className={styles.inlineActivitySelector}>
+                                            <ActivitySelectorPanel
+                                                activities={activities}
+                                                activityGroups={activityGroups}
+                                                onClose={resetActivityPicker}
+                                                onSelectActivity={handleAddActivity}
+                                                closeOnSelect={true}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className={styles.actionBar}>
+                                    <span className={styles.durationText}>
+                                        Total Duration: <strong className={styles.durationValue}>{totalDuration} minutes</strong>
+                                    </span>
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={handleOpenAddSection}
+                                    >
+                                        + Add Section
+                                    </Button>
+                                </div>
+
+                                <div>
+                                    <h3 className={styles.sectionListTitle}>Sections</h3>
+                                    {currentTemplate.sections.length === 0 ? (
+                                        <div className={styles.emptyState}>
+                                            No sections yet. Click "Add Section" to start building your template.
+                                        </div>
+                                    ) : (
+                                        <div className={styles.sectionsContainer}>
+                                            {currentTemplate.sections.map((section, sectionIndex) => (
+                                                <div key={sectionIndex} className={styles.sectionCard}>
+                                                    <div className={styles.sectionHeader}>
+                                                        <div className={styles.sectionInfo}>
+                                                            <div className={styles.sectionTitleRow}>
+                                                                <strong className={styles.sectionName}>{section.name}</strong>
+                                                                <span className={styles.sectionDurationBadge}>
+                                                                    {section.duration_minutes} min
+                                                                </span>
+                                                            </div>
+                                                            <p className={styles.sectionMeta}>
+                                                                {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
+                                                            </p>
+                                                        </div>
+                                                        <div className={styles.sectionControls}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() => handleEditSection(sectionIndex)}
+                                                                title="Edit section"
+                                                            >
+                                                                ✎
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() => handleMoveSection(sectionIndex, 'up')}
+                                                                disabled={sectionIndex === 0}
+                                                            >
+                                                                ↑
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="secondary"
+                                                                onClick={() => handleMoveSection(sectionIndex, 'down')}
+                                                                disabled={sectionIndex === currentTemplate.sections.length - 1}
+                                                            >
+                                                                ↓
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="danger"
+                                                                onClick={() => handleRemoveSection(sectionIndex)}
+                                                            >
+                                                                ×
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className={styles.activitiesList}>
+                                                        {(section.activities || []).map((activity, activityIndex) => (
+                                                            <div
+                                                                key={`${activity.activity_id || activity.name}-${activityIndex}`}
+                                                                className={styles.activityItem}
+                                                            >
+                                                                <div className={styles.activityInfo}>
+                                                                    <div className={styles.activityName}>{activity.name}</div>
+                                                                    {activity.type && (
+                                                                        <div className={styles.activityType}>
+                                                                            {activity.type}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className={styles.activityActions}>
+                                                                    <div className={styles.miniMoveGroup}>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={styles.miniMoveBtn}
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleMoveActivity(sectionIndex, activityIndex, 'up');
+                                                                            }}
+                                                                            disabled={activityIndex === 0}
+                                                                            title="Move Up"
+                                                                        >
+                                                                            ↑
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={styles.miniMoveBtn}
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleMoveActivity(sectionIndex, activityIndex, 'down');
+                                                                            }}
+                                                                            disabled={activityIndex === (section.activities || []).length - 1}
+                                                                            title="Move Down"
+                                                                        >
+                                                                            ↓
+                                                                        </button>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
+                                                                        className={styles.removeActivityButton}
+                                                                    >
+                                                                        ×
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedSectionIndex(sectionIndex);
+                                                                setShowActivityModal(true);
+                                                            }}
+                                                            className={styles.addActivityPrompt}
+                                                        >
+                                                            + Add Activity
+                                                        </button>
+
+                                                        {showActivityModal && selectedSectionIndex === sectionIndex && (
+                                                            <div className={styles.inlineActivitySelector}>
+                                                                <ActivitySelectorPanel
+                                                                    activities={activities}
+                                                                    activityGroups={activityGroups}
+                                                                    onClose={resetActivityPicker}
+                                                                    onSelectActivity={handleAddActivity}
+                                                                    closeOnSelect={true}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </ModalBody>
 
                 <ModalFooter>
-                    <Button
-                        variant="secondary"
-                        onClick={handleClose}
-                    >
+                    <Button variant="secondary" onClick={handleClose}>
                         Cancel
                     </Button>
-                    <Button
-                        variant="success"
-                        onClick={handleSave}
-                    >
-                        {editingTemplate ? 'Update Template' : 'Save Template'}
+                    <Button variant="success" onClick={handleSave}>
+                        {isExistingTemplate ? 'Update Template' : 'Save Template'}
                     </Button>
                 </ModalFooter>
             </Modal>
 
-            {/* Add/Edit Section Modal */}
             {showSectionModal && (
                 <div
                     className={styles.secondaryModalOverlay}
-                    onClick={() => {
-                        setShowSectionModal(false);
-                        setEditingSectionIndex(null);
-                        setNewSection({ name: '', duration_minutes: '10', activities: [] });
-                    }}
+                    onClick={resetSectionEditor}
                 >
                     <div
                         className={styles.secondaryModalContent}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
                     >
                         <h2 className={styles.secondaryHeader}>
                             {editingSectionIndex !== null ? 'Edit Section' : 'Add Section'}
@@ -464,7 +686,7 @@ function TemplateBuilderModal({
                             <Input
                                 label="Section Name"
                                 value={newSection.name}
-                                onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
+                                onChange={(event) => setNewSection({ ...newSection, name: event.target.value })}
                                 placeholder="e.g., Warm-up"
                                 fullWidth
                             />
@@ -476,20 +698,13 @@ function TemplateBuilderModal({
                                 label="Duration (minutes)"
                                 min="1"
                                 value={newSection.duration_minutes}
-                                onChange={(e) => setNewSection({ ...newSection, duration_minutes: e.target.value })}
+                                onChange={(event) => setNewSection({ ...newSection, duration_minutes: event.target.value })}
                                 fullWidth
                             />
                         </div>
 
                         <div className={styles.secondaryActions}>
-                            <Button
-                                variant="secondary"
-                                onClick={() => {
-                                    setShowSectionModal(false);
-                                    setEditingSectionIndex(null);
-                                    setNewSection({ name: '', duration_minutes: '10', activities: [] });
-                                }}
-                            >
+                            <Button variant="secondary" onClick={resetSectionEditor}>
                                 Cancel
                             </Button>
                             <Button
@@ -503,52 +718,16 @@ function TemplateBuilderModal({
                 </div>
             )}
 
-            {/* Add Activity Modal */}
-            {showActivityModal && (
-                <div
-                    className={styles.secondaryModalOverlay}
-                    onClick={() => {
-                        setShowActivityModal(false);
-                        setSelectedSectionIndex(null);
-                        setSelectedActivities([]);
-                    }}
-                >
-                    <div
-                        className={`${styles.secondaryModalContent} ${styles.secondaryModalLarge}`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ padding: 0, overflow: 'hidden' }}
-                    >
-                        <ActivitySearchWidget
-                            activities={activities}
-                            activityGroups={activityGroups}
-                            preSelectedActivityIds={selectedActivities}
-                            allowGroupSelection={false}
-                            title="Select Activities"
-                            confirmText="Add Selected"
-                            onConfirm={(newSelectedIds) => {
-                                handleAddActivities(newSelectedIds);
-                            }}
-                            onCancel={() => {
-                                setShowActivityModal(false);
-                                setSelectedSectionIndex(null);
-                                setSelectedActivities([]);
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Alert Modal */}
             {alertModal.show && (
                 <div
                     className={styles.secondaryModalOverlay}
                     style={{ zIndex: 2000 }}
-                    onClick={() => setAlertModal({ ...alertModal, show: false })}
+                    onClick={() => setAlertModal((previous) => ({ ...previous, show: false }))}
                 >
                     <div
                         className={styles.secondaryModalContent}
                         style={{ width: 'min(400px, 90vw)' }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
                     >
                         <h2 className={`${styles.alertTitle} ${alertModal.title === 'Error' ? styles.alertError : ''}`}>
                             {alertModal.title}
@@ -557,7 +736,8 @@ function TemplateBuilderModal({
                             {alertModal.message}
                         </p>
                         <button
-                            onClick={() => setAlertModal({ ...alertModal, show: false })}
+                            type="button"
+                            onClick={() => setAlertModal((previous) => ({ ...previous, show: false }))}
                             className={styles.alertButton}
                         >
                             OK

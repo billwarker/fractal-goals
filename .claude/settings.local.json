@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/will/Projects/fractal-goals/client/src/components/sessionDetail/QuickSessionActivityCard.*)",
+      "Bash(ls -la client/src/components/sessionDetail/QuickSession* client/src/components/sessionDetail/useQuickSession*)"
+    ]
+  }
+}

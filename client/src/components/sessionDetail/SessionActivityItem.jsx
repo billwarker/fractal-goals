@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
@@ -7,13 +7,16 @@ import { queryKeys } from '../../hooks/queryKeys';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { fractalApi } from '../../utils/api';
+import { getGroupBreadcrumb } from '../../utils/manageActivities';
 import notify from '../../utils/notify';
+import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import Linkify from '../atoms/Linkify';
 import GoalIcon from '../atoms/GoalIcon';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
+import useMetricDrafts from './useMetricDrafts';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -23,6 +26,29 @@ function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function buildEmptySet(definition, hasSplits) {
+    if (!Array.isArray(definition?.metric_definitions)) {
+        return { instance_id: crypto.randomUUID(), completed: false, metrics: [] };
+    }
+
+    const metrics = hasSplits && Array.isArray(definition?.split_definitions)
+        ? definition.split_definitions.flatMap((split) => definition.metric_definitions.map((metric) => ({
+            metric_id: metric.id,
+            split_id: split.id,
+            value: '',
+        })))
+        : definition.metric_definitions.map((metric) => ({
+            metric_id: metric.id,
+            value: '',
+        }));
+
+    return {
+        instance_id: crypto.randomUUID(),
+        completed: false,
+        metrics,
+    };
 }
 
 /**
@@ -46,12 +72,14 @@ function SessionActivityItem({
     isDragging,
     activityDefinition: activityDefinitionProp = null,
     activityNotes: activityNotesProp = null,
+    quickMode = false,
 }) {
     // Context
     const {
         rootId,
         sessionId,
         activities,
+        activityGroups,
         microGoals,
         session,
         goalAchievements,
@@ -84,25 +112,7 @@ function SessionActivityItem({
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
 
-    const setMetricDraftKey = useCallback((setIndex, metricId, splitId = null) => (
-        `${setIndex}:${metricId}:${splitId || ''}`
-    ), []);
-    const singleMetricDraftKey = useCallback((metricId, splitId = null) => (
-        `${metricId}:${splitId || ''}`
-    ), []);
-
-    const [setMetricDrafts, setSetMetricDrafts] = useState({});
-    const [singleMetricDrafts, setSingleMetricDrafts] = useState({});
-
-    // Ref to track the synchronous optimistic state of sets specifically to handle
-    // event racing (e.g. mobile Safari triggering blur + click in the same execution frame).
-    const latestSetsRef = useRef(exercise.sets || []);
-    useEffect(() => {
-        latestSetsRef.current = exercise.sets || [];
-    }, [exercise.sets]);
-
     const handleUpdateSets = useCallback((newSets) => {
-        latestSetsRef.current = newSets;
         onUpdate('sets', newSets);
     }, [onUpdate]);
 
@@ -113,118 +123,6 @@ function SessionActivityItem({
     const resolveSplitId = useCallback((metric) => (
         metric?.split_id || metric?.split_definition_id || null
     ), []);
-
-    const applyDraftsToSets = useCallback((baseSets, drafts) => {
-        if (!drafts || Object.keys(drafts).length === 0) return [...baseSets];
-        return baseSets.map((set, setIdx) => {
-            const newSet = { ...set };
-            if (!newSet.metrics) return newSet;
-            const newMetrics = [...newSet.metrics];
-            let changed = false;
-
-            Object.entries(drafts).forEach(([key, draftValue]) => {
-                const parts = key.split(':');
-                if (parts.length >= 2 && parseInt(parts[0], 10) === setIdx) {
-                    const metricId = parts[1];
-                    const splitId = parts[2] || null;
-
-                    const metricIdx = newMetrics.findIndex(m =>
-                        resolveMetricId(m) === metricId &&
-                        (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
-                    );
-
-                    if (metricIdx >= 0) {
-                        newMetrics[metricIdx] = { ...newMetrics[metricIdx], value: draftValue };
-                    } else {
-                        const newMetric = { metric_id: metricId, value: draftValue };
-                        if (splitId) newMetric.split_id = splitId;
-                        newMetrics.push(newMetric);
-                    }
-                    changed = true;
-                }
-            });
-
-            if (changed) newSet.metrics = newMetrics;
-            return newSet;
-        });
-    }, [resolveMetricId, resolveSplitId]);
-
-    useEffect(() => {
-        setSetMetricDrafts({});
-        setSingleMetricDrafts({});
-    }, [exercise.id]);
-
-    const clearSingleMetricDraft = useCallback((metricId, splitId = null) => {
-        const key = singleMetricDraftKey(metricId, splitId);
-        setSingleMetricDrafts((prev) => {
-            if (!(key in prev)) return prev;
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    }, [singleMetricDraftKey]);
-
-    const getMetricValue = useCallback((metricsList, metricId, splitId = null) => {
-        const m = metricsList?.find(x =>
-            resolveMetricId(x) === metricId && (splitId ? resolveSplitId(x) === splitId : !resolveSplitId(x))
-        );
-        return m ? m.value : '';
-    }, [resolveMetricId, resolveSplitId]);
-
-    const getSetMetricDisplayValue = useCallback((setIndex, metricsList, metricId, splitId = null) => {
-        const key = setMetricDraftKey(setIndex, metricId, splitId);
-        if (Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) {
-            return setMetricDrafts[key];
-        }
-        return getMetricValue(metricsList, metricId, splitId);
-    }, [getMetricValue, setMetricDraftKey, setMetricDrafts]);
-
-    const getSingleMetricDisplayValue = useCallback((metricsList, metricId, splitId = null) => {
-        const key = singleMetricDraftKey(metricId, splitId);
-        if (Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) {
-            return singleMetricDrafts[key];
-        }
-        return getMetricValue(metricsList, metricId, splitId);
-    }, [getMetricValue, singleMetricDraftKey, singleMetricDrafts]);
-
-    const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null) => {
-        const key = setMetricDraftKey(setIndex, metricId, splitId);
-        if (!Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) return;
-
-        const newSets = applyDraftsToSets(latestSetsRef.current, setMetricDrafts);
-        handleUpdateSets(newSets);
-        setSetMetricDrafts({});
-    }, [setMetricDraftKey, setMetricDrafts, applyDraftsToSets, handleUpdateSets]);
-
-    const commitSingleMetricChange = useCallback((metricId, splitId = null) => {
-        const key = singleMetricDraftKey(metricId, splitId);
-        if (!Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) return;
-        const value = singleMetricDrafts[key];
-
-        const currentMetrics = [...(exercise.metrics || [])];
-        const metricIdx = currentMetrics.findIndex(m =>
-            resolveMetricId(m) === metricId && (splitId ? resolveSplitId(m) === splitId : !resolveSplitId(m))
-        );
-        if (metricIdx >= 0) {
-            currentMetrics[metricIdx] = { ...currentMetrics[metricIdx], value };
-        } else {
-            const newMetric = { metric_id: metricId, value };
-            if (splitId) newMetric.split_id = splitId;
-            currentMetrics.push(newMetric);
-        }
-        onUpdate('metrics', currentMetrics);
-        clearSingleMetricDraft(metricId, splitId);
-    }, [exercise.metrics, onUpdate, resolveMetricId, resolveSplitId, singleMetricDraftKey, singleMetricDrafts, clearSingleMetricDraft]);
-
-    const handleSetMetricDraftChange = useCallback((setIndex, metricId, value, splitId = null) => {
-        const key = setMetricDraftKey(setIndex, metricId, splitId);
-        setSetMetricDrafts((prev) => ({ ...prev, [key]: value }));
-    }, [setMetricDraftKey]);
-
-    const handleSingleMetricDraftChange = useCallback((metricId, value, splitId = null) => {
-        const key = singleMetricDraftKey(metricId, splitId);
-        setSingleMetricDrafts((prev) => ({ ...prev, [key]: value }));
-    }, [singleMetricDraftKey]);
 
     // Find active micro goal for this activity in the current session
     // Include completed ones so they show as green icons rather than disappearing
@@ -445,28 +343,46 @@ function SessionActivityItem({
     const hasSplits = def.has_splits && def.split_definitions && def.split_definitions.length > 0;
     // Check if metrics exist by looking at the definition, not just the flag
     const hasMetrics = def.metric_definitions && def.metric_definitions.length > 0;
+    const {
+        getMetricValue,
+        getSetMetricDisplayValue,
+        getSingleMetricDisplayValue,
+        handleSetMetricDraftChange,
+        handleSingleMetricDraftChange,
+        commitSetMetricChange,
+        commitSingleMetricChange,
+        applyAllSetDrafts,
+        clearSetDrafts,
+        latestSetsRef,
+    } = useMetricDrafts({
+        exercise,
+        updateExercise: onUpdate,
+    });
+    const groupLabel = useMemo(() => {
+        const groupId = activityDefinition?.group_id || exercise.group_id || null;
+        if (groupId && Array.isArray(activityGroups) && activityGroups.length > 0) {
+            const breadcrumb = getGroupBreadcrumb(groupId, activityGroups);
+            if (breadcrumb) return breadcrumb;
+        }
+        return exercise.group_name || null;
+    }, [activityDefinition?.group_id, activityGroups, exercise.group_id, exercise.group_name]);
 
     const handleAddSet = () => {
-        const newSet = {
-            instance_id: crypto.randomUUID(),
-            completed: false,
-            metrics: def.metric_definitions.map(m => ({ metric_id: m.id, value: '' }))
-        };
-
-        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts), newSet];
+        const newSet = buildEmptySet(def, hasSplits);
+        const newSets = [...applyAllSetDrafts(latestSetsRef.current), newSet];
         handleUpdateSets(newSets);
-        setSetMetricDrafts({}); // Clear drafts since they are now committed
+        clearSetDrafts();
     };
 
     const handleRemoveSet = (setIndex) => {
-        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts)];
+        const newSets = [...applyAllSetDrafts(latestSetsRef.current)];
         newSets.splice(setIndex, 1);
         handleUpdateSets(newSets);
-        setSetMetricDrafts({});
+        clearSetDrafts();
     };
 
     const handleCascade = (metricId, value, splitId = null, sourceIndex = 0) => {
-        const newSets = [...applyDraftsToSets(latestSetsRef.current, setMetricDrafts)];
+        const newSets = [...applyAllSetDrafts(latestSetsRef.current)];
         let hasChanges = false;
 
         // Iterate through all sets after the source set
@@ -497,7 +413,7 @@ function SessionActivityItem({
 
         if (hasChanges) {
             handleUpdateSets(newSets);
-            setSetMetricDrafts({});
+            clearSetDrafts();
         }
     };
 
@@ -559,7 +475,7 @@ function SessionActivityItem({
                         className={styles.activityNameContainer}
                     >
                         <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
-                            {activeMicroGoal && (
+                            {!quickMode && activeMicroGoal && (
                                 <div title={`Micro Goal: ${activeMicroGoal.name}`}>
                                     <GoalIcon
                                         shape={activeMicroGoal.shape || microChars?.icon || 'target'}
@@ -574,16 +490,25 @@ function SessionActivityItem({
                                 {!activityDefinition && <DeletedBadge />}
                             </span>
                         </div>
-                        {exercise.group_name && (
-                            <div className={styles.activityGroupLabel}>{exercise.group_name}</div>
+                        {groupLabel && (
+                            <div className={styles.activityGroupLabel}>{groupLabel}</div>
                         )}
                         {def.description && <div className={styles.activityDescription}><Linkify>{def.description}</Linkify></div>}
                     </div>
                 </div>
 
                 <div className={styles.activityHeaderRight}>
-                    {/* Timer Controls - New Design */}
-                    {exercise.id && (
+                    {quickMode ? (
+                        <div className={styles.quickModeStatus}>
+                            <ActivityCompletionButton
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onUpdate('completed', !exercise.completed);
+                                }}
+                                completed={exercise.completed}
+                            />
+                        </div>
+                    ) : (
                         <div className={styles.timerControlsGrid}>
                             <div className={styles.timerMetaColumn}>
                                 {/* DateTime Start Field */}
@@ -720,7 +645,7 @@ function SessionActivityItem({
                 </div>
 
                 {/* Delete Button */}
-                <button onClick={onDelete} className={styles.deleteButton}>×</button>
+                {!quickMode && <button onClick={onDelete} className={styles.deleteButton}>×</button>}
             </div>
 
             {/* Content Area */}
@@ -899,40 +824,42 @@ function SessionActivityItem({
                         )
                     ) : (
                         <div className={styles.noMetricsMessage}>
-                            Track activity based on completion checkbox above.
+                            {quickMode ? 'Mark this activity complete when finished.' : 'Track activity based on completion checkbox above.'}
                         </div>
                     )
                 )}
 
                 {/* Quick Note Add */}
                 {/* Notes Section - Timeline + Quick Add */}
-                <div className={styles.notesSection}>
-                    {activityNotes.length > 0 && (
-                        <div className={styles.notesTimelineContainer}>
-                            <NoteTimeline
-                                notes={activityNotes}
-                                onUpdate={onUpdateNote}
-                                onDelete={onDeleteNote}
-                                onToggleNanoGoal={handleToggleNanoGoal}
-                                pendingNanoGoalIds={pendingNanoGoalIds}
-                                compact={false}
-                            />
-                        </div>
-                    )}
-                    <NoteQuickAdd
-                        onSubmit={handleAddNote}
-                        placeholder={nanoMode
-                            ? "Add a nano goal / sub-step..."
-                            : (selectedSetIndex !== null
-                                ? `Note for Set #${selectedSetIndex + 1}...`
-                                : "Add a note about this activity...")
-                        }
-                        buttonLabel={nanoMode ? "Add Nano" : "Add Note"}
-                        isNanoMode={nanoMode}
-                        hasMicroGoal={!!activeMicroGoal}
-                        onToggleNanoMode={handleToggleNanoMode}
-                    />
-                </div>
+                {!quickMode && (
+                    <div className={styles.notesSection}>
+                        {activityNotes.length > 0 && (
+                            <div className={styles.notesTimelineContainer}>
+                                <NoteTimeline
+                                    notes={activityNotes}
+                                    onUpdate={onUpdateNote}
+                                    onDelete={onDeleteNote}
+                                    onToggleNanoGoal={handleToggleNanoGoal}
+                                    pendingNanoGoalIds={pendingNanoGoalIds}
+                                    compact={false}
+                                />
+                            </div>
+                        )}
+                        <NoteQuickAdd
+                            onSubmit={handleAddNote}
+                            placeholder={nanoMode
+                                ? "Add a nano goal / sub-step..."
+                                : (selectedSetIndex !== null
+                                    ? `Note for Set #${selectedSetIndex + 1}...`
+                                    : "Add a note about this activity...")
+                            }
+                            buttonLabel={nanoMode ? "Add Nano" : "Add Note"}
+                            isNanoMode={nanoMode}
+                            hasMicroGoal={!!activeMicroGoal}
+                            onToggleNanoMode={handleToggleNanoMode}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

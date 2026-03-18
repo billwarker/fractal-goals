@@ -2,7 +2,7 @@ import json
 import uuid
 import pytest
 
-from models import Goal, Note, Session
+from models import Goal, Note, Session, SessionTemplate
 
 
 @pytest.mark.integration
@@ -217,6 +217,43 @@ class TestNotesApiNanoValidation:
 
         assert response.status_code == 400
         assert "Activity instance not found" in response.get_json().get("error", "")
+
+    def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
+        root_id = sample_ultimate_goal.id
+        quick_template = SessionTemplate(
+            id=str(uuid.uuid4()),
+            name='Quick Template',
+            root_id=root_id,
+            template_data=json.dumps({
+                'session_type': 'quick',
+                'activities': [{'activity_id': sample_activity_definition.id}],
+            }),
+        )
+        db_session.add(quick_template)
+        db_session.commit()
+
+        create_response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Quick Session',
+                'template_id': quick_template.id,
+            }
+        )
+        assert create_response.status_code == 201
+        session = create_response.get_json()
+
+        response = authed_client.post(
+            f'/api/{root_id}/notes',
+            json={
+                'content': 'Should fail',
+                'context_type': 'session',
+                'context_id': session['id'],
+                'session_id': session['id'],
+            }
+        )
+
+        assert response.status_code == 400
+        assert 'Quick sessions do not support notes' in response.get_json()['error']
 
         db_session.expire_all()
         rolled_back_goal = db_session.query(Goal).filter_by(name="Should Roll Back").first()

@@ -175,6 +175,65 @@
     border-color: var(--color-brand-primary);
 }
 
+.sessionMetaGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.select {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+}
+
+.select:focus {
+    outline: none;
+    border-color: var(--color-brand-primary);
+}
+
+.colorRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 42px;
+}
+
+.colorInput {
+    width: 52px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    cursor: pointer;
+}
+
+.colorValue {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-monospace, monospace);
+}
+
+.previewRow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.previewStack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
 /* Duration & Add Section Bar */
 .actionBar {
     display: flex;
@@ -319,6 +378,10 @@
     border-left: 2px solid var(--color-border);
 }
 
+.inlineActivitySelector {
+    margin-top: 12px;
+}
+
 .activityItem {
     background: var(--color-bg-secondary);
     padding: 10px 12px;
@@ -328,6 +391,22 @@
     justify-content: space-between;
     align-items: center;
     border: 1px solid transparent;
+}
+
+.activityInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.activityActions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.miniMoveGroup {
+    display: flex;
+    gap: 4px;
 }
 
 .activityItem:hover {
@@ -431,7 +510,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1100;
+    z-index: 2100;
     backdrop-filter: blur(2px);
 }
 
@@ -534,4 +613,30 @@
     margin: 0 0 20px 0;
     color: var(--color-text-secondary);
     line-height: 1.5;
+}
+
+.alertButton {
+    padding: 8px 14px;
+    background: var(--color-brand-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .sessionMetaGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .actionBar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .sectionHeader {
+        flex-direction: column;
+        gap: 12px;
+    }
 }

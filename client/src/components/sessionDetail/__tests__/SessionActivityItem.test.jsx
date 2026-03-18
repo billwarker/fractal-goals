@@ -54,6 +54,7 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         microGoals: [
             {
                 id: 'micro-1',
+                name: 'Micro Goal',
                 parent_id: 'ig-1',
                 completed: false,
                 attributes: { session_id: 'session-1' },
@@ -349,5 +350,133 @@ describe('SessionActivityItem nano note flow', () => {
         expect(updateInstance).toHaveBeenCalledWith('instance-3', {
             time_start: '2026-01-01T01:15:00.000Z'
         });
+    });
+});
+
+describe('SessionActivityItem quick mode', () => {
+    const quickModeDefinition = {
+        id: 'activity-1',
+        name: 'Military Press',
+        group_id: 'group-child',
+        associated_goal_ids: ['ig-1'],
+        metric_definitions: [{ id: 'm1', name: 'Weight', unit: 'lbs' }],
+        split_definitions: [],
+        has_sets: false,
+        has_splits: false,
+    };
+
+    const baseExercise = {
+        id: 'quick-instance-1',
+        session_id: 'session-1',
+        activity_definition_id: 'activity-1',
+        completed: false,
+        metrics: [{ metric_id: 'm1', value: '190' }],
+        sets: [],
+        time_start: null,
+        time_stop: null,
+        duration_seconds: 0,
+    };
+
+    beforeEach(() => {
+        updateInstance.mockClear();
+        updateTimer.mockClear();
+        removeActivity.mockClear();
+    });
+
+    it('renders timer controls, notes, delete button, and micro goal icon in regular mode', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByTitle('Micro Goal: Micro Goal')).toBeInTheDocument();
+        expect(screen.getByTitle('Start timer')).toBeInTheDocument();
+        expect(screen.getByTitle('Instant complete (0s duration)')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Add a nano goal / sub-step...')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '×' })).toBeInTheDocument();
+    });
+
+    it('renders completion button, hides timer controls, notes, delete button, and micro goal icon in quick mode', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{ ...baseExercise, metrics: [] }}
+                quickMode
+                isSelected={false}
+                activityDefinition={{ ...quickModeDefinition, metric_definitions: [] }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.queryByTitle('Start timer')).not.toBeInTheDocument();
+        expect(screen.queryByTitle('Instant complete (0s duration)')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Add a nano goal / sub-step...')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '×' })).not.toBeInTheDocument();
+        expect(screen.queryByTitle('Micro Goal: Micro Goal')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Mark Complete' })).toBeInTheDocument();
+        expect(screen.getByText('Mark this activity complete when finished.')).toBeInTheDocument();
+    });
+
+    it('renders the same metric input surface in quick and regular modes', () => {
+        const regularRender = renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('Weight')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('190')).toBeInTheDocument();
+
+        regularRender.unmount();
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                quickMode
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('Weight')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('190')).toBeInTheDocument();
     });
 });

@@ -12,9 +12,18 @@ import { formatDuration, calculateSessionDuration } from '../../hooks/useSession
 import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import { isSMART } from '../../utils/smartHelpers';
 import GoalIcon from '../atoms/GoalIcon';
+import CardCornerActionButton from '../common/CardCornerActionButton';
+import CompletionCheckBadge from '../common/CompletionCheckBadge';
+import MetaField from '../common/MetaField';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import SessionSectionGrid from './SessionSectionGrid';
+import ExerciseCard from './ExerciseCard';
 import styles from './SessionCardExpanded.module.css';
+import {
+    getReadableTextColor,
+    getTemplateColor,
+    isQuickSession,
+} from '../../utils/sessionRuntime';
 
 const GOAL_LEVEL_ORDER = {
     UltimateGoal: 0,
@@ -147,13 +156,17 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     sessionActivityInstances = [],
     isSelected,
     onSelect,
+    onRequestDelete,
     getGoalColor,
     formatDate
 }) {
     const { getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
     const sessionData = session.attributes?.session_data;
+    const quickSession = isQuickSession(session);
+    const templateColor = getTemplateColor(session);
+    const templateTextColor = getReadableTextColor(templateColor);
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
-    const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end || session?.attributes?.updated_at || session?.updated_at;
+    const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
     const microGoals = session.micro_goals || [];
@@ -285,13 +298,47 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 
     // Memoize duration calculation
     const duration = useMemo(() => {
+        if (quickSession && !sessionEnd) {
+            return '-';
+        }
         const seconds = calculateSessionDuration(session);
         return formatDuration(seconds);
-    }, [session]);
+    }, [quickSession, session, sessionEnd]);
 
     const handleClick = () => {
         onSelect?.(session.id);
     };
+
+    const handleDeleteClick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onRequestDelete?.(session);
+    };
+
+    const quickActivities = useMemo(() => {
+        if (!quickSession) return [];
+        const orderedIds = Array.isArray(sessionData?.activity_ids) ? sessionData.activity_ids : [];
+        const instanceMap = new Map((sessionActivityInstances || []).map((instance) => [instance.id, instance]));
+        if (orderedIds.length > 0) {
+            return orderedIds
+                .map((id) => instanceMap.get(id))
+                .filter(Boolean)
+                .map((instance) => ({
+                    ...instance,
+                    type: 'activity',
+                    activity_id: instance.activity_definition_id,
+                    instance_id: instance.id,
+                    name: instance.name || 'Activity',
+                }));
+        }
+        return (sessionActivityInstances || []).map((instance) => ({
+            ...instance,
+            type: 'activity',
+            activity_id: instance.activity_definition_id,
+            instance_id: instance.id,
+            name: instance.name || 'Activity',
+        }));
+    }, [quickSession, sessionActivityInstances, sessionData?.activity_ids]);
 
     return (
         <div
@@ -299,19 +346,29 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             onClick={handleClick}
             className={`${styles.sessionCard} ${isSelected ? styles.sessionCardSelected : ''}`}
         >
+            <CardCornerActionButton
+                className={styles.deleteBtn}
+                onClick={handleDeleteClick}
+                label={`Delete session ${session.name}`}
+                title="Delete Session"
+            />
+
             {/* Top Level: High-level session info */}
             <div className={styles.cardTopLevel}>
                 {/* Session Name (Link) */}
                 <div className={styles.topTitleBlock}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className={styles.topTitleRow}>
                         <Link
-                            to={`/${rootId}/session/${session.id}`}
-                            className={styles.cardHeaderTitle}
+                            to={quickSession
+                                ? `/${rootId}/sessions?quickSessionId=${session.id}`
+                                : `/${rootId}/session/${session.id}`}
+                            className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
+                            style={sessionData?.template_name ? { backgroundColor: templateColor, color: templateTextColor } : undefined}
                         >
                             {session.name}
                         </Link>
                         {session.attributes?.completed && (
-                            <span style={{ color: 'var(--color-brand-success)', fontSize: '16px' }}>✓</span>
+                            <CompletionCheckBadge />
                         )}
                     </div>
                     {session.attributes?.description && (
@@ -342,48 +399,35 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 </div>
 
                 {/* Session Start */}
-                <div className={styles.metaItem}>
-                    <div className={styles.fieldLabel}>Session Start</div>
-                    {sessionStart ? (
-                        <div className={styles.fieldValue}>{formatDate(sessionStart)}</div>
-                    ) : (
-                        <div className={styles.fieldValueMuted}>-</div>
-                    )}
-                </div>
+                <MetaField
+                    className={styles.metaItem}
+                    label="Session Start"
+                    value={sessionStart ? formatDate(sessionStart) : '-'}
+                    muted={!sessionStart}
+                />
 
                 {/* Session End */}
-                <div className={styles.metaItem}>
-                    <div className={styles.fieldLabel}>Session End</div>
-                    {sessionEnd ? (
-                        <div className={styles.fieldValue}>{formatDate(sessionEnd)}</div>
-                    ) : (
-                        <div className={styles.fieldValueMuted}>-</div>
-                    )}
-                </div>
+                <MetaField
+                    className={styles.metaItem}
+                    label="Session End"
+                    value={sessionEnd ? formatDate(sessionEnd) : '-'}
+                    muted={!sessionEnd}
+                />
 
                 {/* Last Modified */}
-                <div className={styles.metaItem}>
-                    <div className={styles.fieldLabel}>Last Modified</div>
-                    <div className={styles.fieldValue}>{formatDate(session.attributes?.updated_at)}</div>
-                </div>
+                <MetaField
+                    className={styles.metaItem}
+                    label="Last Modified"
+                    value={formatDate(session.attributes?.updated_at)}
+                />
 
                 {/* Duration */}
-                <div className={styles.metaItem}>
-                    <div className={styles.fieldLabel}>Duration</div>
-                    <div className={styles.fieldValue} style={{ fontWeight: 500 }}>{duration}</div>
-                </div>
-
-                {/* Template */}
-                <div className={styles.metaItem}>
-                    <div className={styles.fieldLabel}>Template</div>
-                    {sessionData?.template_name ? (
-                        <span className={styles.templateBadge}>
-                            {sessionData.template_name}
-                        </span>
-                    ) : (
-                        <span className={styles.fieldValueMuted}>None</span>
-                    )}
-                </div>
+                <MetaField
+                    className={styles.metaItem}
+                    label="Duration"
+                    value={duration}
+                    emphasize
+                />
             </div>
 
             {/* Session Accomplishments Section */}
@@ -397,7 +441,27 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 
             {/* Bottom Level: Session data with horizontal sections */}
             <div className={styles.cardBottomLevel}>
-                {sessionData?.sections && sessionData.sections.length > 0 ? (
+                {quickSession ? (
+                    quickActivities.length > 0 ? (
+                        <div className={styles.quickActivityList}>
+                            {quickActivities.map((activity, index) => {
+                                const activityDefinition = activities?.find((entry) => entry.id === activity.activity_id) || null;
+
+                                return (
+                                    <ExerciseCard
+                                        key={activity.instance_id || activity.id || `${activity.name}-${index}`}
+                                        exercise={activity}
+                                        activityDefinition={activityDefinition}
+                                    />
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className={styles.emptyState} style={{ padding: '20px', margin: 0 }}>
+                            No activities recorded for this quick session
+                        </p>
+                    )
+                ) : sessionData?.sections && sessionData.sections.length > 0 ? (
                     <>
                         <SessionSectionGrid
                             sections={sessionData.sections}

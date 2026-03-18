@@ -1,5 +1,5 @@
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test/test-utils';
 import Sessions from '../Sessions';
 
@@ -54,6 +54,14 @@ vi.mock('../../components/sessions', () => ({
     )
 }));
 
+vi.mock('../../components/sessionDetail', () => ({
+    QuickSessionWorkspace: () => <div data-testid="quick-session-modal-content">quick session modal</div>,
+}));
+
+vi.mock('../../contexts/ActiveSessionContext', () => ({
+    ActiveSessionProvider: ({ children }) => <>{children}</>,
+}));
+
 describe('Sessions page data loading', () => {
     beforeEach(() => {
         Object.defineProperty(window, 'localStorage', {
@@ -95,5 +103,83 @@ describe('Sessions page data loading', () => {
         });
 
         expect(getSessionActivities).not.toHaveBeenCalled();
+    });
+
+    it('renders quick sessions in a sessions-page modal when quickSessionId is present in the route', async () => {
+        getSessions.mockResolvedValue({
+            data: {
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Quick Session 1',
+                        attributes: {
+                            completed: true,
+                            updated_at: '2026-03-16T10:00:00Z',
+                            session_data: {
+                                session_type: 'quick',
+                                sections: [],
+                            },
+                        },
+                        activity_instances: [],
+                        notes: [],
+                    },
+                ],
+                pagination: { limit: 10, offset: 0, total: 1, has_more: false }
+            }
+        });
+        getActivities.mockResolvedValue({ data: [] });
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions?quickSessionId=s1',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('quick-session-modal-content')).toBeInTheDocument();
+        });
+
+        expect(screen.getByRole('dialog', { name: 'Quick session: Quick Session 1' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close quick session' })).toBeInTheDocument();
+    });
+
+    it('closes the quick-session modal on escape', async () => {
+        getSessions.mockResolvedValue({
+            data: {
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Quick Session 1',
+                        attributes: {
+                            completed: true,
+                            updated_at: '2026-03-16T10:00:00Z',
+                            session_data: {
+                                session_type: 'quick',
+                                sections: [],
+                            },
+                        },
+                        activity_instances: [],
+                        notes: [],
+                    },
+                ],
+                pagination: { limit: 10, offset: 0, total: 1, has_more: false }
+            }
+        });
+        getActivities.mockResolvedValue({ data: [] });
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions?quickSessionId=s1',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
+        });
+
+        const dialog = await screen.findByRole('dialog', { name: 'Quick session: Quick Session 1' });
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'Quick session: Quick Session 1' })).not.toBeInTheDocument();
+        });
     });
 });

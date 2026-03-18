@@ -1,3 +1,4 @@
+import copy
 from datetime import date, datetime, time, timedelta, timezone
 import logging
 import uuid
@@ -21,6 +22,13 @@ from services.owned_entity_queries import (
 from services.service_types import JsonDict, ServiceResult
 from services.serializers import serialize_activity_instance, serialize_session
 from services.goal_type_utils import get_canonical_goal_type
+from services.session_runtime import (
+    DEFAULT_TEMPLATE_COLOR,
+    SESSION_TYPE_QUICK,
+    get_template_color,
+    get_template_session_type,
+    is_quick_session,
+)
 logger = logging.getLogger(__name__)
 
 VALID_SESSION_COMPLETION_FILTERS = {"all", "completed", "incomplete"}
@@ -50,6 +58,12 @@ def _parse_iso_datetime_strict(value) -> datetime | None:
     return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _as_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
 class SessionService:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -59,6 +73,7 @@ class SessionService:
     def _session_read_options():
         return (
             selectinload(Session.goals),
+            selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
@@ -102,6 +117,22 @@ class SessionService:
                 value = nested.get(key)
                 if isinstance(value, str) and value.strip():
                     return value
+        return None
+
+    @classmethod
+    def _normalize_template_activities(cls, raw_items) -> list[tuple[dict | str, str]]:
+        normalized = []
+        for raw_item in raw_items or []:
+            activity_id = cls._extract_activity_definition_id(raw_item)
+            if not activity_id:
+                continue
+            normalized.append((raw_item, activity_id))
+        return normalized
+
+    @staticmethod
+    def _quick_session_structure_error(session):
+        if is_quick_session(session):
+            return "Quick session structure is fixed by the template", 400
         return None
 
     def _session_goals_supports_source(self) -> bool:
@@ -625,6 +656,9 @@ class SessionService:
         session = get_owned_session(self.db_session, root_id, session_id)
         if not session:
             return None, "Session not found", 404
+        quick_error = self._quick_session_structure_error(session)
+        if quick_error:
+            return None, *quick_error
 
         activity_definition_id = data.get('activity_definition_id')
         if not activity_definition_id:
@@ -706,6 +740,9 @@ class SessionService:
         session = get_owned_session(self.db_session, root_id, session_id)
         if not session:
             return None, "Session not found", 404
+        quick_error = self._quick_session_structure_error(session)
+        if quick_error:
+            return None, *quick_error
 
         for idx, instance_id in enumerate(activity_ids):
             instance = self.db_session.query(ActivityInstance).filter_by(
@@ -771,6 +808,9 @@ class SessionService:
         session = get_owned_session(self.db_session, root_id, session_id)
         if not session:
             return None, "Session not found", 404
+        quick_error = self._quick_session_structure_error(session)
+        if quick_error:
+            return None, *quick_error
 
         instance = get_owned_activity_instance(
             self.db_session,
@@ -908,7 +948,10 @@ class SessionService:
         )
         
         session_data_dict = models._safe_load_json(data.get('session_data'), {})
-        new_session.attributes = session_data_dict
+        new_session.attributes = copy.deepcopy(session_data_dict)
+        template = None
+        template_payload = {}
+        template_session_type = get_template_session_type(session_data_dict)
         
         # Program Context
         program_day_id = None
@@ -929,7 +972,6 @@ class SessionService:
                 else:
                     return None, "Invalid program day context for this fractal", 400
 
-        template = None
         # Validate template ownership when provided
         if new_session.template_id:
             template = self.db_session.query(models.SessionTemplate).filter(
@@ -939,19 +981,29 @@ class SessionService:
             ).first()
             if not template:
                 return None, "Template not found in this fractal", 404
-            # Fallback: if client payload omitted sections, hydrate from stored template.
-            if isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
-                template_payload = models._safe_load_json(template.template_data, {})
+            template_payload = models._safe_load_json(template.template_data, {})
+            template_session_type = get_template_session_type(template_payload)
+
+            session_data_dict.setdefault('template_id', template.id)
+            session_data_dict.setdefault('template_name', template.name)
+            session_data_dict.setdefault('session_type', template_session_type)
+            session_data_dict.setdefault('template_color', get_template_color(template_payload) or DEFAULT_TEMPLATE_COLOR)
+
+            if template_session_type == SESSION_TYPE_QUICK:
+                if program_day_id:
+                    return None, "Quick session templates cannot be used from a program day", 400
+                if not new_session.session_start:
+                    new_session.session_start = datetime.now(timezone.utc)
+            elif isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
                 if isinstance(template_payload, dict) and template_payload.get('sections'):
                     session_data_dict['sections'] = template_payload.get('sections', [])
-                    if not session_data_dict.get('template_name'):
-                        session_data_dict['template_name'] = template.name
                     if (
                         not session_data_dict.get('total_duration_minutes')
                         and template_payload.get('total_duration_minutes') is not None
                     ):
                         session_data_dict['total_duration_minutes'] = template_payload.get('total_duration_minutes')
-                    new_session.attributes = session_data_dict
+
+            new_session.attributes = copy.deepcopy(session_data_dict)
         
         self.db_session.add(new_session)
         self.db_session.flush()
@@ -977,72 +1029,106 @@ class SessionService:
                 local_section_exercises.append((section, normalized))
             return local_activity_ids, local_section_exercises
 
-        sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
-        activity_def_ids, section_exercises = collect_section_exercises(sections)
+        is_quick_template = template_session_type == SESSION_TYPE_QUICK
 
-        # If the incoming session payload had sections but no parseable activity ids,
-        # fall back to canonical template sections from DB.
-        if not activity_def_ids and template:
-            template_payload = models._safe_load_json(template.template_data, {})
-            template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
-            template_activity_ids, template_section_exercises = collect_section_exercises(template_sections)
-            if template_activity_ids:
-                session_data_dict['sections'] = template_sections
-                sections = session_data_dict.get('sections', [])
-                activity_def_ids = template_activity_ids
-                section_exercises = template_section_exercises
-        
-        if activity_def_ids:
-            activities = self.db_session.query(ActivityDefinition).options(
-                joinedload(ActivityDefinition.associated_goals)
-            ).filter(
-                ActivityDefinition.id.in_(activity_def_ids),
+        if is_quick_template:
+            quick_items = template_payload.get('activities', []) if isinstance(template_payload, dict) else []
+            normalized_quick_items = self._normalize_template_activities(quick_items)
+            if not (1 <= len(normalized_quick_items) <= 5):
+                return None, "Quick sessions must include between 1 and 5 activities", 400
+
+            unique_activity_def_ids = {activity_id for _, activity_id in normalized_quick_items}
+            activities = self.db_session.query(ActivityDefinition).filter(
+                ActivityDefinition.id.in_(unique_activity_def_ids),
                 ActivityDefinition.root_id == root_id,
                 ActivityDefinition.deleted_at == None
             ).all()
             found_activity_ids = {a.id for a in activities}
-            missing_activity_ids = activity_def_ids - found_activity_ids
+            missing_activity_ids = unique_activity_def_ids - found_activity_ids
             if missing_activity_ids:
                 return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
-            activity_map = {a.id: a for a in activities}
 
-            # Persist activity instances and canonical activity ordering for section rendering.
-            for section, normalized_exercises in section_exercises:
-                section_activity_ids = []
-                for exercise, activity_id in normalized_exercises:
-                    if activity_id not in activity_map:
-                        continue
-                    instance_id = exercise.get('instance_id') or str(uuid.uuid4())
-                    instance = ActivityInstance(
-                        id=instance_id,
-                        session_id=new_session.id,
-                        activity_definition_id=activity_id,
-                        root_id=root_id
-                    )
-                    self.db_session.add(instance)
-                    section_activity_ids.append(instance_id)
+            created_activity_ids = []
+            for raw_item, activity_id in normalized_quick_items:
+                raw_dict = raw_item if isinstance(raw_item, dict) else {}
+                instance_id = raw_dict.get('instance_id') or str(uuid.uuid4())
+                instance = ActivityInstance(
+                    id=instance_id,
+                    session_id=new_session.id,
+                    activity_definition_id=activity_id,
+                    root_id=root_id,
+                )
+                self.db_session.add(instance)
+                created_activity_ids.append(instance_id)
 
-                section['activity_ids'] = section_activity_ids
-                section.pop('exercises', None)
-                section.pop('activities', None)
-                if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
-                    section['estimated_duration_minutes'] = section.get('duration_minutes')
+            session_data_dict['activity_ids'] = created_activity_ids
+            session_data_dict.pop('sections', None)
+        else:
+            sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
+            activity_def_ids, section_exercises = collect_section_exercises(sections)
 
-            for act in activities:
-                for goal in act.associated_goals:
-                    if (
-                        goal.root_id == root_id and
-                        not goal.completed and
-                        not goal.deleted_at
-                    ):
-                        inherited_goal_map[goal.id] = goal
+            # If the incoming session payload had sections but no parseable activity ids,
+            # fall back to canonical template sections from DB.
+            if not activity_def_ids and template:
+                template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
+                template_activity_ids, template_section_exercises = collect_section_exercises(template_sections)
+                if template_activity_ids:
+                    session_data_dict['sections'] = template_sections
+                    sections = session_data_dict.get('sections', [])
+                    activity_def_ids = template_activity_ids
+                    section_exercises = template_section_exercises
+
+            if activity_def_ids:
+                activities = self.db_session.query(ActivityDefinition).options(
+                    joinedload(ActivityDefinition.associated_goals)
+                ).filter(
+                    ActivityDefinition.id.in_(activity_def_ids),
+                    ActivityDefinition.root_id == root_id,
+                    ActivityDefinition.deleted_at == None
+                ).all()
+                found_activity_ids = {a.id for a in activities}
+                missing_activity_ids = activity_def_ids - found_activity_ids
+                if missing_activity_ids:
+                    return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
+                activity_map = {a.id: a for a in activities}
+
+                # Persist activity instances and canonical activity ordering for section rendering.
+                for section, normalized_exercises in section_exercises:
+                    section_activity_ids = []
+                    for exercise, activity_id in normalized_exercises:
+                        if activity_id not in activity_map:
+                            continue
+                        instance_id = exercise.get('instance_id') or str(uuid.uuid4())
+                        instance = ActivityInstance(
+                            id=instance_id,
+                            session_id=new_session.id,
+                            activity_definition_id=activity_id,
+                            root_id=root_id
+                        )
+                        self.db_session.add(instance)
+                        section_activity_ids.append(instance_id)
+
+                    section['activity_ids'] = section_activity_ids
+                    section.pop('exercises', None)
+                    section.pop('activities', None)
+                    if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
+                        section['estimated_duration_minutes'] = section.get('duration_minutes')
+
+                for act in activities:
+                    for goal in act.associated_goals:
+                        if (
+                            goal.root_id == root_id and
+                            not goal.completed and
+                            not goal.deleted_at
+                        ):
+                            inherited_goal_map[goal.id] = goal
 
         # Reassign JSON attributes after in-place section normalization so SQLAlchemy
         # reliably persists updates for non-mutable JSON columns.
-        new_session.attributes = models._safe_load_json(session_data_dict, {})
+        new_session.attributes = copy.deepcopy(session_data_dict)
 
         # Filter inherited goals by program-selected goals when in program context
-        if program_day_id and program_goal_ids:
+        if not is_quick_template and program_day_id and program_goal_ids:
             inherited_goal_map = {gid: g for gid, g in inherited_goal_map.items() if gid in program_goal_ids}
 
         # Persist Associations
@@ -1055,56 +1141,60 @@ class SessionService:
         # Provenance-aware linking
         linked_goal_ids = set()
 
-        for goal_id, goal_obj in inherited_goal_map.items():
-            self.db_session.execute(
-                session_goals.insert().values(
-                    **self._session_goal_insert_values(
-                        new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'activity'
-                    )
-                )
-            )
-            linked_goal_ids.add(goal_id)
-
-        for goal_id in manual_ids:
-            goal_obj = self.db_session.query(Goal).filter(
-                Goal.id == goal_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).first()
-            if not goal_obj:
-                return None, f"Goal not found in this fractal: {goal_id}", 400
-            if goal_id in linked_goal_ids:
-                continue
-            self.db_session.execute(
-                session_goals.insert().values(
-                    **self._session_goal_insert_values(
-                        new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'manual'
-                    )
-                )
-            )
-            linked_goal_ids.add(goal_id)
-
-        # Immediate Goals
-        immediate_goal_ids = data.get('immediate_goal_ids', [])
-        for ig_id in immediate_goal_ids:
-            goal = self.db_session.query(Goal).filter(
-                Goal.id == ig_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).first()
-            if not goal:
-                return None, f"Immediate goal not found in this fractal: {ig_id}", 400
-            if get_canonical_goal_type(goal) != 'ImmediateGoal':
-                return None, f"Goal is not an ImmediateGoal: {ig_id}", 400
-            if ig_id not in linked_goal_ids:
+        # Quick sessions intentionally skip all goal-link creation. Their runtime
+        # is measurement-first and does not participate in inherited/manual goal
+        # association flows used by normal sessions.
+        if not is_quick_template:
+            for goal_id, goal_obj in inherited_goal_map.items():
                 self.db_session.execute(
                     session_goals.insert().values(
                         **self._session_goal_insert_values(
-                            new_session.id, ig_id, get_canonical_goal_type(goal), 'manual'
+                            new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'activity'
                         )
                     )
                 )
-                linked_goal_ids.add(ig_id)
+                linked_goal_ids.add(goal_id)
+
+            for goal_id in manual_ids:
+                goal_obj = self.db_session.query(Goal).filter(
+                    Goal.id == goal_id,
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None
+                ).first()
+                if not goal_obj:
+                    return None, f"Goal not found in this fractal: {goal_id}", 400
+                if goal_id in linked_goal_ids:
+                    continue
+                self.db_session.execute(
+                    session_goals.insert().values(
+                        **self._session_goal_insert_values(
+                            new_session.id, goal_id, get_canonical_goal_type(goal_obj), 'manual'
+                        )
+                    )
+                )
+                linked_goal_ids.add(goal_id)
+
+            # Immediate Goals
+            immediate_goal_ids = data.get('immediate_goal_ids', [])
+            for ig_id in immediate_goal_ids:
+                goal = self.db_session.query(Goal).filter(
+                    Goal.id == ig_id,
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None
+                ).first()
+                if not goal:
+                    return None, f"Immediate goal not found in this fractal: {ig_id}", 400
+                if get_canonical_goal_type(goal) != 'ImmediateGoal':
+                    return None, f"Goal is not an ImmediateGoal: {ig_id}", 400
+                if ig_id not in linked_goal_ids:
+                    self.db_session.execute(
+                        session_goals.insert().values(
+                            **self._session_goal_insert_values(
+                                new_session.id, ig_id, get_canonical_goal_type(goal), 'manual'
+                            )
+                        )
+                    )
+                    linked_goal_ids.add(ig_id)
 
         if program_day_id:
             from models import ProgramDay
@@ -1165,6 +1255,16 @@ class SessionService:
             if data['completed']:
                 completion_time = datetime.now(timezone.utc)
                 session.completed_at = completion_time
+                if is_quick_session(session):
+                    if not session.session_start:
+                        session.session_start = session.created_at or completion_time
+                    session.session_end = None
+                    session.total_duration_seconds = None
+                    if isinstance(session.attributes, dict) and 'session_data' in session.attributes:
+                        session.attributes['session_data']['session_end'] = None
+                        session.attributes['session_data']['total_duration_seconds'] = None
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(session, "attributes")
 
                 # Keep session card exercise state consistent with session completion.
                 instances = self.db_session.query(ActivityInstance).filter(

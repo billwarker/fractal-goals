@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useGoals } from '../contexts/GoalsContext';
@@ -9,12 +10,20 @@ import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQuerie
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
+import { QuickSessionWorkspace } from '../components/sessionDetail';
+import CardCornerActionButton from '../components/common/CardCornerActionButton';
+import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import { flattenGoals } from '../utils/goalHelpers';
 import { formatDateInTimezone } from '../utils/dateUtils';
+import { fractalApi } from '../utils/api';
+import { queryKeys } from '../hooks/queryKeys';
+import notify from '../utils/notify';
+import { isQuickSession } from '../utils/sessionRuntime';
 import '../App.css';
 import styles from './Sessions.module.css';
+import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 
 /**
  * Sessions Page - View and query practice sessions
@@ -24,11 +33,15 @@ function Sessions() {
     const { rootId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const queryClient = useQueryClient();
     const { timezone } = useTimezone();
     const { setActiveRootId } = useGoals();
     const isMobile = useIsMobile();
+    const quickSessionDialogRef = useRef(null);
 
     const [selectedSessionId, setSelectedSessionId] = useState(null);
+    const [sessionToDelete, setSessionToDelete] = useState(null);
     const filtersPaneStorageKey = `sessions-query-pane-open:${rootId || 'default'}`;
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
         if (typeof window === 'undefined') return true;
@@ -78,6 +91,7 @@ function Sessions() {
     }, [sessionsPages]);
 
     const totalSessions = sessionsPages?.pages?.[0]?.pagination?.total || 0;
+    const activeQuickSessionId = searchParams.get('quickSessionId');
 
     useEffect(() => {
         const deletedId = location.state?.deletedSessionId;
@@ -105,6 +119,10 @@ function Sessions() {
         () => sessions.filter((session) => !hiddenSessionIds.has(session.id)),
         [sessions, hiddenSessionIds]
     );
+    const activeQuickSession = useMemo(
+        () => sessions.find((session) => session.id === activeQuickSessionId) || null,
+        [activeQuickSessionId, sessions]
+    );
 
     useEffect(() => {
         if (!selectedSessionId) return;
@@ -122,6 +140,66 @@ function Sessions() {
             }
         }
     }, [selectedSessionId]);
+
+    useEffect(() => {
+        if (!activeQuickSessionId) return;
+        if (sessionsLoading || (sessionsFetching && sessions.length === 0)) return;
+        if (!activeQuickSession || !isQuickSession(activeQuickSession)) {
+            const nextSearchParams = new URLSearchParams(searchParams);
+            nextSearchParams.delete('quickSessionId');
+            setSearchParams(nextSearchParams, { replace: true });
+        }
+    }, [activeQuickSession, activeQuickSessionId, searchParams, setSearchParams, sessions, sessionsFetching, sessionsLoading]);
+
+    const handleCloseQuickSessionModal = useCallback(() => {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.delete('quickSessionId');
+        setSearchParams(nextSearchParams);
+    }, [searchParams, setSearchParams]);
+
+    useEffect(() => {
+        if (!activeQuickSession || !quickSessionDialogRef.current) return undefined;
+
+        const dialog = quickSessionDialogRef.current;
+        dialog.focus();
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                handleCloseQuickSessionModal();
+                return;
+            }
+
+            if (event.key !== 'Tab') return;
+
+            const focusableElements = dialog.querySelectorAll(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            const focusable = Array.from(focusableElements).filter((element) => (
+                !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true'
+            ));
+
+            if (focusable.length === 0) {
+                event.preventDefault();
+                dialog.focus();
+                return;
+            }
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        dialog.addEventListener('keydown', handleKeyDown);
+        return () => dialog.removeEventListener('keydown', handleKeyDown);
+    }, [activeQuickSession, handleCloseQuickSessionModal]);
 
     const goalOptions = useMemo(() => {
         const allGoals = flattenGoals(goalTree ? [goalTree] : []);
@@ -156,6 +234,38 @@ function Sessions() {
     const handleSessionSelect = useCallback((sessionId) => {
         setSelectedSessionId(sessionId);
     }, []);
+
+    const handleRequestDeleteSession = useCallback((session) => {
+        setSessionToDelete(session);
+    }, []);
+
+    const handleCloseDeleteModal = useCallback(() => {
+        setSessionToDelete(null);
+    }, []);
+
+    const handleConfirmDeleteSession = useCallback(async () => {
+        if (!sessionToDelete) return;
+
+        try {
+            await fractalApi.deleteSession(rootId, sessionToDelete.id);
+
+            setHiddenSessionIds((prev) => {
+                const next = new Set(prev);
+                next.add(sessionToDelete.id);
+                return next;
+            });
+            setSelectedSessionId((prev) => (prev === sessionToDelete.id ? null : prev));
+            setSessionToDelete(null);
+
+            queryClient.removeQueries({ queryKey: queryKeys.session(rootId, sessionToDelete.id) });
+            queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
+
+            notify.success('Session deleted');
+        } catch (err) {
+            console.error('Failed to delete session:', err);
+            notify.error('Failed to delete session: ' + (err.response?.data?.error || err.message));
+        }
+    }, [queryClient, rootId, sessionToDelete]);
 
     if (activitiesLoading || activityGroupsLoading || goalsLoading || !goalTree) {
         return (
@@ -216,6 +326,7 @@ function Sessions() {
                                     activities={activities}
                                     isSelected={selectedSessionId === session.id}
                                     onSelect={handleSessionSelect}
+                                    onRequestDelete={handleRequestDeleteSession}
                                     getGoalColor={getGoalColor}
                                     timezone={timezone}
                                     formatDate={formatDate}
@@ -269,6 +380,45 @@ function Sessions() {
                         onToggleCollapse={() => setIsFiltersPaneOpen(false)}
                         isMobile={isMobile}
                     />
+                </div>
+            )}
+
+            <DeleteConfirmModal
+                isOpen={Boolean(sessionToDelete)}
+                onClose={handleCloseDeleteModal}
+                onConfirm={handleConfirmDeleteSession}
+                title="Delete Session"
+                message={sessionToDelete
+                    ? `Are you sure you want to delete "${sessionToDelete.name}"?`
+                    : 'Are you sure you want to delete this session?'}
+                confirmText="Delete Session"
+            />
+
+            {activeQuickSession && isQuickSession(activeQuickSession) && (
+                <div
+                    className={styles.quickSessionModalOverlay}
+                    onClick={handleCloseQuickSessionModal}
+                    role="presentation"
+                >
+                    <div
+                        ref={quickSessionDialogRef}
+                        className={styles.quickSessionModal}
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Quick session: ${activeQuickSession.name}`}
+                        tabIndex={-1}
+                    >
+                        <CardCornerActionButton
+                            className={styles.quickSessionModalClose}
+                            onClick={handleCloseQuickSessionModal}
+                            label="Close quick session"
+                            title="Close"
+                        />
+                        <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSession.id}>
+                            <QuickSessionWorkspace />
+                        </ActiveSessionProvider>
+                    </div>
                 </div>
             )}
         </div>

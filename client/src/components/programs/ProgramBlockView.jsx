@@ -8,6 +8,7 @@ import Button from '../atoms/Button';
 import styles from './ProgramBlockView.module.css';
 import { useState } from 'react';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
@@ -226,14 +227,17 @@ function ProgramBlockView({
                                                             const sCount = tSessions.length;
                                                             const isDone = sCount > 0;
 
-                                                            return (
-                                                                <div key={template.id}
-                                                                    className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending}`}
-                                                                >
-                                                                    <span>{isDone ? '✓ ' : ''}{template.name}</span>
-                                                                    {sCount > 1 && <span>{sCount}</span>}
-                                                                </div>
-                                                            );
+                                                                return (
+                                                                    <div key={template.id}
+                                                                        className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending}`}
+                                                                    >
+                                                                        <div className={styles.templateBadgeWrap}>
+                                                                            {isDone && <span className={styles.templateDoneMark}>✓</span>}
+                                                                            <SessionTemplateNameBadge entity={template} size="sm" />
+                                                                        </div>
+                                                                        {sCount > 1 && <span className={styles.templateCount}>{sCount}</span>}
+                                                                    </div>
+                                                                );
                                                         });
                                                     }
                                                     return <div className={styles.restDay}>Rest</div>;

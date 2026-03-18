@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
+import CardCornerActionButton from '../components/common/CardCornerActionButton';
 import { isBlockActive, ActiveBlockBadge } from '../utils/programUtils.jsx';
 import { formatLiteralDate } from '../utils/dateUtils';
 import styles from './Programs.module.css'; // Import CSS Module
@@ -191,13 +192,12 @@ function Programs() {
                                     className={styles.card}
                                 >
                                     {/* Delete Button - Top Right */}
-                                    <button
+                                    <CardCornerActionButton
                                         className={styles.deleteBtn}
                                         onClick={(e) => handleDeleteProgram(e, program)}
+                                        label={`Delete program ${program.name}`}
                                         title="Delete Program"
-                                    >
-                                        ×
-                                    </button>
+                                    />
 
                                     {/* Program Header */}
                                     <div className={styles.cardHeader}>

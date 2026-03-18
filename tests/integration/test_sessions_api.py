@@ -18,7 +18,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from models import ActivityDefinition, ActivityInstance, Session, activity_goal_associations
+from models import ActivityDefinition, ActivityInstance, Session, SessionTemplate, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -371,6 +371,94 @@ class TestSessionCRUDEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['template_id'] == sample_session_template.id
+
+    def test_create_quick_session_from_template(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        quick_template = SessionTemplate(
+            id=str(uuid4()),
+            name='Daily Weight',
+            description='Quick log',
+            root_id=root_id,
+            template_data=json.dumps({
+                'session_type': 'quick',
+                'template_color': '#123456',
+                'activities': [
+                    {'activity_id': sample_activity_definition.id, 'name': sample_activity_definition.name}
+                ],
+            }),
+        )
+        db_session.add(quick_template)
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Quick Weight Entry',
+                'template_id': quick_template.id,
+                'session_start': datetime.utcnow().isoformat(),
+                'session_data': {
+                    'template_id': quick_template.id,
+                    'template_name': quick_template.name,
+                    'session_type': 'quick',
+                    'template_color': '#123456',
+                },
+            }
+        )
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['session_type'] == 'quick'
+        assert data['template_color'] == '#123456'
+        assert data['attributes']['session_data']['activity_ids']
+        assert data['immediate_goals'] == []
+        assert data['micro_goals'] == []
+
+    def test_complete_quick_session_sets_end_and_duration(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        quick_template = SessionTemplate(
+            id=str(uuid4()),
+            name='Quick Template',
+            root_id=root_id,
+            template_data=json.dumps({
+                'session_type': 'quick',
+                'activities': [{'activity_id': sample_activity_definition.id}],
+            }),
+        )
+        db_session.add(quick_template)
+        db_session.commit()
+
+        create_response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Quick Session',
+                'template_id': quick_template.id,
+                'session_start': datetime.utcnow().isoformat(),
+            }
+        )
+        assert create_response.status_code == 201
+        created = create_response.get_json()
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/sessions/{created["id"]}',
+            json={'completed': True}
+        )
+        assert update_response.status_code == 200
+        updated = update_response.get_json()
+        assert updated['completed'] is True
+        assert updated['session_end'] is None
+        assert updated['total_duration_seconds'] is None
 
     def test_create_session_persists_template_activities(
         self, authed_client, sample_goal_hierarchy, sample_session_template, sample_activity_definition

@@ -1,8 +1,10 @@
+import copy
 from datetime import datetime, timezone, date
 import json
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
+from .session_runtime import get_template_color, get_template_session_type
 
 def format_utc(dt):
     """Format a datetime or date object to ISO string with UTC indicator."""
@@ -213,6 +215,7 @@ def serialize_goal(goal, include_children=True):
 def serialize_session(session, include_image_data=False):
     """Serialize a Session object."""
     active_instances = _active_session_instances(session)
+    template_payload = _safe_load_json(getattr(getattr(session, "template", None), "template_data", None), {})
     result = {
         "id": session.id,
         "name": session.name,
@@ -271,16 +274,28 @@ def serialize_session(session, include_image_data=False):
     # 2. Otherwise merge the attrs themselves (legacy support)
     if attrs:
         if "session_data" in attrs and isinstance(attrs["session_data"], dict):
-            session_data.update(attrs["session_data"])
+            session_data.update(copy.deepcopy(attrs["session_data"]))
         else:
-            session_data.update(attrs)
+            session_data.update(copy.deepcopy(attrs))
             
         # Ensure top-level attributes dict has all keys for flexibility
         for k, v in attrs.items():
             if k not in result["attributes"]:
-                result["attributes"][k] = v
+                result["attributes"][k] = copy.deepcopy(v)
+
+    if isinstance(template_payload, dict):
+        if not session_data.get("template_name") and getattr(getattr(session, "template", None), "name", None):
+            session_data["template_name"] = session.template.name
+        if not session_data.get("template_color"):
+            fallback_color = get_template_color(template_payload)
+            if fallback_color:
+                session_data["template_color"] = fallback_color
+        if not session_data.get("session_type"):
+            session_data["session_type"] = get_template_session_type(template_payload)
                 
     result["attributes"]["session_data"] = session_data
+    result["session_type"] = get_template_session_type(session_data)
+    result["template_color"] = get_template_color(session_data)
 
     # Hydrate section activity ordering + exercises from database ActivityInstances.
     # SessionDetail renders from section.activity_ids, so normalize legacy shapes too.
@@ -483,11 +498,17 @@ def serialize_split_definition(split):
 
 def serialize_session_template(template):
     """Serialize a SessionTemplate object."""
+    template_data = _safe_load_json(template.template_data, {})
     return {
         "id": template.id, 
         "name": template.name, 
-        "template_data": _safe_load_json(template.template_data, {}),
+        "description": getattr(template, 'description', '') or '',
+        "root_id": getattr(template, 'root_id', None),
+        "template_data": template_data,
+        "session_type": get_template_session_type(template_data),
+        "template_color": get_template_color(template_data),
         "created_at": format_utc(getattr(template, 'created_at', None)),
+        "updated_at": format_utc(getattr(template, 'updated_at', None)),
         "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
     }
 

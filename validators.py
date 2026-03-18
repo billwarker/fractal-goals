@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 MAX_NAME_LENGTH = 255
 MAX_DESCRIPTION_LENGTH = 5000
 MAX_RELEVANCE_LENGTH = 2000
+HEX_COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 
 
 # =============================================================================
@@ -145,6 +146,58 @@ def parse_date_string(value: str) -> date:
     value = value.replace('Z', '')
     
     return datetime.strptime(value, '%Y-%m-%d').date()
+
+
+def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(template_data, dict):
+        raise ValueError('template_data must be an object')
+
+    normalized = dict(template_data)
+    session_type = str(normalized.get('session_type') or 'normal').strip().lower()
+    if session_type not in {'normal', 'quick'}:
+        raise ValueError("template_data.session_type must be 'normal' or 'quick'")
+    normalized['session_type'] = session_type
+
+    template_color = normalized.get('template_color')
+    if template_color in ('', None):
+        normalized.pop('template_color', None)
+    else:
+        if not isinstance(template_color, str) or not HEX_COLOR_RE.match(template_color.strip()):
+            raise ValueError('template_data.template_color must be a valid #RRGGBB hex color')
+        normalized['template_color'] = template_color.strip()
+
+    if session_type == 'normal':
+        sections = normalized.get('sections')
+        if not isinstance(sections, list) or len(sections) == 0:
+            raise ValueError('normal templates must include at least one section')
+        for section in sections:
+            if not isinstance(section, dict):
+                raise ValueError('each section must be an object')
+            section_name = sanitize_string(section.get('name') or '')
+            if not section_name:
+                raise ValueError('each section must include a name')
+            section_activities = None
+            for key in ('activities', 'exercises', 'activity_ids'):
+                if key in section:
+                    section_activities = section.get(key)
+                    break
+            if section_activities is None:
+                continue
+            if not isinstance(section_activities, list):
+                raise ValueError('section activities must be a list')
+        quick_activities = normalized.get('activities')
+        if isinstance(quick_activities, list) and len(quick_activities) > 0:
+            raise ValueError('normal templates cannot define top-level activities')
+    else:
+        activities = normalized.get('activities')
+        if not isinstance(activities, list) or not (1 <= len(activities) <= 5):
+            raise ValueError('quick templates must include between 1 and 5 activities')
+        sections = normalized.get('sections')
+        if isinstance(sections, list) and len(sections) > 0:
+            raise ValueError('quick templates cannot define sections')
+        normalized.pop('sections', None)
+
+    return normalized
 
 
 # =============================================================================
@@ -496,14 +549,15 @@ class SessionCreateSchema(BaseModel):
     @model_validator(mode='after')
     def check_parent_linkage(self) -> 'SessionCreateSchema':
         # Ensure at least one way of linking to a parent goal is provided
+        # OR it's template-backed
         # OR it's part of a program (indicated by program_context in session_data)
         
         is_program_linked = False
         if self.session_data and 'program_context' in self.session_data:
             is_program_linked = True
 
-        if not any([self.parent_id, self.parent_ids, self.goal_ids, is_program_linked]):
-             raise ValueError('Session must be linked to at least one parent goal (parent_id, parent_ids, or goal_ids) or be part of a program')
+        if not any([self.parent_id, self.parent_ids, self.goal_ids, self.template_id, is_program_linked]):
+             raise ValueError('Session must be linked to a parent goal, template, or program')
         return self
 
 
@@ -1008,12 +1062,47 @@ class SessionTemplateCreateSchema(BaseModel):
     def sanitize_name(cls, v: str) -> str:
         return sanitize_string(v)
 
+    @field_validator('description')
+    @classmethod
+    def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+    @field_validator('template_data')
+    @classmethod
+    def validate_template_data(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        return validate_session_template_data(v)
+
 
 class SessionTemplateUpdateSchema(BaseModel):
     """Schema for updating a session template."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     template_data: Optional[Dict[str, Any]] = None
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+    @field_validator('description')
+    @classmethod
+    def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+    @field_validator('template_data')
+    @classmethod
+    def validate_template_data(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if v is None:
+            return v
+        return validate_session_template_data(v)
 
 
 # =============================================================================

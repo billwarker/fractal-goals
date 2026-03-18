@@ -169,25 +169,39 @@
 }
 
 .templateItem {
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.templateBadgeWrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.templateDoneMark {
+    flex: 0 0 auto;
+    color: var(--color-brand-success);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.templateCount {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .templateItemDone {
-    color: var(--color-text-choices-completed, #c8e6c9);
-    /* Fallback */
-    background: var(--color-bg-choices-completed, #1b5e20);
-    /* Fallback - consider adding tokens for these states if not present */
-    border-left: 2px solid var(--color-brand-success);
+    opacity: 1;
 }
 
 .templateItemPending {
-    color: var(--color-text-muted);
-    background: var(--color-bg-input);
-    border-left: 2px solid var(--color-border);
+    opacity: 0.8;
 }
 
 .restDay {

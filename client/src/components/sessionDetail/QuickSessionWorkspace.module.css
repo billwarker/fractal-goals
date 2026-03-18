@@ -1,0 +1,184 @@
+.workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+}
+
+.embeddedWorkspace {
+    margin-top: 24px;
+}
+
+.standaloneWorkspace {
+    width: 100%;
+}
+
+.surface {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.headerSection {
+    padding: 18px 20px 0 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.topGrid {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.2fr) minmax(0, 1.8fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.titleGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.titleRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.metaRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.completedBadge {
+    margin-top: 1px;
+}
+
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: flex-end;
+    gap: 18px 24px;
+    min-width: 0;
+    padding-right: 56px;
+}
+
+.summaryItem {
+    min-width: 0;
+}
+
+.programFieldValue {
+    min-width: 0;
+}
+
+.programValueGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.programLink {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.programSubtext {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.actionBar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 0 16px 0;
+    margin-top: 14px;
+    border-top: 1px solid var(--color-border);
+}
+
+.actionGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.actionButton {
+    min-height: 38px;
+}
+
+.secondaryButton {
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+.bodySection {
+    padding: 18px 20px 20px 20px;
+    background: var(--color-bg-card);
+}
+
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.emptyState {
+    padding: 24px;
+    border: 1px dashed var(--color-border);
+    border-radius: 10px;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .headerSection {
+        padding: 16px 16px 0 16px;
+    }
+
+    .topGrid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .summaryItem {
+        min-width: 0;
+    }
+
+    .actionBar {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .actionGroup {
+        width: 100%;
+    }
+
+    .actionButton,
+    .secondaryButton {
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    .bodySection {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 560px) {
+    .summaryGrid {
+        grid-template-columns: 1fr;
+        padding-right: 0;
+    }
+}

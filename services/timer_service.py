@@ -20,6 +20,7 @@ from services.owned_entity_queries import (
     get_owned_session,
 )
 from services.events import Event, Events, event_bus
+from services.session_runtime import is_quick_session
 from services.serializers import serialize_activity_instance, serialize_session
 from services.service_types import JsonDict, ServiceResult
 
@@ -60,6 +61,7 @@ class TimerService:
     def _session_query_options():
         return (
             selectinload(Session.goals),
+            selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
@@ -97,6 +99,12 @@ class TimerService:
         instance.definition = activity_definition
         self.db_session.add(instance)
         return instance
+
+    @staticmethod
+    def _quick_session_timer_error(session):
+        if session and is_quick_session(session):
+            return "Quick sessions do not support timers", 400
+        return None
 
     @staticmethod
     def _activity_event_payload(instance, root_id, activity_name, *, updated_fields=None) -> JsonDict:
@@ -213,6 +221,9 @@ class TimerService:
             session_record = get_owned_session(self.db_session, root_id, session_id)
             if not session_record:
                 return None, "Session not found in this fractal", 404
+            quick_error = self._quick_session_timer_error(session_record)
+            if quick_error:
+                return None, *quick_error
 
             activity_definition = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
             if not activity_definition:
@@ -227,6 +238,9 @@ class TimerService:
             )
         else:
             session_record = get_owned_session(self.db_session, root_id, instance.session_id)
+            quick_error = self._quick_session_timer_error(session_record)
+            if quick_error:
+                return None, *quick_error
 
         start_time = _utc_now_naive()
         instance.time_start = start_time
@@ -279,6 +293,11 @@ class TimerService:
         )
         if not instance:
             return None, "Activity instance not found.", 404
+
+        session_record = get_owned_session(self.db_session, root_id, instance.session_id)
+        quick_error = self._quick_session_timer_error(session_record)
+        if quick_error:
+            return None, *quick_error
 
         now = _utc_now_naive()
         if not instance.time_start:
@@ -431,6 +450,9 @@ class TimerService:
         session = get_owned_session(self.db_session, root_id, session_id)
         if not session:
             return None, "Session not found", 404
+        quick_error = self._quick_session_timer_error(session)
+        if quick_error:
+            return None, *quick_error
         if session.is_paused:
             return None, "Session is already paused", 400
 
@@ -472,6 +494,9 @@ class TimerService:
         session = get_owned_session(self.db_session, root_id, session_id)
         if not session:
             return None, "Session not found", 404
+        quick_error = self._quick_session_timer_error(session)
+        if quick_error:
+            return None, *quick_error
         if not session.is_paused:
             return None, "Session is not paused", 400
 

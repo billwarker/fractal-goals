@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { getReadableTextColor, getTemplateColor } from '../../utils/sessionRuntime';
 import './SessionCard.css';
 
 function SessionCard({
@@ -26,6 +27,8 @@ function SessionCard({
     const { getGoalColor, getGoalTextColor } = useGoalLevels();;
 
     const sessionData = session.session_data || {};
+    const templateColor = getTemplateColor(session);
+    const templateTextColor = getReadableTextColor(templateColor);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -87,7 +90,10 @@ function SessionCard({
 
             {/* Template Name */}
             {sessionData.template_name && (
-                <div className="session-card-template">
+                <div
+                    className="session-card-template"
+                    style={{ backgroundColor: templateColor, color: templateTextColor }}
+                >
                     {sessionData.template_name}
                 </div>
             )}

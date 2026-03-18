@@ -175,6 +175,55 @@
     color: #888;
 }
 
+.quickSessionModalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3200;
+    background: rgba(6, 11, 18, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding:
+        max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+}
+
+.quickSessionModal {
+    position: relative;
+    width: min(800px, calc(100vw - 40px));
+    max-height: calc(100vh - max(40px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    overflow-y: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.quickSessionModalClose {
+    top: 14px;
+    right: 14px;
+    z-index: 4;
+}
+
+@media (max-width: 640px) {
+    .quickSessionModalOverlay {
+        align-items: flex-start;
+        padding:
+            max(12px, env(safe-area-inset-top))
+            max(12px, env(safe-area-inset-right))
+            max(12px, env(safe-area-inset-bottom))
+            max(12px, env(safe-area-inset-left));
+    }
+
+    .quickSessionModal {
+        width: min(100%, calc(100vw - 24px));
+        max-height: calc(100vh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    }
+}
+
 /* Session Card */
 .sessionCard {
     background: var(--color-bg-card);
@@ -467,6 +516,17 @@
     .secondaryButton {
         min-height: 40px;
         font-size: 12px;
+    }
+
+    .quickSessionModalOverlay {
+        padding: 8px;
+        align-items: stretch;
+    }
+
+    .quickSessionModal {
+        width: 100%;
+        max-height: calc(100vh - 16px);
+        padding: var(--spacing-md);
     }
 }
 

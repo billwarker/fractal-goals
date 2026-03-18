@@ -1,189 +1,123 @@
 import React from 'react';
+
 import Linkify from './atoms/Linkify';
+import SessionTemplateNameBadge from './common/SessionTemplateNameBadge';
+import SessionTemplateTypePill from './common/SessionTemplateTypePill';
+import styles from './TemplateCard.module.css';
+import {
+    isQuickSession,
+} from '../utils/sessionRuntime';
+
+function getQuickActivityCount(template) {
+    return template.template_data?.activities?.length || 0;
+}
+
+function getNormalActivityCount(template) {
+    return template.template_data?.sections?.reduce(
+        (sum, section) => sum + (section.activities?.length || section.exercises?.length || 0),
+        0
+    ) || 0;
+}
 
 /**
  * Template Card - Display card for session templates in grid view
  */
 function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
+    const quickTemplate = isQuickSession(template);
     const totalDuration = template.template_data?.total_duration_minutes || 0;
     const sectionCount = template.template_data?.sections?.length || 0;
-    const activityCount = template.template_data?.sections?.reduce(
-        (sum, section) => sum + (section.activities?.length || section.exercises?.length || 0),
-        0
-    ) || 0;
+    const activityCount = quickTemplate ? getQuickActivityCount(template) : getNormalActivityCount(template);
 
     return (
         <div
-            style={{
-                background: 'var(--color-bg-card)',
-                border: '1px solid var(--color-border-card)',
-                borderRadius: '8px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                transition: 'all 0.2s',
-                cursor: 'pointer'
-            }}
+            className={`${styles.card} template-card hover-glow`}
             onClick={() => onEdit(template)}
-            className="template-card hover-glow"
         >
-            {/* Template Name */}
-            <div>
-                <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    margin: 0,
-                    color: 'var(--color-text-primary)'
-                }}>
-                    {template.name}
-                </h3>
+            <div className={styles.header}>
+                <div className={styles.nameBlock}>
+                    <SessionTemplateNameBadge entity={template} size="md" />
+                    <SessionTemplateTypePill entity={template} size="sm" />
+                </div>
+
                 {template.description && (
-                    <p style={{
-                        fontSize: '13px',
-                        color: 'var(--color-text-secondary)',
-                        margin: '6px 0 0 0',
-                        lineHeight: '1.4',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                    }}>
+                    <p className={styles.description}>
                         <Linkify>{template.description}</Linkify>
                     </p>
                 )}
             </div>
 
-            {/* Stats Row */}
-            <div style={{
-                display: 'flex',
-                gap: '16px',
-                color: 'var(--color-text-muted)',
-                fontSize: '13px'
-            }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: 'var(--color-brand-primary)' }}>⏱</span>
-                    {totalDuration} min
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: 'var(--color-brand-success)' }}>§</span>
-                    {sectionCount} section{sectionCount !== 1 ? 's' : ''}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: '#ff9800' }}>◆</span>
+            <div className={styles.statsRow}>
+                {!quickTemplate && (
+                    <span className={styles.stat}>
+                        <span className={styles.durationIcon}>⏱</span>
+                        {totalDuration} min
+                    </span>
+                )}
+                {!quickTemplate && (
+                    <span className={styles.stat}>
+                        <span className={styles.sectionIcon}>§</span>
+                        {sectionCount} section{sectionCount !== 1 ? 's' : ''}
+                    </span>
+                )}
+                <span className={styles.stat}>
+                    <span className={styles.activityIcon}>◆</span>
                     {activityCount} activit{activityCount !== 1 ? 'ies' : 'y'}
                 </span>
             </div>
 
-            {/* Sections Preview */}
-            {template.template_data?.sections && template.template_data.sections.length > 0 && (
-                <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px'
-                }}>
-                    {template.template_data.sections.slice(0, 4).map((section, idx) => (
-                        <span
-                            key={idx}
-                            style={{
-                                padding: '4px 8px',
-                                background: 'var(--color-bg-input)',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                color: 'var(--color-text-secondary)',
-                                border: '1px solid var(--color-border)'
-                            }}
-                        >
+            {!quickTemplate && template.template_data?.sections?.length > 0 && (
+                <div className={styles.sectionsPreview}>
+                    {template.template_data.sections.slice(0, 4).map((section) => (
+                        <span key={section.id || section.name || 'section'} className={styles.sectionTag}>
                             {section.name}
                         </span>
                     ))}
                     {template.template_data.sections.length > 4 && (
-                        <span style={{
-                            padding: '4px 8px',
-                            background: 'transparent',
-                            fontSize: '11px',
-                            color: 'var(--color-text-muted)'
-                        }}>
+                        <span className={styles.moreTag}>
                             +{template.template_data.sections.length - 4} more
                         </span>
                     )}
                 </div>
             )}
 
-            {/* Action Buttons */}
-            <div style={{
-                display: 'flex',
-                gap: '8px',
-                marginTop: 'auto',
-                paddingTop: '8px',
-                borderTop: '1px solid var(--color-border)'
-            }}>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(template);
-                    }}
-                    style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        background: 'var(--color-brand-primary)',
-                        border: '1px solid var(--color-border-btn)',
-                        borderRadius: '4px',
-                        color: 'white',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'background 0.2s'
-                    }}
-                    className="hover-brighten"
-                >
-                    Edit
-                </button>
+            {quickTemplate && template.template_data?.activities?.length > 0 && (
+                <div className={styles.sectionsPreview}>
+                    {template.template_data.activities.slice(0, 4).map((activity) => (
+                        <span
+                            key={activity.id || activity.activity_id || activity.activity_definition_id || activity.name || 'activity'}
+                            className={styles.sectionTag}
+                        >
+                            {activity.name || 'Activity'}
+                        </span>
+                    ))}
+                    {template.template_data.activities.length > 4 && (
+                        <span className={styles.moreTag}>
+                            +{template.template_data.activities.length - 4} more
+                        </span>
+                    )}
+                </div>
+            )}
+
+            <div className={styles.actions}>
                 {onDuplicate && (
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
                             onDuplicate(template);
                         }}
-                        style={{
-                            padding: '8px 12px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: 'var(--color-text-secondary)',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
-                        className="hover-brighten"
+                        className={styles.ghostAction}
                     >
                         Duplicate
                     </button>
                 )}
                 <button
-                    onClick={(e) => {
-                        e.stopPropagation();
+                    type="button"
+                    onClick={(event) => {
+                        event.stopPropagation();
                         onDelete(template);
                     }}
-                    style={{
-                        padding: '8px 12px',
-                        background: 'transparent',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '4px',
-                        color: 'var(--color-text-muted)',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#d32f2f';
-                        e.currentTarget.style.color = '#d32f2f';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--color-border)';
-                        e.currentTarget.style.color = 'var(--color-text-muted)';
-                    }}
+                    className={styles.deleteAction}
                 >
                     Delete
                 </button>

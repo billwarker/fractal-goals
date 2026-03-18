@@ -10,6 +10,7 @@
 import React from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
+import SessionCompletionButton from '../common/SessionCompletionButton';
 import GoalsPanel from './GoalsPanel';
 import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
@@ -69,13 +70,11 @@ function SessionSidePane({
 
                         {/* Session Controls */}
                         <div className={styles.sidebarActions}>
-                            <Button
+                            <SessionCompletionButton
                                 onClick={details?.onToggleComplete}
-                                variant={details?.isCompleted ? 'success' : 'secondary'}
+                                completed={details?.isCompleted}
                                 title="Mark Session Complete"
-                            >
-                                {details?.isCompleted ? '✓ Done' : 'Complete'}
-                            </Button>
+                            />
                             <Button
                                 onClick={details?.onSave}
                                 variant="primary" // Blue

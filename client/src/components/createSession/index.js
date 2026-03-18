@@ -7,4 +7,5 @@ export { default as TemplatePicker } from './TemplatePicker';
 export { default as GoalAssociation } from './GoalAssociation';
 export { default as ImmediateGoalSection } from './ImmediateGoalSection';
 export { default as CreateSessionActions } from './CreateSessionActions';
+export { default as QuickSessionCompleteStep } from './QuickSessionCompleteStep';
 export { default as SelectExistingGoalModal } from './SelectExistingGoalModal';

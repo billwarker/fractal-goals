@@ -1,0 +1,20 @@
+.button {
+    min-height: 34px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pending {
+    background: var(--color-bg-input);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+.done {
+    background: var(--color-brand-success);
+    color: white;
+}

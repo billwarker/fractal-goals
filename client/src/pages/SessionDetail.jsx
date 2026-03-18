@@ -6,12 +6,14 @@ import {
     SessionDetailMobileDock,
     SessionDetailModals,
     SessionDetailPaneLayout,
+    QuickSessionWorkspace,
 } from '../components/sessionDetail';
 import styles from './SessionDetail.module.css';
 import '../App.css';
 import StatusState from '../components/common/StatusState';
 import useIsMobile from '../hooks/useIsMobile';
 import { useSessionDetailController } from '../hooks/useSessionDetailController';
+import { isQuickSession } from '../utils/sessionRuntime';
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
@@ -99,6 +101,24 @@ function SessionDetailContent() {
                         onAction={() => navigate(`/${rootId}/sessions`)}
                     />
                 </div>
+            </div>
+        );
+    }
+
+    if (isQuickSession(session)) {
+        return (
+            <div className={styles.sessionDetailContainer}>
+                <div className={styles.sessionMainContent}>
+                    <QuickSessionWorkspace />
+                </div>
+
+                {autoSaveStatus && (
+                    <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
+                        {autoSaveStatus === 'saving' && 'Saving changes...'}
+                        {autoSaveStatus === 'saved' && 'Saved'}
+                        {autoSaveStatus === 'error' && 'Save failed'}
+                    </div>
+                )}
             </div>
         );
     }

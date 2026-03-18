@@ -8,6 +8,7 @@ function CreateSessionActions({
     selectedTemplate,
     selectedProgramDay,
     creating,
+    quickMode = false,
     onCreateSession,
 }) {
     const isDisabled = !selectedTemplate || creating;
@@ -60,7 +61,7 @@ function CreateSessionActions({
                     marginBottom: '24px'
                 }}
             >
-                {creating ? 'Creating...' : '✓ Create Session'}
+                {creating ? 'Creating...' : quickMode ? 'Start Quick Session' : '✓ Create Session'}
             </button>
 
             {selectedTemplate && (

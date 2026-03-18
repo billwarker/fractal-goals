@@ -1,4 +1,5 @@
 import React from 'react';
+import { fireEvent } from '@testing-library/react';
 import { renderWithProviders, screen } from '../../../test/test-utils';
 import SessionCardExpanded from '../SessionCardExpanded';
 
@@ -36,6 +37,22 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 
 vi.mock('../SessionSectionGrid', () => ({
     default: () => <div data-testid="section-grid" />,
+}));
+
+vi.mock('../ExerciseCard', () => ({
+    default: ({ exercise, activityDefinition }) => (
+        <div data-testid="exercise-card">
+            <div>{exercise.name}</div>
+            {Array.isArray(exercise.metrics) && exercise.metrics.map((metric) => {
+                const definition = activityDefinition?.metric_definitions?.find((entry) => entry.id === metric.metric_id);
+                return (
+                    <div key={metric.metric_id}>
+                        {definition?.name}: {metric.value} {definition?.unit}
+                    </div>
+                );
+            })}
+        </div>
+    ),
 }));
 
 describe('SessionCardExpanded', () => {
@@ -190,5 +207,147 @@ describe('SessionCardExpanded', () => {
         );
 
         expect(screen.getByText('Manual completion')).toBeInTheDocument();
+    });
+
+    it('renders quick-session activities as exercise cards instead of pills', () => {
+        renderWithProviders(
+            <SessionCardExpanded
+                session={{
+                    id: 'session-quick-1',
+                    name: 'Weigh Myself',
+                    short_term_goals: [],
+                    immediate_goals: [],
+                    micro_goals: [],
+                    attributes: {
+                        completed: true,
+                        updated_at: '2026-03-14T20:03:00Z',
+                        session_data: {
+                            session_type: 'quick',
+                            template_name: 'Weigh Myself',
+                            activity_ids: ['instance-1'],
+                            session_start: '2026-03-14T20:03:00Z',
+                            session_end: '2026-03-14T20:03:00Z',
+                        },
+                    },
+                }}
+                rootId="root-1"
+                activities={[
+                    {
+                        id: 'activity-1',
+                        metric_definitions: [
+                            { id: 'metric-1', name: 'Weight', unit: 'lb' },
+                        ],
+                    },
+                ]}
+                isSelected={false}
+                onSelect={() => {}}
+                getGoalColor={() => '#607d8b'}
+                formatDate={(value) => value}
+                sessionActivityInstances={[
+                    {
+                        id: 'instance-1',
+                        name: 'Weigh Myself',
+                        activity_definition_id: 'activity-1',
+                        completed: true,
+                        metrics: [
+                            { metric_id: 'metric-1', value: '180' },
+                        ],
+                    },
+                ]}
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        expect(screen.getByTestId('exercise-card')).toBeInTheDocument();
+        expect(screen.getAllByText('Weigh Myself')).toHaveLength(2);
+        expect(screen.getByText('Weight: 180 lb')).toBeInTheDocument();
+    });
+
+    it('links quick-session titles back to the sessions route with a modal query param', () => {
+        renderWithProviders(
+            <SessionCardExpanded
+                session={{
+                    id: 'session-quick-link',
+                    name: 'Weigh Myself',
+                    short_term_goals: [],
+                    immediate_goals: [],
+                    micro_goals: [],
+                    attributes: {
+                        updated_at: '2026-03-14T20:03:00Z',
+                        session_data: {
+                            session_type: 'quick',
+                            template_name: 'Weigh Myself',
+                            activity_ids: [],
+                        },
+                    },
+                }}
+                rootId="root-1"
+                activities={[]}
+                isSelected={false}
+                onSelect={() => {}}
+                onRequestDelete={() => {}}
+                getGoalColor={() => '#607d8b'}
+                formatDate={(value) => value}
+                sessionActivityInstances={[]}
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        expect(screen.getByRole('link', { name: 'Weigh Myself' })).toHaveAttribute(
+            'href',
+            '/root-1/sessions?quickSessionId=session-quick-link'
+        );
+    });
+
+    it('calls the delete callback from the row X button without selecting the row', () => {
+        const onSelect = vi.fn();
+        const onRequestDelete = vi.fn();
+
+        renderWithProviders(
+            <SessionCardExpanded
+                session={{
+                    id: 'session-delete-1',
+                    name: 'Delete Me',
+                    short_term_goals: [],
+                    immediate_goals: [],
+                    micro_goals: [],
+                    attributes: {
+                        updated_at: '2026-03-14T20:03:00Z',
+                        session_data: {
+                            sections: [],
+                        },
+                    },
+                }}
+                rootId="root-1"
+                activities={[]}
+                isSelected={false}
+                onSelect={onSelect}
+                onRequestDelete={onRequestDelete}
+                getGoalColor={() => '#607d8b'}
+                formatDate={(value) => value}
+                sessionActivityInstances={[]}
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        fireEvent.click(screen.getByLabelText('Delete session Delete Me'));
+
+        expect(onRequestDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'session-delete-1' }));
+        expect(onSelect).not.toHaveBeenCalled();
     });
 });

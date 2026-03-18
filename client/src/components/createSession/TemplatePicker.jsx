@@ -1,6 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
+import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import StepHeader from './StepHeader';
+import {
+    isQuickSession,
+} from '../../utils/sessionRuntime';
 
 /**
  * Step 1 (Template Mode): Select a Template
@@ -41,7 +46,9 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
                     {templates.map(template => {
                         const isSelected = selectedTemplate?.id === template.id;
+                        const quickTemplate = isQuickSession(template);
                         const sectionCount = template.template_data?.sections?.length || 0;
+                        const quickActivityCount = template.template_data?.activities?.length || 0;
                         const duration = template.template_data?.total_duration_minutes || 0;
 
                         return (
@@ -57,11 +64,14 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px', color: 'var(--color-text-primary)' }}>
-                                    {template.name}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px', marginBottom: '8px' }}>
+                                    <SessionTemplateNameBadge entity={template} size="md" />
+                                    <SessionTemplateTypePill entity={template} size="sm" />
                                 </div>
                                 <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
-                                    {sectionCount} section{sectionCount !== 1 ? 's' : ''} • {duration} min
+                                    {quickTemplate
+                                        ? `${quickActivityCount} activit${quickActivityCount === 1 ? 'y' : 'ies'}`
+                                        : `${sectionCount} section${sectionCount !== 1 ? 's' : ''} • ${duration} min`}
                                 </div>
                                 {template.description && (
                                     <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>

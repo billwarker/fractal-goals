@@ -92,23 +92,6 @@ function CreateSessionTemplate() {
         },
     });
 
-    const duplicateTemplateMutation = useMutation({
-        mutationFn: async (template) => {
-            const payload = {
-                name: `${template.name} (Copy)`,
-                description: template.description || '',
-                template_data: template.template_data,
-            };
-
-            await fractalApi.createSessionTemplate(rootId, payload);
-        },
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
-            setError(null);
-            notify.success('Template duplicated successfully!');
-        },
-    });
-
     const templates = templatesQuery.data || [];
     const activities = activitiesQuery.data || [];
     const activityGroups = activityGroupsQuery.data || [];
@@ -158,7 +141,13 @@ function CreateSessionTemplate() {
 
     const handleDuplicate = async (template) => {
         try {
-            await duplicateTemplateMutation.mutateAsync(template);
+            setEditingTemplate({
+                ...template,
+                id: null,
+                name: `${template.name} (Copy)`,
+            });
+            setShowBuilder(true);
+            setError(null);
         } catch (err) {
             console.error("Failed to duplicate template", err);
             setError('Failed to duplicate template');

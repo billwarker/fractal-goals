@@ -13,8 +13,8 @@
 
 .activityCardSelected {
     background: var(--color-bg-card-alt);
-    border-color: #4caf50;
-    box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
+    border-color: var(--color-brand-success);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-success) 20%, transparent);
 }
 
 .activityCardDragging {
@@ -44,7 +44,7 @@
     background: var(--color-bg-input);
     border: 1px solid var(--color-border);
     border-radius: 3px;
-    color: #4caf50;
+    color: var(--color-brand-success);
     cursor: pointer;
     font-size: 12px;
     padding: 2px 6px;
@@ -79,7 +79,7 @@
 .activityName {
     font-weight: bold;
     font-size: 16px;
-    color: #4caf50;
+    color: var(--color-brand-success);
     overflow-wrap: anywhere;
 }
 
@@ -119,6 +119,11 @@
     gap: 10px;
     width: auto;
     max-width: 100%;
+}
+
+.quickModeStatus {
+    display: flex;
+    align-items: center;
 }
 
 .timerMetaColumn {
@@ -187,7 +192,7 @@
 }
 
 .durationActive {
-    color: #4caf50;
+    color: var(--color-brand-success);
 }
 
 .durationInactive {
@@ -195,7 +200,7 @@
 }
 
 .startButton {
-    background: #2196F3;
+    background: var(--color-brand-primary);
     border: none;
     border-radius: 4px;
     color: white;
@@ -211,7 +216,7 @@
 }
 
 .stopButton {
-    background: #f44336;
+    background: var(--color-brand-danger);
     border: none;
     border-radius: 4px;
     color: white;
@@ -225,7 +230,7 @@
 }
 
 .completeButton {
-    background: #4caf50;
+    background: var(--color-brand-success);
     border: none;
     border-radius: 4px;
     color: white;
@@ -241,9 +246,9 @@
 }
 
 .completedBadge {
-    background: rgba(76, 175, 80, 0.1);
-    color: #4caf50;
-    border: 1px solid #4caf50;
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
+    color: var(--color-brand-success);
+    border: 1px solid var(--color-brand-success);
     border-radius: 4px;
     font-size: 12px;
     padding: 6px 10px;
@@ -302,7 +307,7 @@
 .deleteButton {
     background: none;
     border: none;
-    color: #f44336;
+    color: var(--color-brand-danger);
     cursor: pointer;
     font-size: 22px;
     line-height: 1;
@@ -336,8 +341,8 @@
 }
 
 .setRowSelected {
-    background: rgba(76, 175, 80, 0.1);
-    border-color: #4caf50;
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
+    border-color: var(--color-brand-success);
 }
 
 .setNumber {
@@ -399,7 +404,7 @@
 
 .metricInput:focus {
     outline: none;
-    border-color: #4caf50;
+    border-color: var(--color-brand-success);
     background: var(--color-bg-input);
 }
 
@@ -517,8 +522,8 @@
 
 .cascadeButton:hover {
     background: var(--color-bg-input);
-    color: #4caf50;
-    border-color: #4caf50;
+    color: var(--color-brand-success);
+    border-color: var(--color-brand-success);
 }
 
 .cascadeButtonsContainer {

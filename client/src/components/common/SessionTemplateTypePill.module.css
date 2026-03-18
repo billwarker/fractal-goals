@@ -1,0 +1,23 @@
+.pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 999px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+}
+
+.sizeSm {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.sizeMd {
+    padding: 6px 12px;
+    font-size: 13px;
+}

@@ -16,3 +16,4 @@ export { default as NoteTimeline } from './NoteTimeline';
 export { default as NoteItem } from './NoteItem';
 export { default as PreviousNotesSection } from './PreviousNotesSection';
 export { default as HistoryPanel } from './HistoryPanel';
+export { default as QuickSessionWorkspace } from './QuickSessionWorkspace';

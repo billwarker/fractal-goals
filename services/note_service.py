@@ -13,10 +13,12 @@ from models import (
 )
 from services.events import Event, Events, event_bus
 from services.goal_service import GoalService, sync_goal_targets
+from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import serialize_goal, serialize_note
+from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
     serialize_note_with_session,
@@ -29,6 +31,15 @@ logger = logging.getLogger(__name__)
 class NoteService:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def _resolve_note_session(self, root_id, session_id=None, activity_instance_id=None):
+        if session_id:
+            return get_owned_session(self.db_session, root_id, session_id)
+        if activity_instance_id:
+            instance = get_owned_activity_instance(self.db_session, root_id, activity_instance_id)
+            if instance:
+                return get_owned_session(self.db_session, root_id, instance.session_id)
+        return None
 
     def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -241,6 +252,14 @@ class NoteService:
         )
         if relation_error:
             return None, *relation_error
+
+        note_session = self._resolve_note_session(
+            root_id,
+            session_id=session_id,
+            activity_instance_id=activity_instance_id,
+        )
+        if note_session and is_quick_session(note_session):
+            return None, "Quick sessions do not support notes", 400
 
         with self.db_session.begin_nested():
             note = Note(

@@ -1,0 +1,18 @@
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-brand-success) 55%, transparent);
+    flex-shrink: 0;
+}
+
+.mark {
+    color: var(--color-brand-success);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}

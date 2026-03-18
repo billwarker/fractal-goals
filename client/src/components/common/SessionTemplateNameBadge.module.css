@@ -1,0 +1,25 @@
+.badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: 8px;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+    font-weight: 700;
+}
+
+.sizeSm {
+    padding: 6px 10px;
+    font-size: 14px;
+}
+
+.sizeMd {
+    padding: 8px 12px;
+    font-size: 16px;
+}
+
+.sizeLg {
+    padding: 8px 12px;
+    font-size: 18px;
+}

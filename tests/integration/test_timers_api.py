@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timedelta
 import time
 
+from models import SessionTemplate
+
 
 @pytest.mark.integration
 @pytest.mark.critical
@@ -143,6 +145,45 @@ class TestTimerStartStop:
             f'/api/{root_id}/activity-instances/{instance_id}/start'
         )
         assert response.status_code == 200
+
+    def test_quick_session_rejects_timer_actions(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        sample_activity_definition,
+    ):
+        root_id = sample_ultimate_goal.id
+        quick_template = SessionTemplate(
+            id=f'quick-{sample_activity_definition.id}',
+            name='Quick Template',
+            root_id=root_id,
+            template_data=json.dumps({
+                'session_type': 'quick',
+                'activities': [{'activity_id': sample_activity_definition.id}],
+            }),
+        )
+        db_session.add(quick_template)
+        db_session.commit()
+
+        create_response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Quick Session',
+                'template_id': quick_template.id,
+            }
+        )
+        assert create_response.status_code == 201
+        session = create_response.get_json()
+        instance_id = session['activity_instances'][0]['id']
+
+        start_response = authed_client.post(f'/api/{root_id}/activity-instances/{instance_id}/start')
+        assert start_response.status_code == 400
+        assert 'Quick sessions do not support timers' in start_response.get_json()['error']
+
+        pause_response = authed_client.post(f'/api/{root_id}/timers/session/{session["id"]}/pause')
+        assert pause_response.status_code == 400
+        assert 'Quick sessions do not support timers' in pause_response.get_json()['error']
 
 
 @pytest.mark.integration

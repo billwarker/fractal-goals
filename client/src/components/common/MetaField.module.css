@@ -1,0 +1,25 @@
+.field {
+    min-width: 0;
+}
+
+.label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+}
+
+.value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    overflow-wrap: anywhere;
+}
+
+.valueMuted {
+    font-size: 12px;
+    color: #666;
+    overflow-wrap: anywhere;
+}
+
+.valueEmphasized {
+    font-weight: 500;
+}
