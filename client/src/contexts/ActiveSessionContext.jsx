@@ -15,6 +15,154 @@ const SessionActionsContext = createContext(null);
 
 const ActiveSessionContext = createContext(null);
 
+export function QueuedQuickSessionProvider({
+    rootId,
+    draftSession,
+    activityDefinitions = [],
+    activityGroups = [],
+    setDraftSession,
+    children,
+}) {
+    const { setActiveRootId } = useGoals();
+    const [showActivitySelector, setShowActivitySelector] = useState({});
+    const [sidePaneMode, setSidePaneMode] = useState('details');
+    const [draggedItem, setDraggedItem] = useState(null);
+
+    useEffect(() => {
+        if (!rootId) return;
+        setActiveRootId(rootId);
+        return () => setActiveRootId(null);
+    }, [rootId, setActiveRootId]);
+
+    const updateDraft = useCallback((updater) => {
+        setDraftSession((previous) => {
+            if (!previous) return previous;
+            return typeof updater === 'function' ? updater(previous) : updater;
+        });
+    }, [setDraftSession]);
+
+    const groupMap = useMemo(() => {
+        if (!Array.isArray(activityGroups)) return { ungrouped: { id: 'ungrouped', name: 'Ungrouped' } };
+        return activityGroups.reduce((acc, group) => {
+            acc[group.id] = group;
+            return acc;
+        }, { ungrouped: { id: 'ungrouped', name: 'Ungrouped' } });
+    }, [activityGroups]);
+
+    const groupedActivities = useMemo(() => {
+        if (!Array.isArray(activityDefinitions)) return {};
+        return activityDefinitions.reduce((acc, activity) => {
+            const groupId = activity.group_id || 'ungrouped';
+            if (!acc[groupId]) acc[groupId] = [];
+            acc[groupId].push(activity);
+            return acc;
+        }, {});
+    }, [activityDefinitions]);
+
+    const calculateTotalDuration = useCallback(() => (
+        (draftSession?.activityInstances || []).reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0)
+    ), [draftSession?.activityInstances]);
+
+    const updateInstance = useCallback((instanceId, updates) => {
+        updateDraft((previous) => ({
+            ...previous,
+            activityInstances: (previous.activityInstances || []).map((instance) => (
+                instance.id === instanceId ? { ...instance, ...updates } : instance
+            )),
+        }));
+    }, [updateDraft]);
+
+    const dataValue = useMemo(() => ({
+        rootId,
+        sessionId: draftSession?.session?.id || null,
+        session: draftSession?.session || null,
+        activityInstances: draftSession?.activityInstances || [],
+        activities: activityDefinitions,
+        activityGroups,
+        parentGoals: [],
+        immediateGoals: [],
+        microGoals: [],
+        sessionGoalsView: null,
+        loading: false,
+        instancesLoading: false,
+        activitiesLoading: false,
+        sessionError: null,
+        autoSaveStatus: '',
+        localSessionData: draftSession?.localSessionData || null,
+        groupMap,
+        groupedActivities,
+        targetAchievements: [],
+        achievedTargetIds: [],
+        goalAchievements: [],
+        calculateTotalDuration,
+    }), [
+        activityDefinitions,
+        activityGroups,
+        calculateTotalDuration,
+        draftSession?.activityInstances,
+        draftSession?.localSessionData,
+        draftSession?.session,
+        groupMap,
+        groupedActivities,
+        rootId,
+    ]);
+
+    const uiValue = useMemo(() => ({
+        sidePaneMode,
+        setSidePaneMode,
+        showActivitySelector,
+        setShowActivitySelector,
+        draggedItem,
+        setDraggedItem,
+    }), [draggedItem, showActivitySelector, sidePaneMode]);
+
+    const actionsValue = useMemo(() => ({
+        setLocalSessionData: (updater) => {
+            updateDraft((previous) => ({
+                ...previous,
+                localSessionData: typeof updater === 'function'
+                    ? updater(previous.localSessionData)
+                    : updater,
+            }));
+        },
+        refreshSession: async () => draftSession?.session || null,
+        refreshInstances: async () => draftSession?.activityInstances || [],
+        updateSession: async () => draftSession?.session || null,
+        addActivity: () => {},
+        removeActivity: () => {},
+        updateInstance,
+        updateTimer: () => {},
+        createGoal: async () => null,
+        updateGoal: async () => null,
+        toggleGoalCompletion: async () => null,
+        reorderActivity: () => {},
+        moveActivity: () => {},
+        deleteSession: async () => null,
+        pauseSession: async () => null,
+        resumeSession: async () => null,
+        toggleSessionComplete: () => {},
+        calculateTotalDuration,
+    }), [calculateTotalDuration, draftSession?.activityInstances, draftSession?.session, updateDraft, updateInstance]);
+
+    const value = useMemo(() => ({
+        ...dataValue,
+        ...uiValue,
+        ...actionsValue,
+    }), [actionsValue, dataValue, uiValue]);
+
+    return (
+        <SessionDataContext.Provider value={dataValue}>
+            <SessionUiContext.Provider value={uiValue}>
+                <SessionActionsContext.Provider value={actionsValue}>
+                    <ActiveSessionContext.Provider value={value}>
+                        {children}
+                    </ActiveSessionContext.Provider>
+                </SessionActionsContext.Provider>
+            </SessionUiContext.Provider>
+        </SessionDataContext.Provider>
+    );
+}
+
 export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const queryClient = useQueryClient();
     const { setActiveRootId } = useGoals();

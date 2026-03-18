@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
@@ -25,11 +25,9 @@ function QuickSessionWorkspace({
     onStartAnother,
     showCompletionAction = true,
 }) {
-    const navigate = useNavigate();
     const { timezone } = useTimezone();
     const {
         rootId,
-        sessionId,
         session,
         localSessionData,
         activityInstances,
@@ -127,16 +125,6 @@ function QuickSessionWorkspace({
 
                     <div className={styles.actionBar}>
                         <div className={styles.actionGroup}>
-                            {embedded && (
-                                <button
-                                    type="button"
-                                    onClick={() => navigate(`/${rootId}/session/${sessionId}`)}
-                                    className={styles.secondaryButton}
-                                    aria-label="Open full session detail page"
-                                >
-                                    Open Full Session
-                                </button>
-                            )}
                             {completed && embedded && onStartAnother && (
                                 <button
                                     type="button"

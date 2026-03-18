@@ -17,9 +17,139 @@ import {
 import LoadingState from '../components/common/LoadingState';
 import StepContainer from '../components/common/StepContainer';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
-import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+import { ActiveSessionProvider, QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
 import { isQuickSession } from '../utils/sessionRuntime';
 import '../App.css';
+
+function extractActivityId(item) {
+    if (typeof item === 'string') return item;
+    if (!item || typeof item !== 'object') return null;
+    const direct =
+        item.activity_id ||
+        item.activity_definition_id ||
+        item.activityId ||
+        item.activityDefinitionId ||
+        item.definition_id ||
+        item.id;
+    if (direct) return direct;
+    if (item.activity && typeof item.activity === 'object') {
+        return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
+    }
+    return null;
+}
+
+function buildDraftMetrics(definition, splitId = null) {
+    const metrics = Array.isArray(definition?.metric_definitions) ? definition.metric_definitions : [];
+    return metrics.map((metric) => ({
+        metric_id: metric.id,
+        ...(splitId ? { split_id: splitId } : {}),
+        value: '',
+    }));
+}
+
+function buildDraftSet(definition) {
+    const splits = Array.isArray(definition?.split_definitions) ? definition.split_definitions : [];
+    const metrics = definition?.has_splits && splits.length > 0
+        ? splits.flatMap((split) => buildDraftMetrics(definition, split.id))
+        : buildDraftMetrics(definition);
+
+    return {
+        instance_id: crypto.randomUUID(),
+        completed: false,
+        metrics,
+    };
+}
+
+function buildQueuedQuickSession(template, activityDefinitions) {
+    const queuedSessionId = `queued-quick-${template.id}-${crypto.randomUUID()}`;
+    const templateActivities = Array.isArray(template?.template_data?.activities) ? template.template_data.activities : [];
+
+    const activityInstances = templateActivities
+        .map((item, index) => {
+            const activityId = extractActivityId(item);
+            if (!activityId) return null;
+
+            const definition = (activityDefinitions || []).find((entry) => entry.id === activityId);
+            const hasSets = Boolean(definition?.has_sets);
+            const metrics = hasSets ? [] : buildDraftMetrics(definition);
+            const sets = hasSets ? [buildDraftSet(definition)] : [];
+
+            return {
+                id: `queued-instance-${activityId}-${index}`,
+                session_id: queuedSessionId,
+                activity_definition_id: activityId,
+                name: definition?.name || item?.name || 'Activity',
+                type: 'activity',
+                completed: false,
+                has_sets: hasSets,
+                metrics,
+                sets,
+                duration_seconds: null,
+                time_start: null,
+                time_stop: null,
+                total_paused_seconds: 0,
+                notes: '',
+                description: definition?.description || '',
+            };
+        })
+        .filter(Boolean);
+
+    const localSessionData = {
+        template_id: template.id,
+        template_name: template.name,
+        template_color: template.template_color || template.template_data?.template_color,
+        session_type: 'quick',
+        activity_ids: activityInstances.map((instance) => instance.id),
+        program_context: null,
+    };
+
+    return {
+        session: {
+            id: queuedSessionId,
+            name: template.name,
+            template_id: template.id,
+            completed: false,
+            attributes: {
+                completed: false,
+                session_data: localSessionData,
+            },
+        },
+        localSessionData,
+        activityInstances,
+    };
+}
+
+function normalizeMetricValue(rawValue) {
+    if (rawValue === '' || rawValue == null) return null;
+    if (typeof rawValue === 'string') {
+        const trimmed = rawValue.trim();
+        if (trimmed === '') return null;
+        if (!Number.isNaN(Number(trimmed))) return Number(trimmed);
+        return rawValue;
+    }
+    return rawValue;
+}
+
+function sanitizeMetrics(metrics) {
+    return (Array.isArray(metrics) ? metrics : [])
+        .map((metric) => {
+            const value = normalizeMetricValue(metric?.value);
+            if (value == null) return null;
+            return {
+                metric_id: metric.metric_id,
+                ...(metric.split_id ? { split_id: metric.split_id } : {}),
+                value,
+            };
+        })
+        .filter(Boolean);
+}
+
+function sanitizeSets(sets) {
+    return (Array.isArray(sets) ? sets : []).map((set) => ({
+        ...set,
+        metrics: sanitizeMetrics(set.metrics),
+    }));
+}
 
 /**
  * Create Session Page
@@ -44,6 +174,7 @@ function CreateSession() {
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [activeQuickSessionId, setActiveQuickSessionId] = useState(null);
+    const [queuedQuickSession, setQueuedQuickSession] = useState(null);
 
     // UI state
     const [creating, setCreating] = useState(false);
@@ -51,6 +182,8 @@ function CreateSession() {
         templates,
         programDays,
         programsByName,
+        activityDefinitions,
+        activityGroups,
         loading,
     } = useCreateSessionPageData(rootId);
 
@@ -77,6 +210,7 @@ function CreateSession() {
     // Handler functions
     const handleSelectProgramDay = (programDay) => {
         setActiveQuickSessionId(null);
+        setQueuedQuickSession(null);
         setSelectedProgramDay(programDay);
         setSelectedProgramSession(null);
         setSelectedTemplate(null);
@@ -96,6 +230,7 @@ function CreateSession() {
 
     const handleSelectProgramSession = (session) => {
         setActiveQuickSessionId(null);
+        setQueuedQuickSession(null);
         setSelectedProgramSession(session);
         setSelectedTemplate({
             id: session.template_id,
@@ -107,6 +242,7 @@ function CreateSession() {
 
     const handleSelectSource = (source) => {
         setActiveQuickSessionId(null);
+        setQueuedQuickSession(null);
         setSelectedTemplate(null);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
@@ -115,6 +251,7 @@ function CreateSession() {
 
     const handleSelectProgram = (programName) => {
         setActiveQuickSessionId(null);
+        setQueuedQuickSession(null);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
         setSelectedTemplate(null);
@@ -185,23 +322,6 @@ function CreateSession() {
         setCreating(true);
 
         try {
-            const extractActivityId = (item) => {
-                if (typeof item === 'string') return item;
-                if (!item || typeof item !== 'object') return null;
-                const direct =
-                    item.activity_id ||
-                    item.activity_definition_id ||
-                    item.activityId ||
-                    item.activityDefinitionId ||
-                    item.definition_id ||
-                    item.id;
-                if (direct) return direct;
-                if (item.activity && typeof item.activity === 'object') {
-                    return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
-                }
-                return null;
-            };
-
             const sessionStart = getLocalISOString();
             const quickTemplate = isQuickSession(template);
             const sessionDataPayload = quickTemplate
@@ -266,10 +386,7 @@ function CreateSession() {
 
             updateCreatedSessionCaches(createdSession);
 
-            if (quickTemplate) {
-                setActiveQuickSessionId(createdSession.id);
-                return createdSession;
-            }
+            if (quickTemplate) return createdSession;
 
             navigate(`/${rootId}/session/${createdSession.id}`);
             return createdSession;
@@ -283,15 +400,83 @@ function CreateSession() {
         }
     };
 
-    const handleSelectTemplate = async (template) => {
+    const completeQueuedQuickSession = async () => {
+        if (!selectedTemplate || !queuedQuickSession) {
+            notify.error('Select a quick session template first.');
+            return;
+        }
+
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        await Promise.resolve();
+
+        const createdSession = await createSessionFromTemplate(selectedTemplate);
+        if (!createdSession?.id) {
+            return;
+        }
+
+        try {
+            const response = await fractalApi.getSessionActivities(rootId, createdSession.id);
+            const persistedInstances = Array.isArray(response.data) ? response.data : [];
+            const persistedByDefinitionId = new Map(
+                persistedInstances.map((instance) => [instance.activity_definition_id, instance])
+            );
+
+            for (const draftInstance of queuedQuickSession.activityInstances || []) {
+                const persistedInstance = persistedByDefinitionId.get(draftInstance.activity_definition_id);
+                if (!persistedInstance) continue;
+
+                if (draftInstance.has_sets) {
+                    await fractalApi.updateActivityInstance(rootId, persistedInstance.id, {
+                        session_id: createdSession.id,
+                        activity_definition_id: persistedInstance.activity_definition_id,
+                        completed: Boolean(draftInstance.completed),
+                        sets: sanitizeSets(draftInstance.sets),
+                    });
+                } else {
+                    const metricsPayload = sanitizeMetrics(draftInstance.metrics);
+                    if (metricsPayload.length > 0) {
+                        await fractalApi.updateActivityMetrics(rootId, createdSession.id, persistedInstance.id, {
+                            metrics: metricsPayload,
+                        });
+                    }
+                    await fractalApi.updateActivityInstance(rootId, persistedInstance.id, {
+                        session_id: createdSession.id,
+                        activity_definition_id: persistedInstance.activity_definition_id,
+                        completed: Boolean(draftInstance.completed),
+                    });
+                }
+            }
+
+            await fractalApi.updateSession(rootId, createdSession.id, { completed: true });
+            const completedSessionResponse = await fractalApi.getSession(rootId, createdSession.id);
+            const completedSession = completedSessionResponse.data;
+
+            updateCreatedSessionCaches(completedSession);
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, createdSession.id) });
+
+            setQueuedQuickSession(null);
+            setActiveQuickSessionId(createdSession.id);
+            notify.success('Quick session completed.');
+        } catch (err) {
+            console.error('Error completing queued quick session:', err);
+            notify.error('Error completing quick session: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const handleSelectTemplate = (template) => {
         setActiveQuickSessionId(null);
         setSelectedTemplate(template);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
-
         if (isQuickSession(template)) {
-            await createSessionFromTemplate(template);
+            setQueuedQuickSession(buildQueuedQuickSession(template, activityDefinitions));
+            notify.success('Quick session queued. Enter your values, then click "Complete Quick Session" to save it.');
+            return;
         }
+
+        setQueuedQuickSession(null);
     };
 
     const handleCreateSession = async () => {
@@ -368,10 +553,29 @@ function CreateSession() {
                     />
                 )}
 
-                {quickTemplateSelected && creating && !activeQuickSessionId && (
+                {quickTemplateSelected && creating && !activeQuickSessionId && !queuedQuickSession && (
                     <StepContainer>
                         <LoadingState label="Loading quick session..." />
                     </StepContainer>
+                )}
+
+                {quickTemplateSelected && queuedQuickSession && !activeQuickSessionId && (
+                    <QueuedQuickSessionProvider
+                        rootId={rootId}
+                        draftSession={queuedQuickSession}
+                        activityDefinitions={activityDefinitions}
+                        activityGroups={activityGroups}
+                        setDraftSession={setQueuedQuickSession}
+                    >
+                        <QuickSessionWorkspace
+                            embedded
+                            showCompletionAction={false}
+                        />
+                        <QuickSessionCompleteStep
+                            onComplete={completeQueuedQuickSession}
+                            isLoading={creating}
+                        />
+                    </QueuedQuickSessionProvider>
                 )}
 
                 {quickTemplateSelected && activeQuickSessionId && (
@@ -379,9 +583,11 @@ function CreateSession() {
                         <QuickSessionWorkspace
                             embedded
                             showCompletionAction={false}
-                            onStartAnother={() => createSessionFromTemplate(selectedTemplate)}
+                            onStartAnother={() => {
+                                setActiveQuickSessionId(null);
+                                setQueuedQuickSession(buildQueuedQuickSession(selectedTemplate, activityDefinitions));
+                            }}
                         />
-                        <QuickSessionCompleteStep />
                     </ActiveSessionProvider>
                 )}
 
