@@ -1,8 +1,34 @@
 import { useMemo } from 'react';
 
 const toId = (value) => (value == null ? null : String(value));
+export const ACTIVE_GOAL_WINDOW_DAYS = 7;
 
-export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = []) => {
+export const getRecentActivityCutoff = (now = new Date()) => (
+    new Date(now.getTime() - ACTIVE_GOAL_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+);
+
+export const getCompletedActivityInstanceDate = (instance) => {
+    const timestamp = instance?.time_stop
+        || instance?.completed_at
+        || instance?.updated_at
+        || instance?.created_at
+        || null;
+    if (!timestamp) return null;
+
+    const completedAt = new Date(timestamp);
+    return Number.isNaN(completedAt.getTime()) ? null : completedAt;
+};
+
+export const isRecentCompletedActivityInstance = (instance, now = new Date()) => {
+    if (!instance?.completed) return false;
+
+    const completedAt = getCompletedActivityInstanceDate(instance);
+    if (!completedAt) return false;
+
+    return completedAt >= getRecentActivityCutoff(now);
+};
+
+export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGroups = [], now = new Date()) => {
     const safeSessions = Array.isArray(sessions) ? sessions : [];
     const safeActivities = Array.isArray(activities) ? activities : [];
     const safeActivityGroups = Array.isArray(activityGroups) ? activityGroups : [];
@@ -39,15 +65,13 @@ export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGr
     });
 
     const evidenceGoalIds = new Set();
-    let hasInstanceEvidence = false;
 
-    // 3. Process completed sessions & instances
+    // 3. Process recent completed activity instances and map them to associated goals.
     safeSessions.forEach((session) => {
-        if (!session?.completed) return;
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
 
         instances.forEach((instance) => {
-            if (!instance?.completed) return;
+            if (!isRecentCompletedActivityInstance(instance, now)) return;
             const activityDefinitionId = toId(instance?.activity_definition_id);
             if (!activityDefinitionId) return;
 
@@ -55,7 +79,6 @@ export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGr
             const directGoalIds = goalsByActivityId.get(activityDefinitionId) || [];
             directGoalIds.forEach((goalId) => {
                 evidenceGoalIds.add(goalId);
-                hasInstanceEvidence = true;
             });
 
             // Group-based evidence
@@ -64,33 +87,10 @@ export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGr
                 const groupGoalIds = goalsByGroupId.get(groupId) || [];
                 groupGoalIds.forEach((goalId) => {
                     evidenceGoalIds.add(goalId);
-                    hasInstanceEvidence = true;
                 });
             }
         });
     });
-
-    // 4. Fallback: If no instance evidence resolved AT ALL, check session-level goals directly.
-    // This prevents highlighting the entire tree if direct mapping fails, but handles
-    // cases where old data doesn't map to activities well.
-    if (!hasInstanceEvidence) {
-        safeSessions.forEach((session) => {
-            if (!session?.completed) return;
-
-            const shortTermGoals = Array.isArray(session.short_term_goals) ? session.short_term_goals : [];
-            const immediateGoals = Array.isArray(session.immediate_goals) ? session.immediate_goals : [];
-
-            shortTermGoals.forEach((goal) => {
-                const gid = toId(goal?.id);
-                if (gid) evidenceGoalIds.add(gid);
-            });
-
-            immediateGoals.forEach((goal) => {
-                const gid = toId(goal?.id);
-                if (gid) evidenceGoalIds.add(gid);
-            });
-        });
-    }
 
     return evidenceGoalIds;
 };
@@ -224,7 +224,7 @@ export const deriveGraphMetrics = (
     let totalInstanceDuration = 0;
 
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = getRecentActivityCutoff(now);
 
     let recentSessionsCount = 0;
     let recentInstancesCount = 0;
@@ -245,8 +245,7 @@ export const deriveGraphMetrics = (
             completedInstancesCount += 1;
             totalInstanceDuration += (inst.duration_seconds || 0);
 
-            const instEnd = new Date(inst.time_stop || inst.updated_at || inst.created_at || now);
-            if (instEnd >= sevenDaysAgo) {
+            if (isRecentCompletedActivityInstance(inst, now)) {
                 recentInstancesCount += 1;
             }
         });

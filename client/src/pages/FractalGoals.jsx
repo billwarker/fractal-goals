@@ -12,6 +12,7 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useAllSessions } from '../hooks/useSessionQueries';
+import { ACTIVE_GOAL_WINDOW_DAYS } from '../hooks/useFlowTreeMetrics';
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
 import { usePrograms } from '../hooks/useProgramQueries';
@@ -30,6 +31,8 @@ const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModa
  */
 function FractalGoals() {
     const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
+    const activeBranchTooltip = `Marks goal paths with at least one associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
+    const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
 
     const { rootId } = useParams();
     const navigate = useNavigate();
@@ -263,12 +266,12 @@ function FractalGoals() {
                     <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''}`}>
                         <div className="flowtree-options-title">Graph View</div>
                         <Checkbox
-                            label="Highlight active branches"
+                            label={<span title={activeBranchTooltip}>Highlight active branches</span>}
                             checked={viewSettings.highlightActiveBranches}
                             onChange={handleToggleViewSetting('highlightActiveBranches')}
                         />
                         <Checkbox
-                            label="Fade inactive branches"
+                            label={<span title={inactiveBranchTooltip}>Fade inactive branches</span>}
                             checked={viewSettings.fadeInactiveBranches}
                             onChange={handleToggleViewSetting('fadeInactiveBranches')}
                         />

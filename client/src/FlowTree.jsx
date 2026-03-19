@@ -7,6 +7,7 @@ import ReactFlow, {
 } from 'reactflow';
 
 import { DEFAULT_VIEW_SETTINGS, buildGraphPresentation } from './components/flowTree/flowTreeGraphUtils';
+import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
 import { useTheme } from './contexts/ThemeContext'
 import { useGoalLevels } from './contexts/GoalLevelsContext';
 import GoalIcon from './components/atoms/GoalIcon';
@@ -342,8 +343,8 @@ const FlowTree = React.forwardRef(({
 
                     <div className={styles.metricsRow}>
                         <div className={styles.metricsRowTitle}>Pathways</div>
-                        <div className={styles.metricItem} title="Branches that contain tracked work or sessions">Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeVisibleNodesCount}</span></div>
-                        <div className={styles.metricItem} title="Branches completely empty of direct work evidence">Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveVisibleNodesCount}</span></div>
+                        <div className={styles.metricItem} title={`Branches with an associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeVisibleNodesCount}</span></div>
+                        <div className={styles.metricItem} title={`Branches without an associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveVisibleNodesCount}</span></div>
                     </div>
 
                     <div className={styles.metricsRow}>
