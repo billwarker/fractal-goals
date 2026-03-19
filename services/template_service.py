@@ -101,6 +101,16 @@ class TemplateService:
         if error:
             return None, error, status
 
+        template_name = template.name
         template.deleted_at = models.utc_now()
         self.db_session.commit()
+        event_bus.emit(Event(
+            Events.SESSION_TEMPLATE_DELETED,
+            {
+                'template_id': template.id,
+                'name': template_name,
+                'root_id': root_id,
+            },
+            source='template_service.delete_template',
+        ))
         return {"message": "Template deleted successfully"}, None, 200

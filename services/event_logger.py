@@ -197,7 +197,15 @@ def _get_event_description(event: Event):
         Events.PROGRAM_DAY_CREATED: f"Created program day: {event.data.get('day_name', 'Unknown')}",
         Events.PROGRAM_DAY_UPDATED: f"Updated program day: {event.data.get('day_name', 'Unknown')}",
         Events.PROGRAM_DAY_DELETED: f"Deleted program day: {event.data.get('day_name', 'Unknown')}",
-        
+        Events.PROGRAM_DAY_SCHEDULED: (
+            f"Scheduled program day: {event.data.get('day_name', 'Unknown')}"
+            + (f" on {event.data.get('scheduled_date')}" if event.data.get('scheduled_date') else "")
+        ),
+        Events.PROGRAM_DAY_UNSCHEDULED: (
+            f"Unscheduled program day: {event.data.get('day_name', 'Unknown')}"
+            + (f" on {event.data.get('date')}" if event.data.get('date') else "")
+        ),
+
         Events.ACTIVITY_CREATED: f"Created activity: {name}" if name else "Created activity",
         Events.ACTIVITY_UPDATED: f"Updated activity: {name}" if name else "Updated activity",
         Events.ACTIVITY_DELETED: f"Deleted activity: {name}" if name else "Deleted activity",
@@ -208,6 +216,23 @@ def _get_event_description(event: Event):
 
         Events.SESSION_TEMPLATE_CREATED: f"Created session template: {name}" if name else "Created session template",
         Events.SESSION_TEMPLATE_UPDATED: f"Updated session template: {name}" if name else "Updated session template",
+        Events.SESSION_TEMPLATE_DELETED: f"Deleted session template: {name}" if name else "Deleted session template",
+
+        Events.NOTE_CREATED: (
+            f"Created note: {event.data.get('note_content', '')[:40]}"
+            if event.data.get('note_content')
+            else "Created note"
+        ),
+        Events.NOTE_UPDATED: (
+            f"Updated note: {event.data.get('note_content', '')[:40]}"
+            if event.data.get('note_content')
+            else "Updated note"
+        ),
+        Events.NOTE_DELETED: (
+            f"Deleted note: {event.data.get('note_content', '')[:40]}"
+            if event.data.get('note_content')
+            else "Deleted note"
+        ),
     }
     
     return descriptions.get(event.name, f"Event {event.name} occurred")

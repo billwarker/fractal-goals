@@ -283,6 +283,8 @@ class Events:
     PROGRAM_DAY_CREATED = 'program_day.created'
     PROGRAM_DAY_UPDATED = 'program_day.updated'
     PROGRAM_DAY_DELETED = 'program_day.deleted'
+    PROGRAM_DAY_SCHEDULED = 'program_day.scheduled'
+    PROGRAM_DAY_UNSCHEDULED = 'program_day.unscheduled'
 
     # Association events
     GOAL_BLOCK_ASSOCIATED = 'goal.block_associated'
@@ -291,3 +293,9 @@ class Events:
     # Session Template events
     SESSION_TEMPLATE_CREATED = 'session_template.created'
     SESSION_TEMPLATE_UPDATED = 'session_template.updated'
+    SESSION_TEMPLATE_DELETED = 'session_template.deleted'
+
+    # Note events
+    NOTE_CREATED = 'note.created'
+    NOTE_UPDATED = 'note.updated'
+    NOTE_DELETED = 'note.deleted'

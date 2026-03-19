@@ -5,12 +5,26 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useSessionNotes from '../useSessionNotes';
 import { queryKeys } from '../queryKeys';
 
-const getSessionNotes = vi.fn();
-const getPreviousSessionNotes = vi.fn();
-const getActivityDefinitionNotes = vi.fn();
-const createNote = vi.fn();
-const updateNote = vi.fn();
-const deleteNote = vi.fn();
+const {
+    getSessionNotes,
+    getPreviousSessionNotes,
+    getActivityDefinitionNotes,
+    createNote,
+    updateNote,
+    deleteNote,
+    notify,
+} = vi.hoisted(() => ({
+    getSessionNotes: vi.fn(),
+    getPreviousSessionNotes: vi.fn(),
+    getActivityDefinitionNotes: vi.fn(),
+    createNote: vi.fn(),
+    updateNote: vi.fn(),
+    deleteNote: vi.fn(),
+    notify: {
+        success: vi.fn(),
+        error: vi.fn(),
+    },
+}));
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
@@ -21,6 +35,10 @@ vi.mock('../../utils/api', () => ({
         updateNote: (...args) => updateNote(...args),
         deleteNote: (...args) => deleteNote(...args),
     }
+}));
+
+vi.mock('../../utils/notify', () => ({
+    default: notify,
 }));
 
 function createWrapper(queryClient) {
@@ -87,6 +105,7 @@ describe('useSessionNotes', () => {
         expect(invalidateSpy).toHaveBeenCalledWith({
             queryKey: queryKeys.sessionNotes('root-1', 'session-1')
         });
+        expect(notify.success).toHaveBeenCalledWith('Note added');
     });
 
     it('updates the cached session note in place after editing', async () => {
@@ -121,6 +140,7 @@ describe('useSessionNotes', () => {
         expect(invalidateSpy).toHaveBeenCalledWith({
             queryKey: queryKeys.sessionNotes('root-1', 'session-1')
         });
+        expect(notify.success).toHaveBeenCalledWith('Note updated');
     });
 
     it('removes the deleted note from the shared session-notes cache', async () => {
@@ -151,5 +171,30 @@ describe('useSessionNotes', () => {
         expect(invalidateSpy).toHaveBeenCalledWith({
             queryKey: queryKeys.sessionNotes('root-1', 'session-1')
         });
+        expect(notify.success).toHaveBeenCalledWith('Note deleted');
+    });
+
+    it('skips the generic success toast for nano-goal notes', async () => {
+        const queryClient = createQueryClient();
+
+        getSessionNotes.mockResolvedValueOnce({ data: [] });
+        createNote.mockResolvedValue({
+            data: { id: 'note-2', content: 'Nano note', session_id: 'session-1', is_nano_goal: true }
+        });
+
+        const { result } = renderHook(
+            () => useSessionNotes('root-1', 'session-1', 'activity-1'),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await waitFor(() => {
+            expect(result.current.notes).toEqual([]);
+        });
+
+        await act(async () => {
+            await result.current.addNote({ session_id: 'session-1', content: 'Nano note' });
+        });
+
+        expect(notify.success).not.toHaveBeenCalledWith('Note added');
     });
 });

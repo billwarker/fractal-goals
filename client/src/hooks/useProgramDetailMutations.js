@@ -1,48 +1,13 @@
-import { useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import { useCallback, useMemo } from 'react';
 
 import { fractalApi } from '../utils/api';
+import { formatError } from '../utils/mutationNotify';
+import notify from '../utils/notify';
 import { useProgramLogic } from './useProgramLogic';
 
-function formatStructuredError(value) {
-    if (!value) {
-        return null;
-    }
-
-    if (typeof value === 'string') {
-        return value;
-    }
-
-    if (Array.isArray(value)) {
-        return value.map((entry) => formatStructuredError(entry)).filter(Boolean).join(', ');
-    }
-
-    if (typeof value === 'object') {
-        if (typeof value.error === 'string' && typeof value.parent_deadline === 'string') {
-            return `${value.error} (parent deadline: ${value.parent_deadline})`;
-        }
-        if (typeof value.error === 'string') {
-            return value.error;
-        }
-        if (typeof value.message === 'string') {
-            return value.message;
-        }
-        return Object.values(value)
-            .map((entry) => formatStructuredError(entry))
-            .filter(Boolean)
-            .join(', ');
-    }
-
-    return String(value);
-}
-
-function getErrorMessage(error, fallbackMessage) {
-    return (
-        formatStructuredError(error?.response?.data?.error)
-        || formatStructuredError(error?.response?.data)
-        || error?.message
-        || fallbackMessage
-    );
+function formatGoalTypeLabel(type) {
+    if (!type) return 'Goal';
+    return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
 export function useProgramDetailMutations({
@@ -64,40 +29,45 @@ export function useProgramDetailMutations({
     onUnscheduleFinished,
     onGoalEditorClosed,
 }) {
-    const resolvedRefreshers = refreshers || {
-        all: refreshData,
-        program: refreshData,
-        programGoals: refreshData,
-        scheduling: refreshData,
-    };
+    const resolvedRefreshers = useMemo(() => (
+        refreshers || {
+            all: refreshData,
+            program: refreshData,
+            programGoals: refreshData,
+            scheduling: refreshData,
+        }
+    ), [refreshData, refreshers]);
     const actions = useProgramLogic(rootId, program, resolvedRefreshers);
 
     const saveProgram = useCallback(async (programData) => {
         try {
             await actions.saveProgram(programData);
+            notify.success('Program updated');
             onProgramSaved?.();
         } catch (error) {
             console.error('Failed to update program:', error);
-            toast.error(`Failed to update program: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to update program: ${formatError(error)}`);
         }
     }, [actions, onProgramSaved]);
 
     const saveBlock = useCallback(async (blockData) => {
         try {
             await actions.saveBlock(blockData);
+            notify.success('Training block saved');
             onBlockSaved?.();
         } catch (error) {
             console.error('Failed to save training block:', error);
-            toast.error(`Failed to save training block: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to save training block: ${formatError(error)}`);
         }
     }, [actions, onBlockSaved]);
 
     const deleteBlock = useCallback(async (blockId) => {
         try {
             await actions.deleteBlock(blockId);
+            notify.success('Training block deleted');
         } catch (error) {
             console.error('Failed to delete block:', error);
-            toast.error(`Failed to delete block: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to delete block: ${formatError(error)}`);
         }
     }, [actions]);
 
@@ -105,24 +75,34 @@ export function useProgramDetailMutations({
         try {
             const dayId = dayModalInitialData?.id ?? null;
             await actions.saveDay(selectedBlockId, dayId, dayData);
+            notify.success('Day saved');
             onDaySaved?.();
         } catch (error) {
             console.error('Failed to save day:', error);
-            toast.error(`Failed to save day: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to save day: ${formatError(error)}`);
         }
     }, [actions, dayModalInitialData, selectedBlockId, onDaySaved]);
 
     const copyDay = useCallback(async (dayId, copyData) => {
-        return actions.copyDay(selectedBlockId, dayId, copyData);
+        try {
+            const result = await actions.copyDay(selectedBlockId, dayId, copyData);
+            notify.success('Day copied');
+            return result;
+        } catch (error) {
+            console.error('Failed to copy day:', error);
+            notify.error(`Failed to copy day: ${formatError(error)}`);
+            throw error;
+        }
     }, [actions, selectedBlockId]);
 
     const deleteDay = useCallback(async (dayId) => {
         try {
             await actions.deleteDay(selectedBlockId, dayId);
+            notify.success('Day deleted');
             onDaySaved?.();
         } catch (error) {
             console.error('Failed to delete day:', error);
-            toast.error(`Failed to delete day: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to delete day: ${formatError(error)}`);
         }
     }, [actions, selectedBlockId, onDaySaved]);
 
@@ -147,9 +127,10 @@ export function useProgramDetailMutations({
             } else {
                 await actions.unscheduleDay(itemToUnschedule);
             }
+            notify.success('Day unscheduled');
         } catch (error) {
             console.error('Failed to unschedule day:', error);
-            toast.error(`Failed to unschedule day: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to unschedule day: ${formatError(error)}`);
         } finally {
             onUnscheduleFinished?.();
         }
@@ -164,29 +145,32 @@ export function useProgramDetailMutations({
     const scheduleDay = useCallback(async (blockId, date, templateDay) => {
         try {
             await actions.scheduleDay(blockId, date, templateDay);
+            notify.success('Day scheduled');
             onScheduleDaySaved?.();
         } catch (error) {
             console.error('Failed to schedule day:', error);
-            toast.error(`Failed to schedule day: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to schedule day: ${formatError(error)}`);
         }
     }, [actions, onScheduleDaySaved]);
 
     const saveAttachedGoal = useCallback(async ({ goal_id, deadline }) => {
         try {
             await actions.attachGoal(attachBlockId, { goal_id, deadline });
+            notify.success('Goal attached');
             onAttachGoalSaved?.();
         } catch (error) {
             console.error('Failed to attach goal:', error);
-            toast.error(`Failed to attach goal: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to attach goal: ${formatError(error)}`);
         }
     }, [actions, attachBlockId, onAttachGoalSaved]);
 
     const setGoalDeadline = useCallback(async (goalId, deadline) => {
         try {
             await actions.setProgramGoalDeadline({ goal_id: goalId, deadline });
+            notify.success('Deadline updated');
         } catch (error) {
             console.error('Failed to set goal deadline:', error);
-            toast.error(`Failed to set goal deadline: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to set goal deadline: ${formatError(error)}`);
         }
     }, [actions]);
 
@@ -194,19 +178,25 @@ export function useProgramDetailMutations({
         try {
             await fractalApi.updateGoal(rootId, goalId, payload);
             await resolvedRefreshers.programGoals();
+            notify.success('Goal updated');
         } catch (error) {
             console.error('Failed to update goal:', error);
-            toast.error(`Failed to update goal: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to update goal: ${formatError(error)}`);
         }
     }, [resolvedRefreshers, rootId]);
 
     const toggleGoalCompletion = useCallback(async (goalId, currentStatus) => {
         try {
-            await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
+            const response = await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
             await resolvedRefreshers.programGoals();
+            const goalResponse = response?.data;
+            const goalType = formatGoalTypeLabel(goalResponse?.attributes?.type || goalResponse?.type);
+            const action = currentStatus ? 'Uncompleted' : 'Completed';
+            const goalName = goalResponse?.name;
+            notify.success(goalName ? `${goalType} ${action}: ${goalName}` : `${goalType} ${action}`);
         } catch (error) {
             console.error('Failed to toggle goal completion:', error);
-            toast.error(`Failed to toggle goal completion: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to toggle goal completion: ${formatError(error)}`);
         }
     }, [resolvedRefreshers, rootId]);
 
@@ -219,9 +209,10 @@ export function useProgramDetailMutations({
             await fractalApi.deleteGoal(rootId, goal.id);
             onGoalEditorClosed?.();
             await resolvedRefreshers.programGoals();
+            notify.success('Goal deleted');
         } catch (error) {
             console.error('Failed to delete goal:', error);
-            toast.error(`Failed to delete goal: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to delete goal: ${formatError(error)}`);
         }
     }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
 
@@ -230,9 +221,10 @@ export function useProgramDetailMutations({
             await fractalApi.createGoal(rootId, payload);
             onGoalEditorClosed?.();
             await resolvedRefreshers.programGoals();
+            notify.success('Goal created');
         } catch (error) {
             console.error('Failed to create goal:', error);
-            toast.error(`Failed to create goal: ${getErrorMessage(error, 'Unknown error')}`);
+            notify.error(`Failed to create goal: ${formatError(error)}`);
         }
     }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
 

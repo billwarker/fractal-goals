@@ -332,6 +332,12 @@ class ProgramService:
             ProgramService._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
 
         ProgramService._commit(session, new_block)
+        event_bus.emit(Event(Events.PROGRAM_BLOCK_CREATED, {
+            'block_id': new_block.id,
+            'block_name': new_block.name,
+            'program_id': program_id,
+            'root_id': root_id,
+        }, source='ProgramService.create_block'))
         return serialize_program_block(new_block)
 
     @staticmethod
@@ -359,6 +365,13 @@ class ProgramService:
             session.expire(block, ['goals'])
 
         ProgramService._commit(session, block)
+        event_bus.emit(Event(Events.PROGRAM_BLOCK_UPDATED, {
+            'block_id': block.id,
+            'block_name': block.name,
+            'program_id': program_id,
+            'root_id': root_id,
+            'updated_fields': list(data.keys()),
+        }, source='ProgramService.update_block'))
         return serialize_program_block(block)
 
     @staticmethod
@@ -783,6 +796,26 @@ class ProgramService:
         if status_code != 201 or scheduled_session is None:
             raise ValueError("Failed to schedule program day")
 
+        scheduled_session_id = (
+            scheduled_session.get('id')
+            if isinstance(scheduled_session, dict)
+            else getattr(scheduled_session, 'id', None)
+        )
+        scheduled_session_name = (
+            scheduled_session.get('name')
+            if isinstance(scheduled_session, dict)
+            else getattr(scheduled_session, 'name', None)
+        )
+        event_bus.emit(Event(Events.PROGRAM_DAY_SCHEDULED, {
+            'day_id': day.id,
+            'day_name': day.name,
+            'block_id': block_id,
+            'program_id': program_id,
+            'root_id': root_id,
+            'scheduled_date': scheduled_date.isoformat(),
+            'session_id': scheduled_session_id,
+            'session_name': scheduled_session_name,
+        }, source='ProgramService.schedule_block_day'))
         return scheduled_session
 
     @staticmethod
@@ -842,6 +875,18 @@ class ProgramService:
                 'session_id': session_id,
                 'session_name': removed_session_names.get(session_id),
                 'root_id': root_id
+            }, source='ProgramService.unschedule_block_day_occurrence'))
+
+        if removed_session_ids:
+            event_bus.emit(Event(Events.PROGRAM_DAY_UNSCHEDULED, {
+                'day_id': day.id,
+                'day_name': day.name,
+                'block_id': block_id,
+                'program_id': program_id,
+                'root_id': root_id,
+                'date': target_date.isoformat(),
+                'removed_session_ids': removed_session_ids,
+                'removed_count': len(removed_session_ids),
             }, source='ProgramService.unschedule_block_day_occurrence'))
 
         return {

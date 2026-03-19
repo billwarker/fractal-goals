@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
+import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
@@ -67,6 +68,7 @@ export function useSessionDetailMutations({
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             invalidateSessionListQueries();
+            notify.success('Activity added');
         },
         onError: (error) => {
             const status = error?.response?.status;
@@ -77,6 +79,7 @@ export function useSessionDetailMutations({
                 message: error?.message,
                 data: error?.response?.data
             });
+            notify.error(`Failed to add activity: ${formatError(error)}`);
         }
     });
 
@@ -100,7 +103,11 @@ export function useSessionDetailMutations({
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             invalidateSessionListQueries();
-        }
+            notify.success('Activity removed');
+        },
+        onError: (error) => {
+            notify.error(`Failed to remove activity: ${formatError(error)}`);
+        },
     });
 
     const deleteSessionMutation = useMutation({
@@ -150,7 +157,10 @@ export function useSessionDetailMutations({
         onSuccess: () => {
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });
-        }
+        },
+        onError: (error) => {
+            notify.error(`Failed to update goal: ${formatError(error)}`);
+        },
     });
 
     const toggleGoalCompletionMutation = useMutation({
@@ -311,7 +321,7 @@ export function useSessionDetailMutations({
         sessionActivitiesKey,
         sessionGoalsViewKey,
         sessionKey,
-        updateInstanceMutation.mutateAsync,
+        updateInstanceMutation,
     ]);
 
     const enqueueInstanceUpdate = useCallback((instanceId, updates) => {
@@ -359,7 +369,7 @@ export function useSessionDetailMutations({
             console.error('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
         }
-    }, [activityInstances, queryClient, rootId, sessionActivitiesKey, sessionId, sessionKey]);
+    }, [activityInstances, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
 
     const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
         updateSessionDataDraft((currentData) => {
@@ -440,10 +450,6 @@ export function useSessionDetailMutations({
             return newInstance;
         } catch (error) {
             console.error('Error adding activity:', error);
-            const serverError = error?.response?.data?.error;
-            const status = error?.response?.status;
-            const message = serverError || (status ? `HTTP ${status}` : error?.message || 'Unknown error');
-            notify.error(`Failed to add activity: ${message}`);
             throw error;
         }
     }, [activities, addActivityMutation, setShowActivitySelector, updateSessionDataDraft]);
@@ -511,6 +517,7 @@ export function useSessionDetailMutations({
             return response.data;
         } catch (error) {
             console.error('Failed to create goal', error);
+            notify.error(`Failed to create goal: ${formatError(error)}`);
             throw error;
         }
     }, [activitiesKey, invalidateGoalQueries, queryClient, rootId, sessionKey]);

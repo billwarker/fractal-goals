@@ -12,6 +12,8 @@ import { queryKeys } from '../hooks/queryKeys';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import useIsMobile from '../hooks/useIsMobile';
+import { formatError } from '../utils/mutationNotify';
+import notify from '../utils/notify';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -85,6 +87,10 @@ function Selection() {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
             setCreateModalOpen(false);
+            notify.success('Fractal created');
+        },
+        onError: (error) => {
+            notify.error(`Failed to create fractal: ${formatError(error)}`);
         },
     });
 
@@ -105,6 +111,10 @@ function Selection() {
             }
 
             setFractalToDelete(null);
+            notify.success('Fractal deleted');
+        },
+        onError: (error) => {
+            notify.error(`Failed to delete fractal: ${formatError(error)}`);
         },
     });
 
@@ -122,7 +132,7 @@ function Selection() {
         try {
             await createFractalMutation.mutateAsync(data);
         } catch (err) {
-            alert('Failed to create fractal: ' + err.message);
+            console.error('Failed to create fractal:', err);
         }
     };
 
@@ -136,7 +146,7 @@ function Selection() {
         try {
             await deleteFractalMutation.mutateAsync(fractalToDelete.id);
         } catch (err) {
-            alert('Failed to delete fractal: ' + err.message);
+            console.error('Failed to delete fractal:', err);
         }
     };
 

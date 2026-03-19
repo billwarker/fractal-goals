@@ -2,6 +2,7 @@ import pytest
 import json
 import uuid
 from models import SessionTemplate
+from services.events import Events
 
 @pytest.fixture
 def sample_session_template_api(authed_client, sample_ultimate_goal):
@@ -197,3 +198,14 @@ class TestSessionTemplates:
         response = authed_client.get(f'/api/{root_id}/session-templates')
         templates = response.get_json()
         assert not any(template['id'] == t_id for template in templates)
+
+    def test_delete_template_emits_deleted_event(self, authed_client, sample_ultimate_goal, sample_session_template_api, monkeypatch):
+        root_id = sample_ultimate_goal.id
+        t_id = sample_session_template_api['id']
+        emitted = []
+        monkeypatch.setattr('services.template_service.event_bus.emit', lambda event: emitted.append(event))
+
+        response = authed_client.delete(f'/api/{root_id}/session-templates/{t_id}')
+
+        assert response.status_code == 200
+        assert Events.SESSION_TEMPLATE_DELETED in [event.name for event in emitted]

@@ -2,6 +2,7 @@ import json
 import uuid
 import pytest
 
+from services.events import Events
 from models import Goal, Note, Session, SessionTemplate
 
 
@@ -173,6 +174,99 @@ class TestNotesApiNanoValidation:
         created_note = db_session.query(Note).filter_by(id=payload["note"]["id"]).first()
         assert created_note is not None
         assert created_note.nano_goal_id == payload["goal"]["id"]
+
+    def test_note_crud_endpoints_emit_note_events_and_preserve_persistence(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        monkeypatch,
+    ):
+        root_id = sample_ultimate_goal.id
+        emitted = []
+        monkeypatch.setattr('services.note_service.event_bus.emit', lambda event: emitted.append(event))
+
+        create_response = authed_client.post(
+            f'/api/{root_id}/notes',
+            json={
+                'content': 'Track this cue',
+                'context_type': 'session',
+                'context_id': 'ctx-1',
+            }
+        )
+        assert create_response.status_code == 201
+        created_note = create_response.get_json()
+        assert created_note['content'] == 'Track this cue'
+        assert [event.name for event in emitted] == [Events.NOTE_CREATED]
+
+        update_response = authed_client.put(
+            f'/api/{root_id}/notes/{created_note["id"]}',
+            json={'content': 'Track this cue carefully'}
+        )
+        assert update_response.status_code == 200
+        assert update_response.get_json()['content'] == 'Track this cue carefully'
+        assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.NOTE_UPDATED]
+
+        delete_response = authed_client.delete(f'/api/{root_id}/notes/{created_note["id"]}')
+        assert delete_response.status_code == 200
+        assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.NOTE_UPDATED, Events.NOTE_DELETED]
+
+        db_session.expire_all()
+        deleted_note = db_session.query(Note).filter_by(id=created_note['id']).first()
+        assert deleted_note is not None
+        assert deleted_note.deleted_at is not None
+
+    def test_create_nano_goal_note_emits_note_and_goal_events(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+        monkeypatch,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        session_id = sample_activity_instance.session_id
+
+        immediate = Goal(
+            id=str(uuid.uuid4()),
+            name="Immediate Goal",
+            owner_id=root.owner_id,
+            parent_id=sample_goal_hierarchy['short_term'].id,
+            root_id=root.id,
+        )
+        db_session.add(immediate)
+        db_session.commit()
+
+        micro_response = authed_client.post(f"/api/{root.id}/goals", json={
+            "name": "Linked Micro",
+            "type": "MicroGoal",
+            "parent_id": immediate.id,
+            "session_id": session_id,
+        })
+        assert micro_response.status_code == 201
+        micro_id = micro_response.get_json()["id"]
+
+        emitted = []
+        monkeypatch.setattr('services.note_service.event_bus.emit', lambda event: emitted.append(event))
+
+        response = authed_client.post(
+            f"/api/{root.id}/nano-goal-notes",
+            data=json.dumps({
+                "name": "Do one strict rep",
+                "parent_id": micro_id,
+                "session_id": session_id,
+                "activity_instance_id": sample_activity_instance.id,
+                "activity_definition_id": sample_activity_instance.activity_definition_id,
+            }),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 201
+        payload = response.get_json()
+        assert payload["note"]["nano_goal_id"] == payload["goal"]["id"]
+        assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.GOAL_CREATED]
+        assert emitted[0].data['note_id'] == payload['note']['id']
+        assert emitted[1].data['goal_id'] == payload['goal']['id']
 
     def test_create_nano_goal_note_rolls_back_on_invalid_activity_instance(
         self,

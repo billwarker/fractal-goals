@@ -1,10 +1,16 @@
 import React, { createContext, useContext } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
 
 const GoalsContext = createContext();
+
+function formatGoalTypeLabel(type) {
+    if (!type) return 'Goal';
+    return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+}
 
 export function GoalsProvider({ children }) {
     const queryClient = useQueryClient();
@@ -17,7 +23,11 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
-        }
+            notify.success('Goal created');
+        },
+        onError: (error) => {
+            notify.error(`Failed to create goal: ${formatError(error)}`);
+        },
     });
 
     const updateGoalMutation = useMutation({
@@ -27,7 +37,10 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
-        }
+        },
+        onError: (error) => {
+            notify.error(`Failed to update goal: ${formatError(error)}`);
+        },
     });
 
     const deleteGoalMutation = useMutation({
@@ -43,7 +56,10 @@ export function GoalsProvider({ children }) {
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionMicroGoals(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: ['session-goals-view', variables.rootId] });
             notify.success('Goal deleted');
-        }
+        },
+        onError: (error) => {
+            notify.error(`Failed to delete goal: ${formatError(error)}`);
+        },
     });
 
     const toggleGoalCompletionMutation = useMutation({
@@ -51,9 +67,16 @@ export function GoalsProvider({ children }) {
             const res = await fractalApi.toggleGoalCompletion(rootId, goalId, completed);
             return res.data;
         },
-        onSuccess: (_, variables) => {
+        onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
-        }
+            const goalType = formatGoalTypeLabel(data?.attributes?.type || data?.type);
+            const action = variables.completed ? 'Completed' : 'Uncompleted';
+            const goalName = data?.name;
+            notify.success(goalName ? `${goalType} ${action}: ${goalName}` : `${goalType} ${action}`);
+        },
+        onError: (error) => {
+            notify.error(`Failed to toggle goal: ${formatError(error)}`);
+        },
     });
 
     const [activeRootId, setActiveRootId] = React.useState(null);

@@ -121,6 +121,32 @@ def test_event_logger_get_event_description_known_and_fallback_events():
     assert _get_event_description(unknown) == "Event unknown.event occurred"
 
 
+def test_event_logger_get_event_description_for_new_note_and_schedule_events():
+    note_event = Event(Events.NOTE_CREATED, {"note_content": "Remember to breathe"})
+    assert _get_event_description(note_event) == "Created note: Remember to breathe"
+
+    note_updated = Event(Events.NOTE_UPDATED, {"note_content": "Tighter form"})
+    assert _get_event_description(note_updated) == "Updated note: Tighter form"
+
+    note_deleted = Event(Events.NOTE_DELETED, {"note_content": "Retired cue"})
+    assert _get_event_description(note_deleted) == "Deleted note: Retired cue"
+
+    scheduled_event = Event(
+        Events.PROGRAM_DAY_SCHEDULED,
+        {"day_name": "Tempo", "scheduled_date": "2026-03-18"},
+    )
+    assert _get_event_description(scheduled_event) == "Scheduled program day: Tempo on 2026-03-18"
+
+    unscheduled_event = Event(
+        Events.PROGRAM_DAY_UNSCHEDULED,
+        {"day_name": "Tempo", "date": "2026-03-19"},
+    )
+    assert _get_event_description(unscheduled_event) == "Unscheduled program day: Tempo on 2026-03-19"
+
+    template_deleted = Event(Events.SESSION_TEMPLATE_DELETED, {"name": "Base Template"})
+    assert _get_event_description(template_deleted) == "Deleted session template: Base Template"
+
+
 def test_event_bus_reports_handler_failures_and_continues():
     bus = EventBus()
     calls = []

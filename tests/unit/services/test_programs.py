@@ -136,6 +136,46 @@ def test_create_block_accepts_camel_case_dates(db_session, sample_program, sampl
 
     assert block_res['start_date'] == date.today().isoformat()
     assert block_res['end_date'] == (date.today() + timedelta(days=3)).isoformat()
+
+
+def test_create_block_emits_program_block_created_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    emitted = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+
+    block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
+        'name': 'Emitted Block',
+        'start_date': date.today().isoformat(),
+        'end_date': (date.today() + timedelta(days=3)).isoformat(),
+    })
+
+    assert block_res['name'] == 'Emitted Block'
+    assert [event.name for event in emitted] == [Events.PROGRAM_BLOCK_CREATED]
+    assert emitted[0].data['block_name'] == 'Emitted Block'
+
+
+def test_update_block_emits_program_block_updated_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name='Original Block',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=5),
+    )
+    db_session.add(block)
+    db_session.commit()
+
+    emitted = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+
+    result = ProgramService.update_block(db_session, root_id, sample_program.id, block.id, {
+        'name': 'Updated Block',
+        'color': '#123456',
+    })
+
+    assert result['name'] == 'Updated Block'
+    assert [event.name for event in emitted] == [Events.PROGRAM_BLOCK_UPDATED]
+    assert emitted[0].data['updated_fields'] == ['name', 'color']
     
 def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
@@ -155,6 +195,122 @@ def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     day_db = db_session.query(ProgramDay).get(day.id)
     assert len(day_db.goals) == 1
     assert day_db.goals[0].id == goal_id
+
+
+def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name='Sched Block',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=7),
+    )
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name='Sched Day', day_number=1)
+    db_session.add(day)
+    db_session.commit()
+
+    emitted = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr(
+        "services.programs.SessionService.create_session",
+        lambda self, root_id, current_user_id, payload: (
+            {'id': 'session-1', 'name': payload['name']},
+            None,
+            201,
+        ),
+    )
+
+    result = ProgramService.schedule_block_day(
+        db_session,
+        root_id,
+        sample_program.id,
+        block.id,
+        day.id,
+        {'session_start': datetime.now(timezone.utc).isoformat()},
+    )
+
+    assert result['id'] == 'session-1'
+    assert [event.name for event in emitted] == [Events.PROGRAM_DAY_SCHEDULED]
+    assert emitted[0].data['day_name'] == 'Sched Day'
+
+
+def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name='Unsched Block',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=7),
+    )
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name='Unsched Day', day_number=1)
+    db_session.add(day)
+    db_session.flush()
+
+    scheduled_session = Session(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name='Scheduled Session',
+        session_start=datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0),
+        completed=False,
+        program_day_id=day.id,
+    )
+    db_session.add(scheduled_session)
+    db_session.commit()
+
+    emitted = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+
+    result = ProgramService.unschedule_block_day_occurrence(
+        db_session,
+        root_id,
+        sample_program.id,
+        block.id,
+        day.id,
+        {'date': scheduled_session.session_start.date().isoformat(), 'timezone': 'UTC'},
+    )
+
+    assert result['removed_count'] == 1
+    assert result['removed_session_ids'] == [scheduled_session.id]
+    assert [event.name for event in emitted] == [Events.SESSION_DELETED, Events.PROGRAM_DAY_UNSCHEDULED]
+    assert emitted[1].data['removed_count'] == 1
+
+
+def test_unschedule_block_day_occurrence_skips_unscheduled_event_when_nothing_matches(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name='Quiet Block',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=7),
+    )
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name='Quiet Day', day_number=1)
+    db_session.add(day)
+    db_session.commit()
+
+    emitted = []
+    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+
+    result = ProgramService.unschedule_block_day_occurrence(
+        db_session,
+        root_id,
+        sample_program.id,
+        block.id,
+        day.id,
+        {'date': date.today().isoformat(), 'timezone': 'UTC'},
+    )
+
+    assert result['removed_count'] == 0
+    assert result['removed_session_ids'] == []
+    assert emitted == []
 
 
 def test_attach_goal_to_block_preserves_program_scope_and_requires_descendant(db_session, sample_program, sample_goal_hierarchy):

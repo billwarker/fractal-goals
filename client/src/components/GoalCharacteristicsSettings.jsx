@@ -7,7 +7,8 @@ import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
 import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
 import useIsMobile from '../hooks/useIsMobile';
-import toast from 'react-hot-toast';
+import { formatError } from '../utils/mutationNotify';
+import notify from '../utils/notify';
 import styles from './GoalCharacteristicsSettings.module.css';
 
 const GoalCharacteristicsSettings = () => {
@@ -41,7 +42,7 @@ const GoalCharacteristicsSettings = () => {
 
         try {
             await updateGoalLevel({ id: levelId, updates: changes });
-            toast.success("Settings saved.");
+            notify.success('Settings saved.');
 
             // Clear local edits for this level since they are now persisted
             setEdits(prev => {
@@ -51,7 +52,7 @@ const GoalCharacteristicsSettings = () => {
             });
         } catch (error) {
             console.error(error);
-            toast.error("Failed to save settings.");
+            notify.error(`Failed to save settings: ${formatError(error)}`);
         }
     };
 
@@ -59,14 +60,14 @@ const GoalCharacteristicsSettings = () => {
         if (!window.confirm("Restore this level to the system default characteristics?")) return;
         try {
             await resetGoalLevel(levelId);
-            toast.success("Reset to defaults.");
+            notify.success('Reset to defaults.');
             setEdits(prev => {
                 const next = { ...prev };
                 delete next[levelId];
                 return next;
             });
         } catch (error) {
-            toast.error("Failed to reset level.");
+            notify.error(`Failed to reset level: ${formatError(error)}`);
         }
     };
 
@@ -384,11 +385,11 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
         try {
             const res = await authApi.updatePreferences({ preferences: edits });
             setUser(res.data);
-            toast.success("Completed goal colors saved.");
+            notify.success('Completed goal colors saved.');
             setEdits({});
         } catch (error) {
             console.error(error);
-            toast.error("Failed to save settings.");
+            notify.error(`Failed to save settings: ${formatError(error)}`);
         }
     };
 
@@ -399,10 +400,10 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
             const changes = { completed_primary_color: null, completed_secondary_color: null };
             const res = await authApi.updatePreferences({ preferences: changes });
             setUser(res.data);
-            toast.success("Reset to defaults.");
+            notify.success('Reset to defaults.');
             setEdits({});
         } catch (error) {
-            toast.error("Failed to reset colors.");
+            notify.error(`Failed to reset colors: ${formatError(error)}`);
         }
     };
 

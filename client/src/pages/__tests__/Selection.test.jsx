@@ -6,12 +6,26 @@ import { MemoryRouter } from 'react-router-dom';
 import Selection from '../Selection';
 import { queryKeys } from '../../hooks/queryKeys';
 
-const mockNavigate = vi.fn();
-const mockLogout = vi.fn();
-const getAllFractals = vi.fn();
-const getGoalLevels = vi.fn();
-const createFractal = vi.fn();
-const deleteFractal = vi.fn();
+const {
+    mockNavigate,
+    mockLogout,
+    getAllFractals,
+    getGoalLevels,
+    createFractal,
+    deleteFractal,
+    notify,
+} = vi.hoisted(() => ({
+    mockNavigate: vi.fn(),
+    mockLogout: vi.fn(),
+    getAllFractals: vi.fn(),
+    getGoalLevels: vi.fn(),
+    createFractal: vi.fn(),
+    deleteFractal: vi.fn(),
+    notify: {
+        success: vi.fn(),
+        error: vi.fn(),
+    },
+}));
 
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom');
@@ -53,7 +67,17 @@ vi.mock('../../hooks/useIsMobile', () => ({
 }));
 
 vi.mock('../../components/modals/GoalModal', () => ({
-    default: () => null,
+    default: function GoalModal({ isOpen, onSubmit }) {
+        if (!isOpen) {
+            return null;
+        }
+
+        return (
+            <button onClick={() => onSubmit({ name: 'New Fractal', type: 'UltimateGoal' })}>
+                Submit fractal
+            </button>
+        );
+    },
 }));
 
 vi.mock('../../components/modals/AuthModal', () => ({
@@ -77,6 +101,10 @@ vi.mock('../../components/modals/DeleteConfirmModal', () => ({
             </div>
         );
     },
+}));
+
+vi.mock('../../utils/notify', () => ({
+    default: notify,
 }));
 
 function createQueryClient() {
@@ -186,5 +214,60 @@ describe('Selection', () => {
         });
 
         expect(localStorage.getItem('fractal_recent_root_id')).toBeNull();
+    });
+
+    it('uses notify instead of alert when fractal creation fails', async () => {
+        const queryClient = createQueryClient();
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+        getAllFractals.mockResolvedValueOnce({ data: [] });
+        createFractal.mockRejectedValueOnce(new Error('Create failed'));
+
+        renderSelection(queryClient);
+
+        await waitFor(() => {
+            expect(screen.getByText('New Fractal')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('New Fractal'));
+        fireEvent.click(screen.getByText('Submit fractal'));
+
+        await waitFor(() => {
+            expect(notify.error).toHaveBeenCalledWith('Failed to create fractal: Create failed');
+        });
+        expect(alertSpy).not.toHaveBeenCalled();
+
+        alertSpy.mockRestore();
+    });
+
+    it('uses notify instead of alert when fractal deletion fails', async () => {
+        const queryClient = createQueryClient();
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+        getAllFractals.mockResolvedValueOnce({
+            data: [
+                { id: 'root-1', name: 'Root 1', type: 'UltimateGoal', is_smart: false, created_at: '2026-03-01T00:00:00Z' },
+            ],
+        });
+        getGoalLevels.mockResolvedValueOnce({
+            data: [{ name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' }],
+        });
+        deleteFractal.mockRejectedValueOnce(new Error('Delete failed'));
+
+        renderSelection(queryClient);
+
+        await waitFor(() => {
+            expect(screen.getByText('Root 1')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByTitle('Delete Fractal'));
+        fireEvent.click(screen.getByText('Confirm delete'));
+
+        await waitFor(() => {
+            expect(notify.error).toHaveBeenCalledWith('Failed to delete fractal: Delete failed');
+        });
+        expect(alertSpy).not.toHaveBeenCalled();
+
+        alertSpy.mockRestore();
     });
 });

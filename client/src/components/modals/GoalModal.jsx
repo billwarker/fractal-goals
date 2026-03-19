@@ -8,7 +8,7 @@ import ModalFooter from '../atoms/ModalFooter';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
-import toast from 'react-hot-toast';
+import notify from '../../utils/notify';
 import styles from './GoalModal.module.css';
 
 function getDefaultDeadline(getLevelCharacteristics, levelType) {
@@ -72,7 +72,7 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
             const maxDays = (maxValue != null && maxUnit) ? getDurationInDays(maxValue, maxUnit) : null;
             const validation = validateDeadlineRange(deadline, minDays, maxDays);
             if (!validation.isValid) {
-                toast.error(validation.message);
+                notify.error(validation.message);
                 return;
             }
         }

@@ -10,11 +10,8 @@ const {
     deleteGoal,
     createGoal,
     refreshData,
-    toast,
+    notify,
 } = vi.hoisted(() => {
-    const toastMock = vi.fn();
-    toastMock.error = vi.fn();
-
     return {
         mockActions: {
             saveProgram: vi.fn(),
@@ -34,7 +31,10 @@ const {
         deleteGoal: vi.fn(),
         createGoal: vi.fn(),
         refreshData: vi.fn(),
-        toast: toastMock,
+        notify: {
+            success: vi.fn(),
+            error: vi.fn(),
+        },
     };
 });
 
@@ -51,8 +51,8 @@ vi.mock('../../utils/api', () => ({
     },
 }));
 
-vi.mock('react-hot-toast', () => ({
-    toast,
+vi.mock('../../utils/notify', () => ({
+    default: notify,
 }));
 
 describe('useProgramDetailMutations', () => {
@@ -110,6 +110,7 @@ describe('useProgramDetailMutations', () => {
 
         expect(mockActions.saveDay).toHaveBeenCalledWith('block-1', 'day-1', { name: 'Intervals' });
         expect(callbacks.onDaySaved).toHaveBeenCalledTimes(1);
+        expect(notify.success).toHaveBeenCalledWith('Day saved');
     });
 
     it('delegates recurring unschedule to the program service path and always clears the confirmation state', async () => {
@@ -135,6 +136,7 @@ describe('useProgramDetailMutations', () => {
         });
         expect(mockActions.unscheduleDay).not.toHaveBeenCalled();
         expect(callbacks.onUnscheduleFinished).toHaveBeenCalledTimes(1);
+        expect(notify.success).toHaveBeenCalledWith('Day unscheduled');
     });
 
     it('deletes a goal after confirmation, then refreshes and closes the goal editor', async () => {
@@ -150,6 +152,7 @@ describe('useProgramDetailMutations', () => {
         expect(deleteGoal).toHaveBeenCalledWith('root-1', 'goal-1');
         expect(callbacks.onGoalEditorClosed).toHaveBeenCalledTimes(1);
         expect(refreshers.programGoals).toHaveBeenCalledTimes(1);
+        expect(notify.success).toHaveBeenCalledWith('Goal deleted');
 
         confirmSpy.mockRestore();
     });
@@ -172,7 +175,7 @@ describe('useProgramDetailMutations', () => {
             await result.current.setGoalDeadline('goal-1', '2026-03-16');
         });
 
-        expect(toast.error).toHaveBeenCalledWith(
+        expect(notify.error).toHaveBeenCalledWith(
             'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
         );
     });

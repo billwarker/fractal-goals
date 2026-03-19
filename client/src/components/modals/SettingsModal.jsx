@@ -4,7 +4,8 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoals } from '../../contexts/GoalsContext';
 import { authApi } from '../../utils/api';
-import toast from 'react-hot-toast';
+import { formatError } from '../../utils/mutationNotify';
+import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './SettingsModal.module.css';
@@ -42,10 +43,10 @@ const SettingsModalInner = ({ onClose }) => {
         e.preventDefault();
         try {
             await authApi.updatePassword(passwordData);
-            toast.success('Password updated successfully');
+            notify.success('Password updated successfully');
             setPasswordData({ current_password: '', new_password: '' });
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to update password');
+            notify.error(`Failed to update password: ${formatError(err)}`);
         }
     };
 
@@ -53,10 +54,10 @@ const SettingsModalInner = ({ onClose }) => {
         e.preventDefault();
         try {
             await authApi.updateEmail(emailData);
-            toast.success('Email updated successfully');
+            notify.success('Email updated successfully');
             setEmailData({ email: '', password: '' });
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to update email');
+            notify.error(`Failed to update email: ${formatError(err)}`);
         }
     };
 
@@ -67,11 +68,11 @@ const SettingsModalInner = ({ onClose }) => {
         if (window.confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
             try {
                 await authApi.deleteAccount(deleteData);
-                toast.success('Account deleted.');
+                notify.success('Account deleted.');
                 logout();
                 onClose();
             } catch (err) {
-                toast.error(err.response?.data?.error || 'Failed to delete account');
+                notify.error(`Failed to delete account: ${formatError(err)}`);
             }
         }
     };

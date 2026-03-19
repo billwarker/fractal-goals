@@ -279,6 +279,20 @@ class NoteService:
 
         self.db_session.commit()
         logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
+        event_bus.emit(Event(
+            Events.NOTE_CREATED,
+            {
+                'note_id': note.id,
+                'note_content': note.content,
+                'context_type': note.context_type,
+                'context_id': note.context_id,
+                'root_id': root_id,
+                'session_id': note.session_id,
+                'activity_instance_id': note.activity_instance_id,
+                'nano_goal_id': note.nano_goal_id,
+            },
+            source='note_service.create_note',
+        ))
         return serialize_note(note), None, 201
 
     def create_nano_goal_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
@@ -328,6 +342,20 @@ class NoteService:
         self.db_session.refresh(new_goal)
         self.db_session.refresh(note)
         event_bus.emit(Event(
+            Events.NOTE_CREATED,
+            {
+                'note_id': note.id,
+                'note_content': note.content,
+                'context_type': note.context_type,
+                'context_id': note.context_id,
+                'root_id': root_id,
+                'session_id': note.session_id,
+                'activity_instance_id': note.activity_instance_id,
+                'nano_goal_id': note.nano_goal_id,
+            },
+            source='note_service.create_nano_goal_note',
+        ))
+        event_bus.emit(Event(
             Events.GOAL_CREATED,
             {
                 'goal_id': new_goal.id,
@@ -369,6 +397,21 @@ class NoteService:
 
         self.db_session.commit()
         logger.info("Updated note %s", note_id)
+        event_bus.emit(Event(
+            Events.NOTE_UPDATED,
+            {
+                'note_id': note.id,
+                'note_content': note.content,
+                'context_type': note.context_type,
+                'context_id': note.context_id,
+                'root_id': root_id,
+                'session_id': note.session_id,
+                'activity_instance_id': note.activity_instance_id,
+                'nano_goal_id': note.nano_goal_id,
+                'updated_fields': list(data.keys()),
+            },
+            source='note_service.update_note',
+        ))
         return serialize_note(note), None, 200
 
     def delete_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -384,7 +427,27 @@ class NoteService:
         if not note:
             return None, "Note not found", 404
 
+        note_content = note.content
+        context_type = note.context_type
+        context_id = note.context_id
+        session_id = note.session_id
+        activity_instance_id = note.activity_instance_id
+        nano_goal_id = note.nano_goal_id
         note.deleted_at = datetime.now(timezone.utc)
         self.db_session.commit()
         logger.info("Deleted note %s", note_id)
+        event_bus.emit(Event(
+            Events.NOTE_DELETED,
+            {
+                'note_id': note_id,
+                'note_content': note_content,
+                'context_type': context_type,
+                'context_id': context_id,
+                'root_id': root_id,
+                'session_id': session_id,
+                'activity_instance_id': activity_instance_id,
+                'nano_goal_id': nano_goal_id,
+            },
+            source='note_service.delete_note',
+        ))
         return {"success": True}, None, 200

@@ -2,6 +2,7 @@ import pytest
 import json
 import uuid
 from datetime import datetime, timedelta
+from services.events import Events
 
 @pytest.fixture
 def sample_program(authed_client, sample_ultimate_goal):
@@ -467,6 +468,57 @@ class TestProgramStructure:
         payload = unschedule_response.get_json()
         assert payload['removed_count'] == 1
         assert payload['removed_session_ids'] == [session_id]
+
+    def test_unschedule_block_day_occurrence_emits_program_day_unscheduled(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy, monkeypatch):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        short_term_goal = sample_goal_hierarchy['short_term']
+
+        authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            json={'selectedGoals': [mid_term_goal.id]}
+        )
+
+        program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block_id = program_data['blocks'][0]['id']
+        scoped_deadline = (
+            datetime.strptime(program_data['blocks'][0]['start_date'], '%Y-%m-%d') + timedelta(days=1)
+        ).strftime('%Y-%m-%d')
+
+        authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
+            json={
+                'goal_id': short_term_goal.id,
+                'deadline': scoped_deadline,
+            }
+        )
+        authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
+            json={'name': 'Recurring Day'}
+        )
+
+        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block = next(entry for entry in refreshed_program['blocks'] if entry['id'] == block_id)
+        day_id = next(day['id'] for day in block['days'] if day.get('name') == 'Recurring Day')
+        scheduled_date = block['start_date']
+
+        schedule_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/schedule',
+            json={'session_start': f'{scheduled_date}T12:00:00Z'}
+        )
+        assert schedule_response.status_code == 201
+
+        emitted = []
+        monkeypatch.setattr('services.programs.event_bus.emit', lambda event: emitted.append(event))
+
+        unschedule_response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/unschedule',
+            json={'date': scheduled_date, 'timezone': 'UTC'}
+        )
+
+        assert unschedule_response.status_code == 200
+        assert Events.PROGRAM_DAY_UNSCHEDULED in [event.name for event in emitted]
 
     def test_set_goal_deadline_for_program_date_enforces_scope_and_returns_goal(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
         root_id = sample_ultimate_goal.id

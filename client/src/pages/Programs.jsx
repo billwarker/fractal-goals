@@ -80,9 +80,11 @@ function Programs() {
             if (selectedProgram) {
                 await fractalApi.updateProgram(rootId, selectedProgram.id, apiData);
                 savedProgramId = selectedProgram.id;
+                notify.success('Program updated');
             } else {
                 const res = await fractalApi.createProgram(rootId, apiData);
                 savedProgramId = res.data.id;
+                notify.success('Program created');
             }
 
             // Navigate to detail view
@@ -123,6 +125,7 @@ function Programs() {
 
         try {
             await fractalApi.deleteProgram(rootId, programToDelete.id);
+            notify.success('Program deleted');
             setShowDeleteModal(false);
             setProgramToDelete(null);
             setDeleteSessionCount(0);
