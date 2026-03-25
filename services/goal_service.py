@@ -20,6 +20,7 @@ from models import (
     TargetMetricCondition,
     VisualizationAnnotation,
     activity_goal_associations,
+    goal_activity_group_associations,
     get_goal_by_id,
     get_session_by_id,
     session_goals,
@@ -442,6 +443,34 @@ class GoalService:
                     child.deadline = new_max
                     logger.info("Cascaded deadline update to child goal %s", child.id)
                     self._cascade_child_deadlines(child, new_max)
+
+    def _get_goal_level_rank(self, goal) -> int | None:
+        if not goal:
+            return None
+
+        level = getattr(goal, 'level', None)
+        if level and getattr(level, 'rank', None) is not None:
+            return level.rank
+
+        level_id = getattr(goal, 'level_id', None)
+        if not level_id:
+            return None
+
+        level = self.db_session.query(GoalLevel).filter_by(id=level_id).first()
+        return getattr(level, 'rank', None) if level else None
+
+    def _goals_share_same_tier(self, left_goal, right_goal) -> bool:
+        if not left_goal or not right_goal:
+            return False
+
+        left_rank = self._get_goal_level_rank(left_goal)
+        right_rank = self._get_goal_level_rank(right_goal)
+        if left_rank is not None and right_rank is not None:
+            return left_rank == right_rank
+
+        from services.goal_type_utils import get_canonical_goal_type
+
+        return get_canonical_goal_type(left_goal) == get_canonical_goal_type(right_goal)
 
     def _apply_goal_updates(
         self,
@@ -1098,6 +1127,9 @@ class GoalService:
         if goal.root_id and goal.root_id != authorized_root_id:
             return None, "Goal not found in this fractal", 404
 
+        if goal.frozen:
+            return None, "Cannot complete a frozen goal. Unfreeze it first.", 400
+
         goal.completed = data['completed'] if 'completed' in data else not goal.completed
 
         if goal.completed:
@@ -1217,7 +1249,7 @@ class GoalService:
         targets_total = len(targets)
         goal_was_completed = False
 
-        if targets_completed == targets_total and targets_total > 0 and not goal.completed:
+        if targets_completed == targets_total and targets_total > 0 and not goal.completed and not goal.frozen:
             goal.completed = True
             goal.completed_at = now
             goal_was_completed = True
@@ -1233,3 +1265,202 @@ class GoalService:
             newly_completed_targets=newly_completed_targets,
             goal_completed=goal_was_completed,
         ), None, 200
+
+    # ========== GOAL OPTIONS ==========
+
+    def copy_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        source = self.db_session.query(Goal).options(
+            selectinload(Goal.targets_rel),
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups),
+        ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
+        if not source:
+            return None, "Goal not found", 404
+
+        from services.goal_type_utils import get_canonical_goal_type
+        goal_type = get_canonical_goal_type(source)
+
+        # Build create payload from source
+        create_data = {
+            'name': f"Copy of {source.name}",
+            'type': goal_type,
+            'description': source.description or '',
+            'parent_id': source.parent_id,
+            'deadline': source.deadline.isoformat() if source.deadline else None,
+            'relevance_statement': source.relevance_statement,
+            'completed_via_children': source.completed_via_children,
+            'inherit_parent_activities': source.inherit_parent_activities,
+            'allow_manual_completion': source.allow_manual_completion,
+            'track_activities': source.track_activities,
+        }
+
+        # Serialize source targets for the copy
+        if source.targets_rel:
+            create_data['targets'] = [
+                {
+                    'name': t.name,
+                    'target_type': t.target_type,
+                    'target_value': t.target_value,
+                    'target_unit': t.target_unit,
+                    'comparison_operator': t.comparison_operator,
+                    'activity_definition_id': t.activity_definition_id,
+                    'metric_definition_id': t.metric_definition_id,
+                    'time_scope': t.time_scope,
+                    'time_scope_value': t.time_scope_value,
+                    'time_scope_unit': t.time_scope_unit,
+                }
+                for t in source.targets_rel if t.deleted_at is None
+            ]
+
+        new_goal, err, status = self.create_fractal_goal_record(root_id, current_user_id, create_data)
+        if err:
+            return None, err, status
+
+        # Copy activity associations
+        for activity in (source.associated_activities or []):
+            self.db_session.execute(
+                activity_goal_associations.insert().values(
+                    activity_id=activity.id,
+                    goal_id=new_goal.id,
+                )
+            )
+
+        # Copy activity group associations
+        for group in (source.associated_activity_groups or []):
+            self.db_session.execute(
+                goal_activity_group_associations.insert().values(
+                    goal_id=new_goal.id,
+                    activity_group_id=group.id,
+                )
+            )
+
+        self.db_session.commit()
+        self.db_session.refresh(new_goal)
+        return new_goal, None, 201
+
+    def toggle_freeze(self, root_id, goal_id, current_user_id, frozen: bool) -> ServiceResult[Goal]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        goal = self.db_session.query(Goal).filter_by(
+            id=goal_id, root_id=root_id, deleted_at=None,
+        ).first()
+        if not goal:
+            return None, "Goal not found", 404
+
+        goal.frozen = frozen
+        goal.frozen_at = datetime.now(timezone.utc) if frozen else None
+        self.db_session.commit()
+        self.db_session.refresh(goal)
+        return goal, None, 200
+
+    def move_goal(self, root_id, goal_id, current_user_id, new_parent_id) -> ServiceResult[Goal]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        goal = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+        ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
+        if not goal:
+            return None, "Goal not found", 404
+
+        if goal.parent_id is None:
+            return None, "Root goals cannot be moved", 400
+
+        if not new_parent_id:
+            return None, "Move goal requires selecting a new parent on the current parent tier", 400
+
+        if new_parent_id == goal_id:
+            return None, "A goal cannot be its own parent", 400
+
+        current_parent = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+        ).filter_by(id=goal.parent_id, root_id=root_id, deleted_at=None).first()
+        if not current_parent:
+            return None, "Current parent goal not found in this fractal", 400
+
+        if new_parent_id == current_parent.id:
+            return goal, None, 200
+
+        new_parent = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+        ).filter_by(id=new_parent_id, root_id=root_id, deleted_at=None).first()
+        if not new_parent:
+            return None, "New parent goal not found in this fractal", 404
+
+        if not self._goals_share_same_tier(current_parent, new_parent):
+            return None, "Can only move a goal under a parent on the same tier as its current parent", 400
+
+        # Prevent circular references — walk up from new_parent
+        current = new_parent
+        while current.parent_id:
+            if current.parent_id == goal_id:
+                return None, "Cannot move goal under one of its own descendants", 400
+            current = self.db_session.query(Goal).filter_by(id=current.parent_id).first()
+            if not current:
+                break
+
+        # Validate level compatibility
+        if goal.level and new_parent.level:
+            if goal.level.rank <= new_parent.level.rank:
+                return None, f"Cannot move: goal level '{goal.level.name}' must be below parent level '{new_parent.level.name}'", 400
+
+        # Validate parent capacity
+        capacity_error = self._validate_parent_capacity(
+            new_parent,
+            error_prefix="Cannot move goal: Parent level",
+        )
+        if capacity_error:
+            return None, capacity_error, 400
+
+        goal.parent_id = new_parent_id
+        self.db_session.commit()
+        self.db_session.refresh(goal)
+        return goal, None, 200
+
+    def convert_goal_level(self, root_id, goal_id, current_user_id, level_id) -> ServiceResult[Goal]:
+        root, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        goal = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+            selectinload(Goal.children),
+        ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
+        if not goal:
+            return None, "Goal not found", 404
+
+        new_level = self.db_session.query(GoalLevel).filter_by(id=level_id).first()
+        if not new_level:
+            return None, "Goal level not found", 404
+
+        root_level_rank = self._get_goal_level_rank(root)
+        if root_level_rank is not None and new_level.rank <= root_level_rank:
+            return None, "Cannot convert a goal to the fractal root level", 400
+
+        # Validate against parent
+        if goal.parent_id:
+            parent = self.db_session.query(Goal).options(
+                selectinload(Goal.level),
+            ).filter_by(id=goal.parent_id).first()
+            if parent and parent.level and new_level.rank <= parent.level.rank:
+                return None, f"New level '{new_level.name}' must be below parent level '{parent.level.name}'", 400
+
+        # Validate against children
+        for child in (goal.children or []):
+            if child.deleted_at:
+                continue
+            child_level = child.level or self.db_session.query(GoalLevel).filter_by(id=child.level_id).first()
+            if child_level and new_level.rank >= child_level.rank:
+                return None, f"New level '{new_level.name}' must be above child level '{child_level.name}'", 400
+
+        goal.level_id = level_id
+        self.db_session.commit()
+        self.db_session.refresh(goal)
+        return goal, None, 200

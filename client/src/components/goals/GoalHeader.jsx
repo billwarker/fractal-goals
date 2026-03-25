@@ -16,10 +16,29 @@ function GoalHeader({
     onClose, // Callback to close modal when navigating
     onCollapse, // Mobile panel collapse toggle
     deadline,
-    headerColor, // New prop for header color
-    isCompact = false // Prop to control collapsed state
+    isCompact = false, // Prop to control collapsed state
+    goalStatus = 'active',
 }) {
     const { timezone } = useTimezone();
+    const normalizedStatus = goalStatus === 'frozen'
+        ? 'frozen'
+        : goalStatus === 'inactive'
+            ? 'inactive'
+            : 'active';
+    const statusConfig = {
+        active: {
+            label: 'Active',
+            color: '#15803d',
+        },
+        inactive: {
+            label: 'Inactive',
+            color: 'var(--color-text-secondary)',
+        },
+        frozen: {
+            label: 'Frozen',
+            color: '#93c5fd',
+        },
+    }[normalizedStatus];
 
     return (
         <div style={{
@@ -126,6 +145,26 @@ function GoalHeader({
                     {/* Only show SMART indicator in non-create mode, or if we have enough data */}
                     {mode !== 'create' && (
                         <SMARTIndicator goal={goal} goalType={goalType} />
+                    )}
+                    {mode !== 'create' && (
+                        <>
+                            <span style={{
+                                color: 'var(--color-text-muted)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                            }}>
+                                |
+                            </span>
+                            <span style={{
+                                color: statusConfig.color,
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                            }}>
+                                {statusConfig.label}
+                            </span>
+                        </>
                     )}
 
                     {mode === 'create' && parentGoal && (

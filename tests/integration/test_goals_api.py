@@ -385,6 +385,124 @@ class TestGoalCompletionEndpoints:
 
 
 @pytest.mark.integration
+class TestGoalOptionsEndpoints:
+    def test_freeze_endpoint_blocks_completion(self, authed_client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['short_term'].id
+
+        freeze_response = authed_client.patch(
+            f'/api/{root_id}/goals/{goal_id}/freeze',
+            json={'frozen': True},
+        )
+
+        assert freeze_response.status_code == 200
+        assert freeze_response.get_json()['frozen'] is True
+
+        completion_response = authed_client.patch(
+            f'/api/goals/{goal_id}/complete',
+            json={'completed': True},
+        )
+
+        assert completion_response.status_code == 400
+        assert completion_response.get_json()['error'] == 'Cannot complete a frozen goal. Unfreeze it first.'
+
+    def test_move_goal_endpoint_only_allows_same_parent_tier(
+        self,
+        authed_client,
+        db_session,
+        test_user,
+        sample_goal_hierarchy,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        long_term = sample_goal_hierarchy['long_term']
+        mid_term = sample_goal_hierarchy['mid_term']
+        short_term = sample_goal_hierarchy['short_term']
+
+        root_level = GoalLevel(id=str(uuid.uuid4()), name='Ultimate Goal', rank=0)
+        long_level = GoalLevel(id=str(uuid.uuid4()), name='Long Term Goal', rank=1)
+        mid_level = GoalLevel(id=str(uuid.uuid4()), name='Mid Term Goal', rank=2)
+        short_level = GoalLevel(id=str(uuid.uuid4()), name='Short Term Goal', rank=3)
+        db_session.add_all([root_level, long_level, mid_level, short_level])
+        db_session.flush()
+
+        root.level_id = root_level.id
+        long_term.level_id = long_level.id
+        mid_term.level_id = mid_level.id
+        short_term.level_id = short_level.id
+
+        alternate_mid = Goal(
+            id=str(uuid.uuid4()),
+            name='Alternate mid-term parent',
+            description='Valid move target',
+            parent_id=long_term.id,
+            root_id=root.id,
+            level_id=mid_level.id,
+            owner_id=test_user.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        alternate_long = Goal(
+            id=str(uuid.uuid4()),
+            name='Alternate long-term parent',
+            description='Invalid move target',
+            parent_id=root.id,
+            root_id=root.id,
+            level_id=long_level.id,
+            owner_id=test_user.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add_all([alternate_mid, alternate_long])
+        db_session.commit()
+
+        allowed_response = authed_client.patch(
+            f'/api/{root.id}/goals/{short_term.id}/move',
+            json={'new_parent_id': alternate_mid.id},
+        )
+
+        assert allowed_response.status_code == 200
+        assert allowed_response.get_json()['attributes']['parent_id'] == alternate_mid.id
+
+        rejected_response = authed_client.patch(
+            f'/api/{root.id}/goals/{short_term.id}/move',
+            json={'new_parent_id': alternate_long.id},
+        )
+
+        assert rejected_response.status_code == 400
+        assert rejected_response.get_json()['error'] == 'Can only move a goal under a parent on the same tier as its current parent'
+
+    def test_convert_level_endpoint_rejects_root_tier(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        long_term = sample_goal_hierarchy['long_term']
+        mid_term = sample_goal_hierarchy['mid_term']
+        short_term = sample_goal_hierarchy['short_term']
+
+        root_level = GoalLevel(id=str(uuid.uuid4()), name='Ultimate Goal', rank=0)
+        long_level = GoalLevel(id=str(uuid.uuid4()), name='Long Term Goal', rank=1)
+        mid_level = GoalLevel(id=str(uuid.uuid4()), name='Mid Term Goal', rank=2)
+        short_level = GoalLevel(id=str(uuid.uuid4()), name='Short Term Goal', rank=3)
+        db_session.add_all([root_level, long_level, mid_level, short_level])
+        db_session.flush()
+
+        root.level_id = root_level.id
+        long_term.level_id = long_level.id
+        mid_term.level_id = mid_level.id
+        short_term.level_id = short_level.id
+        db_session.commit()
+
+        response = authed_client.patch(
+            f'/api/{root.id}/goals/{short_term.id}/convert-level',
+            json={'level_id': root_level.id},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Cannot convert a goal to the fractal root level'
+
+
+@pytest.mark.integration
 class TestGoalTargetEndpoints:
     """Test goal target management endpoints."""
     

@@ -132,6 +132,8 @@ class Goal(Base):
     inherit_parent_activities = Column(Boolean, default=False)
     allow_manual_completion = Column(Boolean, default=True)
     track_activities = Column(Boolean, default=True)
+    frozen = Column(Boolean, default=False)
+    frozen_at = Column(DateTime, nullable=True)
     targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
     
     __table_args__ = (

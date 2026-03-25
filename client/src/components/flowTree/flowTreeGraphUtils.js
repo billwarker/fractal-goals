@@ -121,6 +121,7 @@ export const convertTreeToFlow = (
                 type: nodeType,
                 completed: normalizedNode.completed,
                 completed_at: normalizedNode.completed_at,
+                frozen: normalizedNode.frozen,
                 created_at: normalizedNode.created_at,
                 deadline: normalizedNode.deadline,
                 hasChildren: normalizedNode.children.length > 0,
@@ -260,14 +261,21 @@ export const buildGraphPresentation = ({
     );
 
     const nodeStyleMap = new Map();
+    const frozenNodeIds = new Set();
     remappedNodes.forEach((node) => {
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
-        const shouldFade = normalizedSettings.fadeInactiveBranches && isInactive && !isActive && hasAnyEvidence;
+        const isFrozen = Boolean(node.data?.frozen);
+        const shouldFadeInactive = isInactive && !isActive && hasAnyEvidence;
+        const shouldFade = normalizedSettings.fadeInactiveBranches && (shouldFadeInactive || isFrozen);
+
+        if (isFrozen) {
+            frozenNodeIds.add(node.id);
+        }
 
         if (shouldFade) {
             nodeStyleMap.set(node.id, {
-                opacity: 0.22,
+                opacity: isFrozen ? 0.34 : 0.22,
                 transition: 'opacity 140ms ease-in-out',
             });
         }
@@ -287,9 +295,10 @@ export const buildGraphPresentation = ({
             && activeLineageIds.has(targetId);
 
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
-            && inactiveNodeIds.has(targetId)
-            && !isActiveEdge
-            && hasAnyEvidence;
+            && (
+                frozenNodeIds.has(targetId)
+                || (inactiveNodeIds.has(targetId) && !isActiveEdge && hasAnyEvidence)
+            );
 
         const nextClassName = [
             edge.className,
@@ -304,7 +313,7 @@ export const buildGraphPresentation = ({
             style.opacity = 1;
             style.zIndex = 3;
         } else if (shouldFadeEdge) {
-            style.opacity = 0.16;
+            style.opacity = frozenNodeIds.has(targetId) ? 0.26 : 0.16;
             style.strokeWidth = 1;
         }
 

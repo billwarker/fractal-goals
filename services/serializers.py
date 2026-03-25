@@ -157,6 +157,8 @@ def serialize_goal(goal, include_children=True):
         "completed_session_id": getattr(goal, 'completed_session_id', None),
         "is_smart": all(smart_status.values()),
         "smart_status": smart_status,
+        "frozen": bool(getattr(goal, 'frozen', False)),
+        "frozen_at": format_utc(getattr(goal, 'frozen_at', None)),
         "description": goal.description,
         "deadline": format_utc(goal.deadline),
         "attributes": {
@@ -179,6 +181,8 @@ def serialize_goal(goal, include_children=True):
             "inherit_parent_activities": goal.inherit_parent_activities,
             "allow_manual_completion": goal.allow_manual_completion,
             "track_activities": goal.track_activities,
+            "frozen": bool(getattr(goal, 'frozen', False)),
+            "frozen_at": format_utc(getattr(goal, 'frozen_at', None)),
             "is_smart": all(smart_status.values()),
             "smart_status": smart_status,
             "associated_activity_ids": [a.id for a in goal.associated_activities] if goal.associated_activities else [],

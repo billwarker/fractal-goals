@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
@@ -37,19 +38,21 @@ function GoalViewMode({
     description,
     deadline,
     relevanceStatement,
+    isFrozen,
     // Handlers
     setViewState,
     setIsEditing,
     onClose,
     onToggleCompletion,
     onAddChild,
-    onDelete,
     onGoalSelect,
     onUpdate,
     setTargets,
     handleTimeSpentClick,
 }) {
     const navigate = useNavigate();
+    const { getGoalColor } = useGoalLevels();
+    const childGoalColor = childType ? getGoalColor(childType) : goalColor;
 
     return (
         <div className={styles.viewContainer}>
@@ -58,31 +61,47 @@ function GoalViewMode({
             <div className={styles.actionGrid}>
                 {onToggleCompletion && (() => {
                     const isManualAllowed = levelConfig.allow_manual_completion !== false;
-                    const canShowManual = allowManualCompletion && isManualAllowed;
+                    const canShowManual = allowManualCompletion && isManualAllowed && !isFrozen;
+                    const canToggleCompletion = !isFrozen && (isCompleted || canShowManual);
                     const isTargetsAllowed = levelConfig.track_activities !== false && goalType !== 'NanoGoal';
                     const isChildrenAllowed = !isExecutionGoalType(goalType);
 
                     return (
                         <button
                             onClick={() => {
+                                if (isFrozen) {
+                                    return;
+                                }
                                 if (isCompleted) {
                                     setViewState('uncomplete-confirm');
                                 } else if (canShowManual) {
                                     setViewState('complete-confirm');
                                 }
                             }}
-                            disabled={!isCompleted && !canShowManual}
+                            disabled={!canToggleCompletion}
                             className={styles.btnAction}
                             style={{
-                                background: isCompleted ? '#4caf50' : 'transparent',
-                                border: `1px solid ${isCompleted ? '#4caf50' : (canShowManual ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
-                                color: isCompleted ? 'white' : (canShowManual ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
-                                cursor: (isCompleted || canShowManual) ? 'pointer' : 'default',
-                                fontWeight: isCompleted ? 'bold' : 'normal',
-                                opacity: (!isCompleted && !canShowManual) ? 0.8 : 1
+                                background: isFrozen
+                                    ? 'rgba(30, 58, 95, 0.16)'
+                                    : isCompleted
+                                        ? '#4caf50'
+                                        : 'transparent',
+                                border: `1px solid ${isFrozen
+                                    ? 'rgba(100, 181, 246, 0.35)'
+                                    : isCompleted
+                                        ? '#4caf50'
+                                        : (canShowManual ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
+                                color: isFrozen
+                                    ? '#93c5fd'
+                                    : isCompleted
+                                        ? 'white'
+                                        : (canShowManual ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
+                                cursor: canToggleCompletion ? 'pointer' : 'default',
+                                fontWeight: (isCompleted || isFrozen) ? 'bold' : 'normal',
+                                opacity: canToggleCompletion ? 1 : 0.8
                             }}
                         >
-                            {isCompleted ? '✓ Completed' : (
+                            {isFrozen ? 'Frozen' : isCompleted ? '✓ Completed' : (
                                 canShowManual ? 'Mark Complete' : (
                                     trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed ? 'Complete via Children & Targets' :
                                         trackActivities && isTargetsAllowed ? 'Complete via Target(s)' :
@@ -106,8 +125,8 @@ function GoalViewMode({
                         title={goalType === 'ImmediateGoal' ? "MicroGoals can only be created from the Session Detail page" : ""}
                         style={{
                             background: 'transparent',
-                            border: `1px solid ${goalColor}`, // Fallback for childType color, usually passed down or derived
-                            color: goalColor,
+                            border: `1px solid ${childGoalColor}`,
+                            color: childGoalColor,
                             fontWeight: 'bold',
                             opacity: goalType === 'ImmediateGoal' ? 0.5 : 1,
                             cursor: goalType === 'ImmediateGoal' ? 'not-allowed' : 'pointer'
@@ -130,22 +149,19 @@ function GoalViewMode({
                     Edit Goal
                 </button>
 
-                {onDelete && (
-                    <button
-                        onClick={() => {
-                            if (displayMode === 'modal' && onClose) onClose();
-                            onDelete(goal);
-                        }}
-                        className={`${styles.btnAction} ${styles.btnDelete}`}
-                        style={{
-                            background: 'transparent',
-                            border: '1px solid #d32f2f',
-                            color: '#d32f2f',
-                        }}
-                    >
-                        Delete Goal
-                    </button>
-                )}
+                <button
+                    onClick={() => setViewState('goal-options')}
+                    className={styles.btnAction}
+                    style={{
+                        background: 'transparent',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                        fontWeight: 600,
+                    }}
+                >
+                    Options
+                </button>
+
             </div>
 
             <GoalSmartSection

@@ -81,6 +81,8 @@ export const normalizeGoalNode = (goal, options = {}) => {
         deadline: goal.attributes?.deadline ?? goal.deadline ?? null,
         completed: Boolean(goal.completed ?? goal.attributes?.completed),
         completed_at: goal.attributes?.completed_at ?? goal.completed_at ?? null,
+        frozen: Boolean(goal.frozen ?? goal.attributes?.frozen),
+        frozen_at: goal.attributes?.frozen_at ?? goal.frozen_at ?? null,
         created_at: goal.attributes?.created_at ?? goal.created_at ?? null,
         is_smart: goal.is_smart ?? goal.attributes?.is_smart ?? false,
         depth,

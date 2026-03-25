@@ -76,19 +76,24 @@ vi.mock('../goals/GoalUncompletionModal', () => ({
 }));
 
 vi.mock('../goals/GoalHeader', () => ({
-    default: ({ name, onClose }) => (
+    default: ({ name, onClose, goalStatus }) => (
         <div>
-            <div>header:{name}</div>
+            <div>header:{name}:{goalStatus}</div>
             <button onClick={onClose}>close modal</button>
         </div>
     ),
 }));
 
+vi.mock('../goals/GoalOptionsView', () => ({
+    default: () => <div>goal options view</div>,
+}));
+
 vi.mock('../goals/GoalViewMode', () => ({
-    default: ({ name, setIsEditing }) => (
+    default: ({ name, setIsEditing, setViewState }) => (
         <div>
             <div>view:{name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
+            <button onClick={() => setViewState('goal-options')}>open options</button>
         </div>
     ),
 }));
@@ -153,6 +158,46 @@ describe('GoalDetailModal smoke coverage', () => {
 
         fireEvent.click(screen.getByText('close modal'));
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('keeps the shared header visible when switching to options view', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [
+                        {
+                            id: 'parent-1',
+                            name: 'Parent',
+                            attributes: { id: 'parent-1', type: 'MidTermGoal', level_id: 'level-mid' },
+                            children: [],
+                        },
+                    ],
+                }}
+            />
+        );
+
+        expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('open options'));
+
+        await waitFor(() => {
+            expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
+            expect(screen.getByText('goal options view')).toBeInTheDocument();
+        });
     });
 
     it('renders create mode and submits through onCreate', async () => {

@@ -583,3 +583,91 @@ def evaluate_goal_targets(current_user, root_id, goal_id, validated_data):
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
+
+
+# ============================================================================
+# GOAL OPTIONS ENDPOINTS
+# ============================================================================
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/copy', methods=['POST'])
+@token_required
+def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
+    """Create a copy of an existing goal."""
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.copy_goal(root_id, goal_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal)), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error copying goal")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/freeze', methods=['PATCH'])
+@token_required
+def freeze_goal_endpoint(current_user, root_id: str, goal_id: str):
+    """Toggle frozen state on a goal."""
+    db_session = get_db_session()
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        frozen = data.get('frozen', True)
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.toggle_freeze(root_id, goal_id, current_user.id, frozen)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal)), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error freezing goal")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/move', methods=['PATCH'])
+@token_required
+def move_goal_endpoint(current_user, root_id: str, goal_id: str):
+    """Move a goal to a new parent."""
+    db_session = get_db_session()
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        new_parent_id = data.get('new_parent_id')
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.move_goal(root_id, goal_id, current_user.id, new_parent_id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal)), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error moving goal")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/convert-level', methods=['PATCH'])
+@token_required
+def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str):
+    """Convert a goal to a different level."""
+    db_session = get_db_session()
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        level_id = data.get('level_id')
+        if not level_id:
+            return jsonify({"error": "level_id is required"}), 400
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.convert_goal_level(root_id, goal_id, current_user.id, level_id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal)), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error converting goal level")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()

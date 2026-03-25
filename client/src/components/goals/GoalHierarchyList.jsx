@@ -51,6 +51,8 @@ function GoalHierarchyList({
     nodes = [],
     variant = 'session',
     onGoalClick,
+    isGoalSelectable,
+    getGoalMetaLabel,
     getScopedCharacteristics,
     getGoalColor,
     getGoalSecondaryColor,
@@ -65,6 +67,9 @@ function GoalHierarchyList({
 
     const handleGoalClick = (node) => {
         if (!onGoalClick) {
+            return;
+        }
+        if (isGoalSelectable && !isGoalSelectable(node.originalGoal || node)) {
             return;
         }
         onGoalClick(node.originalGoal || node);
@@ -146,6 +151,9 @@ function GoalHierarchyList({
                     ? Boolean(node.status.completed)
                     : Boolean(node.completed);
                 const isNestedNode = isNestedLevel;
+                const originalNode = node.originalGoal || node;
+                const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
+                const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
 
                 return (
                     <li
@@ -166,11 +174,16 @@ function GoalHierarchyList({
                             </div>
                             <div className={styles.sessionNodeContent}>
                                 <span
-                                    className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''}`}
+                                    className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''}`}
                                     onClick={() => handleGoalClick(node)}
                                 >
                                     {node.name}
                                 </span>
+                                {metaLabel && (
+                                    <span className={styles.sessionNodeMeta}>
+                                        {metaLabel}
+                                    </span>
+                                )}
                                 {onStartSubGoalCreation && canAddChild(node.type) && (
                                     <button
                                         className={styles.addSubGoalBtn}

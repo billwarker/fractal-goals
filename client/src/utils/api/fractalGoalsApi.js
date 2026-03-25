@@ -25,4 +25,13 @@ export const fractalGoalsApi = {
         axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     setGoalAssociationsBatch: (rootId, goalId, data) =>
         axios.put(`${API_BASE}/${rootId}/goals/${goalId}/associations/batch`, data),
+    // Goal Options
+    copyGoal: (rootId, goalId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/copy`),
+    freezeGoal: (rootId, goalId, frozen) =>
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/freeze`, { frozen }),
+    moveGoal: (rootId, goalId, newParentId) =>
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/move`, { new_parent_id: newParentId }),
+    convertGoalLevel: (rootId, goalId, levelId) =>
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/convert-level`, { level_id: levelId }),
 };

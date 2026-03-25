@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
@@ -6,7 +6,9 @@ import useGoalDetailController from '../hooks/useGoalDetailController';
 import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
+import { deriveEvidenceGoalIds, getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType } from '../utils/goalHelpers';
+import { flattenGoalTree } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -23,6 +25,7 @@ const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilder'), 'components/goalDetail/InlineActivityBuilder');
 const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
+const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 
 /**
  * GoalDetailModal Component
@@ -42,6 +45,7 @@ function GoalDetailModal({
     goal,
     onUpdate,
     activityDefinitions: activityDefinitionsRaw = [],
+    sessions: sessionsRaw = [],
     onToggleCompletion,
     onDelete,
     onAddChild,  // Handler for adding child goals
@@ -68,7 +72,18 @@ function GoalDetailModal({
         getLevelByName = () => null,
     } = useGoalLevels() || {};
     // Normalize activityDefinitions to always be an array (handles null case)
-    const activityDefinitions = Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : [];
+    const activityDefinitions = useMemo(
+        () => (Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : []),
+        [activityDefinitionsRaw]
+    );
+    const sessions = useMemo(
+        () => (Array.isArray(sessionsRaw) ? sessionsRaw : []),
+        [sessionsRaw]
+    );
+    const activityGroupsFromProps = useMemo(
+        () => (Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []),
+        [activityGroupsRaw]
+    );
     // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
 
@@ -159,18 +174,13 @@ function GoalDetailModal({
         goalId: depGoalId,
         mode,
         isOpen,
-        activityGroupsRaw,
+        activityGroupsRaw: activityGroupsFromProps,
         initialActivities,
         initialActivityGroups,
         fetchedActivities,
         fetchedGroups,
         onAssociationsChanged,
     });
-
-    // For modal mode, check isOpen
-    if (displayMode === 'modal' && !isOpen) return null;
-    // Allow rendering without goal in create mode
-    if (!goal && mode !== 'create') return null;
 
     const handleSave = async () => {
         if (!validateForm()) {
@@ -245,35 +255,72 @@ function GoalDetailModal({
     const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
+    const isFrozen = Boolean(goal?.frozen || goal?.attributes?.frozen);
 
-    // ============ GOAL CONTENT (VIEW/EDIT) ============
-    const renderGoalContent = () => {
-        // Construct a goal object with current local state for SMART status calculation
-        // This ensures the indicators update immediately as user edits fields (adds targets, activities, etc.)
-        const goalForSmart = {
-            ...goal,
-            attributes: {
-                ...goal?.attributes,
-                description: description,
-                targets: Array.isArray(targets) ? targets : [],
-                associated_activity_ids: associatedActivities ? associatedActivities.map(a => a.id) : [],
-                deadline: deadline,
-                relevance_statement: relevanceStatement,
-                completed_via_children: completedViaChildren,
-                inherit_parent_activities: inheritParentActivities,
-                // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
-                smart_status: undefined,
-                is_smart: undefined
-            },
-            // Also override top-level props if they exist there (the helper checks both)
+    const goalStatus = useMemo(() => {
+        if (mode === 'create') {
+            return 'active';
+        }
+
+        if (isFrozen) {
+            return 'frozen';
+        }
+
+        if (!depGoalId || !treeData) {
+            return 'active';
+        }
+
+        const hasSignalInputs = sessions.length > 0
+            || activityDefinitions.length > 0
+            || activityGroupsFromProps.length > 0;
+        if (!hasSignalInputs) {
+            return 'active';
+        }
+
+        const flattenedTree = flattenGoalTree(treeData, { includeRoot: true });
+        const parentById = new Map(
+            flattenedTree.map((node) => [String(node.id), node.parent_id ? String(node.parent_id) : null])
+        );
+        const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activityDefinitions, activityGroupsFromProps);
+        if (evidenceGoalIds.size === 0) {
+            return 'inactive';
+        }
+
+        const activeLineageIds = getActiveLineageIds(evidenceGoalIds, parentById);
+        return activeLineageIds.has(String(depGoalId)) ? 'active' : 'inactive';
+    }, [activityDefinitions, activityGroupsFromProps, depGoalId, isFrozen, mode, sessions, treeData]);
+
+    const goalForSmart = {
+        ...goal,
+        attributes: {
+            ...goal?.attributes,
             description: description,
             targets: Array.isArray(targets) ? targets : [],
+            associated_activity_ids: associatedActivities ? associatedActivities.map(a => a.id) : [],
             deadline: deadline,
             relevance_statement: relevanceStatement,
             completed_via_children: completedViaChildren,
-            inherit_parent_activities: inheritParentActivities
-        };
+            inherit_parent_activities: inheritParentActivities,
+            // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
+            smart_status: undefined,
+            is_smart: undefined
+        },
+        // Also override top-level props if they exist there (the helper checks both)
+        description: description,
+        targets: Array.isArray(targets) ? targets : [],
+        deadline: deadline,
+        relevance_statement: relevanceStatement,
+        completed_via_children: completedViaChildren,
+        inherit_parent_activities: inheritParentActivities
+    };
 
+    // For modal mode, check isOpen
+    if (displayMode === 'modal' && !isOpen) return null;
+    // Allow rendering without goal in create mode
+    if (!goal && mode !== 'create') return null;
+
+    // ============ GOAL CONTENT (VIEW/EDIT) ============
+    const renderGoalContent = () => {
         return (
             <>
                 <Suspense fallback={null}>
@@ -291,20 +338,6 @@ function GoalDetailModal({
                         type={graphModalConfig?.type}
                     />
                 </Suspense>
-
-                <GoalHeader
-                    mode={mode}
-                    name={name}
-                    goal={goalForSmart}
-                    goalType={goalType}
-                    goalColor={goalColor}
-                    textColor={textColor}
-                    parentGoal={parentGoal}
-                    isCompleted={isCompleted}
-                    onClose={handleClose}
-                    onCollapse={onMobileCollapse}
-                    deadline={deadline}
-                />
 
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
@@ -371,12 +404,12 @@ function GoalDetailModal({
                         description={description}
                         deadline={deadline}
                         relevanceStatement={relevanceStatement}
+                        isFrozen={isFrozen}
                         setViewState={setViewState}
                         setIsEditing={setIsEditing}
                         onClose={handleClose}
                         onToggleCompletion={onToggleCompletion}
                         onAddChild={onAddChild}
-                        onDelete={onDelete}
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
@@ -508,8 +541,51 @@ function GoalDetailModal({
                 />
             </Suspense>
         );
+    } else if (viewState === 'goal-options') {
+        content = (
+            <Suspense fallback={null}>
+                <GoalOptionsView
+                    goal={goal}
+                    goalId={goalId}
+                    rootId={rootId}
+                    goalColor={goalColor}
+                    textColor={textColor}
+                    goalType={goalType}
+                    treeData={treeData}
+                    onGoalSelect={onGoalSelect}
+                    setViewState={setViewState}
+                    setIsEditing={setIsEditing}
+                    onDelete={onDelete}
+                    onClose={handleClose}
+                    displayMode={displayMode}
+                />
+            </Suspense>
+        );
     } else {
         content = renderGoalContent();
+    }
+
+    const shouldShowPersistentHeader = viewState === 'goal' || viewState === 'goal-options';
+    if (shouldShowPersistentHeader) {
+        content = (
+            <>
+                <GoalHeader
+                    mode={mode}
+                    name={name}
+                    goal={goalForSmart}
+                    goalType={goalType}
+                    goalColor={goalColor}
+                    textColor={textColor}
+                    parentGoal={parentGoal}
+                    isCompleted={isCompleted}
+                    onClose={handleClose}
+                    onCollapse={onMobileCollapse}
+                    deadline={deadline}
+                    goalStatus={goalStatus}
+                />
+                {content}
+            </>
+        );
     }
 
     // ============ RENDER ============
