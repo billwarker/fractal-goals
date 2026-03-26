@@ -3,12 +3,26 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import TemplateBuilderModal from '../TemplateBuilderModal';
 
-vi.mock('../../common/ActivityModeSelector', () => ({
-    default: ({ selectedModeIds = [], onChange }) => (
-        <button type="button" onClick={() => onChange(['mode-1'])}>
-            Modes:{selectedModeIds.join(',')}
-        </button>
-    ),
+vi.mock('../../../hooks/useActivityQueries', () => ({
+    useActivityModes: () => ({
+        activityModes: [{ id: 'mode-0', name: 'Strength', color: null, description: null }],
+        isLoading: false,
+    }),
+}));
+
+vi.mock('../ActivityInstanceModesModal', () => ({
+    default: ({ isOpen, onClose, selectedModeIds = [], onChange, onSave }) => {
+        if (!isOpen) return null;
+        return (
+            <div>
+                <button type="button" onClick={() => onChange(['mode-1'])}>
+                    Modes:{selectedModeIds.join(',')}
+                </button>
+                <button type="button" onClick={onSave}>Save Modes</button>
+                <button type="button" onClick={onClose}>Close Modes</button>
+            </div>
+        );
+    },
 }));
 
 describe('TemplateBuilderModal', () => {
@@ -88,7 +102,10 @@ describe('TemplateBuilderModal', () => {
             />
         );
 
+        // Open the modes modal, change modes, then save
+        fireEvent.click(screen.getByRole('button', { name: 'Modes' }));
         fireEvent.click(screen.getByRole('button', { name: 'Modes:mode-0' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save Modes' }));
         fireEvent.click(screen.getByRole('button', { name: 'Update Template' }));
 
         expect(onSave).toHaveBeenCalledWith({
