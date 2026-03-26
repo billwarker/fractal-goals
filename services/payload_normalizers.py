@@ -29,6 +29,10 @@ def normalize_id_list(values):
     return normalized
 
 
+def normalize_mode_ids(values):
+    return normalize_id_list(values)
+
+
 def normalize_activity_metrics(metrics):
     if not isinstance(metrics, list):
         return []

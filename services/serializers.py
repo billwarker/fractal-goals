@@ -93,10 +93,28 @@ def serialize_metric_value(metric):
         "split_name": metric.split.name if metric.split else None
     }
 
+def serialize_activity_mode(mode):
+    """Serialize an ActivityMode object."""
+    return {
+        "id": mode.id,
+        "root_id": mode.root_id,
+        "name": mode.name,
+        "description": mode.description,
+        "color": mode.color,
+        "sort_order": mode.sort_order,
+        "created_at": format_utc(mode.created_at),
+        "updated_at": format_utc(mode.updated_at),
+    }
+
 def serialize_activity_instance(instance):
     """Serialize an ActivityInstance object."""
     data_dict = _safe_load_json(instance.data, {})
     metric_values_list = [serialize_metric_value(m) for m in instance.metric_values]
+    modes = [
+        serialize_activity_mode(mode)
+        for mode in (getattr(instance, 'modes', None) or [])
+        if getattr(mode, 'deleted_at', None) is None
+    ]
     
     # Build full group path (e.g., "Pull > Horizontal")
     group_path = None
@@ -127,6 +145,8 @@ def serialize_activity_instance(instance):
         "notes": instance.notes,
         "sets": data_dict.get('sets', []),
         "data": data_dict,
+        "modes": modes,
+        "mode_ids": [mode["id"] for mode in modes],
         "metric_values": metric_values_list,
         "metrics": metric_values_list  # Frontend alias
     }

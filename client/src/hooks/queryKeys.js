@@ -10,6 +10,7 @@ export const queryKeys = {
         limit,
     ],
     activityGroups: (rootId) => ['activity-groups', rootId],
+    activityModes: (rootId) => ['activity-modes', rootId],
     annotations: (rootId, visualizationType, contextKey = '{}') => [
         'annotations',
         rootId,

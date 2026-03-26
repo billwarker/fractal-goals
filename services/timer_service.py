@@ -19,6 +19,7 @@ from services.owned_entity_queries import (
     get_owned_activity_instance,
     get_owned_session,
 )
+from services.activity_mode_assignments import replace_instance_modes
 from services.events import Event, Events, event_bus
 from services.session_runtime import is_quick_session
 from services.serializers import serialize_activity_instance, serialize_session
@@ -53,6 +54,7 @@ class TimerService:
     def _activity_instance_query_options():
         return (
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
+            selectinload(ActivityInstance.modes),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
         )
@@ -64,6 +66,7 @@ class TimerService:
             selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.modes),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
@@ -159,7 +162,18 @@ class TimerService:
             activity_definition_id=activity_definition_id,
             activity_definition=activity_definition,
         )
+        self.db_session.flush()
+        valid_modes, invalid_mode_ids = replace_instance_modes(
+            self.db_session,
+            root_id,
+            instance.id,
+            data.get('mode_ids'),
+        )
+        if invalid_mode_ids:
+            self.db_session.rollback()
+            return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
         self.db_session.commit()
+        instance.modes = valid_modes
         event_bus.emit_async(Event(
             Events.ACTIVITY_INSTANCE_CREATED,
             self._activity_event_payload(
@@ -397,6 +411,18 @@ class TimerService:
         if 'notes' in data:
             instance.notes = data['notes']
 
+        valid_modes = None
+        if 'mode_ids' in data:
+            valid_modes, invalid_mode_ids = replace_instance_modes(
+                self.db_session,
+                root_id,
+                instance.id,
+                data.get('mode_ids'),
+            )
+            if invalid_mode_ids:
+                self.db_session.rollback()
+                return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
+
         current_data = models._safe_load_json(instance.data, {})
         if 'sets' in data:
             current_data['sets'] = data['sets']
@@ -409,6 +435,8 @@ class TimerService:
             instance.duration_seconds = None
 
         self.db_session.commit()
+        if valid_modes is not None:
+            instance.modes = valid_modes
         activity_name = instance.definition.name if instance.definition else "Unknown"
         updated_fields = list(data.keys())
         non_metric_fields = [field for field in updated_fields if field != 'sets']

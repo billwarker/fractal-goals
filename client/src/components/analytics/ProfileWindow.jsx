@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import ScatterPlot from './ScatterPlot';
 import LineGraph from './LineGraph';
 import GoalCompletionTimeline from './GoalCompletionTimeline';
@@ -9,11 +9,11 @@ import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
 import { Bar, Line } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
+import ActivityModeSelector from '../common/ActivityModeSelector';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -35,7 +35,6 @@ import styles from './ProfileWindow.module.css';
  * @param {boolean} props.hasAnnotationsWindow - Whether any window is showing annotations
  */
 function ProfileWindow({
-    windowId,
     canSplit = false,
     onSplit, // Now accepts: onSplit(direction) where direction is 'vertical' or 'horizontal'
     canClose = false,
@@ -52,7 +51,7 @@ function ProfileWindow({
     onSelect,
     hasAnnotationsWindow = false
 }) {
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
     const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
@@ -89,6 +88,7 @@ function ProfileWindow({
         selectedMetricY2,
         setsHandling,
         selectedSplit,
+        selectedModeIds,
         selectedGoal,
         selectedGoalChart,
         heatmapMonths,
@@ -102,6 +102,7 @@ function ProfileWindow({
     const setSelectedMetricY2 = (value) => updateWindowState({ selectedMetricY2: value });
     const setSetsHandling = (value) => updateWindowState({ setsHandling: value });
     const setSelectedSplit = (value) => updateWindowState({ selectedSplit: value });
+    const setSelectedModeIds = (value) => updateWindowState({ selectedModeIds: value });
     const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
     const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
     const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
@@ -113,6 +114,7 @@ function ProfileWindow({
                 selectedCategory: category,
                 selectedVisualization: null,
                 selectedActivity: null,
+                selectedModeIds: [],
                 selectedGoal: null,
                 isAnnotating: false
             });
@@ -124,6 +126,7 @@ function ProfileWindow({
             updateWindowState({
                 selectedVisualization: null,
                 selectedActivity: null,
+                selectedModeIds: [],
                 selectedGoal: null,
                 isAnnotating: false
             });
@@ -143,21 +146,11 @@ function ProfileWindow({
             selectedCategory: null,
             selectedVisualization: null,
             selectedActivity: null,
+            selectedModeIds: [],
             selectedGoal: null,
             isAnnotating: false
         });
     };
-
-    // ... (rest of file until AnnotatedChartWrapper usages)
-
-    // We need to use multi_replace or specific target replacement for the AnnotatedChartWrapper usages.
-    // Since there are multiple usages (completionTimeline, timeDistribution, weeklyChart, scatterPlot, lineGraph),
-    // I will use a clever trick: I will replace the AnnotatedChartWrapper component usages.
-
-    // But first, let's just make sure I updated the props deconstruction at the top correctly.
-    // The simplified instruction above is not enough for the full file.
-    // I will split this into two tool calls. One for the top, one for the bottom.
-
 
     // Define available visualizations for each category
     const visualizations = {
@@ -216,6 +209,9 @@ function ProfileWindow({
         // Add activity_id for activity visualizations
         if (state.selectedCategory === 'activities' && state.selectedActivity?.id) {
             context.activity_id = state.selectedActivity.id;
+            if (Array.isArray(state.selectedModeIds) && state.selectedModeIds.length > 0) {
+                context.mode_ids = state.selectedModeIds;
+            }
         }
 
         // Add goal_id for goal detail visualization
@@ -235,6 +231,22 @@ function ProfileWindow({
     const getGoalTypeColor = (type) => {
         return getGoalColor(type);
     };
+
+    const filteredActivityInstances = useMemo(() => {
+        if (!Array.isArray(selectedModeIds) || selectedModeIds.length === 0) {
+            return activityInstances;
+        }
+
+        return Object.fromEntries(
+            Object.entries(activityInstances || {}).map(([activityId, instances]) => [
+                activityId,
+                (instances || []).filter((instance) => (
+                    Array.isArray(instance?.modes)
+                    && instance.modes.some((mode) => selectedModeIds.includes(mode.id))
+                )),
+            ])
+        );
+    }, [activityInstances, selectedModeIds]);
 
     // Prepare goal chart data
     const getActivityChartData = () => {
@@ -511,7 +523,9 @@ function ProfileWindow({
         }
 
         if (selectedCategory === 'activities') {
-            const sortedActivities = [...activities].sort((a, b) => (activityInstances[b.id]?.length || 0) - (activityInstances[a.id]?.length || 0));
+            const sortedActivities = [...activities].sort((a, b) => (
+                (filteredActivityInstances[b.id]?.length || 0) - (filteredActivityInstances[a.id]?.length || 0)
+            ));
             const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
 
             return (
@@ -554,6 +568,16 @@ function ProfileWindow({
                             ))}
                         </Select>
                     )}
+
+                    {selectedActivity ? (
+                        <ActivityModeSelector
+                            rootId={rootId}
+                            selectedModeIds={selectedModeIds}
+                            onChange={setSelectedModeIds}
+                            showAllOption
+                            allLabel="All Modes"
+                        />
+                    ) : null}
                 </div>
             );
         }
@@ -806,7 +830,7 @@ function ProfileWindow({
                             >
                                 <ScatterPlot
                                     selectedActivity={selectedActivity}
-                                    activityInstances={activityInstances}
+                                    activityInstances={filteredActivityInstances}
                                     activities={activities}
                                     setsHandling={setsHandling}
                                     selectedSplit={selectedSplit}
@@ -829,7 +853,7 @@ function ProfileWindow({
                             >
                                 <LineGraph
                                     selectedActivity={selectedActivity}
-                                    activityInstances={activityInstances}
+                                    activityInstances={filteredActivityInstances}
                                     activities={activities}
                                     selectedMetric={selectedMetric}
                                     setSelectedMetric={setSelectedMetric}

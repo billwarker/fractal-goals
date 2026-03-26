@@ -8,6 +8,33 @@ function buildActivityInstancesMap(sessions) {
     const instancesMap = {};
 
     sessions.forEach((session) => {
+        const sessionStart =
+            session.session_start
+            || session.attributes?.session_data?.session_start
+            || session.attributes?.created_at;
+
+        const persistedInstances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
+        persistedInstances.forEach((instance) => {
+            const activityId = instance.activity_definition_id || instance.activity_id;
+            if (!activityId) {
+                return;
+            }
+            if (!instancesMap[activityId]) {
+                instancesMap[activityId] = [];
+            }
+            instancesMap[activityId].push({
+                ...instance,
+                activity_id: activityId,
+                session_id: session.id,
+                session_name: session.name,
+                session_date: sessionStart,
+            });
+        });
+
+        if (persistedInstances.length > 0) {
+            return;
+        }
+
         const sessionData = session.attributes?.session_data;
         if (!sessionData?.sections) {
             return;
@@ -26,11 +53,6 @@ function buildActivityInstancesMap(sessions) {
                 if (!instancesMap[exercise.activity_id]) {
                     instancesMap[exercise.activity_id] = [];
                 }
-
-                const sessionStart =
-                    session.session_start
-                    || session.attributes?.session_data?.session_start
-                    || session.attributes?.created_at;
 
                 instancesMap[exercise.activity_id].push({
                     ...exercise,

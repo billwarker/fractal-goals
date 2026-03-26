@@ -33,6 +33,7 @@ const getDefaultWindowState = () => ({
     selectedMetricY2: null,
     setsHandling: 'top',
     selectedSplit: 'all',
+    selectedModeIds: [],
     selectedGoal: null,
     selectedGoalChart: 'duration',
     heatmapMonths: 12

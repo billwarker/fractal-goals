@@ -94,9 +94,13 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     // Collect data points from instances
     const dataPoints = [];
     instances.forEach(instance => {
+        const modeNames = Array.isArray(instance.modes) && instance.modes.length > 0
+            ? instance.modes.map((m) => m.name).join(', ')
+            : null;
         const basePoint = {
             session_name: instance.session_name,
-            session_date: instance.session_date
+            session_date: instance.session_date,
+            mode_label: modeNames,
         };
 
         // For activities with sets
@@ -236,7 +240,8 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
         session_name: p.session_name,
         session_date: p.session_date,
         aggregation: p.aggregation,
-        set_number: p.set_number
+        set_number: p.set_number,
+        mode_label: p.mode_label,
     }));
 
     const chartData = {
@@ -278,6 +283,10 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                         lines.push(new Date(point.session_date).toLocaleDateString());
                         lines.push(`${xMetricToPlot.name}: ${point.x} ${xMetricToPlot.unit}`);
                         lines.push(`${yMetricToPlot.name}: ${point.y} ${yMetricToPlot.unit}`);
+
+                        if (point.mode_label) {
+                            lines.push(`Mode: ${point.mode_label}`);
+                        }
 
                         return lines;
                     }

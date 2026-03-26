@@ -12,8 +12,9 @@ import pytest
 import json
 from datetime import datetime, timedelta
 import time
+from uuid import uuid4
 
-from models import SessionTemplate
+from models import ActivityMode, Goal, SessionTemplate
 
 
 @pytest.mark.integration
@@ -62,6 +63,40 @@ class TestActivityInstanceCreation:
         )
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+    def test_create_instance_rejects_mode_from_other_root(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        test_user,
+    ):
+        root_id = sample_practice_session.root_id
+        other_root = Goal(
+            id=str(uuid4()),
+            name='Other Root',
+            owner_id=test_user.id,
+            root_id=None,
+            created_at=datetime.utcnow(),
+        )
+        other_root.root_id = other_root.id
+        db_session.add(other_root)
+        db_session.flush()
+        other_mode = ActivityMode(root_id=other_root.id, name='Foreign Mode', color='#992233')
+        db_session.add(other_mode)
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances',
+            json={
+                'session_id': sample_practice_session.id,
+                'activity_definition_id': sample_activity_definition.id,
+                'mode_ids': [other_mode.id],
+            }
+        )
+        assert response.status_code == 404
+        assert 'Mode(s) not found in this fractal' in response.get_json()['error']
 
 
 @pytest.mark.integration
@@ -258,6 +293,62 @@ class TestManualTimeEntry:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['time_start'] is not None
+
+    def test_update_instance_modes_manually(self, authed_client, db_session, sample_activity_instance):
+        from models import Session
+
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        mode = ActivityMode(
+            root_id=root_id,
+            name='Standing',
+            color='#2255DD',
+        )
+        db_session.add(mode)
+        db_session.commit()
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'mode_ids': [mode.id]}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['mode_ids'] == [mode.id]
+        assert data['modes'][0]['name'] == 'Standing'
+
+    def test_update_instance_rejects_mode_from_other_root(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+        test_user,
+    ):
+        from models import Session
+
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        other_root = Goal(
+            id=str(uuid4()),
+            name='Other Root',
+            owner_id=test_user.id,
+            root_id=None,
+            created_at=datetime.utcnow(),
+        )
+        other_root.root_id = other_root.id
+        db_session.add(other_root)
+        db_session.flush()
+        other_mode = ActivityMode(root_id=other_root.id, name='Foreign Mode', color='#993355')
+        db_session.add(other_mode)
+        db_session.commit()
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'mode_ids': [other_mode.id]}
+        )
+        assert response.status_code == 404
+        assert 'Mode(s) not found in this fractal' in response.get_json()['error']
     
     def test_update_only_stop_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the stop time."""

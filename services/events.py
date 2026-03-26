@@ -268,6 +268,11 @@ class Events:
     ACTIVITY_CREATED = 'activity.created'
     ACTIVITY_UPDATED = 'activity.updated'
     ACTIVITY_DELETED = 'activity.deleted'
+
+    # Activity Mode events
+    ACTIVITY_MODE_CREATED = 'activity_mode.created'
+    ACTIVITY_MODE_UPDATED = 'activity_mode.updated'
+    ACTIVITY_MODE_DELETED = 'activity_mode.deleted'
     
     # Activity Group events
     ACTIVITY_GROUP_CREATED = 'activity_group.created'

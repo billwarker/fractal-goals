@@ -146,6 +146,15 @@ def test_event_logger_get_event_description_for_new_note_and_schedule_events():
     template_deleted = Event(Events.SESSION_TEMPLATE_DELETED, {"name": "Base Template"})
     assert _get_event_description(template_deleted) == "Deleted session template: Base Template"
 
+    mode_created = Event(Events.ACTIVITY_MODE_CREATED, {"name": "Standing"})
+    assert _get_event_description(mode_created) == "Created activity mode: Standing"
+
+    mode_updated = Event(Events.ACTIVITY_MODE_UPDATED, {"name": "Tempo"})
+    assert _get_event_description(mode_updated) == "Updated activity mode: Tempo"
+
+    mode_deleted = Event(Events.ACTIVITY_MODE_DELETED, {"name": "Technique"})
+    assert _get_event_description(mode_deleted) == "Deleted activity mode: Technique"
+
 
 def test_event_bus_reports_handler_failures_and_continues():
     bus = EventBus()

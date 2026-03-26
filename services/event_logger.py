@@ -209,6 +209,9 @@ def _get_event_description(event: Event):
         Events.ACTIVITY_CREATED: f"Created activity: {name}" if name else "Created activity",
         Events.ACTIVITY_UPDATED: f"Updated activity: {name}" if name else "Updated activity",
         Events.ACTIVITY_DELETED: f"Deleted activity: {name}" if name else "Deleted activity",
+        Events.ACTIVITY_MODE_CREATED: f"Created activity mode: {name}" if name else "Created activity mode",
+        Events.ACTIVITY_MODE_UPDATED: f"Updated activity mode: {name}" if name else "Updated activity mode",
+        Events.ACTIVITY_MODE_DELETED: f"Deleted activity mode: {name}" if name else "Deleted activity mode",
         
         Events.ACTIVITY_GROUP_CREATED: f"Created activity group: {name}" if name else "Created activity group",
         Events.ACTIVITY_GROUP_UPDATED: f"Updated activity group: {name}" if name else "Updated activity group",

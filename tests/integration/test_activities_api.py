@@ -1,7 +1,7 @@
 import pytest
 import json
 import uuid
-from models import ActivityGroup, MetricDefinition, Goal, SplitDefinition
+from models import ActivityGroup, ActivityMode, MetricDefinition, Goal, SplitDefinition
 
 
 @pytest.mark.integration
@@ -206,6 +206,68 @@ class TestActivityGroups:
         )
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+
+@pytest.mark.integration
+class TestActivityModes:
+    def test_create_list_update_and_delete_activity_mode(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        create_response = authed_client.post(
+            f'/api/{root_id}/activity-modes',
+            json={
+                'name': 'Strength',
+                'description': 'Low-rep work',
+                'color': '#3366FF',
+            }
+        )
+        assert create_response.status_code == 201
+        created = create_response.get_json()
+        assert created['name'] == 'Strength'
+        assert created['color'] == '#3366FF'
+
+        list_response = authed_client.get(f'/api/{root_id}/activity-modes')
+        assert list_response.status_code == 200
+        listed = list_response.get_json()
+        assert any(mode['id'] == created['id'] for mode in listed)
+
+        update_response = authed_client.put(
+            f"/api/{root_id}/activity-modes/{created['id']}",
+            json={
+                'name': 'Technique',
+                'description': 'Tempo-focused practice',
+                'color': '#22AA66',
+            }
+        )
+        assert update_response.status_code == 200
+        updated = update_response.get_json()
+        assert updated['name'] == 'Technique'
+        assert updated['color'] == '#22AA66'
+
+        delete_response = authed_client.delete(f"/api/{root_id}/activity-modes/{created['id']}")
+        assert delete_response.status_code == 200
+
+        db_session.expire_all()
+        deleted = db_session.query(ActivityMode).filter_by(id=created['id']).first()
+        assert deleted is not None
+        assert deleted.deleted_at is not None
+
+        final_list = authed_client.get(f'/api/{root_id}/activity-modes').get_json()
+        assert all(mode['id'] != created['id'] for mode in final_list)
+
+    def test_create_activity_mode_rejects_duplicate_name(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        first = authed_client.post(
+            f'/api/{root_id}/activity-modes',
+            json={'name': 'Standing'}
+        )
+        assert first.status_code == 201
+
+        second = authed_client.post(
+            f'/api/{root_id}/activity-modes',
+            json={'name': 'Standing'}
+        )
+        assert second.status_code == 409
 
 
 @pytest.mark.integration

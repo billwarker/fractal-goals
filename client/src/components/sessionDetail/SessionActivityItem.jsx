@@ -13,6 +13,8 @@ import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
 import GoalIcon from '../atoms/GoalIcon';
+import Button from '../atoms/Button';
+import ActivityInstanceModesModal from '../modals/ActivityInstanceModesModal';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
@@ -28,6 +30,8 @@ function formatDuration(seconds) {
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
+
+const MAX_VISIBLE_MODE_BADGES = 2;
 
 function buildEmptySet(definition, hasSplits) {
     if (!Array.isArray(definition?.metric_definitions)) {
@@ -117,6 +121,12 @@ function SessionActivityItem({
         onUpdate('sets', newSets);
     }, [onUpdate]);
 
+    const selectedModeIds = useMemo(() => (
+        Array.isArray(exercise.mode_ids)
+            ? exercise.mode_ids
+            : (Array.isArray(exercise.modes) ? exercise.modes.map((mode) => mode.id) : [])
+    ), [exercise.mode_ids, exercise.modes]);
+
     const resolveMetricId = useCallback((metric) => (
         metric?.metric_id || metric?.metric_definition_id || null
     ), []);
@@ -159,6 +169,8 @@ function SessionActivityItem({
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
     const [pendingNanoGoalIds, setPendingNanoGoalIds] = useState(() => new Set());
+    const [isModesModalOpen, setIsModesModalOpen] = useState(false);
+    const [draftModeIds, setDraftModeIds] = useState([]);
 
 
 
@@ -367,12 +379,73 @@ function SessionActivityItem({
         }
         return exercise.group_name || null;
     }, [activityDefinition?.group_id, activityGroups, exercise.group_id, exercise.group_name]);
+    const activeModes = useMemo(
+        () => (Array.isArray(exercise.modes) ? exercise.modes.filter(Boolean) : []),
+        [exercise.modes]
+    );
+    const visibleModes = useMemo(
+        () => activeModes.slice(0, MAX_VISIBLE_MODE_BADGES),
+        [activeModes]
+    );
+    const hiddenModes = useMemo(
+        () => activeModes.slice(MAX_VISIBLE_MODE_BADGES),
+        [activeModes]
+    );
+    const hiddenModeCount = Math.max(0, activeModes.length - visibleModes.length);
+    const hiddenModesLabel = useMemo(
+        () => hiddenModes.map((mode) => mode.name).join(', '),
+        [hiddenModes]
+    );
 
     const handleAddSet = () => {
         const newSet = buildEmptySet(def, hasSplits);
         const newSets = [...applyAllSetDrafts(latestSetsRef.current), newSet];
         handleUpdateSets(newSets);
         clearSetDrafts();
+    };
+
+    const handleOpenModesModal = useCallback((event) => {
+        event.stopPropagation();
+        setDraftModeIds(selectedModeIds);
+        setIsModesModalOpen(true);
+    }, [selectedModeIds]);
+
+    const renderModeBadgeRow = () => {
+        if (!activeModes.length) {
+            return null;
+        }
+
+        return (
+            <div className={styles.modeBadgeList}>
+                {visibleModes.map((mode) => (
+                    <span
+                        key={mode.id}
+                        className={styles.modeBadge}
+                        style={mode.color ? { borderColor: mode.color } : undefined}
+                        title={mode.description || mode.name}
+                    >
+                        {mode.color ? (
+                            <span
+                                className={styles.modeBadgeDot}
+                                style={{ backgroundColor: mode.color }}
+                            />
+                        ) : null}
+                        <span>{mode.name}</span>
+                    </span>
+                ))}
+                {hiddenModeCount > 0 ? (
+                    <button
+                        type="button"
+                        className={`${styles.modeBadge} ${styles.modeBadgeSummary} ${styles.modeBadgeSummaryButton}`}
+                        title={hiddenModesLabel}
+                        aria-label={`Hidden modes: ${hiddenModesLabel}. Click to edit modes.`}
+                        onClick={handleOpenModesModal}
+                    >
+                        +{hiddenModeCount} mode{hiddenModeCount === 1 ? '' : 's'}
+                    </button>
+                ) : null}
+            </div>
+        );
     };
 
     const handleRemoveSet = (setIndex) => {
@@ -494,157 +567,192 @@ function SessionActivityItem({
                         {groupLabel && (
                             <div className={styles.activityGroupLabel}>{groupLabel}</div>
                         )}
-                        {def.description && <div className={styles.activityDescription}><Linkify>{def.description}</Linkify></div>}
+                        {def.description && (
+                            <div className={styles.activityDescription} title={def.description}>
+                                <Linkify
+                                    className={styles.activityDescriptionContent}
+                                    linkClassName={styles.activityDescriptionLink}
+                                >
+                                    {def.description}
+                                </Linkify>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className={styles.activityHeaderRight}>
                     {quickMode ? (
-                        <div className={styles.quickModeStatus}>
-                            <ActivityCompletionButton
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    onUpdate('completed', !exercise.completed);
-                                }}
-                                completed={exercise.completed}
-                            />
+                        <div className={styles.actionStack}>
+                            <div className={styles.quickModeStatus}>
+                                <ActivityCompletionButton
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onUpdate('completed', !exercise.completed);
+                                    }}
+                                    completed={exercise.completed}
+                                />
+                            </div>
+                            <div className={styles.modeActionRow}>
+                                {renderModeBadgeRow()}
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className={styles.modesButton}
+                                    onClick={handleOpenModesModal}
+                                >
+                                    Modes
+                                </Button>
+                            </div>
                         </div>
                     ) : (
-                        <div className={styles.timerControlsGrid}>
-                            <div className={styles.timerMetaColumn}>
-                                {/* DateTime Start Field */}
-                                <div className={styles.timerFieldContainer}>
-                                    <label className={styles.timerLabel}>Start</label>
-                                    <input
-                                        type="text"
-                                        placeholder="YYYY-MM-DD HH:MM:SS"
-                                        value={localStartTime}
-                                        onChange={(e) => setStartTimeDraft(e.target.value)}
-                                        onBlur={(e) => {
-                                            if (e.target.value) {
-                                                try {
-                                                    const isoValue = localToISO(e.target.value, timezone);
-                                                    onUpdate('time_start', isoValue);
-                                                    setStartTimeDraft(null);
-                                                } catch (err) {
-                                                    console.error('Invalid date format:', err);
+                        <div className={styles.actionStack}>
+                            <div className={styles.timerControlsGrid}>
+                                <div className={styles.timerMetaColumn}>
+                                    {/* DateTime Start Field */}
+                                    <div className={styles.timerFieldContainer}>
+                                        <label className={styles.timerLabel}>Start</label>
+                                        <input
+                                            type="text"
+                                            placeholder="YYYY-MM-DD HH:MM:SS"
+                                            value={localStartTime}
+                                            onChange={(e) => setStartTimeDraft(e.target.value)}
+                                            onBlur={(e) => {
+                                                if (e.target.value) {
+                                                    try {
+                                                        const isoValue = localToISO(e.target.value, timezone);
+                                                        onUpdate('time_start', isoValue);
+                                                        setStartTimeDraft(null);
+                                                    } catch (err) {
+                                                        console.error('Invalid date format:', err);
+                                                        setStartTimeDraft(null);
+                                                    }
+                                                } else {
+                                                    onUpdate('time_start', null);
                                                     setStartTimeDraft(null);
                                                 }
-                                            } else {
-                                                onUpdate('time_start', null);
-                                                setStartTimeDraft(null);
-                                            }
-                                        }}
-                                        className={styles.timerInput}
-                                    />
-                                </div>
+                                            }}
+                                            className={styles.timerInput}
+                                        />
+                                    </div>
 
-                                {/* DateTime Stop Field */}
-                                <div className={styles.timerFieldContainer}>
-                                    <label className={styles.timerLabel}>Stop</label>
-                                    <input
-                                        type="text"
-                                        placeholder="YYYY-MM-DD HH:MM:SS"
-                                        value={localStopTime}
-                                        onChange={(e) => setStopTimeDraft(e.target.value)}
-                                        onBlur={(e) => {
-                                            if (e.target.value) {
-                                                try {
-                                                    const isoValue = localToISO(e.target.value, timezone);
-                                                    onUpdate('time_stop', isoValue);
-                                                    setStopTimeDraft(null);
-                                                } catch (err) {
-                                                    console.error('Invalid date format:', err);
+                                    {/* DateTime Stop Field */}
+                                    <div className={styles.timerFieldContainer}>
+                                        <label className={styles.timerLabel}>Stop</label>
+                                        <input
+                                            type="text"
+                                            placeholder="YYYY-MM-DD HH:MM:SS"
+                                            value={localStopTime}
+                                            onChange={(e) => setStopTimeDraft(e.target.value)}
+                                            onBlur={(e) => {
+                                                if (e.target.value) {
+                                                    try {
+                                                        const isoValue = localToISO(e.target.value, timezone);
+                                                        onUpdate('time_stop', isoValue);
+                                                        setStopTimeDraft(null);
+                                                    } catch (err) {
+                                                        console.error('Invalid date format:', err);
+                                                        setStopTimeDraft(null);
+                                                    }
+                                                } else {
+                                                    onUpdate('time_stop', null);
                                                     setStopTimeDraft(null);
                                                 }
-                                            } else {
-                                                onUpdate('time_stop', null);
-                                                setStopTimeDraft(null);
-                                            }
-                                        }}
-                                        disabled={!exercise.time_start}
-                                        className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
-                                    />
+                                            }}
+                                            disabled={!exercise.time_start}
+                                            className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
+                                        />
+                                    </div>
+
+                                    {/* Duration Display */}
+                                    <div className={styles.timerFieldContainer}>
+                                        <MetaField
+                                            className={styles.durationMetaField}
+                                            label="Duration"
+                                            value={formatDuration(realtimeDuration)}
+                                            valueClassName={[
+                                                styles.durationDisplay,
+                                                (exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive,
+                                            ].join(' ')}
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Duration Display */}
-                                <div className={styles.timerFieldContainer}>
-                                    <MetaField
-                                        className={styles.durationMetaField}
-                                        label="Duration"
-                                        value={formatDuration(realtimeDuration)}
-                                        valueClassName={[
-                                            styles.durationDisplay,
-                                            (exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive,
-                                        ].join(' ')}
-                                    />
+                                <div className={styles.timerActionColumn}>
+                                    {!exercise.time_start ? (
+                                        <>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'start');
+                                                }}
+                                                className={styles.startButton}
+                                                title="Start timer"
+                                            >
+                                                ▶ Start
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'complete');
+                                                }}
+                                                className={styles.completeButton}
+                                                title="Instant complete (0s duration)"
+                                            >
+                                                ✓ Complete
+                                            </button>
+                                        </>
+                                    ) : !exercise.time_stop ? (
+                                        <>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'complete');
+                                                }}
+                                                className={styles.completeButton}
+                                                title="Complete activity"
+                                            >
+                                                ✓ Complete
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'reset');
+                                                }}
+                                                className={styles.resetButton}
+                                                title="Reset timer"
+                                            >
+                                                ↺ Reset
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
+                                                Completed
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'reset');
+                                                }}
+                                                className={styles.resetButton}
+                                                title="Reset timer"
+                                            >
+                                                ↺ Reset
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-
-                            <div className={styles.timerActionColumn}>
-                                {!exercise.time_start ? (
-                                    <>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdate('timer_action', 'start');
-                                            }}
-                                            className={styles.startButton}
-                                            title="Start timer"
-                                        >
-                                            ▶ Start
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdate('timer_action', 'complete');
-                                            }}
-                                            className={styles.completeButton}
-                                            title="Instant complete (0s duration)"
-                                        >
-                                            ✓ Complete
-                                        </button>
-                                    </>
-                                ) : !exercise.time_stop ? (
-                                    <>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdate('timer_action', 'complete');
-                                            }}
-                                            className={styles.completeButton}
-                                            title="Complete activity"
-                                        >
-                                            ✓ Complete
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdate('timer_action', 'reset');
-                                            }}
-                                            className={styles.resetButton}
-                                            title="Reset timer"
-                                        >
-                                            ↺ Reset
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
-                                            Completed
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdate('timer_action', 'reset');
-                                            }}
-                                            className={styles.resetButton}
-                                            title="Reset timer"
-                                        >
-                                            ↺ Reset
-                                        </button>
-                                    </>
-                                )}
+                            <div className={styles.modeActionRow}>
+                                {renderModeBadgeRow()}
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className={styles.modesButton}
+                                    onClick={handleOpenModesModal}
+                                >
+                                    Modes
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -867,6 +975,18 @@ function SessionActivityItem({
                     </div>
                 )}
             </div>
+
+            <ActivityInstanceModesModal
+                isOpen={isModesModalOpen}
+                onClose={() => setIsModesModalOpen(false)}
+                rootId={rootId}
+                selectedModeIds={draftModeIds}
+                onChange={setDraftModeIds}
+                onSave={() => {
+                    onUpdate('mode_ids', draftModeIds);
+                    setIsModesModalOpen(false);
+                }}
+            />
         </div>
     );
 }

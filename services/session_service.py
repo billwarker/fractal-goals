@@ -7,12 +7,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria
 from models import (
-    ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition,
+    ActivityDefinition, ActivityGroup, ActivityInstance,
+    Goal, MetricDefinition,
     MetricValue, ProgramBlock, ProgramDay, Session, session_goals,
     validate_root_goal
 )
 import models
 from services import event_bus, Event, Events
+from services.activity_mode_assignments import attach_template_modes, replace_instance_modes
 from services.payload_normalizers import normalize_session_payload
 from services.owned_entity_queries import (
     get_owned_activity_definition,
@@ -76,6 +78,7 @@ class SessionService:
             selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.modes),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
@@ -86,6 +89,7 @@ class SessionService:
     def _session_activity_read_options():
         return (
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
+            selectinload(ActivityInstance.modes),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
         )
@@ -675,6 +679,17 @@ class SessionService:
             root_id=root_id,
         )
         self.db_session.add(instance)
+        self.db_session.flush()
+
+        valid_modes, invalid_mode_ids = replace_instance_modes(
+            self.db_session,
+            root_id,
+            instance.id,
+            data.get('mode_ids'),
+        )
+        if invalid_mode_ids:
+            self.db_session.rollback()
+            return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
 
         associated_goals = [goal for goal in (activity_def.associated_goals or []) if not goal.deleted_at]
         program_goal_ids = set()
@@ -715,6 +730,7 @@ class SessionService:
 
         self.db_session.commit()
         self.db_session.refresh(instance)
+        instance.modes = valid_modes
         activity_name = activity_def.name if activity_def else 'Unknown'
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_CREATED,
@@ -779,9 +795,21 @@ class SessionService:
             instance.notes = data['notes']
         if 'completed' in data:
             instance.completed = data.get('completed')
+        if 'mode_ids' in data:
+            valid_modes, invalid_mode_ids = replace_instance_modes(
+                self.db_session,
+                root_id,
+                instance.id,
+                data.get('mode_ids'),
+            )
+            if invalid_mode_ids:
+                self.db_session.rollback()
+                return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
 
         self.db_session.commit()
         self.db_session.refresh(instance)
+        if 'mode_ids' in data:
+            instance.modes = valid_modes
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
             {
@@ -1059,6 +1087,8 @@ class SessionService:
                     root_id=root_id,
                 )
                 self.db_session.add(instance)
+                self.db_session.flush()
+                attach_template_modes(self.db_session, root_id, instance.id, raw_item)
                 created_activity_ids.append(instance_id)
 
             session_data_dict['activity_ids'] = created_activity_ids
@@ -1106,6 +1136,8 @@ class SessionService:
                             root_id=root_id
                         )
                         self.db_session.add(instance)
+                        self.db_session.flush()
+                        attach_template_modes(self.db_session, root_id, instance.id, exercise)
                         section_activity_ids.append(instance_id)
 
                     section['activity_ids'] = section_activity_ids

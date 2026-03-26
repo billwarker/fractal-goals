@@ -187,6 +187,9 @@ function LineGraph({
         const dataPoints = [];
         instances.forEach(instance => {
             const timestamp = new Date(instance.session_date);
+            const modeNames = Array.isArray(instance.modes) && instance.modes.length > 0
+                ? instance.modes.map((m) => m.name).join(', ')
+                : null;
 
             // For activities with sets
             if (instance.has_sets && instance.sets) {
@@ -221,7 +224,8 @@ function LineGraph({
                                 value,
                                 session_name: instance.session_name,
                                 set_number: topSetIndex + 1,
-                                aggregation: 'Top Set'
+                                aggregation: 'Top Set',
+                                mode_label: modeNames,
                             });
                         }
                     }
@@ -245,7 +249,8 @@ function LineGraph({
                             value: Math.round(avgValue * 100) / 100,
                             session_name: instance.session_name,
                             set_number: null,
-                            aggregation: `Avg of ${setValues.length} sets`
+                            aggregation: `Avg of ${setValues.length} sets`,
+                            mode_label: modeNames,
                         });
                     }
                 }
@@ -258,7 +263,8 @@ function LineGraph({
                         timestamp,
                         value,
                         session_name: instance.session_name,
-                        set_number: 1
+                        set_number: 1,
+                        mode_label: modeNames,
                     });
                 }
             }
@@ -302,7 +308,8 @@ function LineGraph({
         y: p.value,
         session_name: p.session_name,
         aggregation: p.aggregation,
-        set_number: p.set_number
+        set_number: p.set_number,
+        mode_label: p.mode_label,
     }));
 
     const chartDataPointsY2 = dataPointsY2.map(p => ({
@@ -310,7 +317,8 @@ function LineGraph({
         y: p.value,
         session_name: p.session_name,
         aggregation: p.aggregation,
-        set_number: p.set_number
+        set_number: p.set_number,
+        mode_label: p.mode_label,
     }));
 
     const datasets = [
@@ -430,6 +438,10 @@ function LineGraph({
 
                         lines.push(point.x.toLocaleDateString());
                         lines.push(`${datasetLabel}: ${point.y}${isProduct ? ` (${unit})` : ` ${unit}`}`);
+
+                        if (point.mode_label) {
+                            lines.push(`Mode: ${point.mode_label}`);
+                        }
 
                         return lines;
                     }

@@ -78,6 +78,7 @@ function buildQueuedQuickSession(template, activityDefinitions) {
                 id: `queued-instance-${activityId}-${index}`,
                 session_id: queuedSessionId,
                 activity_definition_id: activityId,
+                mode_ids: Array.isArray(item?.mode_ids) ? item.mode_ids : [],
                 name: definition?.name || item?.name || 'Activity',
                 type: 'activity',
                 completed: false,
@@ -356,6 +357,7 @@ function CreateSession() {
                                     type: 'activity',
                                     name: name || 'Activity',
                                     activity_id: activityId,
+                                    mode_ids: Array.isArray(activity?.mode_ids) ? activity.mode_ids : [],
                                     instance_id: crypto.randomUUID(),
                                     completed: false,
                                     notes: ''
@@ -432,6 +434,7 @@ function CreateSession() {
                         session_id: createdSession.id,
                         activity_definition_id: persistedInstance.activity_definition_id,
                         completed: Boolean(draftInstance.completed),
+                        mode_ids: draftInstance.mode_ids || [],
                         sets: sanitizeSets(draftInstance.sets),
                     });
                 } else {
@@ -445,6 +448,7 @@ function CreateSession() {
                         session_id: createdSession.id,
                         activity_definition_id: persistedInstance.activity_definition_id,
                         completed: Boolean(draftInstance.completed),
+                        mode_ids: draftInstance.mode_ids || [],
                     });
                 }
             }

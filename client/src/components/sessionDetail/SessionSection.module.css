@@ -89,6 +89,21 @@
     animation: fadeIn 0.2s ease-in-out;
 }
 
+.modeSelectorWrap {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-card-alt);
+}
+
+.modeSelectorLabel {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
 .mobileSelectorOverlay {
     position: fixed;
     inset: 0;

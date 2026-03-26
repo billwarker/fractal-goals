@@ -11,7 +11,7 @@ import React from 'react';
  * @param {Object} props.style - Optional inline styles
  * @param {string} props.linkStyle - Optional inline styles for the link
  */
-const Linkify = ({ children, className, style, linkColor }) => {
+const Linkify = ({ children, className, style, linkColor, linkClassName }) => {
     if (!children || typeof children !== 'string') {
         return <span className={className} style={style}>{children}</span>;
     }
@@ -33,6 +33,7 @@ const Linkify = ({ children, className, style, linkColor }) => {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()} // Prevent triggering parent click handlers (e.g., cards)
+                            className={linkClassName}
                             style={{
                                 color: linkColor || 'var(--color-brand-primary)',
                                 textDecoration: 'underline',

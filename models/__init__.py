@@ -12,7 +12,7 @@ from .goal import (
 )
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, 
-    SplitDefinition, ActivityInstance, MetricValue
+    SplitDefinition, ActivityMode, ActivityInstanceMode, ActivityInstance, MetricValue
 )
 from .session import (
     Session, SessionTemplate, get_session_by_id, get_all_sessions,

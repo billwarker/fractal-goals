@@ -418,6 +418,38 @@
     margin-top: 2px;
 }
 
+.modeBadgeList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.modeBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.modeBadgeDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.modeBadgeSummary {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 .removeActivityButton {
     padding: 4px 8px;
     background: rgba(211, 47, 47, 0.1);

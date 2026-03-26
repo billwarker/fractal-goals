@@ -1,0 +1,79 @@
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modeRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-secondary);
+}
+
+.modeIdentity {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    margin-top: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    flex: 0 0 auto;
+}
+
+.modeName {
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.modeDescription {
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.modeActions {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex: 0 0 auto;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    min-width: 0;
+    width: 100%;
+}
+
+.checkbox {
+    margin-top: 3px;
+    accent-color: var(--color-brand-primary);
+    flex: 0 0 auto;
+}
+
+.checkboxText {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.emptyState {
+    padding: 20px;
+    border: 1px dashed var(--color-border);
+    border-radius: 10px;
+    color: var(--color-text-muted);
+    background: var(--color-bg-secondary);
+}

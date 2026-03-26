@@ -9,7 +9,8 @@ const {
     removeActivity,
     toggleGoalCompletion,
     deleteGoal,
-    createNanoGoalNote
+    createNanoGoalNote,
+    getActivityModes,
 } = vi.hoisted(() => ({
     updateInstance: vi.fn(() => Promise.resolve()),
     updateTimer: vi.fn(),
@@ -31,7 +32,8 @@ const {
                 is_nano_goal: true
             }
         }
-    }))
+    })),
+    getActivityModes: vi.fn(() => Promise.resolve({ data: [] })),
 }));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
@@ -74,7 +76,8 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         deleteGoal,
-        createNanoGoalNote
+        createNanoGoalNote,
+        getActivityModes,
     }
 }));
 
@@ -127,6 +130,8 @@ describe('SessionActivityItem nano note flow', () => {
         toggleGoalCompletion.mockClear();
         deleteGoal.mockClear();
         createNanoGoalNote.mockClear();
+        getActivityModes.mockClear();
+        getActivityModes.mockResolvedValue({ data: [] });
     });
 
     it('creates a nano goal note without runtime errors', async () => {
@@ -416,6 +421,40 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.getByRole('button', { name: '×' })).toBeInTheDocument();
     });
 
+    it('truncates long descriptions to one line and exposes the full value in a tooltip', () => {
+        const description = 'https://my.pickupmusic.com/lesson/35e8b87f-c2a5-46d8-baa9-c8352f1444ef';
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{ ...quickModeDefinition, description }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByTitle(description)).toBeInTheDocument();
+
+        const descriptionLink = screen.getByRole('link', { name: description });
+        expect(descriptionLink).toHaveAttribute('href', description);
+    });
+
     it('renders completion button, hides timer controls, notes, delete button, and micro goal icon in quick mode', () => {
         renderWithProviders(
             <SessionActivityItem
@@ -478,5 +517,59 @@ describe('SessionActivityItem quick mode', () => {
 
         expect(screen.getByText('Weight')).toBeInTheDocument();
         expect(screen.getByDisplayValue('190')).toBeInTheDocument();
+    });
+
+    it('opens the modes modal and saves checked activity modes', async () => {
+        getActivityModes.mockResolvedValue({
+            data: [
+                { id: 'mode-1', name: 'Standing', color: '#4488EE' },
+                { id: 'mode-2', name: 'Tempo', color: '#55AA66' },
+                { id: 'mode-3', name: 'Quality', color: '#DD8844' },
+                { id: 'mode-4', name: 'Balance', color: '#AA66CC' },
+            ],
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    ...baseExercise,
+                    modes: [
+                        { id: 'mode-1', name: 'Standing', color: '#4488EE' },
+                        { id: 'mode-2', name: 'Tempo', color: '#55AA66' },
+                        { id: 'mode-3', name: 'Quality', color: '#DD8844' },
+                    ],
+                    mode_ids: ['mode-1', 'mode-2', 'mode-3'],
+                }}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getAllByText('Standing').length).toBeGreaterThan(0);
+        expect(screen.getByText('Tempo')).toBeInTheDocument();
+        const hiddenModesButton = screen.getByRole('button', {
+            name: 'Hidden modes: Quality. Click to edit modes.',
+        });
+        expect(hiddenModesButton).toHaveTextContent('+1 mode');
+        expect(hiddenModesButton).toHaveAttribute('title', 'Quality');
+        expect(screen.queryByText('Quality')).not.toBeInTheDocument();
+
+        fireEvent.click(hiddenModesButton);
+
+        const balanceCheckbox = await screen.findByLabelText('Balance');
+        fireEvent.click(balanceCheckbox);
+        fireEvent.click(screen.getByRole('button', { name: 'Save Modes' }));
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('quick-instance-1', {
+                mode_ids: ['mode-1', 'mode-2', 'mode-3', 'mode-4'],
+            });
+        });
     });
 });
