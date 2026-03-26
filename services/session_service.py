@@ -1298,7 +1298,9 @@ class SessionService:
                         from sqlalchemy.orm.attributes import flag_modified
                         flag_modified(session, "attributes")
 
-                # Keep session card exercise state consistent with session completion.
+                # Stop any activity instances with active timers when the session is completed.
+                # Instances that were never started are left untouched — only the user's
+                # explicit completion gesture (or an active timer) confirms an activity was done.
                 instances = self.db_session.query(ActivityInstance).filter(
                     ActivityInstance.session_id == session.id,
                     ActivityInstance.deleted_at == None
@@ -1307,24 +1309,23 @@ class SessionService:
                     if instance.completed:
                         continue
                     if not instance.time_start:
-                        # Match instant-complete semantics used by timers API.
-                        instance.time_start = completion_time
+                        # Never started — leave as-is, do not auto-complete.
+                        continue
+                    if not instance.time_stop:
+                        # Active timer: stop it and mark complete.
                         instance.time_stop = completion_time
-                        instance.duration_seconds = 0
-                    elif not instance.time_stop:
-                        instance.time_stop = completion_time
-                        
+
                         # Apply any active straggler paused time if the session was currently paused
                         if instance.is_paused and instance.last_paused_at:
                             paused_duration = (completion_time - instance.last_paused_at).total_seconds()
                             instance.total_paused_seconds = (instance.total_paused_seconds or 0) + int(paused_duration)
                             instance.is_paused = False
                             instance.last_paused_at = None
-                            
+
                         duration = (instance.time_stop - instance.time_start).total_seconds()
                         active_duration = max(0, duration - (instance.total_paused_seconds or 0))
                         instance.duration_seconds = int(active_duration)
-                    instance.completed = True
+                        instance.completed = True
             else:
                 session.completed_at = None
                 session.session_end = None

@@ -115,7 +115,7 @@ function SessionActivityItem({
     const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
     const sessionKey = queryKeys.session(rootId, sessionId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName } = useGoalLevels();
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
 
     const handleUpdateSets = useCallback((newSets) => {
         onUpdate('sets', newSets);
@@ -148,9 +148,6 @@ function SessionActivityItem({
             ?? activeMicroGoal.attributes?.completed
         )
         : false;
-
-    // Characteristics for goal icons
-    const microChars = getLevelByName('MicroGoal');
 
     const [nanoModeOverrides, setNanoModeOverrides] = useState({});
     const nanoModeKey = activeMicroGoal?.id || 'none';
@@ -552,7 +549,7 @@ function SessionActivityItem({
                             {!quickMode && activeMicroGoal && (
                                 <div title={`Micro Goal: ${activeMicroGoal.name}`}>
                                     <GoalIcon
-                                        shape={activeMicroGoal.shape || microChars?.icon || 'target'}
+                                        shape={getGoalIcon(activeMicroGoal)}
                                         color={activeMicroGoalCompleted ? getGoalColor('Completed') : getGoalColor(activeMicroGoal)}
                                         secondaryColor={activeMicroGoalCompleted ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor(activeMicroGoal)}
                                         size={14}
