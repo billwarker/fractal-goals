@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
+import styles from './AnnotationModal.module.css';
 
 /**
  * AnnotationModal - Modal for creating/editing visualization annotations.
- * 
+ *
  * @param {boolean} isOpen - Whether the modal is open
  * @param {Function} onClose - Callback when modal is closed
  * @param {Function} onSave - Callback when annotation is saved: (content) => void
@@ -71,159 +72,42 @@ function AnnotationModal({
 
     return (
         <div
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                display: 'flex',
-                alignItems: isMobile ? 'flex-end' : 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-                padding: isMobile ? 0 : '16px'
-            }}
+            className={`${styles.overlay} ${isMobile ? styles.overlayMobile : ''}`}
             onClick={handleClose}
         >
             <div
-                style={{
-                    background: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: isMobile ? '16px 16px 0 0' : '12px',
-                    padding: isMobile ? '16px' : '24px',
-                    width: isMobile ? '100vw' : 'min(500px, 90vw)',
-                    maxHeight: isMobile ? '85vh' : '90vh',
-                    overflowY: 'auto',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
-                }}
+                className={`${styles.container} ${isMobile ? styles.containerMobile : ''}`}
                 onClick={e => e.stopPropagation()}
             >
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '16px'
-                }}>
-                    <h3 style={{
-                        margin: 0,
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        color: 'var(--color-text-primary)'
-                    }}>
-                        ✏️ Add Annotation
-                    </h3>
-                    <button
-                        onClick={handleClose}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--color-text-muted)',
-                            fontSize: '18px',
-                            cursor: 'pointer',
-                            padding: '4px 8px'
-                        }}
-                    >
-                        ✕
-                    </button>
+                <div className={styles.header}>
+                    <h3 className={styles.title}>✏️ Add Annotation</h3>
+                    <button className={styles.closeBtn} onClick={handleClose}>✕</button>
                 </div>
 
-                {/* Selected points info */}
-                <div style={{
-                    background: 'var(--color-bg-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    marginBottom: '16px'
-                }}>
-                    <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-text-muted)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        marginBottom: '4px'
-                    }}>
-                        Selected Data
-                    </div>
-                    <div style={{
-                        fontSize: '13px',
-                        color: 'var(--color-brand-primary)',
-                        fontWeight: 500
-                    }}>
-                        {formatSelectedPoints()}
-                    </div>
+                <div className={styles.selectedDataBox}>
+                    <div className={styles.selectedDataLabel}>Selected Data</div>
+                    <div className={styles.selectedDataValue}>{formatSelectedPoints()}</div>
                 </div>
 
-                {/* Content textarea */}
                 <textarea
                     autoFocus
+                    className={styles.textarea}
                     value={content}
                     onChange={(e) => setDraftContent(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Add your insight or note about this data..."
-                    style={{
-                        width: '100%',
-                        height: '120px',
-                        padding: '12px',
-                        background: 'var(--color-bg-input)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                        color: 'var(--color-text-primary)',
-                        fontSize: '14px',
-                        fontFamily: 'inherit',
-                        resize: 'vertical',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                    }}
                 />
 
-                {/* Hint */}
-                <div style={{
-                    fontSize: '11px',
-                    color: 'var(--color-text-muted)',
-                    marginTop: '8px',
-                    marginBottom: '16px'
-                }}>
-                    Press ⌘+Enter to save quickly
-                </div>
+                <div className={styles.hint}>Press ⌘+Enter to save quickly</div>
 
-                {/* Actions */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '12px',
-                    flexDirection: isMobile ? 'column-reverse' : 'row'
-                }}>
-                    <button
-                        onClick={handleClose}
-                        style={{
-                            padding: '10px 20px',
-                            background: 'var(--color-bg-surface)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '6px',
-                            color: 'var(--color-text-secondary)',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            cursor: 'pointer'
-                        }}
-                    >
+                <div className={`${styles.actions} ${isMobile ? styles.actionsMobile : ''}`}>
+                    <button className={styles.cancelBtn} onClick={handleClose}>
                         Cancel
                     </button>
                     <button
+                        className={`${styles.saveBtn} ${content.trim() ? styles.saveBtnActive : styles.saveBtnDisabled}`}
                         onClick={handleSave}
                         disabled={!content.trim()}
-                        style={{
-                            padding: '10px 20px',
-                            background: content.trim() ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
-                            border: content.trim() ? 'none' : '1px solid var(--color-border)',
-                            borderRadius: '6px',
-                            color: content.trim() ? 'white' : 'var(--color-text-muted)',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            cursor: content.trim() ? 'pointer' : 'not-allowed',
-                            opacity: content.trim() ? 1 : 0.7
-                        }}
                     >
                         Save Annotation
                     </button>

@@ -215,10 +215,6 @@ function ActivityBuilderForm({
 
     return (
         <>
-            <h2 className={styles.modalTitle}>
-                {editingActivity?.id ? 'Edit Activity' : 'Create Activity'}
-            </h2>
-
             {error && (
                 <div className={styles.errorMessage}>
                     {error}

@@ -1,37 +1,5 @@
 /* ActivityBuilder.module.css */
 
-/* Modal Overlays */
-.overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3100;
-    padding: 20px;
-}
-
-.modalContent {
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 800px;
-    width: 100%;
-    max-height: 90vh;
-    overflow: auto;
-    color: var(--color-text-primary);
-}
-
-.modalTitle {
-    font-size: 24px;
-    margin-bottom: 20px;
-    font-weight: 300;
-}
 
 .errorMessage {
     padding: 10px;

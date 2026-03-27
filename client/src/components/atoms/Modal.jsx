@@ -13,7 +13,7 @@ const Modal = ({
     onClose,
     title,
     children,
-    size = 'md', // sm, md, lg
+    size = 'md', // sm, md, lg, xl
     className = '',
     showCloseButton = true
 }) => {

@@ -4,7 +4,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import { useChartOptions } from './ChartJSWrapper'; // Import hook
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalIcon from '../atoms/GoalIcon';
-import '../../App.css'; // For global modal styles if needed
+import styles from './GenericGraphModal.module.css';
 
 /**
  * Generic Graph Modal
@@ -179,32 +179,11 @@ const GenericGraphModal = ({
 
     return ReactDOM.createPortal(
         <div
-            className="modal-overlay"
+            className={styles.overlay}
             onClick={onClose}
-            style={{
-                zIndex: 9999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0, 0, 0, 0.4)', // User requested not blacked out
-                backdropFilter: 'blur(4px)'
-            }}
         >
             <div
-                style={{
-                    width: '95%',
-                    maxWidth: '1200px',
-                    height: '85vh',
-                    maxHeight: '900px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    padding: '24px 32px', // Reduced top/bottom padding
-                    background: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border)',
-                    boxShadow: '0 50px 100px rgba(0,0,0,0.5)',
-                    animation: 'modalFadeIn 0.3s ease-out',
-                    borderRadius: '0' // USER: get rid of rounded edges
-                }}
+                className={styles.container}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}

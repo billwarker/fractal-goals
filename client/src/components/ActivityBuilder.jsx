@@ -4,9 +4,10 @@ import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
+import Modal from './atoms/Modal';
+import ModalBody from './atoms/ModalBody';
 import ActivityBuilderForm from './activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from './activityBuilder/activityBuilderUtils';
-import styles from './ActivityBuilder.module.css';
 
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity } = useActivities();
@@ -19,27 +20,28 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         [currentFractal, editingActivity?.id]
     );
 
-    if (!isOpen) {
-        return null;
-    }
-
     return (
-        <div className={styles.overlay} onClick={onClose}>
-            <div className={styles.modalContent} onClick={(event) => event.stopPropagation()}>
-                <ActivityBuilderForm
-                    key={editingActivity?.id || 'create'}
-                    allGoals={allGoals}
-                    editingActivity={editingActivity}
-                    rootId={rootId}
-                    activityGroups={activityGroups}
-                    createActivity={createActivity}
-                    updateActivity={updateActivity}
-                    onSave={onSave}
-                    onClose={onClose}
-                    getGoalColor={getGoalColor}
-                />
-            </div>
-        </div>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={editingActivity?.id ? 'Edit Activity' : 'Create Activity'}
+            size="lg"
+        >
+            <ModalBody>
+            <ActivityBuilderForm
+                key={editingActivity?.id || 'create'}
+                allGoals={allGoals}
+                editingActivity={editingActivity}
+                rootId={rootId}
+                activityGroups={activityGroups}
+                createActivity={createActivity}
+                updateActivity={updateActivity}
+                onSave={onSave}
+                onClose={onClose}
+                getGoalColor={getGoalColor}
+            />
+            </ModalBody>
+        </Modal>
     );
 }
 

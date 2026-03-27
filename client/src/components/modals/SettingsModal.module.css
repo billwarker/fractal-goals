@@ -9,6 +9,7 @@
     display: flex;
     justify-content: center;
     backdrop-filter: blur(3px);
+    animation: fadeIn 0.2s ease-out;
 }
 
 .overlayMobile {
@@ -28,12 +29,14 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: scaleIn 0.2s ease-out;
 }
 
 .modalMobile {
     width: 100vw;
     height: min(88vh, 760px);
     border-radius: 16px 16px 0 0;
+    animation: slideUp 0.25s ease-out;
 }
 
 .modalDesktop {
@@ -382,4 +385,19 @@
     padding-top: 12px;
     margin-top: 12px;
     border-top: 1px solid var(--color-border);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
