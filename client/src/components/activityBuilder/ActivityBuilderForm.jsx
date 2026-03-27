@@ -30,6 +30,7 @@ function ActivityBuilderForm({
     onSave,
     onClose,
     getGoalColor,
+    getGoalIcon,
 }) {
     const initialState = getInitialActivityBuilderState(editingActivity);
     const [error, setError] = useState(null);
@@ -249,6 +250,7 @@ function ActivityBuilderForm({
                         selectedGoalIds={selectedGoalIds}
                         onOpenModal={() => setShowAssociationModal(true)}
                         getGoalColor={getGoalColor}
+                        getGoalIcon={getGoalIcon}
                     />
 
                     <div>
@@ -283,13 +285,6 @@ function ActivityBuilderForm({
                             checked={hasMetrics}
                             onChange={(event) => setHasMetrics(event.target.checked)}
                         />
-                        {metrics.length >= 2 && (
-                            <Checkbox
-                                label="Metrics are multiplicative"
-                                checked={metricsMultiplicative}
-                                onChange={(event) => setMetricsMultiplicative(event.target.checked)}
-                            />
-                        )}
                     </div>
 
                     {hasSplits && (

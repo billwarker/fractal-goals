@@ -11,7 +11,7 @@ import { flattenGoals } from './activityBuilder/activityBuilderUtils';
 
 function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
     const { createActivity, updateActivity } = useActivities();
-    const { getGoalColor } = useGoalLevels();
+    const { getGoalColor, getGoalIcon } = useGoalLevels();
     const { activityGroups = [] } = useActivityGroups(rootId);
     const { data: currentFractal } = useFractalTree(rootId);
 
@@ -39,6 +39,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 onSave={onSave}
                 onClose={onClose}
                 getGoalColor={getGoalColor}
+                getGoalIcon={getGoalIcon}
             />
             </ModalBody>
         </Modal>

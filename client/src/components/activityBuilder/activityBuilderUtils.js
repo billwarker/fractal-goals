@@ -150,6 +150,7 @@ export function getInitialActivityBuilderState(editingActivity) {
         metrics: metricDefinitions.length > 0
             ? metricDefinitions.map((metric) => ({
                 id: metric.id,
+                fractal_metric_id: metric.fractal_metric_id || null,
                 name: metric.name,
                 unit: metric.unit,
                 is_top_set_metric: metric.is_top_set_metric || false,

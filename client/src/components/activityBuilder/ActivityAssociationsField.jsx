@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 
 import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
 import styles from '../ActivityBuilder.module.css';
 import { buildGoalAssociationSummary } from './activityBuilderUtils';
 
@@ -19,6 +20,7 @@ function ActivityAssociationsField({
     selectedGoalIds,
     onOpenModal,
     getGoalColor,
+    getGoalIcon,
 }) {
     const summary = useMemo(
         () => buildGoalAssociationSummary(allGoals, selectedGoalIds),
@@ -53,22 +55,22 @@ function ActivityAssociationsField({
 
                             const color = getGoalColor(type);
 
+                            const icon = getGoalIcon ? getGoalIcon(type) : 'circle';
+
+                            const countParts = [];
+                            if (stats.direct > 0) countParts.push(`${stats.direct} direct`);
+                            if (stats.inherited > 0) countParts.push(`${stats.inherited} inherited`);
+
                             return (
-                                <div key={type} className={styles.summaryItem} style={{ borderColor: color }}>
-                                    <div className={styles.summaryLabel} style={{ color }}>
-                                        {GOAL_TYPE_LABELS[type] || type}
-                                    </div>
-                                    <div className={styles.summaryCounts}>
-                                        {stats.direct > 0 && (
-                                            <span className={styles.countDirect} title="Directly Associated">
-                                                {stats.direct} Direct
-                                            </span>
-                                        )}
-                                        {stats.inherited > 0 && (
-                                            <span className={styles.countInherited} title="Inherited from Selection">
-                                                {stats.inherited} Inherited
-                                            </span>
-                                        )}
+                                <div key={type} className={styles.summaryItem}>
+                                    <GoalIcon shape={icon} color={color} size={12} />
+                                    <div className={styles.summaryItemContent}>
+                                        <span className={styles.summaryLabel} style={{ color }}>
+                                            {GOAL_TYPE_LABELS[type] || type}
+                                        </span>
+                                        <span className={styles.summaryCounts}>
+                                            {countParts.join(', ')}
+                                        </span>
                                     </div>
                                 </div>
                             );

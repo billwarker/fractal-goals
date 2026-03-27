@@ -116,9 +116,6 @@ function ActivityMetricsSection({
                                     ))}
                                     <option value="__create__">+ Create new metric…</option>
                                 </select>
-                                {linked && (
-                                    <span className={metricStyles.metricUnitBadge}>{linked.unit}</span>
-                                )}
                                 {metrics.length > 1 && (
                                     <Button
                                         type="button"
@@ -133,8 +130,8 @@ function ActivityMetricsSection({
 
                             {linked && (
                                 <div className={metricStyles.metricMeta}>
-                                    {linked.is_multiplicative && <span className={metricStyles.metaBadge}>multiplicative</span>}
-                                    {linked.is_additive && <span className={metricStyles.metaBadge}>additive</span>}
+                                    {linked.is_multiplicative && <span className={metricStyles.metaBadgeMultiplicative}>Multiplicative</span>}
+                                    {linked.is_additive && <span className={metricStyles.metaBadgeAdditive}>Additive</span>}
                                     {linked.input_type !== 'number' && <span className={metricStyles.metaBadge}>{linked.input_type}</span>}
                                     {linked.description && <span className={metricStyles.metaDesc}>{linked.description}</span>}
                                 </div>
