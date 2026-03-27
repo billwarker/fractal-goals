@@ -242,5 +242,34 @@
 
     .card {
         padding: 14px;
+        /* Disable lift transform on touch — causes tap-delay feel */
+        transform: none !important;
+    }
+
+    .emptyState {
+        padding: 40px 20px;
+    }
+
+    .emptyTitle {
+        font-size: 20px;
+    }
+
+    .createFirstBtn {
+        min-height: 44px;
+        width: 100%;
+    }
+
+    .blockDates {
+        /* Slightly larger for readability on mobile */
+        font-size: 12px;
+    }
+
+    .cardTitle {
+        font-size: 16px;
+    }
+
+    .statsFooter {
+        flex-direction: column;
+        gap: 4px;
     }
 }

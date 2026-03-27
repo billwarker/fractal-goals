@@ -224,6 +224,16 @@
     }
 }
 
+/* Bottom sheet backdrop — mobile only */
+.sheetBackdrop {
+    display: none;
+}
+
+/* Bottom sheet wrapper for sidebar on mobile */
+.sidebarSheet {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .container {
         padding-top: 76px;
@@ -244,19 +254,60 @@
     }
 
     .backBtn {
-        min-height: 38px;
-        padding: 8px 10px;
+        min-height: 44px;
+        padding: 8px 12px;
         font-size: 13px;
     }
 
     .mainLayout {
-        flex-direction: column;
+        /* On mobile: content fills full height, sidebar is a sheet overlay */
+        position: relative;
     }
 
     .rightPanel {
         padding: 12px;
         padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
         background-size: 16px 16px;
+        /* content panel takes full width on mobile */
+        flex: 1;
+    }
+
+    .sheetBackdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 499;
+        animation: backdropFadeIn 0.2s ease;
+    }
+
+    .sidebarSheet {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 75vh;
+        border-radius: 16px 16px 0 0;
+        background: var(--color-bg-sidebar);
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+        z-index: 500;
+        overflow: hidden;
+        animation: sheetSlideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* Drag handle indicator */
+    .sidebarSheet::before {
+        content: '';
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 36px;
+        height: 4px;
+        background: var(--color-border-hover);
+        border-radius: 2px;
+        z-index: 1;
     }
 
     .programTitle {
@@ -293,21 +344,37 @@
 
     .toggleBtn {
         flex: 1;
-        min-height: 36px;
+        min-height: 44px;
         font-size: 12px;
     }
 
     .editBtn {
-        min-height: 36px;
+        min-height: 44px;
         width: auto;
         padding: 8px 12px;
         font-size: 12px;
     }
 
     .sidebarToggleBtn {
-        min-height: 36px;
+        min-height: 44px;
         padding: 8px 10px;
         font-size: 12px;
         white-space: nowrap;
     }
+}
+
+@keyframes sheetSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0.6;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes backdropFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }

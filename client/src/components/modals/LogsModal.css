@@ -208,3 +208,32 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+    .logs-modal-content {
+        width: 100vw;
+        height: 100dvh;
+        max-width: 100%;
+        border-radius: 0;
+    }
+
+    /* Switch from 4-column grid to stacked card layout on mobile */
+    .logs-grid-header {
+        display: none;
+    }
+
+    .log-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 12px;
+    }
+
+    .log-source {
+        text-align: left;
+    }
+
+    .load-more-logs {
+        min-height: 44px;
+    }
+}

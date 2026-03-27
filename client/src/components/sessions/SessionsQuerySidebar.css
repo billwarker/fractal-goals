@@ -345,7 +345,14 @@
 
 @media (max-width: 768px) {
     .sessions-query-sidebar-header {
-        padding-top: 12px;
+        /* 24px top accounts for the drag handle (10px offset + 4px handle + gap) */
+        padding: 24px 16px 14px 16px;
+    }
+
+    .sessions-query-sidebar-collapse,
+    .sessions-query-sidebar-reset {
+        min-height: 44px;
+        padding: 8px 14px;
     }
 
     .sessions-query-date-grid {

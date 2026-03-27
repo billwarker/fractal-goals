@@ -834,3 +834,19 @@
     cursor: pointer;
     font-size: 12px;
 }
+
+@media (max-width: 480px) {
+    .activityGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .metricsBreakdown {
+        grid-template-columns: 1fr;
+    }
+
+    .inlineSectionHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}

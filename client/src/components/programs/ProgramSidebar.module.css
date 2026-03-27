@@ -92,22 +92,30 @@
 @media (max-width: 768px) {
     .sidebar {
         width: 100%;
+        height: 100%;
         border-right: none;
-        border-bottom: 1px solid var(--color-border);
-        max-height: 40vh;
+        border-bottom: none;
+        /* No max-height — the .sidebarSheet container controls height */
+        max-height: none;
     }
 
-    .topSection,
+    .topSection {
+        /* 28px top accounts for drag handle above */
+        padding: 28px 16px 14px 16px;
+    }
+
     .bottomSection {
-        padding: 12px;
+        padding: 12px 16px;
     }
 
     .metricsScroll {
-        max-height: 180px;
+        /* Let it breathe inside the sheet */
+        max-height: 160px;
     }
 
     .goalsScroll {
-        max-height: 34vh;
+        /* Sheet is 75vh; leave room for topSection (~140px) */
+        max-height: calc(75vh - 200px);
     }
 
     .metricsList {

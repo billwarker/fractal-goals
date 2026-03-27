@@ -364,6 +364,13 @@ function Sessions() {
                 </div>
             </div>
 
+            {isFiltersPaneOpen && isMobile && (
+                <div
+                    className={styles.sheetBackdrop}
+                    onClick={() => setIsFiltersPaneOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
             {isFiltersPaneOpen && (
                 <div className={styles.rightPanel}>
                     <SessionsQuerySidebar

@@ -21,6 +21,7 @@ import { ActiveSessionProvider, QueuedQuickSessionProvider } from '../contexts/A
 import { isQuickSession } from '../utils/sessionRuntime';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
+import styles from './CreateSession.module.css';
 import '../App.css';
 
 function extractActivityId(item) {
@@ -515,8 +516,8 @@ function CreateSession() {
                 subtitle="Select a template or program day to begin your session."
             />
 
-            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent}`} style={{ padding: '32px 40px' }}>
-            <div style={{ maxWidth: '800px' }}>
+            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
+            <div className={styles.inner}>
                 {/* Step 0a: Choose Program (if multiple programs available) */}
                 {showProgramChoice && (
                     <ProgramSelector

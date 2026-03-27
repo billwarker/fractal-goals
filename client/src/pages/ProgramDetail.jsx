@@ -269,7 +269,18 @@ const ProgramDetail = () => {
                 {isMobile ? (
                     <>
                         {contentPanel}
-                        {isSidebarOpen && sidebarPanel}
+                        {isSidebarOpen && (
+                            <div
+                                className={styles.sheetBackdrop}
+                                onClick={() => setIsSidebarOpen(false)}
+                                aria-hidden="true"
+                            />
+                        )}
+                        {isSidebarOpen && (
+                            <div className={styles.sidebarSheet}>
+                                {sidebarPanel}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>
