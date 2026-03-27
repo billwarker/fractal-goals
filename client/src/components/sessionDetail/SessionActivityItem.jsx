@@ -756,7 +756,7 @@ function SessionActivityItem({
                 </div>
 
                 {/* Delete Button */}
-                {!quickMode && <button onClick={onDelete} className={styles.deleteButton}>×</button>}
+                {!quickMode && <button onClick={onDelete} className={styles.deleteButton} aria-label="Delete activity">×</button>}
             </div>
 
             {/* Content Area */}
@@ -871,7 +871,7 @@ function SessionActivityItem({
                                     )}
 
 
-                                    <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton}>×</button>
+                                    <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton} aria-label="Remove set">×</button>
                                 </div>
                             ))}
                         </div>

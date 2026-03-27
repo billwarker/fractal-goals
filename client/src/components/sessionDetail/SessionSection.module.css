@@ -2,9 +2,8 @@
 /* Migrated from inline styles to maintain pixel-perfect visual fidelity */
 
 .sectionContainer {
-    background: linear-gradient(170deg, var(--color-bg-card), var(--color-bg-card-alt));
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border-card);
-    border-left: 4px solid var(--color-brand-primary);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-sm);
     padding: var(--spacing-xl);
@@ -270,7 +269,7 @@
 }
 
 .noActivitiesMessage {
-    color: #888;
+    color: var(--color-text-muted);
     font-style: italic;
     padding: 10px;
 }

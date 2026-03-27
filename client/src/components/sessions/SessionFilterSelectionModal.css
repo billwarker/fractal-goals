@@ -193,7 +193,7 @@
 .session-filter-modal-primary {
     border: none;
     background: var(--color-brand-primary);
-    color: #fff;
+    color: var(--color-text-inverse);
 }
 
 @media (max-width: 768px) {

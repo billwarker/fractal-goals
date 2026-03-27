@@ -8,7 +8,7 @@
 .errorMessage {
     padding: 10px;
     background: rgba(255, 0, 0, 0.1);
-    color: #f44336;
+    color: var(--color-brand-danger);
     margin-bottom: 20px;
     border-radius: var(--radius-sm);
 }
@@ -43,7 +43,7 @@
 
 .groupDescription {
     font-size: 13px;
-    color: #888;
+    color: var(--color-text-muted);
     margin: 0;
     max-width: 600px;
 }
@@ -86,7 +86,7 @@
 }
 
 .editGroupBtn:hover {
-    background: #444;
+    background: var(--color-bg-input);
     color: white;
 }
 
@@ -98,12 +98,12 @@
     color: var(--color-text-muted);
     cursor: pointer;
     font-size: 12px;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .deleteGroupBtn:hover {
-    border-color: #666;
-    color: #ef5350;
+    border-color: var(--color-text-muted);
+    color: var(--color-brand-danger);
 }
 
 /* Grid Layouts */
@@ -133,7 +133,7 @@
 .ungroupedTitle {
     font-size: 16px;
     font-weight: 500;
-    color: #666;
+    color: var(--color-text-muted);
     margin-bottom: 20px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -149,14 +149,14 @@
 }
 
 .emptyStateText {
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 16px;
     margin-bottom: 20px;
 }
 
 .createFirstBtn {
     padding: 12px 24px;
-    background: #4caf50;
+    background: var(--color-brand-success);
     border: none;
     border-radius: var(--radius-md);
     color: white;
@@ -167,7 +167,7 @@
 }
 
 .createFirstBtn:hover {
-    background: #45a049;
+    background: var(--color-brand-success-hover);
 }
 
 /* Drag-and-Drop Styles */
@@ -175,7 +175,7 @@
     min-height: 60px;
     border: 2px dashed transparent;
     border-radius: 8px;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     position: relative;
 }
 
@@ -208,7 +208,7 @@
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .ungroupedDropZoneActive {

@@ -104,7 +104,7 @@
 }
 
 .programIcon {
-    color: #66bb6a;
+    color: var(--color-brand-success);
 }
 
 /* Target Item */
@@ -152,7 +152,7 @@
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .cancelButton {

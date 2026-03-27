@@ -47,7 +47,7 @@
     border-radius: 4px;
     font-size: 14px;
     line-height: 1;
-    transition: all 0.15s;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
 .expandBtn:hover {
@@ -149,7 +149,7 @@
 .closeBtn {
     background: transparent;
     border: none;
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 24px;
     cursor: pointer;
     padding: 0;
@@ -213,7 +213,7 @@
 .groupContainer {
     background: var(--color-bg-card-alt);
     border: 1px solid var(--color-border);
-    border-left: 3px solid var(--color-brand-primary);
+
     border-radius: 8px;
     padding: 14px 16px;
     margin-bottom: 8px;
@@ -291,7 +291,7 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     line-height: 1.2;
-    transition: all 0.15s;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
 .groupUnlinkBtn:hover {
@@ -328,7 +328,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     position: relative;
 }
 
@@ -347,12 +347,12 @@
 
 .miniCardSelected {
     background: rgba(76, 175, 80, 0.12);
-    border-color: #4caf50;
+    border-color: var(--color-brand-success);
 }
 
 .miniCardSelected:hover {
     background: rgba(76, 175, 80, 0.18);
-    border-color: #4caf50;
+    border-color: var(--color-brand-success);
 }
 
 .miniCardInherited {
@@ -415,7 +415,7 @@
 }
 
 .removeBtn:hover {
-    color: var(--color-danger, #d32f2f);
+    color: var(--color-danger, var(--color-brand-danger));
 }
 
 /* Selection checkbox indicator */
@@ -429,13 +429,13 @@
     justify-content: center;
     flex-shrink: 0;
     font-size: 12px;
-    transition: all 0.15s;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     background: transparent;
 }
 
 .miniCardSelected .selectIndicator {
-    background: #4caf50;
-    border-color: #4caf50;
+    background: var(--color-brand-success);
+    border-color: var(--color-brand-success);
     color: white;
 }
 
@@ -488,12 +488,12 @@
 
 .indicatorMetric {
     background: var(--color-bg-card-alt);
-    color: #4caf50;
+    color: var(--color-brand-success);
     border-color: var(--color-border);
 }
 
 .indicatorSets {
-    color: #ff9800;
+    color: var(--color-mode-sets);
 }
 
 .indicatorNone {
@@ -540,12 +540,12 @@
     border: 1px solid var(--color-border);
     background: var(--color-bg-card-alt);
     color: var(--color-text-muted);
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .addSelectedBtn:not(:disabled) {
-    background: #4caf50;
-    border-color: #4caf50;
+    background: var(--color-brand-success);
+    border-color: var(--color-brand-success);
     color: white;
     cursor: pointer;
 }
@@ -563,7 +563,7 @@
     cursor: pointer;
     font-weight: bold;
     font-size: 13px;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .cancelBtn:hover {
@@ -581,15 +581,15 @@
 
 .associateBtn {
     background: transparent;
-    border: 1.5px solid #4caf50;
-    color: #4caf50;
+    border: 1.5px solid var(--color-brand-success);
+    color: var(--color-brand-success);
     border-radius: 8px;
     padding: 10px 16px;
     cursor: pointer;
     font-size: 13px;
     font-weight: bold;
     align-self: flex-start;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .associateBtn:hover {
@@ -598,14 +598,14 @@
 
 .inlineAssociateBtn {
     background: transparent;
-    border: 1.5px solid #4caf50;
+    border: 1.5px solid var(--color-brand-success);
     border-radius: 4px;
-    color: #4caf50;
+    color: var(--color-brand-success);
     cursor: pointer;
     font-size: 12px;
     font-weight: bold;
     padding: 2px 8px;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .inlineAssociateBtn:hover {
@@ -711,7 +711,7 @@
 
 /* ============ GROUP SELECTION ============ */
 .groupContainerSelected {
-    border-color: #4caf50;
+    border-color: var(--color-brand-success);
     background: rgba(76, 175, 80, 0.06);
 }
 
@@ -724,22 +724,22 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.15s;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
 .groupSelectBtn:hover {
-    border-color: #4caf50;
-    color: #4caf50;
+    border-color: var(--color-brand-success);
+    color: var(--color-brand-success);
 }
 
 .groupSelectBtnActive {
-    background: #4caf50;
-    border-color: #4caf50;
+    background: var(--color-brand-success);
+    border-color: var(--color-brand-success);
     color: white;
 }
 
 .groupSelectBtnActive:hover {
-    background: #43a047;
+    background: var(--color-brand-success);
 }
 
 /* ============ INLINE GROUP CREATOR ============ */

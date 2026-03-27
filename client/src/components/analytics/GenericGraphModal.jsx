@@ -216,6 +216,7 @@ const GenericGraphModal = ({
 
                     <button
                         onClick={onClose}
+                        aria-label="Close"
                         style={{
                             background: 'transparent',
                             border: 'none',

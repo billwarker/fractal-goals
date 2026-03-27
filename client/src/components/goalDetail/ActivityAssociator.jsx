@@ -523,7 +523,7 @@ const ActivityAssociator = ({
                         </h3>
                         <div className={styles.headerRight}>
                             {onClose && (
-                                <button onClick={onClose} className={styles.closeBtn}>×</button>
+                                <button onClick={onClose} className={styles.closeBtn} aria-label="Close">×</button>
                             )}
                         </div>
                     </div>

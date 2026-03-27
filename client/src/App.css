@@ -66,7 +66,7 @@ html {
 
 .sidebar {
     width: 33.33vw;
-    min-width: 350px;
+    min-width: min(350px, 90vw);
     background: var(--color-bg-sidebar);
     border-left: 1px solid var(--color-border);
     display: flex;
@@ -96,8 +96,8 @@ html {
     cursor: pointer;
     border-radius: 6px;
     margin-bottom: 8px;
-    color: #aaa;
-    transition: all 0.2s ease;
+    color: var(--color-text-muted);
+    transition: background 0.2s ease, color 0.2s ease;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -105,7 +105,7 @@ html {
 
 .fractal-list li:hover {
     background: var(--color-bg-card-hover);
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .fractal-list li:hover .delete-fractal-btn {
@@ -116,21 +116,20 @@ html {
     opacity: 0;
     background: transparent;
     border: none;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 1.2rem;
     cursor: pointer;
     padding: 0 5px;
-    transition: all 0.2s;
+    transition: color 0.2s;
 }
 
 .delete-fractal-btn:hover {
-    color: #ff5252;
+    color: var(--color-brand-danger);
 }
 
 .fractal-list li.active {
-    background: #37373d;
+    background: var(--color-bg-card-hover);
     color: var(--color-brand-primary);
-    border-left: 3px solid var(--color-brand-primary);
     font-weight: 500;
 }
 
@@ -147,13 +146,13 @@ html {
 }
 
 .create-fractal-btn:hover {
-    background: #2b7cdb;
+    background: var(--color-brand-primary-hover);
 }
 
 .session-btn {
     margin-top: 12px;
     padding: 12px;
-    background: #4caf50;
+    background: var(--color-brand-success);
     color: white;
     border: 1px solid var(--color-border-btn);
     border-radius: 6px;
@@ -163,7 +162,7 @@ html {
 }
 
 .session-btn:hover {
-    background: #45a049;
+    background: var(--color-brand-success-hover);
 }
 
 .empty-state {
@@ -209,15 +208,15 @@ html {
     background: var(--color-bg-card);
     padding: 25px;
     border-radius: 12px;
-    width: 450px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    width: min(450px, calc(100vw - 32px));
+    box-shadow: var(--shadow-md);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
 }
 
 .modal h2 {
     margin-top: 0;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 1.2rem;
     border-bottom: 1px solid var(--color-border);
     padding-bottom: 10px;
@@ -232,7 +231,7 @@ html {
 .modal label {
     margin-top: 15px;
     font-size: 0.9rem;
-    color: #aaa;
+    color: var(--color-text-secondary);
 }
 
 .modal input,
@@ -277,7 +276,7 @@ html {
 
 .modal button[type="button"] {
     background: transparent;
-    color: #aaa;
+    color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
 }
 
@@ -309,7 +308,7 @@ html {
 }
 
 .details-modal strong {
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .details-modal ul {
@@ -326,11 +325,11 @@ html {
 
 /* Fractal Visualization Specifics */
 .rd3t-link {
-    stroke: #fff !important;
+    stroke: var(--color-text-inverse) !important;
 }
 
 .add-child-text {
-    fill: #fff !important;
+    fill: var(--color-text-inverse) !important;
     stroke: none !important;
 }
 
@@ -392,7 +391,7 @@ html {
 }
 
 .no-children {
-    color: #666;
+    color: var(--color-text-muted);
     font-style: italic;
 }
 
@@ -437,7 +436,7 @@ html {
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     font-size: 14px;
 }
 
@@ -448,17 +447,17 @@ html {
 }
 
 .action-btn.primary:hover {
-    background: #2b7cdb;
+    background: var(--color-brand-primary-hover);
 }
 
 .action-btn.danger {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     color: white;
     border: 1px solid var(--color-border-btn);
 }
 
 .action-btn.danger:hover {
-    background: #b71c1c;
+    background: var(--color-brand-danger-hover);
 }
 
 .switch-view-btn {
@@ -470,7 +469,7 @@ html {
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .switch-view-btn:hover {
@@ -518,7 +517,7 @@ html {
 
 .sessions-grid h3 {
     margin: 0 0 15px 0;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 1.1rem;
 }
 
@@ -529,7 +528,7 @@ html {
 }
 
 .no-sessions-message {
-    color: #888;
+    color: var(--color-text-muted);
     font-style: italic;
     padding: 20px;
     text-align: center;
@@ -541,7 +540,7 @@ html {
     border-radius: 8px;
     padding: 15px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     min-height: 100px;
     display: flex;
     flex-direction: column;
@@ -556,14 +555,14 @@ html {
 }
 
 .session-square.selected {
-    border-color: #4caf50;
-    background: rgba(76, 175, 80, 0.1);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    border-color: var(--color-brand-success);
+    background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-card));
+    box-shadow: 0 0 20px color-mix(in srgb, var(--color-brand-success) 30%, transparent);
 }
 
 .session-name {
     font-weight: 600;
-    color: #fff;
+    color: var(--color-text-primary);
     font-size: 0.95rem;
     margin-bottom: 8px;
     line-height: 1.3;
@@ -571,11 +570,11 @@ html {
 
 .session-meta {
     font-size: 0.85rem;
-    color: #888;
+    color: var(--color-text-muted);
 }
 
 .session-square.selected .session-meta {
-    color: #4caf50;
+    color: var(--color-brand-success);
 }
 
 /* Session Modal */
@@ -596,16 +595,16 @@ html {
 }
 
 .session-name-preview {
-    background: rgba(76, 175, 80, 0.1);
+    background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-card));
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;
-    border: 1px solid rgba(76, 175, 80, 0.3);
+    border: 1px solid color-mix(in srgb, var(--color-brand-success) 30%, transparent);
 }
 
 .session-name-preview p {
     margin: 5px 0 0 0;
-    color: #4caf50;
+    color: var(--color-brand-success);
     font-weight: 600;
 }
 
@@ -649,7 +648,7 @@ html {
 }
 
 .no-goals-message {
-    color: #666;
+    color: var(--color-text-muted);
     font-style: italic;
     padding: 10px;
 }
@@ -681,7 +680,7 @@ html {
 }
 
 .remove-goal-btn {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     color: white;
     border: 1px solid var(--color-border-btn);
     padding: 8px 12px;
@@ -692,7 +691,7 @@ html {
 }
 
 .remove-goal-btn:hover {
-    background: #b71c1c;
+    background: var(--color-brand-danger-hover);
 }
 
 .add-goal-btn {
@@ -703,7 +702,7 @@ html {
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     width: 100%;
 }
 
@@ -742,12 +741,12 @@ html {
 
 .connection-header h2 {
     margin: 0;
-    color: #ff9800;
+    color: var(--color-mode-sets);
     font-size: 1.3rem;
 }
 
 .close-connection-btn {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     color: white;
     border: 1px solid var(--color-border-btn);
     padding: 10px 20px;
@@ -755,11 +754,11 @@ html {
     cursor: pointer;
     font-weight: 600;
     font-size: 0.95rem;
-    transition: all 0.2s;
+    transition: background 0.2s, transform 0.2s;
 }
 
 .close-connection-btn:hover {
-    background: #b71c1c;
+    background: var(--color-brand-danger-hover);
     transform: scale(1.05);
 }
 
@@ -786,12 +785,12 @@ html {
 
 /* Goal circles - subtle styling */
 .connection-view circle[fill="#4caf50"] {
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 /* Clear Session Button */
 .clear-session-btn {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     color: white;
     border: 1px solid var(--color-border-btn);
     padding: 8px 16px;
@@ -799,12 +798,12 @@ html {
     cursor: pointer;
     font-weight: 600;
     font-size: 0.9rem;
-    transition: all 0.2s;
+    transition: background 0.2s, transform 0.2s;
     margin-left: 15px;
 }
 
 .clear-session-btn:hover {
-    background: #b71c1c;
+    background: var(--color-brand-danger-hover);
     transform: scale(1.05);
 }
 
@@ -815,7 +814,7 @@ html {
 
 .sidebar.expanded {
     width: 33.33vw;
-    min-width: 350px;
+    min-width: min(350px, 90vw);
 }
 
 /* Session Details Pane */
@@ -827,12 +826,12 @@ html {
 
 .session-details-pane h2 {
     margin: 10px 0;
-    color: #ffffff;
+    color: var(--color-text-primary);
     font-size: 1.5rem;
 }
 
 .session-details-pane .meta-info {
-    color: #888;
+    color: var(--color-text-muted);
     margin-bottom: 20px;
     font-size: 0.9em;
     padding-bottom: 10px;
@@ -842,7 +841,7 @@ html {
 .back-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--color-text-muted);
     cursor: pointer;
     text-align: left;
     padding: 0;
@@ -868,14 +867,14 @@ html {
 
 .description-section h4 {
     margin-top: 0;
-    color: #aaa;
+    color: var(--color-text-secondary);
     margin-bottom: 10px;
     font-weight: 500;
 }
 
 .description-section p {
     line-height: 1.5;
-    color: #ddd;
+    color: var(--color-text-primary);
     white-space: pre-wrap;
 }
 
@@ -893,26 +892,27 @@ html {
     border: none;
     cursor: pointer;
     font-weight: 600;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .sidebar-actions .action-btn.secondary {
     background: var(--color-bg-card-hover);
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .sidebar-actions .action-btn.secondary:hover {
-    background: #4e4e52;
+    background: var(--color-bg-card-hover);
+    filter: brightness(1.15);
 }
 
 .sidebar-actions .action-btn.danger {
-    background: #5c2b2b;
-    color: #ff9999;
+    background: color-mix(in srgb, var(--color-brand-danger) 20%, var(--color-bg-card));
+    color: var(--color-brand-danger);
 }
 
 .sidebar-actions .action-btn.danger:hover {
-    background: #7d3333;
-    color: #fff;
+    background: var(--color-brand-danger);
+    color: white;
 }
 
 .sidebar-actions .action-btn.primary {
@@ -922,7 +922,7 @@ html {
 }
 
 .sidebar-actions .action-btn.primary:hover {
-    background: #2b7cdb;
+    background: var(--color-brand-primary-hover);
 }
 
 /* Edit Form inside Sidebar */
@@ -938,7 +938,7 @@ html {
     background: transparent;
     border: none;
     border-bottom: 2px solid var(--color-brand-primary);
-    color: white;
+    color: var(--color-text-primary);
     margin-bottom: 20px;
     padding: 5px 0;
     width: 100%;
@@ -946,7 +946,7 @@ html {
 
 .edit-input-title:focus {
     outline: none;
-    border-bottom-color: #2b7cdb;
+    border-bottom-color: var(--color-brand-primary-hover);
 }
 
 .edit-form-sidebar .form-group {
@@ -997,7 +997,7 @@ html {
 
 .sidebar-toggle-btn:hover {
     background: var(--color-bg-card-hover);
-    color: white;
+    color: var(--color-text-primary);
 }
 
 .practice-sessions-grid.collapsed {
@@ -1013,14 +1013,14 @@ html {
 .collapse-btn {
     background: transparent;
     border: none;
-    color: #888;
+    color: var(--color-text-muted);
     cursor: pointer;
     font-size: 1.2rem;
     padding: 5px;
 }
 
 .collapse-btn:hover {
-    color: white;
+    color: var(--color-text-primary);
 }
 
 /* Sidebar Navigation Items */
@@ -1032,14 +1032,14 @@ html {
     text-align: left;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     font-weight: 500;
 }
 
 .nav-item:hover {
     background: var(--color-bg-card-hover);
-    color: white;
-    border-color: #666;
+    color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
 }
 
 .nav-item.active {
@@ -1051,7 +1051,7 @@ html {
 
 .view-container {
     padding: 40px;
-    color: #fff;
+    color: var(--color-text-primary);
     height: 100%;
     overflow-y: auto;
 }
@@ -1065,7 +1065,7 @@ html {
     display: flex;
     gap: 15px;
     align-items: center;
-    background: rgba(30, 30, 30, 0.8);
+    background: color-mix(in srgb, var(--color-bg-elevated) 80%, transparent);
     padding: 10px 20px;
     border-radius: 30px;
     backdrop-filter: blur(10px);
@@ -1076,12 +1076,12 @@ html {
 .nav-link {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--color-text-secondary);
     cursor: pointer;
     font-size: 0.95rem;
     padding: 5px 10px;
     font-family: inherit;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 500;
@@ -1108,6 +1108,7 @@ html {
     background: var(--color-bg-header);
     border-bottom: 1px solid var(--color-border);
     backdrop-filter: blur(10px);
+    will-change: transform;
     display: flex;
     align-items: center;
     padding: 0 32px;
@@ -1124,11 +1125,11 @@ html {
 
 .fractal-title {
     color: var(--color-text-primary);
-    font-weight: 700;
+    font-weight: var(--font-weight-semibold);
     margin-right: 10px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    font-size: 0.8125rem;
 }
 
 .nav-separator {
@@ -1147,7 +1148,7 @@ html {
     color: var(--color-text-secondary);
     font-size: 0.85rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 5px 0;
@@ -1167,11 +1168,11 @@ html {
 }
 
 .nav-text-link.home-link {
-    color: #ff5252;
+    color: var(--color-brand-danger);
 }
 
 .nav-text-link.home-link:hover {
-    color: #ff8a80;
+    color: var(--color-brand-danger-hover);
 }
 
 /* Details Window (Floating Sidebar) */
@@ -1180,7 +1181,7 @@ html {
     top: 80px;
     right: 20px;
     width: 33vw;
-    min-width: 400px;
+    min-width: min(400px, calc(100vw - 40px));
     bottom: 60px;
     max-height: calc(100vh - 160px);
     background: var(--color-bg-card);
@@ -1261,7 +1262,7 @@ html {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
     position: relative;
     overflow: hidden;
     backdrop-filter: blur(5px);
@@ -1291,11 +1292,11 @@ html {
     right: 15px;
     background: transparent;
     border: none;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 1.5rem;
     cursor: pointer;
     opacity: 0;
-    transition: all 0.2s;
+    transition: color 0.2s, opacity 0.2s;
     z-index: 10;
 }
 
@@ -1304,22 +1305,22 @@ html {
 }
 
 .fractal-card .delete-btn:hover {
-    color: #ff5252;
+    color: var(--color-brand-danger);
 }
 
 .add-fractal-card {
-    border: 2px dashed #444;
+    border: 2px dashed var(--color-border);
     background: transparent;
 }
 
 .add-fractal-card:hover {
     border-color: var(--color-brand-primary);
-    background: rgba(43, 124, 219, 0.05);
+    background: color-mix(in srgb, var(--color-brand-primary) 5%, transparent);
 }
 
 .add-icon {
     font-size: 3rem;
-    color: #444;
+    color: var(--color-border-hover);
     margin-bottom: 20px;
     transition: color 0.3s;
 }
@@ -1410,7 +1411,7 @@ html {
     border-radius: 4px;
     font-size: 11px;
     font-weight: 600;
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: var(--font-family-mono);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     opacity: 0.7;
@@ -1424,19 +1425,19 @@ html {
 }
 
 .env-indicator.development {
-    background: #4caf50;
+    background: var(--color-brand-success);
     color: white;
-    border: 1px solid #45a049;
+    border: 1px solid var(--color-brand-success-hover);
 }
 
 .env-indicator.testing {
-    background: #ff9800;
+    background: var(--color-brand-secondary);
     color: white;
-    border: 1px solid #f57c00;
+    border: 1px solid var(--color-brand-secondary-hover);
 }
 
 .env-indicator.production {
-    background: #f44336;
+    background: var(--color-brand-danger);
     color: white;
-    border: 1px solid #d32f2f;
+    border: 1px solid var(--color-brand-danger-hover);
 }

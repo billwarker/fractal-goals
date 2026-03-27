@@ -31,16 +31,19 @@
 
 .pageTitle {
     margin: 0;
-    font-size: 28px;
-    line-height: 1;
+    font-family: var(--font-family);
+    font-size: 26px;
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.02em;
     color: var(--color-text-primary);
 }
 
 .pageSubtitle {
     margin: 0;
     max-width: 640px;
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-base);
     color: var(--color-text-muted);
 }
 

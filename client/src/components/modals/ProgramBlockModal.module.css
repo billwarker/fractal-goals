@@ -44,7 +44,7 @@
 .colorValue {
     font-size: var(--font-size-base);
     color: var(--color-text-secondary);
-    font-family: monospace;
+    font-family: var(--font-family-mono);
 }
 
 .footerActions {

@@ -106,6 +106,7 @@ const DayViewModal = ({
                         <button
                             onClick={handleClose}
                             className={styles.closeButton}
+                            aria-label="Close"
                         >
                             ×
                         </button>

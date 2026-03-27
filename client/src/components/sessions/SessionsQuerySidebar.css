@@ -130,7 +130,7 @@
 .sessions-query-chip.active {
     background: var(--color-brand-primary);
     border-color: var(--color-brand-primary);
-    color: #fff;
+    color: var(--color-text-inverse);
 }
 
 .sessions-query-date-grid {
@@ -175,7 +175,7 @@
     border: 1px solid var(--color-brand-primary);
     border-radius: var(--border-radius-sm);
     background: var(--color-brand-primary);
-    color: #fff;
+    color: var(--color-text-inverse);
     cursor: pointer;
     font-size: 12px;
     text-align: center;
@@ -222,7 +222,7 @@
     border: 1px solid var(--color-brand-primary);
     border-radius: var(--border-radius-sm);
     background: var(--color-brand-primary);
-    color: #fff;
+    color: var(--color-text-inverse);
     cursor: pointer;
     font-size: 12px;
     text-align: center;
@@ -268,9 +268,9 @@
 }
 
 .sessions-query-clear-inline:hover:not(:disabled) {
-    border-color: #c7d2e1;
+    border-color: var(--color-border-hover);
     color: var(--color-text-primary);
-    background: #f8fafc;
+    background: var(--color-bg-card-hover);
 }
 
 .sessions-query-clear-inline:disabled {

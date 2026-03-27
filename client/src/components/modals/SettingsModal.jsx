@@ -86,6 +86,7 @@ const SettingsModalInner = ({ onClose }) => {
                     <button
                         onClick={onClose}
                         className={`${styles.closeButton} ${isMobile ? styles.closeButtonMobile : styles.closeButtonDesktop}`}
+                        aria-label="Close settings"
                     >
                         &times;
                     </button>

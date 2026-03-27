@@ -2,14 +2,16 @@
 
 :root {
   font-family: var(--font-family);
-  line-height: 1.5;
-  font-weight: 400;
+  font-size: 16px; /* base for rem calculations */
+  line-height: var(--line-height-base);
+  font-weight: var(--font-weight-regular);
   color: var(--color-text-primary);
   background-color: var(--color-bg-app);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
 }
 
 *,
@@ -33,17 +35,48 @@ body {
   min-width: 320px;
   min-height: 100vh;
   font-family: var(--font-family);
-  background:
-    radial-gradient(1200px 600px at 10% -20%, rgba(79, 156, 249, 0.14), transparent 55%),
-    radial-gradient(900px 540px at 95% 8%, rgba(60, 137, 232, 0.14), transparent 60%),
-    var(--color-bg-app);
+  background: var(--color-bg-app);
   color: var(--color-text-primary);
   overflow-x: hidden;
 }
 
+/* Heading hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
 h1 {
   font-size: var(--font-size-title);
-  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: var(--font-size-2xl);
+  letter-spacing: -0.015em;
+}
+
+h3 {
+  font-size: var(--font-size-xl);
+  letter-spacing: -0.01em;
+}
+
+h4 {
+  font-size: var(--font-size-lg);
+}
+
+/* Display typeface — reserved for fractal names and major decorative landmarks */
+.display {
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: -0.01em;
+  line-height: var(--line-height-tight);
+}
+
+/* Tabular numbers for metrics, durations, counts */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -62,10 +95,9 @@ svg {
 
 .mono {
   font-family: var(--font-family-mono);
-}
-
-[data-theme="dark"] .mono {
-  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  font-feature-settings: "calt" 1, "liga" 1;
 }
 
 *:focus-visible {

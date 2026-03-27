@@ -130,8 +130,9 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
                     />
 
                     <div className={styles.field}>
-                        <label className={styles.label}>Description</label>
+                        <label htmlFor="program-description" className={styles.label}>Description</label>
                         <textarea
+                            id="program-description"
                             className={styles.textarea}
                             value={programData.description}
                             onChange={(e) => setProgramData({ ...programData, description: e.target.value })}

@@ -32,7 +32,7 @@
 
 .historySelector select:focus {
     outline: none;
-    border-color: #4caf50;
+    border-color: var(--color-brand-success);
 }
 
 .historyContent {
@@ -52,7 +52,7 @@
 }
 
 .historyError {
-    color: #f44336;
+    color: var(--color-brand-danger);
 }
 
 .historyList {
@@ -78,7 +78,7 @@
 
 .historyCardDate {
     font-size: 12px;
-    color: #4caf50;
+    color: var(--color-brand-success);
     font-weight: 500;
 }
 

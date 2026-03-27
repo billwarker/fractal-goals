@@ -98,10 +98,11 @@ function GoalHeader({
                     {onClose && (
                         <button
                             onClick={onClose}
+                            aria-label="Close"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
-                                color: '#888',
+                                color: 'var(--color-text-muted)',
                                 fontSize: '24px',
                                 cursor: 'pointer',
                                 padding: '0',

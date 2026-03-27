@@ -241,6 +241,7 @@ function ActivitiesManager({ rootId, onClose }) {
                                                             onClick={() => handleRemoveMetric(idx)}
                                                             variant="ghost"
                                                             className={styles.metricRemoveButton}
+                                                            aria-label="Remove metric"
                                                         >
                                                             ×
                                                         </Button>

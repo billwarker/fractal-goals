@@ -47,20 +47,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
-    border-bottom: 1px solid var(--color-border-card, #333);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border-card);
 }
 
 .title {
     margin: 0;
-    font-size: 18px;
-    font-weight: 600;
+    font-family: var(--font-family);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.01em;
+    line-height: var(--line-height-tight);
 }
 
 .closeButton {
     background: transparent;
     border: none;
-    color: var(--color-text-secondary, #999);
+    color: var(--color-text-secondary);
     font-size: 24px;
     cursor: pointer;
     padding: 0;
@@ -72,7 +75,7 @@
 }
 
 .closeButton:hover {
-    color: var(--color-text-primary, #fff);
+    color: var(--color-text-primary);
 }
 
 .body {
@@ -83,7 +86,7 @@
 }
 
 .bodyWrapper {
-    padding: var(--spacing-lg, 24px);
+    padding: var(--spacing-lg);
     flex: 1;
 }
 
@@ -92,8 +95,8 @@
 }
 
 .footerWrapper {
-    padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
-    border-top: 1px solid var(--color-border-card, #333);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border-card);
     display: flex;
     gap: 12px;
 }

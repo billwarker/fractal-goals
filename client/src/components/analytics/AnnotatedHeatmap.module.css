@@ -129,7 +129,7 @@
 
 .dayCell {
     border-radius: 2px;
-    transition: all 0.1s ease;
+    transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
     box-sizing: border-box;
 }
 
@@ -138,12 +138,12 @@
 }
 
 .dayCellAnnotated {
-    border: 1px solid #ff9800;
+    border: 1px solid var(--color-mode-sets);
 }
 
 .dayCellHighlighted {
     transform: scale(1.2);
-    border: 1px solid #ffeb3b;
+    border: 1px solid var(--color-brand-secondary);
     box-shadow: 0 0 8px rgba(255, 235, 59, 0.6);
     z-index: 1;
 }
@@ -203,8 +203,8 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #ff9800;
-    border: 2px solid #f57c00;
+    background: var(--color-mode-sets);
+    border: 2px solid var(--color-brand-secondary-hover);
     color: white;
     font-size: 10px;
     font-weight: 700;

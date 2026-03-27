@@ -175,7 +175,7 @@
 }
 
 .tabActiveMobile {
-    border-bottom: 3px solid var(--color-brand-primary, #3b82f6);
+    border-bottom: 3px solid var(--color-brand-primary);
 }
 
 .tabInactiveMobile {
@@ -183,7 +183,7 @@
 }
 
 .tabActiveDesktop {
-    border-left: 3px solid var(--color-brand-primary, #3b82f6);
+    border-left: 3px solid var(--color-brand-primary);
 }
 
 .tabInactiveDesktop {

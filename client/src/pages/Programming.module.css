@@ -7,7 +7,7 @@
 
 .header {
     font-weight: 300;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--color-border);
     padding-bottom: 15px;
     margin-bottom: 20px;
 }
@@ -20,8 +20,8 @@
 
 /* Common Card Styles */
 .card {
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -40,14 +40,14 @@
 .label {
     display: block;
     margin-bottom: 6px;
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 .input {
     width: 100%;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     color: white;
     font-size: 14px;
@@ -57,8 +57,8 @@
     width: 100%;
     min-height: 80px;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     color: white;
     font-family: inherit;
@@ -69,8 +69,8 @@
 .select {
     width: 100%;
     padding: 10px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     color: white;
     font-size: 14px;
@@ -85,7 +85,7 @@
 }
 
 .durationText {
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 .durationValue {
@@ -95,7 +95,7 @@
 
 .btnAddParams {
     padding: 10px 16px;
-    background: #2196f3;
+    background: var(--color-brand-primary);
     border: none;
     border-radius: 4px;
     color: white;
@@ -114,7 +114,7 @@
 }
 
 .emptyState {
-    color: #666;
+    color: var(--color-text-muted);
     text-align: center;
     padding: 20px;
 }
@@ -126,8 +126,8 @@
 }
 
 .componentItem {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     padding: 12px;
     display: flex;
@@ -154,13 +154,13 @@
 }
 
 .componentDuration {
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 14px;
 }
 
 .componentDescription {
     margin: 0;
-    color: #aaa;
+    color: var(--color-text-muted);
     font-size: 13px;
 }
 
@@ -171,7 +171,7 @@
 
 .btnMove {
     padding: 4px 8px;
-    background: #333;
+    background: var(--color-bg-input);
     border: none;
     border-radius: 3px;
     color: white;
@@ -185,7 +185,7 @@
 
 .btnRemove {
     padding: 4px 8px;
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     border: none;
     border-radius: 3px;
     color: white;
@@ -202,7 +202,7 @@
 .btnSave {
     flex: 1;
     padding: 12px;
-    background: #4caf50;
+    background: var(--color-brand-success);
     border: none;
     border-radius: 4px;
     color: white;
@@ -213,7 +213,7 @@
 .btnExport {
     flex: 1;
     padding: 12px;
-    background: #2196f3;
+    background: var(--color-brand-primary);
     border: none;
     border-radius: 4px;
     color: white;
@@ -222,7 +222,7 @@
 }
 
 .btnExport:disabled {
-    background: #333;
+    background: var(--color-bg-input);
     cursor: not-allowed;
 }
 
@@ -234,8 +234,8 @@
 }
 
 .savedTemplateItem {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     padding: 12px;
 }
@@ -247,7 +247,7 @@
 
 .savedTemplateMeta {
     margin: 0 0 8px 0;
-    color: #aaa;
+    color: var(--color-text-muted);
     font-size: 13px;
 }
 
@@ -259,7 +259,7 @@
 .btnLoad {
     flex: 1;
     padding: 6px;
-    background: #2196f3;
+    background: var(--color-brand-primary);
     border: none;
     border-radius: 3px;
     color: white;
@@ -269,7 +269,7 @@
 
 .btnDelete {
     padding: 6px 12px;
-    background: #d32f2f;
+    background: var(--color-brand-danger);
     border: none;
     border-radius: 3px;
     color: white;
@@ -292,8 +292,8 @@
 }
 
 .modalContent {
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 24px;
     max-width: 500px;
@@ -315,7 +315,7 @@
 .btnAdd {
     flex: 1;
     padding: 12px;
-    background: #4caf50;
+    background: var(--color-brand-success);
     border: none;
     border-radius: 4px;
     color: white;
@@ -326,7 +326,7 @@
 .btnCancel {
     flex: 1;
     padding: 12px;
-    background: #666;
+    background: var(--color-text-muted);
     border: none;
     border-radius: 4px;
     color: white;

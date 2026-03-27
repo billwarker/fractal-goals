@@ -4,7 +4,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--color-overlay);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -13,22 +13,22 @@
 }
 
 .logs-modal-content {
-    background: #1a1a1a;
+    background: var(--color-bg-elevated);
     width: 90vw;
     max-width: 1000px;
     height: 80vh;
-    border-radius: 12px;
+    border-radius: var(--border-radius-lg);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    border: 1px solid #333;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--color-border);
     overflow: hidden;
 }
 
 .logs-modal-header {
     padding: 20px 24px;
-    background: #222;
-    border-bottom: 1px solid #333;
+    background: var(--color-bg-header);
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -36,10 +36,10 @@
 
 .logs-modal-header h2 {
     margin: 0;
-    color: #fff;
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.01em;
 }
 
 .logs-header-actions {
@@ -51,7 +51,7 @@
 .close-logs-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 2rem;
     cursor: pointer;
     line-height: 1;
@@ -60,30 +60,30 @@
 }
 
 .close-logs-btn:hover {
-    color: #fff;
+    color: var(--color-text-primary);
 }
 
 .clear-logs-btn {
-    background: #c62828;
+    background: var(--color-brand-danger-hover);
     color: white;
     border: none;
     padding: 8px 16px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: bold;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background 0.2s;
 }
 
 .clear-logs-btn:hover {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
 }
 
 .logs-modal-body {
     flex: 1;
     overflow-y: auto;
     padding: 24px;
-    background: #141414;
+    background: var(--color-bg-app);
 }
 
 .logs-loading,
@@ -92,7 +92,7 @@
     justify-content: center;
     align-items: center;
     height: 100%;
-    color: #888;
+    color: var(--color-text-muted);
     font-style: italic;
 }
 
@@ -100,109 +100,108 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    background: #333;
-    /* Column lines */
-    border: 1px solid #333;
-    border-radius: 4px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
     overflow: hidden;
 }
 
 .logs-grid-header {
     display: grid;
     grid-template-columns: 180px 180px 1fr 100px;
-    background: #252525;
+    background: var(--color-bg-card-alt);
     padding: 12px 16px;
-    font-weight: bold;
-    font-size: 0.85rem;
-    color: #aaa;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
 }
 
 .log-item {
     display: grid;
     grid-template-columns: 180px 180px 1fr 100px;
-    background: #1c1c1c;
+    background: var(--color-bg-card);
     padding: 12px 16px;
-    font-size: 0.9rem;
+    font-size: var(--font-size-base);
     align-items: start;
     transition: background 0.1s;
 }
 
 .log-item:hover {
-    background: #252525;
+    background: var(--color-bg-card-hover);
 }
 
 .log-timestamp {
-    color: #888;
-    font-family: monospace;
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
 }
 
 .log-event-type {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-xs);
     display: inline-block;
 }
 
 .log-event-type.session {
-    color: #4caf50;
-    background: rgba(76, 175, 80, 0.1);
+    color: var(--color-brand-success);
+    background: color-mix(in srgb, var(--color-brand-success) 12%, transparent);
 }
 
 .log-event-type.goal {
-    color: #2196f3;
-    background: rgba(33, 150, 243, 0.1);
+    color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 12%, transparent);
 }
 
 .log-event-type.target {
-    color: #ff9800;
-    background: rgba(255, 152, 0, 0.1);
+    color: var(--color-log-target);
+    background: color-mix(in srgb, var(--color-log-target) 12%, transparent);
 }
 
 .log-event-type.activity_instance {
-    color: #9c27b0;
-    background: rgba(156, 39, 176, 0.1);
+    color: var(--color-log-activity);
+    background: color-mix(in srgb, var(--color-log-activity) 12%, transparent);
 }
 
 .log-event-type.program {
-    color: #00bcd4;
-    background: rgba(0, 188, 212, 0.1);
+    color: var(--color-log-program);
+    background: color-mix(in srgb, var(--color-log-program) 12%, transparent);
 }
 
 .log-description {
-    color: #eee;
+    color: var(--color-text-primary);
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
 .log-entity-id {
-    font-size: 0.75rem;
-    color: #666;
-    font-family: monospace;
+    font-size: var(--font-size-2xs);
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
 }
 
 .log-source {
-    color: #666;
-    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     text-align: right;
 }
 
 .load-more-logs {
-    background: #333;
-    color: #ccc;
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
     border: none;
     padding: 12px;
     cursor: pointer;
-    font-weight: bold;
+    font-weight: var(--font-weight-semibold);
     transition: background 0.2s, color 0.2s;
 }
 
 .load-more-logs:hover:not(:disabled) {
-    background: #444;
-    color: #fff;
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
 .load-more-logs:disabled {

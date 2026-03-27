@@ -6,19 +6,19 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #121212;
+    background: var(--color-bg-app);
 }
 
 .sessions-list-header {
     padding: 16px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
 }
 
 .sessions-list-title {
     font-size: 18px;
     font-weight: 600;
-    color: #ddd;
+    color: var(--color-text-primary);
     margin: 0 0 12px 0;
 }
 
@@ -30,23 +30,23 @@
 .filter-btn {
     padding: 6px 12px;
     background: transparent;
-    border: 1px solid #444;
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
 .filter-btn:hover {
-    background: #252525;
-    color: #aaa;
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-muted);
 }
 
 .filter-btn.active {
-    background: #2a2a2a;
-    border-color: #2196f3;
-    color: #2196f3;
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-brand-primary);
+    color: var(--color-brand-primary);
 }
 
 .sessions-list-content {
@@ -60,7 +60,7 @@
 
 .sessions-list-loading,
 .sessions-list-empty {
-    color: #666;
+    color: var(--color-text-muted);
     text-align: center;
     padding: 40px 20px;
     font-size: 14px;

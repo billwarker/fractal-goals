@@ -19,7 +19,7 @@
 }
 
 .notes-error {
-    color: #f44336;
+    color: var(--color-brand-danger);
 }
 
 .notes-list {
@@ -37,7 +37,7 @@
 
 .note-item.selected {
     background: var(--color-bg-card-hover);
-    border-color: #2196f3;
+    border-color: var(--color-brand-primary);
 }
 
 .note-header {
@@ -60,12 +60,12 @@
 
 /* Activity notes */
 .note-context-badge.context-activity {
-    color: #7cb342;
+    color: var(--color-brand-success);
 }
 
 /* Set notes */
 .note-context-badge.context-set {
-    color: #64b5f6;
+    color: var(--color-brand-primary);
 }
 
 .note-timestamp {
@@ -102,23 +102,23 @@
     color: var(--color-text-muted);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     width: 100%;
     justify-content: flex-start;
 }
 
 .notes-toggle-btn:hover {
     background: var(--color-bg-card-hover);
-    border-color: #2196f3;
-    color: #2196f3;
+    border-color: var(--color-brand-primary);
+    color: var(--color-brand-primary);
 }
 
 .notes-toggle-btn.has-notes {
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 .notes-toggle-btn .notes-count-badge {
-    background: #2196f3;
+    background: var(--color-brand-primary);
     color: white;
     padding: 2px 8px;
     border-radius: 12px;

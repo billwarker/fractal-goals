@@ -56,13 +56,13 @@
     justify-content: center;
     border-radius: 3px;
     border: 2px solid var(--color-border-hover);
-    color: #1a1a1a;
+    color: var(--color-text-inverse);
     font-size: 12px;
     font-weight: 700;
 }
 
 .checkboxSelected {
-    color: #1a1a1a;
+    color: var(--color-text-inverse);
 }
 
 .goalContent {

@@ -19,6 +19,8 @@ import StepContainer from '../components/common/StepContainer';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import { ActiveSessionProvider, QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
 import { isQuickSession } from '../utils/sessionRuntime';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
 import '../App.css';
 
 function extractActivityId(item) {
@@ -507,12 +509,14 @@ function CreateSession() {
     const quickTemplateSelected = Boolean(selectedTemplate && isQuickSession(selectedTemplate) && !selectedProgramDay);
 
     return (
-        <div className="page-container">
-            <h1 style={{ fontWeight: 300, borderBottom: '1px solid var(--color-border)', paddingBottom: '15px', marginBottom: '30px', color: 'var(--color-text-primary)' }}>
-                Create Session
-            </h1>
+        <div className={headerStyles.pageShell}>
+            <PageHeader
+                title="Create Session"
+                subtitle="Select a template or program day to begin your session."
+            />
 
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent}`} style={{ padding: '32px 40px' }}>
+            <div style={{ maxWidth: '800px' }}>
                 {/* Step 0a: Choose Program (if multiple programs available) */}
                 {showProgramChoice && (
                     <ProgramSelector
@@ -604,6 +608,7 @@ function CreateSession() {
                         onCreateSession={handleCreateSession}
                     />
                 )}
+            </div>
             </div>
         </div>
     );

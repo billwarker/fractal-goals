@@ -751,6 +751,7 @@ function TemplateBuilderModalContent({
                                                                         type="button"
                                                                         onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
                                                                         className={styles.removeActivityButton}
+                                                                        aria-label="Remove activity"
                                                                     >
                                                                         ×
                                                                     </button>

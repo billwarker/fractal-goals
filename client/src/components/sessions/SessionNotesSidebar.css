@@ -59,7 +59,7 @@
 .sidebar-placeholder,
 .sidebar-loading,
 .sidebar-empty {
-    color: #555;
+    color: var(--color-text-secondary);
     text-align: center;
     padding: 40px 20px;
     font-size: 13px;
@@ -77,7 +77,7 @@
     border-radius: 6px;
     padding: 12px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     border: 1px solid var(--color-border);
     /* Reserve space for border */
 }
@@ -94,21 +94,21 @@
 .note-context {
     font-size: 11px;
     font-weight: 500;
-    color: #888;
+    color: var(--color-text-muted);
     margin-bottom: 4px;
 }
 
 .note-context.context-session {
-    color: #999;
+    color: var(--color-text-muted);
 }
 
 .note-context.context-activity {
-    color: #7cb342;
+    color: var(--color-brand-success);
 }
 
 .note-timestamp {
     font-size: 11px;
-    color: #555;
+    color: var(--color-text-secondary);
     margin-bottom: 6px;
 }
 
@@ -128,7 +128,7 @@
     max-width: 100%;
     max-height: 200px;
     border-radius: 4px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border);
 }
 
 @media (max-width: 768px) {

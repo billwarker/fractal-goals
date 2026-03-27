@@ -228,6 +228,7 @@ function Programming() {
                                                     <button
                                                         onClick={() => handleRemoveComponent(component.id)}
                                                         className={styles.btnRemove}
+                                                        aria-label="Remove component"
                                                     >
                                                         ×
                                                     </button>

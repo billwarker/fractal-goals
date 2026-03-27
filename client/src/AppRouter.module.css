@@ -21,14 +21,18 @@
 }
 
 .addSessionBtn {
-    background: #4caf50;
+    background: var(--color-brand-success);
     color: white;
     padding: 6px 14px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
     font-weight: bold;
     border: none;
     font-size: 11px;
     margin-right: 10px;
+}
+
+.addSessionBtn:hover {
+    background: var(--color-brand-success-hover);
 }
 
 .navSeparator {
@@ -74,7 +78,7 @@
     min-height: 34px !important;
     font-size: 11px !important;
     padding: 6px 10px !important;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
     flex-shrink: 0;
 }
 

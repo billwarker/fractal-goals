@@ -7,7 +7,7 @@
 .errorBanner {
     padding: 10px;
     background: rgba(255, 0, 0, 0.1);
-    color: var(--color-brand-danger, #f44336);
+    color: var(--color-brand-danger);
     margin-bottom: 20px;
     border-radius: 4px;
 }
@@ -83,7 +83,7 @@
 }
 
 .tagMultiplicative {
-    color: #e91e63;
+    color: var(--color-mode-splits);
 }
 
 .tagMetric {

@@ -39,7 +39,7 @@
 
 .header-subtitle {
     margin: 4px 0 0 0;
-    color: #888;
+    color: var(--color-text-muted);
     font-size: 14px;
 }
 
@@ -66,16 +66,16 @@
 }
 
 .refresh-logs-btn:hover {
-    background: #444;
+    background: var(--color-bg-input);
 }
 
 .clear-logs-btn {
-    background: #c62828;
+    background: var(--color-brand-danger-hover);
     color: white;
 }
 
 .clear-logs-btn:hover {
-    background: #d32f2f;
+    background: var(--color-brand-danger);
 }
 
 /* Filters */
@@ -97,7 +97,7 @@
 .filter-group label {
     font-size: 11px;
     text-transform: uppercase;
-    color: #888;
+    color: var(--color-text-muted);
     font-weight: 700;
     letter-spacing: 0.5px;
 }
@@ -115,12 +115,12 @@
 
 .filter-group select:focus,
 .filter-group input:focus {
-    border-color: #666;
+    border-color: var(--color-text-muted);
 }
 
 .logs-stats {
     font-size: 13px;
-    color: #666;
+    color: var(--color-text-muted);
     margin-left: 8px;
     white-space: nowrap;
 }
@@ -179,7 +179,7 @@
 
 .log-timestamp {
     color: var(--color-text-secondary);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--font-family-mono);
     font-size: 13px;
 }
 
@@ -195,31 +195,31 @@
 
 .log-event-tag.session {
     background: rgba(76, 175, 80, 0.15);
-    color: #81c784;
+    color: var(--color-brand-success);
     border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .log-event-tag.goal {
     background: rgba(33, 150, 243, 0.15);
-    color: #64b5f6;
+    color: var(--color-brand-primary);
     border: 1px solid rgba(33, 150, 243, 0.3);
 }
 
 .log-event-tag.target {
     background: rgba(255, 152, 0, 0.15);
-    color: #ffb74d;
+    color: var(--color-mode-sets);
     border: 1px solid rgba(255, 152, 0, 0.3);
 }
 
 .log-event-tag.program {
     background: rgba(0, 188, 212, 0.15);
-    color: #4dd0e1;
+    color: var(--color-log-program);
     border: 1px solid rgba(0, 188, 212, 0.3);
 }
 
 .log-event-tag.deleted {
     background: rgba(198, 40, 40, 0.15);
-    color: #ef5350;
+    color: var(--color-brand-danger);
     border: 1px solid rgba(198, 40, 40, 0.3);
 }
 
@@ -236,8 +236,8 @@
 
 .log-entity-id {
     font-size: 11px;
-    color: #555;
-    font-family: monospace;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-mono);
 }
 
 .log-source {

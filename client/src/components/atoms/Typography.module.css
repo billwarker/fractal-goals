@@ -1,106 +1,108 @@
 /* Headings */
 .heading {
     margin: 0;
-    font-weight: 600;
-    line-height: 1.2;
-    font-family: var(--font-family, inherit);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    font-family: var(--font-family);
 }
 
 .h1 {
-    font-size: 32px;
+    font-size: var(--font-size-title);
     letter-spacing: -0.02em;
 }
 
 .h2 {
-    font-size: 24px;
-    letter-spacing: -0.01em;
+    font-size: var(--font-size-2xl);
+    letter-spacing: -0.015em;
 }
 
 .h3 {
-    font-size: 20px;
+    font-size: var(--font-size-xl);
+    letter-spacing: -0.005em;
 }
 
 .h4 {
-    font-size: 18px;
+    font-size: var(--font-size-xl);
 }
 
 .h5 {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
 }
 
 .h6 {
-    font-size: 14px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
 /* Text */
 .text {
     margin: 0;
-    line-height: 1.5;
-    font-family: var(--font-family, inherit);
+    line-height: var(--line-height-base);
+    font-family: var(--font-family);
 }
 
 /* Sizes */
 .sm {
-    font-size: 12px;
+    font-size: var(--font-size-xs);
 }
 
 .md {
-    font-size: 14px;
+    font-size: var(--font-size-md);
 }
 
 /* Base size */
 .lg {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
 }
 
 .xl {
-    font-size: 18px;
+    font-size: var(--font-size-xl);
 }
 
 .xs {
-    font-size: 11px;
+    font-size: var(--font-size-2xs);
 }
 
 /* Colors */
 .primary {
-    color: var(--color-text-primary, #e0e0e0);
+    color: var(--color-text-primary);
 }
 
 .secondary {
-    color: var(--color-text-secondary, #b0b0b0);
+    color: var(--color-text-secondary);
 }
 
 .muted {
-    color: var(--color-text-muted, #888);
+    color: var(--color-text-muted);
 }
 
 .inverse {
-    color: var(--color-text-inverse, #121212);
+    color: var(--color-text-inverse);
 }
 
 .brand {
-    color: var(--color-brand-primary, #3b82f6);
+    color: var(--color-brand-primary);
 }
 
 .success {
-    color: var(--color-brand-success, #10b981);
+    color: var(--color-brand-success);
 }
 
 .danger {
-    color: var(--color-brand-danger, #ef4444);
+    color: var(--color-brand-danger);
 }
 
 /* Weights */
 .normal {
-    font-weight: 400;
+    font-weight: var(--font-weight-regular);
 }
 
 .medium {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .bold {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }

@@ -2,9 +2,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-family, inherit);
-    font-weight: 500;
-    border-radius: var(--border-radius-md, 8px);
+    font-family: var(--font-family);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--border-radius-md);
     border: 1px solid transparent;
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.16s ease;
@@ -29,19 +29,26 @@
 
 /* Sizes */
 .sm {
-    font-size: 12px;
-    padding: 6px 12px;
-    height: 28px;
+    font-size: var(--font-size-xs);
+    padding: 5px 12px;
+    min-height: 32px;
+}
+
+@media (pointer: coarse) {
+    .sm {
+        min-height: 44px;
+        padding: 8px 12px;
+    }
 }
 
 .md {
-    font-size: 14px;
+    font-size: var(--font-size-md);
     padding: 10px 16px;
     height: 38px;
 }
 
 .lg {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     padding: 12px 24px;
     height: 48px;
 }
@@ -63,54 +70,54 @@
 
 /* Primary - Brand Blue */
 .primary {
-    background-color: var(--color-brand-primary, #3b82f6);
+    background-color: var(--color-brand-primary);
     color: white;
     border-color: transparent;
 }
 
 .primary:hover:not(:disabled) {
-    background-color: var(--color-brand-primary-hover, #2563eb);
+    background-color: var(--color-brand-primary-hover);
 }
 
-/* Secondary - Grey/Outline (Matches existing default buttons) */
+/* Secondary - Grey/Outline */
 .secondary {
     background-color: transparent;
-    border: 1px solid var(--color-border, #333);
-    color: var(--color-text-secondary, #e0e0e0);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
 }
 
 .secondary:hover:not(:disabled) {
-    background-color: var(--color-bg-card-hover, #333);
-    border-color: var(--color-border-hover, #555);
-    color: var(--color-text-primary, #fff);
+    background-color: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
 }
 
-/* Success - Green (Matches 'Add Target' etc) */
+/* Success - Green */
 .success {
-    background-color: var(--color-brand-success, #10b981);
+    background-color: var(--color-brand-success);
     color: white;
     border-color: transparent;
 }
 
 .success:hover:not(:disabled) {
-    background-color: var(--color-brand-success-hover, #059669);
+    background-color: var(--color-brand-success-hover);
 }
 
 /* Danger - Red */
 .danger {
-    background-color: var(--color-brand-danger, #ef4444);
+    background-color: var(--color-brand-danger);
     color: white;
     border-color: transparent;
 }
 
 .danger:hover:not(:disabled) {
-    background-color: var(--color-brand-danger-hover, #dc2626);
+    background-color: var(--color-brand-danger-hover);
 }
 
 /* Ghost - Transparent text-only */
 .ghost {
     background-color: transparent;
-    color: var(--color-text-secondary, #9ca3af);
+    color: var(--color-text-secondary);
     border-color: transparent;
 }
 

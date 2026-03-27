@@ -102,7 +102,7 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
             <form onSubmit={handleSubmit} className={styles.form}>
                 <ModalBody>
                     <div className={styles.formGroup}>
-                        <label className={styles.label} style={{ color: themeColor }}>
+                        <label htmlFor="goal-type-select" className={styles.label} style={{ color: themeColor }}>
                             Goal Type
                         </label>
                         {parent ? (
@@ -121,6 +121,7 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                             </div>
                         ) : (
                             <select
+                                id="goal-type-select"
                                 value={goalType}
                                 onChange={e => setGoalType(e.target.value)}
                                 className={styles.select}
@@ -147,10 +148,11 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label className={styles.label} style={{ color: themeColor }}>
-                            Description {descriptionRequired && <span style={{ color: 'red' }}>*</span>}
+                        <label htmlFor="goal-description" className={styles.label} style={{ color: themeColor }}>
+                            Description {descriptionRequired && <span style={{ color: 'var(--color-brand-danger)' }}>*</span>}
                         </label>
                         <textarea
+                            id="goal-description"
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             placeholder="What is this goal about?"
@@ -161,7 +163,7 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label className={styles.label} style={{ color: themeColor }}>
+                        <label htmlFor="goal-relevance" className={styles.label} style={{ color: themeColor }}>
                             Relevance (SMART)
                         </label>
                         <div className={styles.descriptionLabel}>
@@ -171,6 +173,7 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                             }
                         </div>
                         <textarea
+                            id="goal-relevance"
                             value={relevanceStatement}
                             onChange={e => setRelevanceStatement(e.target.value)}
                             placeholder={!parent ? "Explain the significance..." : "Explain the contribution..."}

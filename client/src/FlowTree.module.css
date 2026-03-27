@@ -111,12 +111,12 @@
 }
 
 .dueTimeOnTime {
-    color: #4caf50;
+    color: var(--color-brand-success);
     font-weight: bold;
 }
 
 .addChildButton {
-    color: #ff9800;
+    color: var(--color-mode-sets);
     font-size: 11px;
     margin-top: 4px;
     text-decoration: underline;

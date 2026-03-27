@@ -7,7 +7,7 @@
     border-radius: var(--border-radius-md);
     overflow: hidden;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     position: relative;
 }
 
@@ -77,7 +77,7 @@
 
 .fieldValueMuted {
     font-size: 12px;
-    color: #666;
+    color: var(--color-text-muted);
 }
 
 .programLink {
@@ -89,7 +89,7 @@
 
 .programSubtext {
     font-size: 11px;
-    color: #666;
+    color: var(--color-text-muted);
     margin-top: 1px;
     overflow-wrap: anywhere;
 }
@@ -138,21 +138,21 @@
 /* Achieved Targets */
 .achievedSection {
     padding: 12px 16px;
-    background: #1a2e1a;
-    border-bottom: 1px solid #333;
+    background: color-mix(in srgb, var(--color-brand-success) 8%, var(--color-bg-card));
+    border-bottom: 1px solid var(--color-border);
     border-left: 3px solid var(--color-brand-success);
 }
 
 .achievedHeader {
     font-size: 11px;
-    color: #81c784;
+    color: var(--color-brand-success);
     margin-bottom: 8px;
     font-weight: 600;
 }
 
 .achievedTag {
     padding: 6px 12px;
-    background: #2e7d32;
+    background: var(--color-brand-success);
     border-radius: var(--border-radius-sm);
     font-size: 12px;
     color: white;
@@ -169,14 +169,14 @@
 /* Session Notes */
 .sessionNotes {
     padding: 12px;
-    background: #252525;
+    background: var(--color-bg-card-alt);
     border-radius: 6px;
-    border-left: 3px solid #ff9800;
+    border-left: 3px solid var(--color-mode-sets);
 }
 
 .sessionNotesHeader {
     font-size: 11px;
-    color: #888;
+    color: var(--color-text-muted);
     margin-bottom: 4px;
 }
 
