@@ -418,7 +418,7 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.getByTitle('Start timer')).toBeInTheDocument();
         expect(screen.getByTitle('Instant complete (0s duration)')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Add a nano goal / sub-step...')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '×' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete activity' })).toBeInTheDocument();
     });
 
     it('truncates long descriptions to one line and exposes the full value in a tooltip', () => {
