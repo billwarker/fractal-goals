@@ -307,9 +307,9 @@ function ActivityBuilderForm({
 
                     {hasMetrics && (
                         <ActivityMetricsSection
+                            rootId={rootId}
                             metrics={metrics}
                             hasSets={hasSets}
-                            metricsMultiplicative={metricsMultiplicative}
                             onAddMetric={handleAddMetric}
                             onRemoveMetric={handleRemoveMetric}
                             onMetricChange={handleMetricChange}

@@ -11,6 +11,7 @@ export const queryKeys = {
     ],
     activityGroups: (rootId) => ['activity-groups', rootId],
     activityModes: (rootId) => ['activity-modes', rootId],
+    fractalMetrics: (rootId) => ['fractal-metrics', rootId],
     annotations: (rootId, visualizationType, contextKey = '{}') => [
         'annotations',
         rootId,

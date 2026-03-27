@@ -2,7 +2,8 @@ import logging
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, select
 from models import (
-    ActivityDefinition, MetricDefinition, SplitDefinition, ActivityGroup, ActivityMode, Goal,
+    ActivityDefinition, MetricDefinition, FractalMetricDefinition,
+    SplitDefinition, ActivityGroup, ActivityMode, Goal,
     activity_goal_associations, goal_activity_group_associations,
     validate_root_goal, utc_now
 )
@@ -382,6 +383,189 @@ class ActivityService:
         }, source='activity_service.delete_mode'))
 
         return {"message": "Mode deleted"}, None, 200
+
+    # ── Fractal Metrics ─────────────────────────────────────────────────────
+
+    def _get_active_fractal_metric(self, root_id, metric_id) -> FractalMetricDefinition | None:
+        return self.db_session.query(FractalMetricDefinition).filter(
+            FractalMetricDefinition.id == metric_id,
+            FractalMetricDefinition.root_id == root_id,
+            FractalMetricDefinition.deleted_at.is_(None),
+        ).first()
+
+    def list_fractal_metrics(self, root_id, current_user_id) -> ServiceResult[list[FractalMetricDefinition]]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        metrics = self.db_session.query(FractalMetricDefinition).filter(
+            FractalMetricDefinition.root_id == root_id,
+            FractalMetricDefinition.deleted_at.is_(None),
+        ).order_by(
+            FractalMetricDefinition.sort_order,
+            FractalMetricDefinition.created_at,
+        ).all()
+
+        # Annotate each with activity_count
+        for m in metrics:
+            m._activity_count = self.db_session.query(func.count(MetricDefinition.id)).filter(
+                MetricDefinition.fractal_metric_id == m.id,
+                MetricDefinition.deleted_at.is_(None),
+            ).scalar() or 0
+
+        return metrics, None, 200
+
+    def create_fractal_metric(self, root_id, current_user_id, data) -> ServiceResult[FractalMetricDefinition]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        name = (data.get('name') or '').strip()
+        unit = (data.get('unit') or '').strip()
+        if not name:
+            return None, "Name is required", 400
+        if not unit:
+            return None, "Unit is required", 400
+
+        existing = self.db_session.query(FractalMetricDefinition).filter(
+            FractalMetricDefinition.root_id == root_id,
+            FractalMetricDefinition.name == name,
+            FractalMetricDefinition.unit == unit,
+            FractalMetricDefinition.deleted_at.is_(None),
+        ).first()
+        if existing:
+            return None, "A metric with this name and unit already exists in this fractal", 409
+
+        max_order = self.db_session.query(func.max(FractalMetricDefinition.sort_order)).filter(
+            FractalMetricDefinition.root_id == root_id,
+            FractalMetricDefinition.deleted_at.is_(None),
+        ).scalar()
+
+        input_type = data.get('input_type', 'number')
+        if input_type not in ('number', 'integer', 'duration'):
+            return None, "input_type must be 'number', 'integer', or 'duration'", 400
+
+        metric = FractalMetricDefinition(
+            root_id=root_id,
+            name=name,
+            unit=unit,
+            is_multiplicative=data.get('is_multiplicative', True),
+            is_additive=data.get('is_additive', True),
+            input_type=input_type,
+            default_value=data.get('default_value'),
+            higher_is_better=data.get('higher_is_better'),
+            predefined_values=data.get('predefined_values'),
+            min_value=data.get('min_value'),
+            max_value=data.get('max_value'),
+            description=(data.get('description') or '').strip() or None,
+            sort_order=data.get('sort_order') if data.get('sort_order') is not None else (max_order or 0) + 1,
+        )
+        self.db_session.add(metric)
+        self.db_session.commit()
+        self.db_session.refresh(metric)
+        metric._activity_count = 0
+
+        event_bus.emit(Event(Events.FRACTAL_METRIC_CREATED, {
+            'metric_id': metric.id,
+            'name': metric.name,
+            'root_id': root_id,
+        }, source='activity_service.create_fractal_metric'))
+
+        return metric, None, 201
+
+    def update_fractal_metric(self, root_id, metric_id, current_user_id, data) -> ServiceResult[FractalMetricDefinition]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        metric = self._get_active_fractal_metric(root_id, metric_id)
+        if not metric:
+            return None, "Metric not found", 404
+
+        if 'name' in data or 'unit' in data:
+            name = (data.get('name') or metric.name).strip()
+            unit = (data.get('unit') or metric.unit).strip()
+            if not name:
+                return None, "Name is required", 400
+            if not unit:
+                return None, "Unit is required", 400
+            conflict = self.db_session.query(FractalMetricDefinition).filter(
+                FractalMetricDefinition.root_id == root_id,
+                FractalMetricDefinition.name == name,
+                FractalMetricDefinition.unit == unit,
+                FractalMetricDefinition.id != metric_id,
+                FractalMetricDefinition.deleted_at.is_(None),
+            ).first()
+            if conflict:
+                return None, "A metric with this name and unit already exists in this fractal", 409
+            metric.name = name
+            metric.unit = unit
+
+        if 'is_multiplicative' in data:
+            metric.is_multiplicative = data['is_multiplicative']
+        if 'is_additive' in data:
+            metric.is_additive = data['is_additive']
+        if 'input_type' in data:
+            input_type = data['input_type']
+            if input_type not in ('number', 'integer', 'duration'):
+                return None, "input_type must be 'number', 'integer', or 'duration'", 400
+            metric.input_type = input_type
+        if 'default_value' in data:
+            metric.default_value = data['default_value']
+        if 'higher_is_better' in data:
+            metric.higher_is_better = data['higher_is_better']
+        if 'predefined_values' in data:
+            metric.predefined_values = data['predefined_values']
+        if 'min_value' in data:
+            metric.min_value = data['min_value']
+        if 'max_value' in data:
+            metric.max_value = data['max_value']
+        if 'description' in data:
+            metric.description = (data.get('description') or '').strip() or None
+        if 'sort_order' in data and data.get('sort_order') is not None:
+            metric.sort_order = data['sort_order']
+
+        self.db_session.commit()
+        self.db_session.refresh(metric)
+
+        metric._activity_count = self.db_session.query(func.count(MetricDefinition.id)).filter(
+            MetricDefinition.fractal_metric_id == metric.id,
+            MetricDefinition.deleted_at.is_(None),
+        ).scalar() or 0
+
+        event_bus.emit(Event(Events.FRACTAL_METRIC_UPDATED, {
+            'metric_id': metric.id,
+            'name': metric.name,
+            'root_id': root_id,
+            'updated_fields': list(data.keys()),
+        }, source='activity_service.update_fractal_metric'))
+
+        return metric, None, 200
+
+    def delete_fractal_metric(self, root_id, metric_id, current_user_id) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        metric = self._get_active_fractal_metric(root_id, metric_id)
+        if not metric:
+            return None, "Metric not found", 404
+
+        activity_count = self.db_session.query(func.count(MetricDefinition.id)).filter(
+            MetricDefinition.fractal_metric_id == metric_id,
+            MetricDefinition.deleted_at.is_(None),
+        ).scalar() or 0
+
+        metric.deleted_at = utc_now()
+        self.db_session.commit()
+
+        event_bus.emit(Event(Events.FRACTAL_METRIC_DELETED, {
+            'metric_id': metric.id,
+            'name': metric.name,
+            'root_id': root_id,
+        }, source='activity_service.delete_fractal_metric'))
+
+        return {"message": "Metric deleted", "activity_count": activity_count}, None, 200
 
     def create_activity_group(self, root_id, current_user_id, data) -> ServiceResult[ActivityGroup]:
         data = normalize_activity_payload(data)
@@ -842,13 +1026,14 @@ class ActivityService:
                 new_metric = MetricDefinition(
                     activity_id=new_activity.id,
                     root_id=root_id,
+                    fractal_metric_id=m.get('fractal_metric_id'),
                     name=m['name'],
                     unit=m['unit'],
                     is_top_set_metric=m.get('is_top_set_metric', False),
                     is_multiplicative=m.get('is_multiplicative', True)
                 )
                 self.db_session.add(new_metric)
-        
+
         # Create Splits
         splits_data = data.get('splits', [])
         for idx, s in enumerate(splits_data):
@@ -917,6 +1102,7 @@ class ActivityService:
                     
                     if metric_id and metric_id in existing_metrics_dict:
                         existing_metric = existing_metrics_dict[metric_id]
+                        existing_metric.fractal_metric_id = m.get('fractal_metric_id')
                         existing_metric.name = m['name']
                         existing_metric.unit = m['unit']
                         existing_metric.is_top_set_metric = m.get('is_top_set_metric', False)
@@ -925,13 +1111,14 @@ class ActivityService:
                     else:
                         matched_metric = None
                         for existing_metric in existing_metrics:
-                            if (existing_metric.name == m['name'] and 
-                                existing_metric.unit == m['unit'] and 
+                            if (existing_metric.name == m['name'] and
+                                existing_metric.unit == m['unit'] and
                                 existing_metric.id not in updated_metric_ids):
                                 matched_metric = existing_metric
                                 break
-                        
+
                         if matched_metric:
+                            matched_metric.fractal_metric_id = m.get('fractal_metric_id')
                             matched_metric.is_top_set_metric = m.get('is_top_set_metric', False)
                             matched_metric.is_multiplicative = m.get('is_multiplicative', True)
                             updated_metric_ids.add(matched_metric.id)
@@ -939,6 +1126,7 @@ class ActivityService:
                             new_metric = MetricDefinition(
                                 activity_id=activity.id,
                                 root_id=root_id,
+                                fractal_metric_id=m.get('fractal_metric_id'),
                                 name=m['name'],
                                 unit=m['unit'],
                                 is_top_set_metric=m.get('is_top_set_metric', False),

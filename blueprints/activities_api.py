@@ -12,12 +12,14 @@ from validators import (
     ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
     ActivityGoalsSetSchema, ActivityModeCreateSchema, ActivityModeUpdateSchema,
-    GoalAssociationBatchSchema, GroupReorderSchema
+    GoalAssociationBatchSchema, GroupReorderSchema,
+    FractalMetricCreateSchema, FractalMetricUpdateSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, etag_json_response, internal_error
 from services.serializers import (
-    serialize_activity_group, serialize_activity_definition, serialize_activity_mode
+    serialize_activity_group, serialize_activity_definition, serialize_activity_mode,
+    serialize_fractal_metric,
 )
 from services.goal_type_utils import get_canonical_goal_type
 from services.owned_entity_queries import get_owned_activity_definition
@@ -156,6 +158,80 @@ def delete_activity_mode(current_user, root_id, mode_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error deleting activity mode")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+# ============================================================================
+# FRACTAL METRIC ENDPOINTS
+# ============================================================================
+
+@activities_bp.route('/<root_id>/fractal-metrics', methods=['GET'])
+@token_required
+def get_fractal_metrics(current_user, root_id):
+    session = get_db_session()
+    try:
+        service = ActivityService(session)
+        metrics, error, status = service.list_fractal_metrics(root_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify([serialize_fractal_metric(m) for m in metrics])
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/fractal-metrics', methods=['POST'])
+@token_required
+@validate_request(FractalMetricCreateSchema)
+def create_fractal_metric(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        service = ActivityService(session)
+        metric, error, status = service.create_fractal_metric(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_fractal_metric(metric)), status
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error creating fractal metric")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/fractal-metrics/<metric_id>', methods=['PUT'])
+@token_required
+@validate_request(FractalMetricUpdateSchema)
+def update_fractal_metric(current_user, root_id, metric_id, validated_data):
+    session = get_db_session()
+    try:
+        service = ActivityService(session)
+        metric, error, status = service.update_fractal_metric(root_id, metric_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_fractal_metric(metric)), status
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error updating fractal metric")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/fractal-metrics/<metric_id>', methods=['DELETE'])
+@token_required
+def delete_fractal_metric(current_user, root_id, metric_id):
+    session = get_db_session()
+    try:
+        service = ActivityService(session)
+        payload, error, status = service.delete_fractal_metric(root_id, metric_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error deleting fractal metric")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

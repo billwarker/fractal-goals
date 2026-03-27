@@ -11,7 +11,7 @@ from .goal import (
     validate_root_goal, delete_goal_recursive
 )
 from .activity import (
-    ActivityGroup, ActivityDefinition, MetricDefinition, 
+    ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
     SplitDefinition, ActivityMode, ActivityInstanceMode, ActivityInstance, MetricValue
 )
 from .session import (

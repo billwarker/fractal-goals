@@ -6,6 +6,7 @@ import { useAllSessions } from '../hooks/useSessionQueries';
 import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
 import ActivityModesModal from '../components/modals/ActivityModesModal';
+import ManageMetricsModal from '../components/modals/ManageMetricsModal';
 
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
@@ -40,6 +41,7 @@ function ManageActivities() {
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupToDelete, setGroupToDelete] = useState(null);
     const [showModesModal, setShowModesModal] = useState(false);
+    const [showMetricsModal, setShowMetricsModal] = useState(false);
 
     // Collapsed state for groups (Set of group IDs)
     const [collapsedGroups, setCollapsedGroups] = useState(new Set());
@@ -387,6 +389,12 @@ function ManageActivities() {
                 actions={(
                     <>
                         <button
+                            onClick={() => setShowMetricsModal(true)}
+                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
+                        >
+                            Manage Metrics
+                        </button>
+                        <button
                             onClick={() => setShowModesModal(true)}
                             className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
                         >
@@ -508,6 +516,12 @@ function ManageActivities() {
             <ActivityModesModal
                 isOpen={showModesModal}
                 onClose={() => setShowModesModal(false)}
+                rootId={rootId}
+            />
+
+            <ManageMetricsModal
+                isOpen={showMetricsModal}
+                onClose={() => setShowMetricsModal(false)}
                 rootId={rootId}
             />
         </div>

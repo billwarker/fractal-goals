@@ -1,0 +1,283 @@
+/* Two-column layout that fills the modal body height */
+.content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    /* Fill the modal body height so both columns can independently scroll/stick */
+    height: calc(90vh - 120px); /* 90vh modal - header (~60px) - some breathing room */
+    overflow: hidden;
+}
+
+.copySource {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.sectionHeading {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+/* ── Left column: scrollable list ── */
+
+.listSection {
+    overflow-y: auto;
+    border-right: 1px solid var(--color-border);
+    min-width: 0;
+}
+
+.listSectionInner {
+    padding: var(--spacing-lg, 24px);
+}
+
+.metricList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.metricRow {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.metricRow:hover {
+    border-color: var(--color-brand-success);
+}
+
+.metricRowSelected {
+    border-color: var(--color-brand-success);
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-success) 20%, transparent);
+}
+
+/* Name + badges on the left, actions on the right — all in one row */
+.metricTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.metricNameRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.metricName {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-brand-primary) 15%, transparent);
+    color: var(--color-brand-primary);
+}
+
+.metricBottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metricUnit {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.usageCount {
+    font-size: 11px;
+    color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+
+.metricActions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.linkButton {
+    border: none;
+    background: transparent;
+    color: var(--color-brand-primary);
+    cursor: pointer;
+    padding: 0;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.deleteButton {
+    color: var(--color-error);
+}
+
+.emptyState {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    padding: 12px 0;
+}
+
+/* ── Right column: fixed height with sticky footer ── */
+
+.formSection {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden; /* children handle their own scroll */
+    border-left: 1px solid var(--color-border);
+    margin-left: -1px; /* collapse double border with listSection */
+}
+
+/* Scrollable form fields area */
+.formScrollable {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg, 24px);
+    padding-bottom: 8px;
+}
+
+/* Always-visible submit bar at bottom of right column */
+.formFooter {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px var(--spacing-lg, 24px);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-modal, var(--color-bg-card));
+}
+
+/* ── Form fields ── */
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.fieldGroup {
+    margin-bottom: 12px;
+}
+
+.fieldLabel {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 14px;
+}
+
+.toggleRow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.toggleLabel {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.toggleLabel input[type="checkbox"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.hint {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.radioRow {
+    display: flex;
+    gap: 16px;
+}
+
+.radioLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.inputHint {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-top: -6px;
+    margin-bottom: 12px;
+}
+
+@media (max-width: 860px) {
+    .content {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    .listSection {
+        overflow-y: visible;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .formSection {
+        border-left: none;
+        overflow: visible;
+    }
+
+    .formScrollable {
+        overflow-y: visible;
+    }
+
+    .formRow {
+        grid-template-columns: 1fr;
+    }
+}

@@ -273,6 +273,11 @@ class Events:
     ACTIVITY_MODE_CREATED = 'activity_mode.created'
     ACTIVITY_MODE_UPDATED = 'activity_mode.updated'
     ACTIVITY_MODE_DELETED = 'activity_mode.deleted'
+
+    # Fractal Metric events
+    FRACTAL_METRIC_CREATED = 'fractal_metric.created'
+    FRACTAL_METRIC_UPDATED = 'fractal_metric.updated'
+    FRACTAL_METRIC_DELETED = 'fractal_metric.deleted'
     
     # Activity Group events
     ACTIVITY_GROUP_CREATED = 'activity_group.created'

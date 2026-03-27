@@ -231,8 +231,6 @@ export const buildGraphPresentation = ({
 
     const treeMaps = buildTreeMaps(treeData);
     const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activities, activityGroups);
-    const hasAnyEvidence = evidenceGoalIds.size > 0;
-
     const activeLineageIds = getActiveLineageIds(evidenceGoalIds, treeMaps.parentById);
     const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, evidenceGoalIds);
 
@@ -266,7 +264,7 @@ export const buildGraphPresentation = ({
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
         const isFrozen = Boolean(node.data?.frozen);
-        const shouldFadeInactive = isInactive && !isActive && hasAnyEvidence;
+        const shouldFadeInactive = isInactive && !isActive;
         const shouldFade = normalizedSettings.fadeInactiveBranches && (shouldFadeInactive || isFrozen);
 
         if (isFrozen) {
@@ -297,7 +295,7 @@ export const buildGraphPresentation = ({
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
             && (
                 frozenNodeIds.has(targetId)
-                || (inactiveNodeIds.has(targetId) && !isActiveEdge && hasAnyEvidence)
+                || (inactiveNodeIds.has(targetId) && !isActiveEdge)
             );
 
         const nextClassName = [

@@ -1,6 +1,11 @@
 import { API_BASE, axios } from './core';
 
 export const fractalActivitiesApi = {
+    getFractalMetrics: (rootId) => axios.get(`${API_BASE}/${rootId}/fractal-metrics`),
+    createFractalMetric: (rootId, data) => axios.post(`${API_BASE}/${rootId}/fractal-metrics`, data),
+    updateFractalMetric: (rootId, metricId, data) =>
+        axios.put(`${API_BASE}/${rootId}/fractal-metrics/${metricId}`, data),
+    deleteFractalMetric: (rootId, metricId) => axios.delete(`${API_BASE}/${rootId}/fractal-metrics/${metricId}`),
     getActivityModes: (rootId) => axios.get(`${API_BASE}/${rootId}/activity-modes`),
     createActivityMode: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activity-modes`, data),
     updateActivityMode: (rootId, modeId, data) =>

@@ -4,6 +4,29 @@ from sqlalchemy.orm import relationship, backref
 import uuid
 from .base import Base, utc_now, JSON_TYPE
 
+
+class FractalMetricDefinition(Base):
+    __tablename__ = 'fractal_metric_definitions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    unit = Column(String, nullable=False)
+    is_multiplicative = Column(Boolean, default=True, nullable=False)
+    is_additive = Column(Boolean, default=True, nullable=False)
+    input_type = Column(String, default='number', nullable=False)  # 'number' | 'integer' | 'duration'
+    default_value = Column(Float, nullable=True)
+    higher_is_better = Column(Boolean, nullable=True)
+    predefined_values = Column(JSON_TYPE, nullable=True)
+    min_value = Column(Float, nullable=True)
+    max_value = Column(Float, nullable=True)
+    description = Column(String, nullable=True)
+    sort_order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+
 class ActivityGroup(Base):
     __tablename__ = 'activity_groups'
 
@@ -65,6 +88,7 @@ class MetricDefinition(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_id = Column(String, ForeignKey('activity_definitions.id'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    fractal_metric_id = Column(String, ForeignKey('fractal_metric_definitions.id'), nullable=True, index=True)
     name = Column(String, nullable=False)
     unit = Column(String, nullable=False)
     created_at = Column(DateTime, default=utc_now)
@@ -74,6 +98,8 @@ class MetricDefinition(Base):
     is_top_set_metric = Column(Boolean, default=False)
     is_multiplicative = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
+
+    fractal_metric = relationship("FractalMetricDefinition", lazy="joined")
 
 class SplitDefinition(Base):
     __tablename__ = 'split_definitions'

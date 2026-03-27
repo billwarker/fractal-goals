@@ -106,6 +106,28 @@ def serialize_activity_mode(mode):
         "updated_at": format_utc(mode.updated_at),
     }
 
+def serialize_fractal_metric(metric):
+    """Serialize a FractalMetricDefinition object."""
+    return {
+        "id": metric.id,
+        "root_id": metric.root_id,
+        "name": metric.name,
+        "unit": metric.unit,
+        "is_multiplicative": metric.is_multiplicative,
+        "is_additive": metric.is_additive,
+        "input_type": metric.input_type,
+        "default_value": metric.default_value,
+        "higher_is_better": metric.higher_is_better,
+        "predefined_values": metric.predefined_values,
+        "min_value": metric.min_value,
+        "max_value": metric.max_value,
+        "description": metric.description,
+        "sort_order": metric.sort_order,
+        "activity_count": getattr(metric, '_activity_count', 0),
+        "created_at": format_utc(metric.created_at),
+        "updated_at": format_utc(metric.updated_at),
+    }
+
 def serialize_activity_instance(instance):
     """Serialize an ActivityInstance object."""
     data_dict = _safe_load_json(instance.data, {})
@@ -502,14 +524,28 @@ def serialize_activity_definition(activity):
     }
 
 def serialize_metric_definition(metric):
-    """Serialize a MetricDefinition object."""
+    """Serialize a MetricDefinition object, joining through to the fractal metric when available."""
+    fm = getattr(metric, 'fractal_metric', None)
+    # Derive name/unit/is_multiplicative from fractal metric if linked, else fall back to own columns
+    name = fm.name if fm else metric.name
+    unit = fm.unit if fm else metric.unit
+    is_multiplicative = fm.is_multiplicative if fm else metric.is_multiplicative
     return {
-        "id": metric.id, 
-        "name": metric.name, 
-        "unit": metric.unit, 
+        "id": metric.id,
+        "fractal_metric_id": metric.fractal_metric_id,
+        "name": name,
+        "unit": unit,
         "is_active": metric.is_active,
         "is_top_set_metric": metric.is_top_set_metric,
-        "is_multiplicative": metric.is_multiplicative
+        "is_multiplicative": is_multiplicative,
+        # Extra fields from fractal metric (None when not linked)
+        "is_additive": fm.is_additive if fm else None,
+        "input_type": fm.input_type if fm else "number",
+        "default_value": fm.default_value if fm else None,
+        "higher_is_better": fm.higher_is_better if fm else None,
+        "predefined_values": fm.predefined_values if fm else None,
+        "min_value": fm.min_value if fm else None,
+        "max_value": fm.max_value if fm else None,
     }
 
 def serialize_split_definition(split):

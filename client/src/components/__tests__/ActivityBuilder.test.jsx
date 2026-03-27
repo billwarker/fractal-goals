@@ -26,6 +26,8 @@ vi.mock('../../hooks/useActivityQueries', () => ({
         isLoading: false,
         error: null,
     }),
+    useFractalMetrics: () => ({ fractalMetrics: [], isLoading: false }),
+    useCreateFractalMetric: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -129,12 +131,8 @@ describe('ActivityBuilder', () => {
             />
         );
 
-        fireEvent.change(screen.getByDisplayValue('Speed'), {
-            target: { value: '' },
-        });
-        fireEvent.change(screen.getByDisplayValue('bpm'), {
-            target: { value: '' },
-        });
+        // Uncheck "Enable Metrics" to remove all metrics
+        fireEvent.click(screen.getByLabelText('Enable Metrics'));
 
         fireEvent.click(screen.getByRole('button', { name: 'Save Activity' }));
 
@@ -144,7 +142,7 @@ describe('ActivityBuilder', () => {
 
         await waitFor(() => {
             expect(mockUpdateActivity).toHaveBeenCalledWith('root-1', 'activity-1', expect.objectContaining({
-                metrics: [],
+                has_metrics: false,
             }));
         });
     });
@@ -173,18 +171,14 @@ describe('ActivityBuilder', () => {
             />
         );
 
-        fireEvent.change(screen.getByDisplayValue('Speed'), {
-            target: { value: '' },
-        });
-        fireEvent.change(screen.getByDisplayValue('bpm'), {
-            target: { value: '' },
-        });
+        // Uncheck "Enable Metrics" to remove all metrics
+        fireEvent.click(screen.getByLabelText('Enable Metrics'));
 
         fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
 
         await waitFor(() => {
             expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
-                metrics: [],
+                has_metrics: false,
             }));
         });
 
