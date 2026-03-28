@@ -3,7 +3,7 @@
 .container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
 }
 
 .header {
@@ -18,39 +18,36 @@
     margin: 0;
 }
 
+/* ─── Block Card ───────────────────────────────────────────────────────────── */
+
 .blockCard {
-    /* Base styles handled by Card atom, specifics here if needed */
     display: flex;
-    gap: 40px;
-    margin-bottom: 16px;
+    flex-direction: column;
+    gap: 0;
+    padding: 0 !important;
+    overflow: hidden;
     border-left-width: 4px;
     border-left-style: solid;
-    /* Border color handled inline via style */
+    /* border-left-color set inline */
     transition: background-color 0.2s ease;
+    margin-bottom: 0;
 }
 
-.mainContent {
-    flex: 1;
-    min-width: 0;
-}
-
-.blockInfo {
-    margin-bottom: 24px;
-}
-
-.blockHeaderRow {
+/* Tinted header band */
+.blockHeader {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
+    padding: 20px 24px 16px 24px;
+    /* background tint set inline via JS */
+    border-bottom: 1px solid var(--color-border);
 }
 
 .blockTitleGroup {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
     min-width: 0;
 }
@@ -58,86 +55,198 @@
 .blockName {
     margin: 0;
     color: var(--color-text-primary);
-    font-size: 18px;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.blockMeta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-top: 6px;
+}
+
+.blockMetaItem {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 12px;
+    margin-right: 12px;
+    border-right: 1px solid var(--color-border);
+}
+
+.blockMetaItem:last-child {
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0;
+}
+
+.blockMetaLabel {
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
+.blockMetaValueEmphasis {
+    /* emphasis color set inline */
+    font-weight: 700;
+}
+
+/* Action buttons in header */
+.blockActions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.iconBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.iconBtn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+}
+
+.iconBtnDanger:hover {
+    background: color-mix(in srgb, var(--color-brand-danger) 10%, var(--color-bg-secondary));
+    border-color: var(--color-brand-danger);
+    color: var(--color-brand-danger);
+}
+
+.iconBtnPrimary {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+    width: auto;
+    padding: 0 12px;
+    font-size: 12px;
     font-weight: 600;
+    gap: 5px;
+    white-space: nowrap;
 }
 
-.blockMetaGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
-    gap: 16px;
+.iconBtnPrimary:hover {
+    filter: brightness(1.08);
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
 }
 
-.blockRemainingValue {
-    color: var(--color-brand-primary);
+.iconBtnTooltip {
+    position: relative;
 }
 
+/* Goals row */
 .goalList {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 16px;
-    margin-top: 12px;
+    gap: 6px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+}
+
+.goalListEmpty {
+    display: none;
 }
 
 .goalListItem {
     appearance: none;
-    background: transparent;
-    border: 0;
-    padding: 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    padding: 4px 10px 4px 8px;
+    border-radius: 100px;
     color: var(--color-text-primary);
     font: inherit;
+    font-size: 12px;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     cursor: pointer;
-    transition: opacity 0.2s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
     min-width: 0;
 }
 
 .goalListItem:hover {
-    opacity: 0.85;
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-hover);
 }
 
 .goalListItemCompleted {
-    opacity: 0.75;
-}
-
-.goalListItemName {
-    font-size: 14px;
-    line-height: 1.35;
-    text-align: left;
+    opacity: 0.65;
 }
 
 .goalListItemCompleted .goalListItemName {
     text-decoration: line-through;
+    color: var(--color-text-muted);
+}
+
+.goalListItemName {
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+/* ─── Days Grid ───────────────────────────────────────────────────────────── */
+
+.daysSection {
+    padding: 20px 24px 24px 24px;
 }
 
 .daysGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
 }
 
 .emptyState {
-    grid-column: 1 / -1;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    padding: 8px 0;
 }
 
+/* ─── Day Card ────────────────────────────────────────────────────────────── */
+
 .dayCard {
-    background: var(--color-bg-card-alt);
-    padding: 16px;
-    border-radius: 8px;
-    min-height: 100px;
+    background: var(--color-bg-secondary);
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    min-height: 80px;
     cursor: pointer;
     border: 1px solid var(--color-border);
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    border-left-width: 3px;
+    /* border-left-color set inline via block color */
+    transition: background 0.15s ease, border-color 0.15s ease;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .dayCard:hover {
+    background: var(--color-bg-hover);
     border-color: var(--color-border-hover);
-    background: var(--color-bg-card-hover);
 }
 
 .dayHeader {
@@ -149,9 +258,9 @@
 .dayName {
     color: var(--color-text-primary);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
     margin-bottom: 2px;
 }
 
@@ -168,33 +277,38 @@
     display: flex;
     align-items: center;
     gap: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
+
+/* ─── Templates List ──────────────────────────────────────────────────────── */
 
 .templatesList {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .templateItem {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
 }
 
 .templateBadgeWrap {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
+    overflow: hidden;
 }
 
 .templateDoneMark {
     flex: 0 0 auto;
     color: var(--color-brand-success);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
 }
 
@@ -202,6 +316,7 @@
     flex: 0 0 auto;
     font-size: 11px;
     font-weight: 700;
+    color: var(--color-text-muted);
 }
 
 .templateItemDone {
@@ -209,7 +324,7 @@
 }
 
 .templateItemPending {
-    opacity: 0.8;
+    opacity: 0.75;
 }
 
 .restDay {
@@ -218,14 +333,70 @@
     font-style: italic;
 }
 
-.actionsColumn {
-    flex: 0 0 120px;
+/* ─── Add Day Card ────────────────────────────────────────────────────────── */
+
+.addDayCard {
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    min-height: 80px;
+    cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.fullWidthBtn {
-    width: 100%;
-    margin-bottom: 0;
+.addDayCard:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-secondary);
+}
+
+.addDayIcon {
+    font-size: 20px;
+    font-weight: 300;
+    line-height: 1;
+    color: var(--color-text-muted);
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .blockHeader {
+        padding: 16px 16px 14px 16px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .daysSection {
+        padding: 16px;
+    }
+
+    .daysGrid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+    }
+
+    .goalList {
+        padding: 10px 16px;
+    }
+
+    .goalListItemName {
+        max-width: 140px;
+    }
+
+    .iconBtn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .iconBtnPrimary {
+        height: 36px;
+    }
 }

@@ -55,7 +55,87 @@
     filter: brightness(1.1);
 }
 
-/* FullCalendar Header Overrides */
+/* ─── Custom Event Pills ─────────────────────────────────────────────────── */
+
+/* Reset FullCalendar's default event wrapper so our pill owns all styling */
+:global(.fc-daygrid-event) {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 1px !important;
+    margin: 1px 0 !important;
+}
+
+:global(.fc-daygrid-event-dot) {
+    display: none !important;
+}
+
+:global(.fc-event-title) {
+    display: none !important;
+}
+
+/* Base pill — shared by all event types */
+.eventPill {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 18px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border-left: 3px solid transparent;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.eventPillText {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+/* Program day — tinted bg + block color left border (dynamic via inline style) */
+.eventPillProgramDay {
+    /* background and borderLeftColor set inline via JS */
+    color: var(--color-text-primary);
+}
+
+/* Template pending */
+.eventPillTemplate {
+    background: var(--color-bg-input);
+    border-left-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+
+/* Template completed */
+.eventPillTemplateCompleted {
+    background: color-mix(in srgb, var(--color-brand-success) 11%, var(--color-bg-card));
+    border-left-color: var(--color-brand-success);
+    color: var(--color-brand-success);
+}
+
+/* Unlinked session pending */
+.eventPillSession {
+    background: var(--color-bg-input);
+    border-left-color: var(--color-border-hover);
+    color: var(--color-text-secondary);
+}
+
+/* Unlinked session completed */
+.eventPillSessionCompleted {
+    background: color-mix(in srgb, var(--color-brand-success) 11%, var(--color-bg-card));
+    border-left-color: var(--color-brand-success);
+    color: var(--color-text-primary);
+}
+
+/* Goal events — background/color/border set inline from event's own color */
+.eventPillGoal {
+    border-left-width: 3px;
+}
+
+/* ─── FullCalendar Header Overrides ─────────────────────────────────────── */
 :global(.fc-header-toolbar) {
     margin-bottom: 32px !important;
     display: flex !important;

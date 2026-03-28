@@ -141,10 +141,20 @@ export function useProgramDetailViewModel({
             if (programDay) {
                 const name = programDay.name;
                 if (!dateGroups[dateStr].groupsByName[name]) {
+                    // Only use the block color if the session date falls within the block's date range.
+                    // Sessions completed outside the block window (e.g. a day late) shouldn't
+                    // inherit the block color since the date now belongs to a different block.
+                    const owningBlock = (program.blocks || []).find(b =>
+                        (b.days || []).some(d => d.id === programDayId)
+                    );
+                    const sessionInBlockRange = owningBlock
+                        ? dateStr >= getDatePart(owningBlock.start_date) && dateStr <= getDatePart(owningBlock.end_date)
+                        : false;
+
                     dateGroups[dateStr].groupsByName[name] = {
                         name,
                         pDay: programDay,
-                        blockColor: programDay.blockColor,
+                        blockColor: sessionInBlockRange ? programDay.blockColor : null,
                         sessions: [],
                         templatesByName: {},
                     };
@@ -201,13 +211,14 @@ export function useProgramDetailViewModel({
                     title: `${isProgramDayCompleted ? '✓ ' : '📋 '}${group.name}`,
                     start: dateStr,
                     allDay: true,
-                    backgroundColor: isProgramDayCompleted ? '#2e7d32' : (group.blockColor || '#37474F'),
-                    borderColor: isProgramDayCompleted ? '#2e7d32' : 'transparent',
-                    textColor: 'white',
+                    backgroundColor: 'transparent',
+                    borderColor: 'transparent',
+                    textColor: 'inherit',
                     classNames: ['program-day-event'],
                     extendedProps: {
                         type: 'program_day',
                         pDayId: group.pDay?.id,
+                        blockColor: group.blockColor || null,
                         isCompleted: isProgramDayCompleted,
                         sortOrder: 0,
                     },
@@ -232,9 +243,9 @@ export function useProgramDetailViewModel({
                         title,
                         start: dateStr,
                         allDay: true,
-                        backgroundColor: isTemplateCompleted ? '#1b5e20' : '#424242',
+                        backgroundColor: 'transparent',
                         borderColor: 'transparent',
-                        textColor: isTemplateCompleted ? '#c8e6c9' : '#bdbdbd',
+                        textColor: 'inherit',
                         classNames: ['template-event'],
                         extendedProps: {
                             type: 'template',
@@ -254,9 +265,9 @@ export function useProgramDetailViewModel({
                     title: `${completed ? '✓ ' : '📋 '}${session.name}`,
                     start: dateStr,
                     allDay: true,
-                    backgroundColor: completed ? '#2e7d32' : '#546e7a',
+                    backgroundColor: 'transparent',
                     borderColor: 'transparent',
-                    textColor: 'white',
+                    textColor: 'inherit',
                     extendedProps: {
                         type: 'session',
                         sortOrder: 2,
