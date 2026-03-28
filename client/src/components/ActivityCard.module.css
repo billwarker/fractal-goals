@@ -82,53 +82,46 @@
 
 .actionList {
     display: flex;
-    gap: 6px;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
 }
 
-.actionBtn {
-    flex: 1;
-    padding: 8px;
-    border: none;
+.ghostAction {
+    padding: 8px 12px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-secondary);
     font-size: 12px;
-    font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
-.editBtn {
-    background: var(--color-brand-primary);
+.ghostAction:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
-.editBtn:hover {
-    background: var(--color-brand-primary-hover);
-}
-
-.duplicateBtn {
-    padding: 8px 12px;
-    background: var(--color-brand-secondary);
-    font-size: 14px;
-}
-
-.duplicateBtn:hover {
-    background: var(--color-brand-secondary-hover);
-}
-
-.duplicateBtn:disabled {
-    background: var(--color-text-muted);
-    cursor: not-allowed;
+.ghostAction:disabled {
     opacity: 0.5;
+    cursor: not-allowed;
 }
 
-.deleteBtn {
+.deleteAction {
     padding: 8px 12px;
-    background: var(--color-brand-danger);
-    font-size: 13px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
-.deleteBtn:hover {
-    background: var(--color-brand-danger-hover);
+.deleteAction:hover {
+    border-color: var(--color-brand-danger);
+    color: var(--color-brand-danger);
 }
 
 /* Drag-and-drop styles */
@@ -152,22 +145,8 @@
         padding: 12px;
     }
 
-    .actionList {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px;
-    }
-
-    .actionBtn {
-        padding: 8px 6px;
-        font-size: 12px;
-        min-width: 0;
+    .ghostAction,
+    .deleteAction {
         min-height: 44px;
-    }
-
-    .duplicateBtn,
-    .deleteBtn {
-        padding: 8px 6px;
-        font-size: 12px;
     }
 }

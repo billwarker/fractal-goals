@@ -104,30 +104,20 @@ function ActivityCard({
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        onEdit(activity);
-                    }}
-                    className={`${styles.actionBtn} ${styles.editBtn}`}
-                >
-                    Edit
-                </button>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
                         onDuplicate(activity);
                     }}
                     disabled={isCreating}
-                    className={`${styles.actionBtn} ${styles.duplicateBtn}`}
+                    className={styles.ghostAction}
                     title="Copy this activity"
-                    style={{ backgroundColor: '#ff9800' }} // Keep generic orange or use class
                 >
-                    Copy
+                    Duplicate
                 </button>
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
                         onDelete(activity);
                     }}
-                    className={`${styles.actionBtn} ${styles.deleteBtn}`}
+                    className={styles.deleteAction}
                 >
                     Delete
                 </button>
