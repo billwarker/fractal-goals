@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
@@ -7,7 +7,7 @@ import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { deriveEvidenceGoalIds, getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
-import { getChildType } from '../utils/goalHelpers';
+import { getChildType, getValidChildTypes, getTypeDisplayName } from '../utils/goalHelpers';
 import { flattenGoalTree } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
@@ -18,6 +18,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
+import GoalIcon from './atoms/GoalIcon';
 
 import styles from './GoalDetailModal.module.css';
 
@@ -101,9 +102,27 @@ function GoalDetailModal({
         resetForm,
         errors, validateForm
     } = useGoalForm(goal, mode);
-    // Derive goal type - in create mode, use child type of parent; otherwise use goal's type
+    // In create mode, compute all valid child types for the parent.
+    // When multiple levels are valid, show a level picker step before the form.
+    const parentType = parentGoal?.attributes?.type || parentGoal?.type;
+    const validChildTypes = mode === 'create' ? getValidChildTypes(parentType) : [];
+    const defaultChildType = validChildTypes[0] ?? getChildType(parentType);
+    const needsLevelPicker = mode === 'create' && validChildTypes.length > 1;
+    // null = picker not yet confirmed; a type string = level chosen, show form
+    const [selectedChildType, setSelectedChildType] = useState(needsLevelPicker ? null : defaultChildType);
+    // Reset when the parent changes (e.g. modal reused for a different goal)
+    React.useEffect(() => {
+        if (mode === 'create') {
+            setSelectedChildType(needsLevelPicker ? null : defaultChildType);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [parentType, mode]);
+
+    // Derive goal type. In create mode, use the confirmed selected type (or default for
+    // single-option cases). If the picker is still showing, fall back to defaultChildType
+    // for color/header purposes only — the form won't render yet.
     const goalType = mode === 'create'
-        ? getChildType(parentGoal?.attributes?.type || parentGoal?.type)
+        ? (selectedChildType || defaultChildType)
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
     const goalColor = getGoalColor(goalType);
@@ -319,6 +338,57 @@ function GoalDetailModal({
     // Allow rendering without goal in create mode
     if (!goal && mode !== 'create') return null;
 
+    // ============ LEVEL PICKER (CREATE MODE — multiple valid levels) ============
+    const renderLevelPicker = () => (
+        <div className={styles.levelPickerContainer}>
+            <div className={styles.levelPickerHeader}>
+                <button
+                    onClick={handleClose}
+                    aria-label="Close"
+                    className={styles.levelPickerClose}
+                >
+                    ×
+                </button>
+            </div>
+            <p className={styles.levelPickerPrompt}>
+                What level of goal do you want to create under{' '}
+                <strong style={{ color: getGoalColor(parentType) }}>{parentGoal?.attributes?.name || parentGoal?.name}</strong>?
+            </p>
+            <div className={styles.levelPickerGrid}>
+                {validChildTypes.map((type) => {
+                    const color = getGoalColor(type);
+                    const secondaryColor = getGoalSecondaryColor(type);
+                    const icon = getGoalIcon(type);
+                    return (
+                        <button
+                            key={type}
+                            className={styles.levelPickerOption}
+                            style={{ borderColor: color, color: color }}
+                            onClick={() => setSelectedChildType(type)}
+                        >
+                            <GoalIcon
+                                shape={icon}
+                                color={color}
+                                secondaryColor={secondaryColor}
+                                size={20}
+                                style={{ flexShrink: 0 }}
+                            />
+                            {getTypeDisplayName(type)}
+                        </button>
+                    );
+                })}
+            </div>
+            {onGoalSelect && parentGoal && (
+                <button
+                    onClick={() => onGoalSelect(parentGoal)}
+                    className={styles.levelPickerBack}
+                >
+                    ← Back
+                </button>
+            )}
+        </div>
+    );
+
     // ============ GOAL CONTENT (VIEW/EDIT) ============
     const renderGoalContent = () => {
         return (
@@ -353,6 +423,8 @@ function GoalDetailModal({
                         parentGoalName={parentGoalName}
                         parentGoalColor={parentGoalColor}
                         isCompleted={isCompleted}
+                        validChildTypes={validChildTypes}
+                        onLevelChange={setSelectedChildType}
                         name={name} setName={setName}
                         description={description} setDescription={setDescription}
                         deadline={deadline} setDeadline={setDeadline}
@@ -561,11 +633,15 @@ function GoalDetailModal({
                 />
             </Suspense>
         );
+    } else if (needsLevelPicker && selectedChildType === null) {
+        // Show level picker before the create form when multiple levels are valid.
+        content = renderLevelPicker();
     } else {
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = viewState === 'goal' || viewState === 'goal-options';
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options')
+        && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         content = (
             <>

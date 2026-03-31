@@ -53,6 +53,8 @@ function GoalHierarchyList({
     onGoalClick,
     isGoalSelectable,
     getGoalMetaLabel,
+    getGoalNameStyle,
+    getGoalLeftSlot,
     getScopedCharacteristics,
     getGoalColor,
     getGoalSecondaryColor,
@@ -144,16 +146,19 @@ function GoalHierarchyList({
 
     const treeRoots = buildSessionHierarchyTree(nodes);
 
-    const renderSessionTreeNodes = (treeNodes, isNestedLevel = false) => (
-        <ul className={isNestedLevel ? styles.sessionTreeChildren : styles.sessionTreeRoot}>
+    const renderSessionTreeNodes = (treeNodes, depth = 0) => (
+        <ul className={depth > 0 ? styles.sessionTreeChildren : styles.sessionTreeRoot}>
             {treeNodes.map((node) => {
                 const isCompleted = node.status
                     ? Boolean(node.status.completed)
                     : Boolean(node.completed);
-                const isNestedNode = isNestedLevel;
+                const isNestedNode = depth > 0;
                 const originalNode = node.originalGoal || node;
                 const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
                 const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
+                // Each level of nesting adds --tree-indent (28px). The left slot must escape
+                // all accumulated indentation plus the 28px padding-left on the wrapper div.
+                const leftSlotOffset = `calc(-1 * ${depth} * var(--tree-indent, 28px) - 28px)`;
 
                 return (
                     <li
@@ -163,6 +168,11 @@ function GoalHierarchyList({
                         <div
                             className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''} ${isNestedNode ? styles.sessionTreeNodeNested : ''}`}
                         >
+                            {getGoalLeftSlot && (
+                                <div className={styles.sessionLeftSlot} style={{ left: leftSlotOffset }}>
+                                    {getGoalLeftSlot(node.originalGoal || node)}
+                                </div>
+                            )}
                             <div className={styles.sessionIconSlot}>
                                 <GoalIcon
                                     shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
@@ -175,14 +185,17 @@ function GoalHierarchyList({
                             <div className={styles.sessionNodeContent}>
                                 <span
                                     className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''}`}
+                                    style={getGoalNameStyle ? getGoalNameStyle(originalNode) : undefined}
                                     onClick={() => handleGoalClick(node)}
                                 >
                                     {node.name}
                                 </span>
                                 {metaLabel && (
-                                    <span className={styles.sessionNodeMeta}>
-                                        {metaLabel}
-                                    </span>
+                                    typeof metaLabel === 'string' ? (
+                                        <span className={styles.sessionNodeMeta}>
+                                            {metaLabel}
+                                        </span>
+                                    ) : metaLabel
                                 )}
                                 {onStartSubGoalCreation && canAddChild(node.type) && (
                                     <button
@@ -203,7 +216,7 @@ function GoalHierarchyList({
                             </div>
                         </div>
 
-                        {node.children.length > 0 ? renderSessionTreeNodes(node.children, true) : null}
+                        {node.children.length > 0 ? renderSessionTreeNodes(node.children, depth + 1) : null}
                     </li>
                 );
             })}

@@ -52,7 +52,7 @@ function GoalViewMode({
 }) {
     const navigate = useNavigate();
     const { getGoalColor } = useGoalLevels();
-    const childGoalColor = childType ? getGoalColor(childType) : goalColor;
+    const childGoalColor = goalColor;
 
     return (
         <div className={styles.viewContainer}>
@@ -132,7 +132,7 @@ function GoalViewMode({
                             cursor: goalType === 'ImmediateGoal' ? 'not-allowed' : 'pointer'
                         }}
                     >
-                        + Add {childType}
+                        + Add Child Goal
                     </button>
                 )}
 

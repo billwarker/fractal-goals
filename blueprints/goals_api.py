@@ -629,6 +629,27 @@ def freeze_goal_endpoint(current_user, root_id: str, goal_id: str):
         db_session.close()
 
 
+@goals_bp.route('/<root_id>/goals/<goal_id>/eligible-parents', methods=['GET'])
+@token_required
+def get_eligible_move_parents(current_user, root_id: str, goal_id: str):
+    """Get all valid move target parents for a goal."""
+    db_session = get_db_session()
+    try:
+        search = request.args.get('search', '').strip() or None
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        result, error, status = service.get_eligible_move_parents(
+            root_id, goal_id, current_user.id, search=search
+        )
+        if error:
+            return jsonify({'error': error}), status
+        return jsonify({'eligible_parents': result}), 200
+    except Exception:
+        logger.exception("Error fetching eligible move parents")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
 @goals_bp.route('/<root_id>/goals/<goal_id>/move', methods=['PATCH'])
 @token_required
 def move_goal_endpoint(current_user, root_id: str, goal_id: str):

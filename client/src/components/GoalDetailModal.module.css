@@ -256,13 +256,16 @@
 }
 
 .optionsBackButton {
-    padding: 0;
-    border: none;
+    align-self: flex-start;
     background: transparent;
-    text-align: left;
-    font-size: 12px;
-    font-weight: 700;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: normal;
     cursor: pointer;
+    padding: 4px 0;
+    margin-top: var(--spacing-xs);
+    text-align: left;
 }
 
 .optionsSectionHeader {
@@ -445,6 +448,89 @@
     color: var(--color-text-muted);
     cursor: pointer;
     font-size: 12px;
+}
+
+/* Level picker — shown before create form when multiple child levels are valid */
+.levelPickerContainer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: 0;
+}
+
+/* Mirrors GoalHeader's sticky bleed row — positions the × at the exact same
+   top-right spot as the normal goal detail modal close button. */
+.levelPickerHeader {
+    position: sticky;
+    top: -24px;
+    margin-top: -24px;
+    padding-top: 24px;
+    margin-right: -24px;
+    padding-right: 24px;
+    margin-left: -24px;
+    padding-left: 24px;
+    background: var(--color-bg-surface);
+    z-index: 20;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.levelPickerClose {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    height: 24px;
+    display: flex;
+    align-items: center;
+}
+
+.levelPickerPrompt {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.levelPickerGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.levelPickerOption {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    background: var(--color-bg-surface);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, transform 0.1s ease;
+    letter-spacing: 0.01em;
+}
+
+.levelPickerOption:hover {
+    background: var(--color-bg-card-alt);
+    transform: translateX(3px);
+}
+
+.levelPickerBack {
+    align-self: flex-start;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+    margin-top: var(--spacing-xs);
 }
 
 .autoAssociationInfo {

@@ -459,6 +459,65 @@ class GoalService:
         level = self.db_session.query(GoalLevel).filter_by(id=level_id).first()
         return getattr(level, 'rank', None) if level else None
 
+    def _validate_ancestor_rank_monotonicity(self, new_level_obj, parent_goal) -> str | None:
+        """
+        Validates that inserting a goal with new_level_obj under parent_goal produces
+        a strictly increasing rank sequence from root to the new goal.
+
+        Prevents incoherent paths like:
+            Long Term (rank 1) → Short Term (rank 3) → Mid Term (rank 2)
+
+        Returns an error message string if validation fails, or None if valid.
+        Execution-tier goals (MicroGoal/NanoGoal) are handled by validators.py
+        and should not be passed here.
+        """
+        if not parent_goal or not new_level_obj:
+            return None
+
+        new_rank = getattr(new_level_obj, 'rank', None)
+        if new_rank is None:
+            return None
+
+        # Walk from parent up to root, collecting (goal, rank) pairs
+        chain = []
+        current = parent_goal
+        seen = set()
+        while current:
+            if current.id in seen:
+                break
+            seen.add(current.id)
+            rank = self._get_goal_level_rank(current)
+            level_name = getattr(getattr(current, 'level', None), 'name', None) or current.id
+            chain.append((level_name, rank))
+            if not current.parent_id:
+                break
+            current = self.db_session.query(Goal).options(
+                selectinload(Goal.level)
+            ).filter_by(id=current.parent_id, deleted_at=None).first()
+
+        # chain is [parent, grandparent, ..., root]; reverse to root → parent
+        chain.reverse()
+
+        # Validate root → parent is already monotonically increasing
+        for i in range(len(chain) - 1):
+            name_a, rank_a = chain[i]
+            name_b, rank_b = chain[i + 1]
+            if rank_a is not None and rank_b is not None and rank_a >= rank_b:
+                return (
+                    f"Hierarchy path is not valid: '{name_a}' (rank {rank_a}) "
+                    f"is not above '{name_b}' (rank {rank_b})"
+                )
+
+        # Validate new goal rank is strictly greater than parent rank
+        parent_name, parent_rank = chain[-1] if chain else (None, None)
+        if parent_rank is not None and new_rank <= parent_rank:
+            return (
+                f"Cannot create goal: '{new_level_obj.name}' (rank {new_rank}) "
+                f"must be below parent level '{parent_name}' (rank {parent_rank})"
+            )
+
+        return None
+
     def _goals_share_same_tier(self, left_goal, right_goal) -> bool:
         if not left_goal or not right_goal:
             return False
@@ -696,6 +755,13 @@ class GoalService:
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
         level_obj = self.db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
+
+        goal_type = data.get('type', '')
+        if parent and goal_type not in ('MicroGoal', 'NanoGoal'):
+            monotonicity_error = self._validate_ancestor_rank_monotonicity(level_obj, parent)
+            if monotonicity_error:
+                return None, monotonicity_error, 400
+
         goal_defaults = Goal(parent_id=parent_id)
         goal_defaults.level = level_obj
         inherit_parent_activities = should_inherit_parent_activities(
@@ -800,8 +866,11 @@ class GoalService:
             return None, description_error, 400
 
         parent_id = data.get('parent_id')
+        parent_goal = None
         if parent_id:
-            parent_goal = self.db_session.query(Goal).filter_by(id=parent_id, root_id=root_id).first()
+            parent_goal = self.db_session.query(Goal).options(
+                selectinload(Goal.level)
+            ).filter_by(id=parent_id, root_id=root_id).first()
             if not parent_goal:
                 return None, "Parent goal not found in this fractal.", 400
             parent_capacity_error = self._validate_parent_capacity(
@@ -810,6 +879,12 @@ class GoalService:
             )
             if parent_capacity_error:
                 return None, parent_capacity_error, 400
+
+            goal_type = data.get('type', '')
+            if goal_type not in ('MicroGoal', 'NanoGoal'):
+                monotonicity_error = self._validate_ancestor_rank_monotonicity(level_obj, parent_goal)
+                if monotonicity_error:
+                    return None, monotonicity_error, 400
 
         completed_via_children = resolve_completed_via_children(data, level_obj)
         goal_defaults = Goal(parent_id=parent_id)
@@ -1374,7 +1449,7 @@ class GoalService:
             return None, "Root goals cannot be moved", 400
 
         if not new_parent_id:
-            return None, "Move goal requires selecting a new parent on the current parent tier", 400
+            return None, "Move goal requires selecting a new parent", 400
 
         if new_parent_id == goal_id:
             return None, "A goal cannot be its own parent", 400
@@ -1394,9 +1469,6 @@ class GoalService:
         if not new_parent:
             return None, "New parent goal not found in this fractal", 404
 
-        if not self._goals_share_same_tier(current_parent, new_parent):
-            return None, "Can only move a goal under a parent on the same tier as its current parent", 400
-
         # Prevent circular references — walk up from new_parent
         current = new_parent
         while current.parent_id:
@@ -1406,10 +1478,11 @@ class GoalService:
             if not current:
                 break
 
-        # Validate level compatibility
-        if goal.level and new_parent.level:
-            if goal.level.rank <= new_parent.level.rank:
-                return None, f"Cannot move: goal level '{goal.level.name}' must be below parent level '{new_parent.level.name}'", 400
+        # Validate full ancestor rank monotonicity
+        if goal.level:
+            mono_error = self._validate_ancestor_rank_monotonicity(goal.level, new_parent)
+            if mono_error:
+                return None, mono_error, 400
 
         # Validate parent capacity
         capacity_error = self._validate_parent_capacity(
@@ -1423,6 +1496,85 @@ class GoalService:
         self.db_session.commit()
         self.db_session.refresh(goal)
         return goal, None, 200
+
+    def get_eligible_move_parents(self, root_id, goal_id, current_user_id, search=None):
+        """
+        Returns all goals in the fractal that are valid move targets for goal_id.
+        Excludes: the goal itself, its descendants, and goals that would violate
+        path monotonicity.
+        """
+        from services.goal_type_utils import get_canonical_goal_type
+
+        # Load the goal
+        goal = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+        ).filter_by(id=goal_id, deleted_at=None).first()
+        if not goal or goal.root_id != root_id:
+            return None, "Goal not found", 404
+
+        # Load all non-deleted goals in this fractal
+        all_goals = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+        ).filter_by(root_id=root_id, deleted_at=None).all()
+
+        # Build descendant set (BFS)
+        children_map = {}
+        for g in all_goals:
+            if g.parent_id:
+                children_map.setdefault(g.parent_id, []).append(g.id)
+
+        descendant_ids = set()
+        queue = [goal_id]
+        while queue:
+            current = queue.pop()
+            for child_id in children_map.get(current, []):
+                descendant_ids.add(child_id)
+                queue.append(child_id)
+
+        # Execution tier rules
+        goal_type = get_canonical_goal_type(goal)
+
+        eligible = []
+        for candidate in all_goals:
+            if candidate.id == goal_id:
+                continue
+            if candidate.id in descendant_ids:
+                continue
+            if not candidate.level:
+                continue
+
+            # Execution tier: strict parent rules
+            if goal_type == 'MicroGoal':
+                if get_canonical_goal_type(candidate) != 'ImmediateGoal':
+                    continue
+            elif goal_type == 'NanoGoal':
+                if get_canonical_goal_type(candidate) != 'MicroGoal':
+                    continue
+            else:
+                # Macro goal: candidate must have lower rank
+                if not goal.level or candidate.level.rank >= goal.level.rank:
+                    continue
+                # Full monotonicity check
+                error = self._validate_ancestor_rank_monotonicity(goal.level, candidate)
+                if error:
+                    continue
+
+            # Optional search filter
+            if search and search.lower() not in candidate.name.lower():
+                continue
+
+            eligible.append({
+                'id': candidate.id,
+                'name': candidate.name,
+                'level_name': candidate.level.name if candidate.level else None,
+                'level_rank': candidate.level.rank if candidate.level else None,
+                'parent_id': candidate.parent_id,
+                'is_current_parent': candidate.id == goal.parent_id,
+            })
+
+        # Sort by level rank then name
+        eligible.sort(key=lambda x: (x['level_rank'] or 99, x['name']))
+        return eligible, None, 200
 
     def convert_goal_level(self, root_id, goal_id, current_user_id, level_id) -> ServiceResult[Goal]:
         root, error = self._validate_owned_root(root_id, current_user_id)
@@ -1439,6 +1591,17 @@ class GoalService:
         new_level = self.db_session.query(GoalLevel).filter_by(id=level_id).first()
         if not new_level:
             return None, "Goal level not found", 404
+
+        # Execution-tier goals (Immediate, Micro, Nano) cannot be converted
+        EXECUTION_TIER_NAMES = {'Immediate Goal', 'Micro Goal', 'Nano Goal'}
+        current_level_name = getattr(goal.level, 'name', None)
+        if current_level_name in EXECUTION_TIER_NAMES:
+            return None, f"Cannot convert an execution-tier goal ('{current_level_name}')", 400
+
+        # Cannot convert to Micro or Nano levels
+        MICRO_NANO_NAMES = {'Micro Goal', 'Nano Goal'}
+        if new_level.name in MICRO_NANO_NAMES:
+            return None, f"Cannot convert a goal to execution tier level '{new_level.name}'", 400
 
         root_level_rank = self._get_goal_level_rank(root)
         if root_level_rank is not None and new_level.rank <= root_level_rank:

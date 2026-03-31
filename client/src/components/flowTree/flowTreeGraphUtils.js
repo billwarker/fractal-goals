@@ -1,7 +1,7 @@
 import dagre from 'dagre';
 
 import { deriveEvidenceGoalIds, getActiveLineageIds, getInactiveNodeIds, deriveGraphMetrics } from '../../hooks/useFlowTreeMetrics';
-import { getChildType, getTypeDisplayName } from '../../utils/goalHelpers';
+import { getValidChildTypes } from '../../utils/goalHelpers';
 import {
     getGoalNodeChildren,
     getGoalNodeId,
@@ -108,9 +108,14 @@ export const convertTreeToFlow = (
             });
         }
 
-        const transientTypes = new Set(['ImmediateGoal', 'MicroGoal', 'NanoGoal']);
-        const childType = !transientTypes.has(nodeType) ? getChildType(nodeType) : null;
-        const childTypeName = childType ? getTypeDisplayName(childType) : null;
+        const validChildren = getValidChildTypes(nodeType);
+        // For macro goals with multiple valid child levels, use a generic label.
+        // For execution-tier strict single-child types, show the specific name.
+        // ImmediateGoal children (MicroGoal) are created through sessions, not the goals page.
+        const hasAddChild = validChildren.length > 0 && nodeType !== 'ImmediateGoal';
+        const childTypeName = hasAddChild
+            ? (validChildren.length === 1 ? validChildren[0].replace(/([A-Z])/g, ' $1').trim() : 'Child Goal')
+            : null;
 
         nodes.push({
             id: nodeId,
@@ -127,7 +132,7 @@ export const convertTreeToFlow = (
                 hasChildren: normalizedNode.children.length > 0,
                 isSmart: normalizedNode.is_smart || isSMART(node),
                 onClick: () => onNodeClick(node),
-                onAddChild: childType ? () => onAddChild(node) : null,
+                onAddChild: hasAddChild ? () => onAddChild(node) : null,
                 childTypeName,
             },
         });

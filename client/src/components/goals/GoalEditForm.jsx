@@ -21,6 +21,9 @@ function GoalEditForm({
     parentGoalName,
     parentGoalColor,
     isCompleted,
+    // Level selection in create mode
+    validChildTypes,
+    onLevelChange,
     // Form state from useGoalForm
     name, setName,
     description, setDescription,

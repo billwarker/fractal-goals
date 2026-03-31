@@ -26,6 +26,7 @@ export const queryKeys = {
     goalDailyDurations: (goalId) => ['goalDailyDurations', goalId],
     goalAnalytics: (rootId) => ['goal-analytics', rootId],
     goalMetrics: (goalId) => ['goalMetrics', goalId],
+    eligibleMoveParents: (rootId, goalId) => ['goals', rootId, 'eligibleMoveParents', goalId],
     goals: (rootId) => ['goals', rootId],
     goalsForSelection: (rootId) => ['goalsForSelection', rootId],
     goalsTree: (rootId) => ['goals-tree', rootId],

@@ -1,8 +1,13 @@
 /**
  * Goal Helpers - Utilities for goal hierarchy management
- * 
+ *
  * IMPORTANT: Sessions are NO LONGER part of the goal hierarchy.
  * Hierarchy is now: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
+ *
+ * Macro goals (Ultimate through Immediate) support flexible hierarchy: a child may be
+ * any lower-rank macro level, not just the immediately adjacent one. Level ordering is
+ * enforced by rank on the backend. The execution tier (Immediate → Micro → Nano) remains
+ * strictly enforced.
  */
 
 import {
@@ -13,17 +18,51 @@ import {
     getGoalNodeType,
 } from './goalNodeModel';
 
+// Canonical type key derived from a GoalLevel name (e.g. "Mid Term Goal" → "MidTermGoal")
+const levelNameToType = (name) => name.replace(/\s+/g, '');
+
+const EXECUTION_TYPES = new Set(['MicroGoal', 'NanoGoal']);
+const MACRO_TYPES_BY_RANK = [
+    'UltimateGoal',   // rank 0
+    'LongTermGoal',   // rank 1
+    'MidTermGoal',    // rank 2
+    'ShortTermGoal',  // rank 3
+    'ImmediateGoal',  // rank 4
+];
+
+/**
+ * Returns all valid child types for a given parent type.
+ *
+ * For macro goals: any lower-rank macro level (flexible hierarchy).
+ * For ImmediateGoal: only MicroGoal (execution tier entry point).
+ * For MicroGoal: only NanoGoal.
+ * For NanoGoal: empty (leaf node).
+ *
+ * @param {string} parentType - canonical goal type string
+ * @returns {string[]} - ordered list of valid child type strings (closest first)
+ */
+export const getValidChildTypes = (parentType) => {
+    if (parentType === 'NanoGoal') return [];
+    if (parentType === 'MicroGoal') return ['NanoGoal'];
+    if (parentType === 'ImmediateGoal') return ['MicroGoal'];
+
+    const parentIndex = MACRO_TYPES_BY_RANK.indexOf(parentType);
+    if (parentIndex === -1) return [];
+
+    // Return all macro types with a higher rank index (lower in the tree),
+    // excluding ImmediateGoal's execution-tier children — those are entered via ImmediateGoal only.
+    // ImmediateGoal is included as a valid macro child.
+    return MACRO_TYPES_BY_RANK.slice(parentIndex + 1);
+};
+
+/**
+ * Returns the single default child type (adjacent next level).
+ * Kept for backward-compat with callsites that only need one type.
+ * @deprecated Prefer getValidChildTypes where multiple levels are possible.
+ */
 export const getChildType = (parentType) => {
-    const map = {
-        'UltimateGoal': 'LongTermGoal',
-        'LongTermGoal': 'MidTermGoal',
-        'MidTermGoal': 'ShortTermGoal',
-        'ShortTermGoal': 'ImmediateGoal',  // Changed: was PracticeSession
-        'ImmediateGoal': 'MicroGoal',
-        'MicroGoal': 'NanoGoal',
-        'NanoGoal': null
-    };
-    return map[parentType];
+    const valid = getValidChildTypes(parentType);
+    return valid.length > 0 ? valid[0] : null;
 };
 
 export const isAboveShortTermGoal = (type) => {

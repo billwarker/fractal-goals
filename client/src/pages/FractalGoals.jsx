@@ -156,6 +156,11 @@ function FractalGoals() {
             return;
         }
 
+        if (parentType === 'ImmediateGoal') {
+            showAlert('Notice', 'Micro Goals are created through sessions.');
+            return;
+        }
+
         // Show the Goal creation modal
         setSelectedParent(nodeDatum);
         setShowGoalModal(true);
@@ -354,6 +359,10 @@ function FractalGoals() {
                                             rootId={rootId}
                                             displayMode="panel"
                                             onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
+                                            onGoalSelect={(goal) => {
+                                                setShowGoalModal(false);
+                                                handleGoalNameClick(goal);
+                                            }}
                                         />
                                     </Suspense>
                                 ) : (

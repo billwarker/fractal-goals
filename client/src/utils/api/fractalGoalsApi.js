@@ -25,6 +25,10 @@ export const fractalGoalsApi = {
         axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     setGoalAssociationsBatch: (rootId, goalId, data) =>
         axios.put(`${API_BASE}/${rootId}/goals/${goalId}/associations/batch`, data),
+    getEligibleMoveParents: (rootId, goalId, search) => {
+        const params = search ? `?search=${encodeURIComponent(search)}` : '';
+        return axios.get(`${API_BASE}/${rootId}/goals/${goalId}/eligible-parents${params}`);
+    },
     // Goal Options
     copyGoal: (rootId, goalId) =>
         axios.post(`${API_BASE}/${rootId}/goals/${goalId}/copy`),

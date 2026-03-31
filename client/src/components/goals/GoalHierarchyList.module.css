@@ -75,6 +75,19 @@
     z-index: 0;
 }
 
+/* Left slot: absolutely positioned so it always sits at the same x coordinate
+   regardless of how deep the node is nested in the tree.
+   Vertically aligned to match the goal icon center within the row. */
+.sessionLeftSlot {
+    position: absolute;
+    left: var(--left-slot-offset, -28px);
+    top: calc(var(--tree-item-pad-y) + var(--icon-size) / 2);
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .sessionIconSlot {
     position: relative;
     display: flex;
